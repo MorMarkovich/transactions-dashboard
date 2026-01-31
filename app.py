@@ -39,53 +39,53 @@ st.markdown("""
     /* ========== Google Fonts ========== */
     @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
     
-    /* ========== CSS Variables - Design System ========== */
+    /* ========== CSS Variables - Design System (Slate Theme) ========== */
     :root {
-        /* Background Colors - יותר בהיר לניגודיות טובה יותר */
-        --bg-primary: #1a1f2e;
-        --bg-secondary: #232a3b;
-        --bg-card: #2a3347;
-        --bg-card-hover: #333d52;
-        --bg-elevated: #3a4560;
-        --bg-overlay: rgba(0, 0, 0, 0.5);
+        /* Background Colors - Slate Palette */
+        --bg-primary: #0f172a; /* slate-900 */
+        --bg-secondary: #1e293b; /* slate-800 */
+        --bg-card: #1e293b; /* slate-800 */
+        --bg-card-hover: #334155; /* slate-700 */
+        --bg-elevated: #334155; /* slate-700 */
+        --bg-overlay: rgba(15, 23, 42, 0.7);
         
-        /* Text Colors - ניגודיות גבוהה */
-        --text-primary: #ffffff;
-        --text-secondary: #c5cdd9;
-        --text-muted: #94a3b8;
-        --text-disabled: #64748b;
+        /* Text Colors - High Contrast */
+        --text-primary: #f8fafc; /* slate-50 */
+        --text-secondary: #cbd5e1; /* slate-300 */
+        --text-muted: #94a3b8; /* slate-400 */
+        --text-disabled: #64748b; /* slate-500 */
         
-        /* Accent Colors */
-        --accent-primary: #818cf8;
-        --accent-primary-light: #a5b4fc;
-        --accent-primary-dark: #6366f1;
-        --accent-secondary: #4ade80;
-        --accent-warning: #fbbf24;
-        --accent-danger: #f87171;
-        --accent-info: #38bdf8;
-        --accent-purple: #c4b5fd;
-        --accent-pink: #f9a8d4;
-        --accent-cyan: #5eead4;
+        /* Accent Colors - Indigo & Emerald */
+        --accent-primary: #6366f1; /* indigo-500 */
+        --accent-primary-light: #818cf8; /* indigo-400 */
+        --accent-primary-dark: #4f46e5; /* indigo-600 */
+        --accent-secondary: #10b981; /* emerald-500 */
+        --accent-warning: #f59e0b; /* amber-500 */
+        --accent-danger: #ef4444; /* red-500 */
+        --accent-info: #0ea5e9; /* sky-500 */
+        --accent-purple: #8b5cf6; /* violet-500 */
+        --accent-pink: #ec4899; /* pink-500 */
+        --accent-cyan: #06b6d4; /* cyan-500 */
         
         /* Gradients */
-        --gradient-primary: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
-        --gradient-secondary: linear-gradient(135deg, #10b981 0%, #4ade80 100%);
-        --gradient-danger: linear-gradient(135deg, #f472b6 0%, #f87171 100%);
-        --gradient-card: linear-gradient(180deg, rgba(129, 140, 248, 0.08) 0%, rgba(167, 139, 250, 0.04) 100%);
-        --gradient-glow: radial-gradient(ellipse at center, rgba(129, 140, 248, 0.1) 0%, transparent 70%);
+        --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        --gradient-secondary: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        --gradient-danger: linear-gradient(135deg, #f43f5e 0%, #ef4444 100%);
+        --gradient-card: linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(30, 41, 59, 0) 100%);
+        --gradient-glow: radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
         
-        /* Borders - יותר נראים */
-        --border-color: rgba(255, 255, 255, 0.12);
-        --border-color-hover: rgba(255, 255, 255, 0.25);
-        --border-accent: rgba(129, 140, 248, 0.6);
+        /* Borders */
+        --border-color: #334155; /* slate-700 */
+        --border-color-hover: #475569; /* slate-600 */
+        --border-accent: rgba(99, 102, 241, 0.5);
         
         /* Shadows */
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-        --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
-        --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.6);
-        --shadow-glow: 0 0 30px rgba(102, 126, 234, 0.3);
-        --shadow-glow-sm: 0 0 15px rgba(102, 126, 234, 0.2);
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
+        --shadow-glow-sm: 0 0 10px rgba(99, 102, 241, 0.15);
         
         /* Spacing */
         --space-xs: 0.25rem;
@@ -1067,50 +1067,109 @@ def get_icon(category: str) -> str:
 
 
 def detect_header_row(df: pd.DataFrame) -> int:
-    keywords = ['תאריך עסקה', 'שם בית העסק', 'סכום', 'קטגוריה']
-    for idx in range(min(10, len(df))):
-        row_text = ' '.join(df.iloc[idx].astype(str).tolist())
-        if sum(1 for k in keywords if k in row_text) >= 2:
+    """זיהוי חכם של שורת הכותרת"""
+    # מילות מפתח לזיהוי כותרות
+    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'Date', 'Amount']
+    
+    # סריקה של 20 השורות הראשונות
+    for idx in range(min(20, len(df))):
+        # המרת השורה לטקסט וניקוי רווחים
+        row_values = [str(val).strip() for val in df.iloc[idx].tolist() if pd.notna(val)]
+        row_text = ' '.join(row_values)
+        
+        # ספירת התאמות
+        matches = sum(1 for k in keywords if k in row_text or any(k in str(v) for v in row_values))
+        
+        # אם יש לפחות 3 התאמות - זו כנראה הכותרת
+        if matches >= 3:
             return idx
+            
     return 0
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """ניקוי והכנת ה-DataFrame"""
     if df.empty:
         return df
     
+    # זיהוי שורת כותרת
     header_row = detect_header_row(df)
+    
     if header_row > 0:
+        # הגדרת הכותרות
         df.columns = df.iloc[header_row].tolist()
         df = df.iloc[header_row + 1:].reset_index(drop=True)
     
-    # הסרת שורות סיכום
-    summary_keywords = ['סך הכל', 'סה"כ', 'total']
-    mask = ~df.apply(lambda row: any(k in ' '.join(row.astype(str)).lower() for k in summary_keywords), axis=1)
-    df = df[mask].dropna(how='all').reset_index(drop=True)
+    # ניקוי שמות העמודות
+    df.columns = [str(c).strip() for c in df.columns]
     
-    if len(df.columns) > 0:
-        first_col = df.columns[0]
-        df = df[df[first_col].notna() & (df[first_col].astype(str).str.strip() != '')]
+    # הסרת שורות סיכום וזבל
+    summary_keywords = ['סך הכל', 'סה"כ', 'total', 'סיכום', 'יתרה']
+    
+    def is_valid_row(row):
+        row_str = ' '.join(row.astype(str).str.lower())
+        # בדיקה אם זו שורת סיכום
+        if any(k in row_str for k in summary_keywords):
+            return False
+        # בדיקה אם השורה ריקה כמעט לגמרי
+        if row.isnull().sum() > len(row) * 0.8:
+            return False
+        return True
+
+    mask = df.apply(is_valid_row, axis=1)
+    df = df[mask].reset_index(drop=True)
+    
+    # הסרת עמודות ריקות לחלוטין
+    df = df.dropna(axis=1, how='all')
     
     return df
 
 
 def clean_amount(value) -> float:
-    if pd.isna(value):
+    """ניקוי ופרסור סכומים בצורה רובסטית"""
+    if pd.isna(value) or value == '':
         return 0.0
+        
     if isinstance(value, (int, float)):
         return float(value)
-    cleaned = re.sub(r'[^\d\.\-\,]', '', str(value).strip())
-    if not cleaned:
+        
+    # המרה למחרוזת וניקוי תווים
+    s_val = str(value).strip()
+    
+    # הסרת סימן שקל ורווחים
+    s_val = s_val.replace('₪', '').replace('NIS', '').strip()
+    
+    # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף)
+    is_negative = '-' in s_val
+    s_val = s_val.replace('-', '').strip()
+    
+    # הסרת כל התווים שאינם מספרים או נקודה/פסיק
+    s_val = re.sub(r'[^\d.,]', '', s_val)
+    
+    if not s_val:
         return 0.0
-    if ',' in cleaned and '.' in cleaned:
-        cleaned = cleaned.replace('.', '').replace(',', '.') if cleaned.rfind(',') > cleaned.rfind('.') else cleaned.replace(',', '')
-    elif ',' in cleaned:
-        cleaned = cleaned.replace(',', '.')
+        
+    # טיפול בפורמטים שונים (1,000.00 או 1.000,00)
+    if ',' in s_val and '.' in s_val:
+        if s_val.rfind(',') > s_val.rfind('.'):
+            # פורמט אירופאי: 1.000,00 -> 1000.00
+            s_val = s_val.replace('.', '').replace(',', '.')
+        else:
+            # פורמט אמריקאי: 1,000.00 -> 1000.00
+            s_val = s_val.replace(',', '')
+    elif ',' in s_val:
+        # רק פסיקים - נניח שהם מפרידי אלפים אלא אם זה בסוף
+        # אבל אם יש רק פסיק אחד ו-2 ספרות אחריו, אולי זה עשרוני?
+        # ליתר ביטחון נחליף בנקודה רק אם זה נראה כמו עשרוני
+        if len(s_val.split(',')[-1]) == 2:
+             s_val = s_val.replace(',', '.')
+        else:
+             s_val = s_val.replace(',', '')
+             
     try:
-        return float(cleaned)
-    except:
+        amount = float(s_val)
+        return -amount if is_negative else amount
+    except ValueError:
         return 0.0
 
 
@@ -2013,54 +2072,54 @@ def main():
             display = df_f.sort_values('סכום_מוחלט', ascending=True)
         
         # הכנת הנתונים
-        max_rows = 100
-        view = display[['סכום', 'קטגוריה', 'תיאור', 'תאריך']].head(max_rows).copy()
-        view['תאריך_מעוצב'] = view['תאריך'].dt.strftime('%d/%m/%Y')
-        view['סכום_מעוצב'] = view['סכום'].apply(lambda x: f"₪{x:,.0f}")
-        view = view.reset_index(drop=True)
+        view = display.copy()
         
-        # בניית טבלת HTML מקצועית
-        rows_html = ""
-        for i, (_, row) in enumerate(view.iterrows()):
-            bg_class = 'style="background: rgba(102, 126, 234, 0.03);"' if i % 2 == 0 else ''
-            icon = get_icon(row['קטגוריה'])
-            rows_html += f'''<tr {bg_class}>
-                <td class="col-amount">{row['סכום_מעוצב']}</td>
-                <td class="col-category"><span style="margin-left: 6px;">{icon}</span> {row['קטגוריה']}</td>
-                <td>{row['תיאור']}</td>
-                <td class="col-date">{row['תאריך_מעוצב']}</td>
-            </tr>'''
-        
-        table_html = f'''
-        <div class="table-scroll">
-            <table class="transactions-table">
-                <thead>
-                    <tr>
-                        <th style="width: 12%;">סכום</th>
-                        <th style="width: 18%;">קטגוריה</th>
-                        <th style="width: 50%;">בית עסק</th>
-                        <th style="width: 12%;">תאריך</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
-        </div>
-        '''
-        st.markdown(table_html, unsafe_allow_html=True)
+        # שימוש ב-st.dataframe לתצוגה מקצועית ואינטראקטיבית
+        st.dataframe(
+            view,
+            column_config={
+                "סכום": st.column_config.NumberColumn(
+                    "סכום",
+                    help="סכום העסקה בשקלים",
+                    format="₪%.2f",
+                    step=0.01,
+                ),
+                "קטגוריה": st.column_config.TextColumn(
+                    "קטגוריה",
+                    help="קטגוריית ההוצאה",
+                    width="medium",
+                ),
+                "תיאור": st.column_config.TextColumn(
+                    "בית עסק",
+                    help="שם בית העסק ותיאור העסקה",
+                    width="large",
+                ),
+                "תאריך": st.column_config.DateColumn(
+                    "תאריך",
+                    help="תאריך ביצוע העסקה",
+                    format="DD/MM/YYYY",
+                ),
+                "סכום_מוחלט": None, # הסתרת עמודות עזר
+                "חודש": None,
+                "יום_בשבוע": None,
+                "מצטבר": None,
+                "_sheet": None
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=500
+        )
         
         # מידע נוסף
         total_shown = len(view)
-        total_available = len(display)
         st.markdown(f'''
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; 
-                    padding: 0.75rem 1rem; background: rgba(102, 126, 234, 0.05); border-radius: 8px;">
-            <span style="color: #a0aec0; font-size: 0.9rem;">
-                מציג {total_shown:,} מתוך {total_available:,} עסקאות
+                    padding: 0.75rem 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2);">
+            <span style="color: #94a3b8; font-size: 0.9rem;">
+                מציג {total_shown:,} עסקאות
             </span>
-            <span style="color: #667eea; font-size: 0.85rem;">
-                💡 להורדת כל הנתונים - השתמש בכפתורי הייצוא למטה
+            <span style="color: #818cf8; font-size: 0.85rem;">
+                💡 ניתן למיין ולסנן את הטבלה בלחיצה על כותרות העמודות
             </span>
         </div>
         ''', unsafe_allow_html=True)
