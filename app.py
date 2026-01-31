@@ -16,8 +16,31 @@ from io import BytesIO
 import re
 from typing import Optional, Dict
 import warnings
+import json
+import time
+import os
 
 warnings.filterwarnings('ignore')
+
+# #region agent log
+def log_debug(message, data, hypothesis_id, location):
+    try:
+        log_dir = r"d:\Transactions\.cursor"
+        os.makedirs(log_dir, exist_ok=True)
+        log_entry = {
+            "sessionId": "debug-session",
+            "runId": "run1",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000)
+        }
+        with open(os.path.join(log_dir, "debug.log"), "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 # =============================================================================
 # הגדרות
@@ -816,33 +839,36 @@ st.markdown("""
     
     /* ========== Transactions Table ========== */
     .transactions-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        direction: rtl;
-        background: #2a3347;
-        border-radius: 12px;
-        overflow: hidden;
-        font-family: 'Heebo', sans-serif;
+        width: 100% !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        direction: rtl !important;
+        background: #2a3347 !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        font-family: 'Heebo', sans-serif !important;
     }
     
     .transactions-table th {
-        background: #333d52;
-        color: #a5b4fc;
-        padding: 14px 18px;
+        background: #333d52 !important;
+        color: #a5b4fc !important;
+        padding: 14px 18px !important;
         text-align: right !important;
-        font-weight: 600;
-        font-size: 0.85rem;
-        letter-spacing: 0.3px;
-        border-bottom: 2px solid rgba(255,255,255,0.1);
+        direction: rtl !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        letter-spacing: 0.3px !important;
+        border-bottom: 2px solid rgba(255,255,255,0.1) !important;
     }
     
     .transactions-table td {
         padding: 12px 18px;
         text-align: right !important;
+        direction: rtl !important;
         border-bottom: 1px solid rgba(255,255,255,0.08);
         color: #ffffff;
         background: #2a3347;
+        unicode-bidi: embed;
     }
     
     .transactions-table tr:nth-child(even) td {
@@ -861,15 +887,26 @@ st.markdown("""
         font-weight: 700;
         color: #f87171;
         font-variant-numeric: tabular-nums;
+        text-align: right !important;
+        direction: rtl !important;
     }
     
     .transactions-table .col-date {
         color: #94a3b8;
         font-variant-numeric: tabular-nums;
+        text-align: right !important;
+        direction: rtl !important;
     }
     
     .transactions-table .col-category {
         color: #c4b5fd;
+        text-align: right !important;
+        direction: rtl !important;
+    }
+    
+    .transactions-table td * {
+        text-align: right !important;
+        direction: rtl !important;
     }
     
     .table-scroll {
@@ -1353,6 +1390,15 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     cat_data = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().reset_index()
     cat_data = cat_data.sort_values('סכום_מוחלט', ascending=False)
 
+    # #region agent log
+    log_debug(
+        "Donut input summary",
+        {"rows": len(df), "expense_rows": len(expenses), "cat_rows": len(cat_data)},
+        "H3",
+        "create_donut_chart:start"
+    )
+    # #endregion
+
     if cat_data.empty:
         fig = go.Figure()
         fig.add_annotation(
@@ -1408,10 +1454,17 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     
     fig.update_layout(
         showlegend=False,
-        margin=dict(t=20, b=20, l=20, r=20),
+        margin=dict(t=40, b=40, l=40, r=40),
         paper_bgcolor='rgba(0,0,0,0)',
-        height=350
+        height=400,
+        width=400,
+        autosize=False
     )
+
+    # #region agent log
+    log_debug("Donut chart layout config", {"layout": fig.layout.to_plotly_json()}, "H3", "create_donut_chart:end")
+    # #endregion
+
     return fig
 
 
@@ -1971,7 +2024,34 @@ def main():
         
         with c2:
             st.markdown('<div class="section-title"><span>🥧</span> חלוקה לפי קטגוריה</div>', unsafe_allow_html=True)
-            st.plotly_chart(create_donut_chart(df_f), use_container_width=True, key="donut")
+            
+            # Center the chart using CSS wrapper
+            donut_fig = create_donut_chart(df_f)
+            
+            # #region agent log
+            log_debug("Donut chart rendering", {"fig_width": donut_fig.layout.width, "fig_height": donut_fig.layout.height, "use_container_width": False}, "H3", "main:donut_render")
+            # #endregion
+            
+            # Center chart with CSS wrapper
+            st.markdown("""
+            <style>
+            div[data-testid="stPlotlyChart"]:has(> div > div[data-testid="stPlotlyChart"]) {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+            }
+            div[data-testid="stPlotlyChart"] > div {
+                display: flex !important;
+                justify-content: center !important;
+                align-items: center !important;
+                width: 100% !important;
+            }
+            </style>
+            <div style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; padding: 20px 0 !important;">
+            """, unsafe_allow_html=True)
+            st.plotly_chart(donut_fig, use_container_width=False, key="donut")
+            st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown('<div class="section-title"><span>📋</span> פירוט קטגוריות</div>', unsafe_allow_html=True)
             render_category_list(df_f)
@@ -2071,45 +2151,68 @@ def main():
         else:
             display = df_f.sort_values('סכום_מוחלט', ascending=True)
         
+        # #region agent log
+        log_debug("Columns in display dataframe before selection", {"columns": display.columns.tolist(), "shape": display.shape}, "H1", "main:before_view_creation")
+        # #endregion
+
         # הכנת הנתונים
         # בחירת עמודות ספציפיות בלבד לתצוגה נקייה
         view = display[['תאריך', 'תיאור', 'קטגוריה', 'סכום']].copy()
+
+        # #region agent log
+        log_debug("Columns in view dataframe after selection", {"columns": view.columns.tolist(), "shape": view.shape}, "H1", "main:after_view_creation")
+        # #endregion
+
+        # #region agent log
+        log_debug(
+            "Dataframe dtypes before rendering",
+            {"dtypes": {k: str(v) for k, v in view.dtypes.items()}},
+            "H2",
+            "main:before_dataframe_render"
+        )
+        # #endregion
         
-        # שימוש ב-st.dataframe לתצוגה מקצועית ואינטראקטיבית
+        # רינדור טבלה עם st.dataframe ו-CSS לייש ור לימין
+        # #region agent log
+        log_debug("Table rendering with st.dataframe", {
+            "rows_count": len(view), 
+            "columns": view.columns.tolist(),
+            "first_row": view.iloc[0].to_dict() if len(view) > 0 else None
+        }, "H2", "main:table_dataframe_render")
+        # #endregion
+        
         st.dataframe(
             view,
             column_config={
-                "סכום": st.column_config.NumberColumn(
-                    "סכום",
-                    help="סכום העסקה בשקלים",
-                    format="₪%.2f",
-                    step=0.01,
-                ),
-                "קטגוריה": st.column_config.TextColumn(
-                    "קטגוריה",
-                    help="קטגוריית ההוצאה",
-                    width="medium",
+                "תאריך": st.column_config.DateColumn(
+                    "תאריך",
+                    help="תאריך ביצוע העסקה",
+                    format="DD/MM/YYYY",
                 ),
                 "תיאור": st.column_config.TextColumn(
                     "בית עסק",
                     help="שם בית העסק ותיאור העסקה",
                     width="large",
                 ),
-                "תאריך": st.column_config.DateColumn(
-                    "תאריך",
-                    help="תאריך ביצוע העסקה",
-                    format="DD/MM/YYYY",
+                "קטגוריה": st.column_config.TextColumn(
+                    "קטגוריה",
+                    help="קטגוריית ההוצאה",
+                    width="medium",
                 ),
-                "סכום_מוחלט": None, # הסתרת עמודות עזר
-                "חודש": None,
-                "יום_בשבוע": None,
-                "מצטבר": None,
-                "_sheet": None
+                "סכום": st.column_config.NumberColumn(
+                    "סכום",
+                    help="סכום העסקה בשקלים",
+                    format="₪%.2f",
+                ),
             },
             hide_index=True,
             use_container_width=True,
             height=500
         )
+        
+        # #region agent log
+        log_debug("After dataframe render", {"success": True}, "H2", "main:after_dataframe_render")
+        # #endregion
         
         # מידע נוסף
         total_shown = len(view)

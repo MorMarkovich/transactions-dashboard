@@ -1,0 +1,33 @@
+.main-nav {
+  display: flex;
+  gap: 4px;
+  background: #2a3347;
+  border-radius: 10px;
+  padding: 4px;
+  direction: rtl;
+  border: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: var(--space-lg);
+}
+
+.main-nav a {
+  background: transparent;
+  border-radius: 6px;
+  color: #c5cdd9;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  display: block;
+}
+
+.main-nav a:hover {
+  color: #ffffff;
+  background: #3a4560;
+}
+
+.main-nav a.active {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);
+}

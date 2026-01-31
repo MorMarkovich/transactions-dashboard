@@ -27,3 +27,23 @@ sample_data/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Cursor
+.cursor/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build
+dist/
+build/
+
+# Backend uploads
+backend/uploads/
+backend/debug_log.txt
+
+# Temp scripts
+test_*.py
+reproduce_*.py
