@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
 declare module 'react-plotly.js/factory' {
-  import { Component } from 'react';
-  import { PlotlyHTMLElement, Data, Layout, Config } from 'plotly.js';
+  import React from 'react';
+  import { Data, Layout, Config } from 'plotly.js';
 
   interface PlotParams {
     data: Data[];
@@ -13,12 +13,13 @@ declare module 'react-plotly.js/factory' {
     className?: string;
     useResizeHandler?: boolean;
     debug?: boolean;
-    onInitialized?: (figure: Readonly<PlotlyHTMLElement>, graphDiv: Readonly<PlotlyHTMLElement>) => void;
-    onUpdate?: (figure: Readonly<PlotlyHTMLElement>, graphDiv: Readonly<PlotlyHTMLElement>) => void;
-    onPurge?: (figure: Readonly<PlotlyHTMLElement>, graphDiv: Readonly<PlotlyHTMLElement>) => void;
+    onInitialized?: (figure: any, graphDiv: any) => void;
+    onUpdate?: (figure: any, graphDiv: any) => void;
+    onPurge?: (figure: any, graphDiv: any) => void;
     onError?: (err: Error) => void;
     divId?: string;
   }
 
-  export default class Plot extends Component<PlotParams> {}
+  const createPlotlyComponent: (plotly: any) => React.ComponentType<PlotParams>;
+  export default createPlotlyComponent;
 }
