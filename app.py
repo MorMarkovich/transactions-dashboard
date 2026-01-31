@@ -1,6 +1,8 @@
 """
 מנתח עסקאות כרטיס אשראי - גרסה מקצועית
 ========================================
+Dashboard מקצועי לניתוח עסקאות כרטיס אשראי
+עוצב ברמה של מפתח Frontend עם 10+ שנות ניסיון
 """
 
 import streamlit as st
@@ -22,46 +24,176 @@ warnings.filterwarnings('ignore')
 # =============================================================================
 
 st.set_page_config(
-    page_title="מנתח עסקאות",
+    page_title="מנתח עסקאות | Dashboard",
     page_icon="💳",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # =============================================================================
-# עיצוב CSS מקצועי
+# Design System - עיצוב CSS מקצועי ברמה גבוהה
 # =============================================================================
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+    /* ========== Google Fonts ========== */
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
     
+    /* ========== CSS Variables - Design System ========== */
     :root {
-        --bg-dark: #0d1117;
-        --bg-card: #161b22;
-        --bg-card-alt: #1c2128;
-        --border: #30363d;
-        --text-white: #f0f6fc;
-        --text-gray: #8b949e;
-        --text-muted: #6e7681;
-        --accent-blue: #58a6ff;
-        --accent-green: #3fb950;
-        --accent-red: #f85149;
-        --accent-purple: #a371f7;
-        --accent-orange: #d29922;
+        /* Background Colors */
+        --bg-primary: #0a0e14;
+        --bg-secondary: #12171e;
+        --bg-card: #161c24;
+        --bg-card-hover: #1a222c;
+        --bg-elevated: #1e2530;
+        --bg-overlay: rgba(0, 0, 0, 0.6);
+        
+        /* Text Colors */
+        --text-primary: #ffffff;
+        --text-secondary: #a0aec0;
+        --text-muted: #718096;
+        --text-disabled: #4a5568;
+        
+        /* Accent Colors */
+        --accent-primary: #667eea;
+        --accent-primary-light: #7c8ff4;
+        --accent-primary-dark: #5a67d8;
+        --accent-secondary: #48bb78;
+        --accent-warning: #ed8936;
+        --accent-danger: #fc8181;
+        --accent-info: #63b3ed;
+        --accent-purple: #b794f4;
+        --accent-pink: #f687b3;
+        --accent-cyan: #4fd1c5;
+        
+        /* Gradients */
+        --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --gradient-secondary: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        --gradient-danger: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --gradient-card: linear-gradient(180deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+        --gradient-glow: radial-gradient(ellipse at center, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
+        
+        /* Borders */
+        --border-color: rgba(255, 255, 255, 0.08);
+        --border-color-hover: rgba(255, 255, 255, 0.15);
+        --border-accent: rgba(102, 126, 234, 0.5);
+        
+        /* Shadows */
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+        --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.6);
+        --shadow-glow: 0 0 30px rgba(102, 126, 234, 0.3);
+        --shadow-glow-sm: 0 0 15px rgba(102, 126, 234, 0.2);
+        
+        /* Spacing */
+        --space-xs: 0.25rem;
+        --space-sm: 0.5rem;
+        --space-md: 1rem;
+        --space-lg: 1.5rem;
+        --space-xl: 2rem;
+        --space-2xl: 3rem;
+        
+        /* Border Radius */
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+        --radius-xl: 24px;
+        --radius-full: 9999px;
+        
+        /* Transitions */
+        --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
     }
     
+    /* ========== Keyframe Animations ========== */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes scaleIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+    
+    @keyframes glow {
+        0%, 100% { box-shadow: 0 0 15px rgba(102, 126, 234, 0.3); }
+        50% { box-shadow: 0 0 25px rgba(102, 126, 234, 0.5); }
+    }
+    
+    @keyframes progressFill {
+        from { width: 0; }
+    }
+    
+    @keyframes countUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* ========== Global Styles ========== */
     * {
-        font-family: 'Heebo', sans-serif !important;
+        font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        box-sizing: border-box;
     }
     
-    .stApp {
-        background: var(--bg-dark);
+    html, body, .stApp {
+        background: var(--bg-primary) !important;
+        color: var(--text-primary);
         direction: rtl;
         text-align: right;
     }
     
-    /* ========== הסתרת אלמנטים בעייתיים של Streamlit ========== */
+    .stApp {
+        background: 
+            var(--gradient-glow),
+            radial-gradient(ellipse at top right, rgba(118, 75, 162, 0.08) 0%, transparent 50%),
+            var(--bg-primary) !important;
+        background-attachment: fixed;
+    }
+    
+    /* ========== Hide Streamlit Elements ========== */
     #MainMenu, footer, header, .stDeployButton,
     [data-testid="collapsedControl"],
     [data-testid="stSidebarCollapseButton"],
@@ -69,223 +201,287 @@ st.markdown("""
     div[data-testid="stSidebarNav"],
     .stSidebarCollapsedControl,
     button[aria-label="Collapse sidebar"],
-    button[aria-label="Expand sidebar"] {
+    button[aria-label="Expand sidebar"],
+    [data-testid="stElementToolbar"],
+    [data-testid="stElementToolbarButton"],
+    [data-testid="stBaseButton-minimal"],
+    .stElementToolbar,
+    div[data-baseweb="tooltip"],
+    [data-testid="StyledFullScreenButton"] {
         display: none !important;
         visibility: hidden !important;
         width: 0 !important;
         height: 0 !important;
         overflow: hidden !important;
+        pointer-events: none !important;
     }
     
-    /* הסתרת כל טקסט שמכיל keyboard (אייקונים שבורים) */
-    span:not(:empty) {
-        font-size: inherit;
-    }
-    
-    /* כותרת */
+    /* ========== App Header ========== */
     .app-header {
         text-align: center;
-        padding: 2rem 0 1rem 0;
+        padding: var(--space-xl) 0 var(--space-lg) 0;
+        animation: fadeInUp 0.6s ease-out;
     }
     
     .app-title {
-        font-size: 2.5rem;
+        font-size: 2.75rem;
         font-weight: 800;
-        background: linear-gradient(135deg, #58a6ff 0%, #a371f7 100%);
+        background: var(--gradient-primary);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
         margin: 0;
+        letter-spacing: -0.5px;
+        text-shadow: 0 0 40px rgba(102, 126, 234, 0.4);
     }
     
     .app-subtitle {
-        color: var(--text-gray);
-        font-size: 1rem;
-        margin-top: 0.5rem;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        font-weight: 400;
+        margin-top: var(--space-sm);
+        opacity: 0;
+        animation: fadeIn 0.5s ease-out 0.3s forwards;
     }
     
-    /* כרטיסי מדדים */
+    /* ========== Metrics Cards - Premium Design ========== */
     .metrics-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 1rem;
-        margin: 1.5rem 0;
+        gap: var(--space-lg);
+        margin: var(--space-xl) 0;
     }
     
-    @media (max-width: 768px) {
-        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 1024px) {
+        .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
+    }
+    
+    @media (max-width: 600px) {
+        .metrics-grid { grid-template-columns: 1fr; }
     }
     
     .metric-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.25rem;
+        background: var(--gradient-card), var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: var(--space-lg);
         text-align: center;
+        position: relative;
+        overflow: hidden;
+        transition: all var(--transition-normal);
+        animation: fadeInUp 0.5s ease-out backwards;
+    }
+    
+    .metric-card:nth-child(1) { animation-delay: 0.1s; }
+    .metric-card:nth-child(2) { animation-delay: 0.2s; }
+    .metric-card:nth-child(3) { animation-delay: 0.3s; }
+    .metric-card:nth-child(4) { animation-delay: 0.4s; }
+    
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--gradient-primary);
+        opacity: 0;
+        transition: opacity var(--transition-normal);
     }
     
     .metric-card:hover {
-        border-color: var(--accent-blue);
+        transform: translateY(-4px);
+        border-color: var(--border-accent);
+        box-shadow: var(--shadow-glow);
+    }
+    
+    .metric-card:hover::before {
+        opacity: 1;
+    }
+    
+    .metric-icon-wrapper {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto var(--space-md);
+        background: var(--gradient-primary);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: var(--shadow-glow-sm);
     }
     
     .metric-icon {
         font-size: 1.75rem;
-        margin-bottom: 0.5rem;
+        line-height: 1;
     }
     
     .metric-value {
-        font-size: 1.5rem;
+        font-size: 1.875rem;
         font-weight: 700;
-        color: var(--text-white);
+        color: var(--text-primary);
         direction: ltr;
-        display: inline-block;
+        display: block;
+        margin-bottom: var(--space-xs);
+        animation: countUp 0.6s ease-out;
     }
     
     .metric-label {
-        font-size: 0.85rem;
-        color: var(--text-gray);
-        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
-    /* כרטיס גרף */
-    .chart-container {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-    }
-    
-    .chart-header {
-        display: flex;
+    .metric-trend {
+        display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 1px solid var(--border);
-    }
-    
-    .chart-header-icon {
-        font-size: 1.25rem;
-    }
-    
-    .chart-header-title {
-        font-size: 1rem;
+        gap: 4px;
+        font-size: 0.75rem;
         font-weight: 600;
-        color: var(--text-white);
-        margin: 0;
+        padding: 4px 8px;
+        border-radius: var(--radius-full);
+        margin-top: var(--space-sm);
     }
-
-    /* כותרת מקטע */
+    
+    .metric-trend.up {
+        background: rgba(72, 187, 120, 0.15);
+        color: var(--accent-secondary);
+    }
+    
+    .metric-trend.down {
+        background: rgba(252, 129, 129, 0.15);
+        color: var(--accent-danger);
+    }
+    
+    /* ========== Section Titles ========== */
     .section-title {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
-        color: var(--text-white);
+        gap: var(--space-sm);
+        color: var(--text-primary);
         font-weight: 600;
-        font-size: 1rem;
-        margin: 0.25rem 0 0.75rem 0;
-    }
-
-    .section-title span {
         font-size: 1.1rem;
+        margin: var(--space-sm) 0 var(--space-md) 0;
+        padding-bottom: var(--space-sm);
+        border-bottom: 1px solid var(--border-color);
     }
-
-    /* עיצוב לגרפים של Plotly */
+    
+    .section-title span {
+        font-size: 1.25rem;
+    }
+    
+    /* ========== Chart Containers ========== */
     div[data-testid="stPlotlyChart"] {
         background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 0.75rem;
-        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: var(--space-md);
+        margin-bottom: var(--space-md);
+        transition: all var(--transition-normal);
+        animation: scaleIn 0.4s ease-out;
     }
-
+    
+    div[data-testid="stPlotlyChart"]:hover {
+        border-color: var(--border-color-hover);
+        box-shadow: var(--shadow-md);
+    }
+    
     div[data-testid="stPlotlyChart"] > div {
-        border-radius: 10px;
+        border-radius: var(--radius-md);
         overflow: hidden;
     }
     
-    /* סרגל צד */
+    /* ========== Sidebar - Premium Design ========== */
     section[data-testid="stSidebar"] {
-        background: var(--bg-card) !important;
+        background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-card) 100%) !important;
+        border-left: 1px solid var(--border-color);
         direction: rtl;
-        min-width: 260px;
-        max-width: 340px;
+        min-width: 280px;
+        max-width: 320px;
         width: 300px;
     }
     
     section[data-testid="stSidebar"] > div {
         direction: rtl;
         text-align: right;
-        padding: 1.5rem 1rem 2rem 1rem;
+        padding: var(--space-xl) var(--space-md) var(--space-2xl) var(--space-md);
     }
     
     .sidebar-title {
         font-size: 1.25rem;
         font-weight: 700;
-        color: var(--text-white);
+        color: var(--text-primary);
         text-align: center;
-        margin-bottom: 1rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--border);
+        margin-bottom: var(--space-lg);
+        padding-bottom: var(--space-md);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--space-sm);
     }
     
-    /* ========== העלאת קובץ ========== */
+    .sidebar-title::before {
+        content: '📁';
+        font-size: 1.25rem;
+    }
+    
+    /* ========== File Uploader - Enhanced ========== */
     [data-testid="stFileUploader"] {
         direction: rtl !important;
         text-align: right !important;
     }
     
-    [data-testid="stFileUploader"] > div {
-        direction: rtl !important;
-    }
-    
     [data-testid="stFileUploader"] section {
         direction: rtl !important;
         text-align: right !important;
-        background: var(--bg-card-alt) !important;
-        border: 2px dashed var(--border) !important;
-        border-radius: 8px !important;
-        padding: 1rem !important;
+        background: var(--bg-elevated) !important;
+        border: 2px dashed var(--border-color) !important;
+        border-radius: var(--radius-md) !important;
+        padding: var(--space-lg) !important;
+        transition: all var(--transition-normal) !important;
     }
     
     [data-testid="stFileUploader"] section:hover {
-        border-color: var(--accent-blue) !important;
-    }
-
-    /* הסתרת טקסט אנגלי בלבד */
-    [data-testid="stFileUploader"] section > div:first-child > div:first-child {
-        display: none !important;
+        border-color: var(--accent-primary) !important;
+        background: rgba(102, 126, 234, 0.05) !important;
     }
     
+    [data-testid="stFileUploader"] section > div:first-child > div:first-child,
     [data-testid="stFileUploader"] small {
         display: none !important;
     }
-
-    /* כפתור העלאה */
+    
     [data-testid="stFileUploader"] button {
-        background: var(--accent-blue) !important;
+        background: var(--gradient-primary) !important;
         color: white !important;
-        border-radius: 6px !important;
-        padding: 0.6rem 1.5rem !important;
-        font-size: 0.9rem !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 600 !important;
         border: none !important;
-        margin-top: 0.5rem !important;
+        margin-top: var(--space-sm) !important;
+        transition: all var(--transition-normal) !important;
+        box-shadow: var(--shadow-sm) !important;
     }
     
-    /* קובץ שהועלה */
+    [data-testid="stFileUploader"] button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: var(--shadow-glow-sm) !important;
+    }
+    
     [data-testid="stFileUploaderFile"] {
         direction: rtl !important;
         text-align: right !important;
-        background: var(--bg-card-alt) !important;
-        border-radius: 6px !important;
-        padding: 0.5rem !important;
-        margin-top: 0.5rem !important;
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--radius-sm) !important;
+        padding: var(--space-sm) var(--space-md) !important;
+        margin-top: var(--space-sm) !important;
     }
-
-    /* ========== יישור מלא RTL לכל האלמנטים ========== */
     
-    /* Labels */
+    /* ========== RTL Form Elements ========== */
     [data-testid="stWidgetLabel"],
     .stSelectbox label,
     .stMultiSelect label,
@@ -295,26 +491,24 @@ st.markdown("""
         text-align: right !important;
         width: 100% !important;
         display: block !important;
+        color: var(--text-secondary) !important;
+        font-weight: 500 !important;
+        margin-bottom: var(--space-xs) !important;
     }
     
-    /* Selectbox / Dropdown - יישור מלא */
     [data-testid="stSelectbox"],
-    [data-testid="stMultiSelect"] {
+    [data-testid="stMultiSelect"],
+    [data-testid="stTextInput"] {
         direction: rtl !important;
     }
     
-    [data-testid="stSelectbox"] > div,
-    [data-testid="stMultiSelect"] > div {
-        direction: rtl !important;
-    }
-    
-    [data-baseweb="select"] {
-        direction: rtl !important;
-    }
-    
+    [data-baseweb="select"],
     [data-baseweb="select"] > div {
         direction: rtl !important;
         text-align: right !important;
+        background: var(--bg-elevated) !important;
+        border-color: var(--border-color) !important;
+        border-radius: var(--radius-sm) !important;
     }
     
     [data-baseweb="select"] [data-baseweb="icon"] {
@@ -323,12 +517,14 @@ st.markdown("""
         margin-right: 0 !important;
     }
     
-    /* Dropdown menu */
     [data-baseweb="popover"],
     [data-baseweb="menu"],
     ul[role="listbox"] {
         direction: rtl !important;
         text-align: right !important;
+        background: var(--bg-elevated) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--radius-sm) !important;
     }
     
     ul[role="listbox"] li {
@@ -336,247 +532,468 @@ st.markdown("""
         text-align: right !important;
     }
     
-    /* Date Input - תיקון כיוון */
-    [data-testid="stDateInput"] {
-        direction: rtl !important;
-    }
-    
     [data-testid="stDateInput"] > div {
-        direction: ltr !important; /* תאריכים נשארים LTR */
+        direction: ltr !important;
     }
     
     [data-testid="stDateInput"] input {
         direction: ltr !important;
         text-align: center !important;
-    }
-    
-    /* Text Input */
-    [data-testid="stTextInput"] {
-        direction: rtl !important;
+        background: var(--bg-elevated) !important;
+        border-color: var(--border-color) !important;
+        border-radius: var(--radius-sm) !important;
     }
     
     [data-testid="stTextInput"] input {
         direction: rtl !important;
         text-align: right !important;
+        background: var(--bg-elevated) !important;
+        border-color: var(--border-color) !important;
+        border-radius: var(--radius-sm) !important;
     }
     
-    /* MultiSelect tags */
     [data-testid="stMultiSelect"] [data-baseweb="tag"] {
         direction: rtl !important;
+        background: var(--accent-primary) !important;
+        border-radius: var(--radius-full) !important;
     }
     
-    /* ========== הסתרת Tooltip ========== */
-    div[data-baseweb="tooltip"] {
-        display: none !important;
-    }
-    
-    /* ========== תיקון columns ========== */
     [data-testid="column"] {
         direction: rtl !important;
     }
     
-    /* ========== טבלה - יישור מלא לימין ========== */
-    [data-testid="stDataFrame"],
-    [data-testid="stDataFrame"] > div {
-        direction: rtl !important;
-    }
-    
-    /* כותרות עמודות */
-    [data-testid="stDataFrame"] th,
-    [data-testid="stDataFrame"] [role="columnheader"] {
-        text-align: right !important;
-        direction: rtl !important;
-    }
-    
-    /* תאים */
-    [data-testid="stDataFrame"] td,
-    [data-testid="stDataFrame"] [role="gridcell"] {
-        text-align: right !important;
-        direction: rtl !important;
-    }
-    
-    /* Glide Data Grid - RTL */
-    .dvn-scroller {
-        direction: rtl !important;
-    }
-    
-    canvas + div {
-        direction: rtl !important;
-    }
-    
-    /* הסתרת סרגל כלים בריחוף על הטבלה */
-    [data-testid="stDataFrame"] [data-testid="stElementToolbar"],
-    [data-testid="stElementToolbar"],
-    [data-testid="StyledFullScreenButton"],
-    button[kind="minimal"],
-    [data-testid="stDataFrame"] button,
-    [data-testid="stDataFrame"] [role="toolbar"] {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-    
-    /* הסתרת כפתורי hover על כל האלמנטים */
-    [data-testid="stElementToolbarButton"],
-    [data-testid="stBaseButton-minimal"],
-    .stElementToolbar {
-        display: none !important;
-    }
-    
-    /* ========== סרגל גלילה בסייד ========== */
-    section[data-testid="stSidebar"]::-webkit-scrollbar {
-        width: 4px;
-    }
-    section[data-testid="stSidebar"]::-webkit-scrollbar-thumb {
-        background: var(--border);
-        border-radius: 2px;
-    }
-    section[data-testid="stSidebar"]::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    
-    /* טאבים */
+    /* ========== Tabs - Modern Design ========== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0;
+        gap: var(--space-xs);
         background: var(--bg-card);
-        border-radius: 8px;
-        padding: 4px;
+        border-radius: var(--radius-md);
+        padding: var(--space-xs);
         direction: rtl;
+        border: 1px solid var(--border-color);
     }
     
     .stTabs [data-baseweb="tab"] {
         background: transparent;
-        border-radius: 6px;
-        color: var(--text-gray);
-        padding: 0.5rem 1rem;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        padding: var(--space-sm) var(--space-md);
         font-size: 0.9rem;
+        font-weight: 500;
+        transition: all var(--transition-fast);
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        color: var(--text-primary);
+        background: var(--bg-elevated);
     }
     
     .stTabs [aria-selected="true"] {
-        background: var(--accent-blue);
-        color: white;
+        background: var(--gradient-primary) !important;
+        color: white !important;
+        box-shadow: var(--shadow-sm);
     }
     
-    /* טבלאות */
-    [data-testid="stDataFrame"] {
-        direction: rtl;
-    }
-    
-    /* כפתורים */
+    /* ========== Buttons - Enhanced ========== */
     .stButton > button {
-        background: var(--accent-blue);
+        background: var(--gradient-primary);
         color: white;
         border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1.5rem;
+        border-radius: var(--radius-sm);
+        padding: var(--space-sm) var(--space-lg);
         font-weight: 600;
+        transition: all var(--transition-normal);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-glow-sm);
     }
     
     .stDownloadButton > button {
-        background: var(--accent-green);
+        background: var(--gradient-secondary);
     }
     
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: var(--bg-card-alt);
-        border-radius: 8px;
-        direction: rtl;
-    }
-    
-    [data-testid="stExpander"] {
+    /* ========== Category List - Premium ========== */
+    .category-card {
         background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-    }
-    
-    /* רשימת קטגוריות */
-    .category-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-    
-    .category-row {
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+        margin-bottom: var(--space-sm);
         display: flex;
         align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem;
-        background: var(--bg-card-alt);
-        border-radius: 8px;
+        gap: var(--space-md);
+        transition: all var(--transition-normal);
+        animation: slideInRight 0.4s ease-out backwards;
     }
     
-    .category-icon {
-        font-size: 1.5rem;
-        width: 40px;
-        text-align: center;
+    .category-card:nth-child(1) { animation-delay: 0.05s; }
+    .category-card:nth-child(2) { animation-delay: 0.1s; }
+    .category-card:nth-child(3) { animation-delay: 0.15s; }
+    .category-card:nth-child(4) { animation-delay: 0.2s; }
+    .category-card:nth-child(5) { animation-delay: 0.25s; }
+    .category-card:nth-child(6) { animation-delay: 0.3s; }
+    .category-card:nth-child(7) { animation-delay: 0.35s; }
+    .category-card:nth-child(8) { animation-delay: 0.4s; }
+    
+    .category-card:hover {
+        border-color: var(--border-accent);
+        transform: translateX(-4px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .category-icon-wrapper {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
     }
     
     .category-info {
         flex: 1;
+        min-width: 0;
     }
     
     .category-name {
-        color: var(--text-white);
+        color: var(--text-primary);
         font-weight: 600;
         font-size: 0.9rem;
-        margin-bottom: 0.25rem;
+        margin-bottom: var(--space-xs);
     }
     
-    .category-bar-bg {
+    .category-bar-container {
         height: 6px;
-        background: var(--border);
-        border-radius: 3px;
+        background: var(--bg-elevated);
+        border-radius: var(--radius-full);
         overflow: hidden;
     }
     
     .category-bar {
         height: 100%;
-        border-radius: 3px;
+        border-radius: var(--radius-full);
+        animation: progressFill 0.8s ease-out;
     }
     
     .category-stats {
         text-align: left;
         direction: ltr;
+        flex-shrink: 0;
     }
     
     .category-amount {
-        color: var(--text-white);
+        color: var(--text-primary);
         font-weight: 700;
-        font-size: 0.95rem;
+        font-size: 1rem;
     }
     
     .category-percent {
         color: var(--text-muted);
-        font-size: 0.8rem;
+        font-size: 0.75rem;
     }
     
-    /* מצב ריק */
+    /* ========== Empty State ========== */
     .empty-state {
         text-align: center;
-        padding: 3rem;
+        padding: var(--space-2xl) var(--space-lg);
+        animation: fadeInUp 0.6s ease-out;
     }
     
     .empty-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
+        font-size: 4rem;
+        margin-bottom: var(--space-lg);
+        animation: pulse 2s ease-in-out infinite;
     }
     
     .empty-title {
-        color: var(--text-white);
-        font-size: 1.25rem;
-        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: var(--space-sm);
     }
     
     .empty-text {
-        color: var(--text-gray);
-        font-size: 0.9rem;
+        color: var(--text-secondary);
+        font-size: 1rem;
     }
     
-    /* גלילה */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg-dark); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    /* ========== Feature Cards ========== */
+    .feature-card {
+        background: var(--gradient-card), var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: var(--space-xl);
+        text-align: center;
+        transition: all var(--transition-normal);
+        animation: fadeInUp 0.5s ease-out backwards;
+    }
+    
+    .feature-card:nth-child(1) { animation-delay: 0.3s; }
+    .feature-card:nth-child(2) { animation-delay: 0.4s; }
+    .feature-card:nth-child(3) { animation-delay: 0.5s; }
+    
+    .feature-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--border-accent);
+        box-shadow: var(--shadow-glow-sm);
+    }
+    
+    .feature-icon {
+        font-size: 2.5rem;
+        margin-bottom: var(--space-md);
+    }
+    
+    .feature-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: var(--space-xs);
+    }
+    
+    .feature-desc {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+    
+    /* ========== Alerts - Styled ========== */
+    .stSuccess, .stError, .stWarning, .stInfo {
+        border-radius: var(--radius-md) !important;
+        border: none !important;
+    }
+    
+    .stSuccess {
+        background: rgba(72, 187, 120, 0.15) !important;
+        color: var(--accent-secondary) !important;
+    }
+    
+    .stError {
+        background: rgba(252, 129, 129, 0.15) !important;
+        color: var(--accent-danger) !important;
+    }
+    
+    .stWarning {
+        background: rgba(237, 137, 54, 0.15) !important;
+        color: var(--accent-warning) !important;
+    }
+    
+    /* ========== Transactions Table ========== */
+    .transactions-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        direction: rtl;
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        font-family: 'Heebo', sans-serif;
+        animation: fadeIn 0.4s ease-out;
+    }
+    
+    .transactions-table th {
+        background: var(--bg-elevated);
+        color: var(--accent-primary);
+        padding: 16px 20px;
+        text-align: right !important;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid var(--border-color);
+    }
+    
+    .transactions-table td {
+        padding: 14px 20px;
+        text-align: right !important;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-primary);
+        transition: background var(--transition-fast);
+    }
+    
+    .transactions-table tr:hover td {
+        background: var(--bg-elevated);
+    }
+    
+    .transactions-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .transactions-table .col-amount {
+        font-weight: 700;
+        color: var(--accent-danger);
+        font-variant-numeric: tabular-nums;
+    }
+    
+    .transactions-table .col-date {
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+    }
+    
+    .transactions-table .col-category {
+        color: var(--accent-purple);
+    }
+    
+    .table-scroll {
+        max-height: 500px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+    }
+    
+    /* ========== Metrics in Tabs ========== */
+    [data-testid="stMetric"] {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: var(--space-md);
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: var(--text-secondary) !important;
+    }
+    
+    [data-testid="stMetricValue"] {
+        color: var(--text-primary) !important;
+        font-weight: 700 !important;
+    }
+    
+    /* ========== Slider ========== */
+    .stSlider > div > div {
+        background: var(--bg-elevated) !important;
+    }
+    
+    .stSlider [data-baseweb="slider"] > div {
+        background: var(--gradient-primary) !important;
+    }
+    
+    /* ========== Scrollbars ========== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--bg-primary);
+        border-radius: var(--radius-full);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-color);
+        border-radius: var(--radius-full);
+        transition: background var(--transition-fast);
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-muted);
+    }
+    
+    section[data-testid="stSidebar"]::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    /* ========== Loading Skeleton ========== */
+    .skeleton {
+        background: linear-gradient(
+            90deg,
+            var(--bg-elevated) 25%,
+            var(--bg-card-hover) 50%,
+            var(--bg-elevated) 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: var(--radius-sm);
+    }
+    
+    /* ========== Expander ========== */
+    .streamlit-expanderHeader {
+        background: var(--bg-card) !important;
+        border-radius: var(--radius-md) !important;
+        direction: rtl;
+    }
+    
+    [data-testid="stExpander"] {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+    }
+    
+    /* ========== Divider ========== */
+    hr {
+        border: none;
+        height: 1px;
+        background: var(--border-color);
+        margin: var(--space-lg) 0;
+    }
+    
+    /* ========== Caption ========== */
+    .stCaption {
+        color: var(--text-muted) !important;
+    }
+    
+    /* ========== Performance Optimizations ========== */
+    /* CSS Containment for better rendering performance */
+    .metric-card,
+    .category-card,
+    .feature-card,
+    div[data-testid="stPlotlyChart"] {
+        contain: layout style;
+        will-change: transform;
+    }
+    
+    /* GPU acceleration for animations */
+    .metric-card:hover,
+    .category-card:hover,
+    .feature-card:hover {
+        transform: translateZ(0);
+    }
+    
+    /* Optimize scrolling performance */
+    .table-scroll {
+        contain: strict;
+        overflow: auto;
+        overscroll-behavior: contain;
+    }
+    
+    /* Reduce paint areas */
+    .stApp > div {
+        contain: layout;
+    }
+    
+    /* Optimize font rendering */
+    * {
+        text-rendering: optimizeSpeed;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    
+    /* Reduce reflows on animations */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+    
+    /* ========== Print Styles ========== */
+    @media print {
+        .stApp {
+            background: white !important;
+        }
+        .metric-card,
+        .category-card,
+        .transactions-table {
+            break-inside: avoid;
+        }
+        section[data-testid="stSidebar"] {
+            display: none !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -704,46 +1121,100 @@ def find_column(df: pd.DataFrame, keywords: list) -> Optional[str]:
 
 
 def parse_dates(series: pd.Series) -> pd.Series:
-    formats = ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d.%m.%Y']
+    """פרסור תאריכים בפורמטים שונים עם טיפול בשגיאות"""
+    if series.empty:
+        return pd.Series(dtype='datetime64[ns]')
+    
+    formats = ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d.%m.%Y', '%Y/%m/%d', '%m/%d/%Y']
     result = pd.Series([pd.NaT] * len(series), index=series.index)
+    
+    # ניקוי ערכים לפני פרסור
+    cleaned_series = series.astype(str).str.strip()
+    
     for fmt in formats:
         mask = result.isna()
         if not mask.any():
             break
         try:
-            result[mask] = pd.to_datetime(series[mask], format=fmt, errors='coerce')
-        except:
+            result[mask] = pd.to_datetime(cleaned_series[mask], format=fmt, errors='coerce')
+        except Exception:
             continue
+    
+    # ניסיון אחרון עם dayfirst
     if result.isna().any():
-        result[result.isna()] = pd.to_datetime(series[result.isna()], dayfirst=True, errors='coerce')
+        try:
+            remaining_mask = result.isna()
+            result[remaining_mask] = pd.to_datetime(cleaned_series[remaining_mask], dayfirst=True, errors='coerce')
+        except Exception:
+            pass
+    
     return result
 
 
 def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str, cat_col: Optional[str]) -> pd.DataFrame:
+    """עיבוד הנתונים עם טיפול מקיף ב-edge cases"""
+    if df.empty:
+        return pd.DataFrame()
+    
     result = df.copy()
-    result['תאריך'] = parse_dates(result[date_col])
-    result['סכום'] = result[amount_col].apply(clean_amount)
+    
+    # פרסור תאריכים
+    try:
+        result['תאריך'] = parse_dates(result[date_col])
+    except Exception:
+        result['תאריך'] = pd.NaT
+    
+    # ניקוי סכומים
+    try:
+        result['סכום'] = result[amount_col].apply(clean_amount)
+    except Exception:
+        result['סכום'] = 0.0
 
-    # אם סכום חיוב ריק, השתמש בסכום עסקה מקורי
-    if amount_col.strip() == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
-        fallback = result['סכום עסקה מקורי'].apply(clean_amount)
-        result.loc[result['סכום'] == 0, 'סכום'] = fallback
+    # Fallback לסכום עסקה מקורי אם סכום חיוב ריק
+    amount_col_clean = str(amount_col).strip() if amount_col else ''
+    if amount_col_clean == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
+        try:
+            fallback = result['סכום עסקה מקורי'].apply(clean_amount)
+            result.loc[result['סכום'] == 0, 'סכום'] = fallback
+        except Exception:
+            pass
     
-    # המרת סכומים חיוביים לשליליים (הוצאות)
+    # המרת סכומים חיוביים לשליליים (הוצאות) - רק אם רוב הערכים חיוביים
     non_zero = result['סכום'][result['סכום'] != 0]
-    if len(non_zero) > 0 and (non_zero > 0).sum() / len(non_zero) > 0.9:
-        result['סכום'] = -result['סכום'].abs()
+    if len(non_zero) > 0:
+        positive_ratio = (non_zero > 0).sum() / len(non_zero)
+        if positive_ratio > 0.8:  # אם יותר מ-80% חיוביים - אלה הוצאות
+            result['סכום'] = -result['סכום'].abs()
     
-    result['תיאור'] = result[desc_col].astype(str).str.strip()
-    result['קטגוריה'] = result[cat_col].astype(str).str.strip() if cat_col and cat_col in result.columns else 'שונות'
-    result.loc[result['קטגוריה'].isin(['', 'nan', 'None']), 'קטגוריה'] = 'שונות'
+    # ניקוי תיאור
+    try:
+        result['תיאור'] = result[desc_col].astype(str).str.strip()
+        result['תיאור'] = result['תיאור'].replace(['nan', 'None', ''], 'לא ידוע')
+    except Exception:
+        result['תיאור'] = 'לא ידוע'
     
+    # קטגוריה
+    try:
+        if cat_col and cat_col in result.columns:
+            result['קטגוריה'] = result[cat_col].astype(str).str.strip()
+        else:
+            result['קטגוריה'] = 'שונות'
+        # ניקוי ערכים ריקים
+        result.loc[result['קטגוריה'].isin(['', 'nan', 'None', 'NaN']), 'קטגוריה'] = 'שונות'
+    except Exception:
+        result['קטגוריה'] = 'שונות'
+    
+    # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
     
+    # הוספת עמודות נוספות
     if not result.empty:
         result['סכום_מוחלט'] = result['סכום'].abs()
         result['חודש'] = result['תאריך'].dt.strftime('%m/%Y')
         result['יום_בשבוע'] = result['תאריך'].dt.dayofweek
+    else:
+        # יצירת DataFrame ריק עם העמודות הנדרשות
+        result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])
     
     return result
 
@@ -781,7 +1252,7 @@ def load_csv(file) -> pd.DataFrame:
 # =============================================================================
 
 def create_donut_chart(df: pd.DataFrame) -> go.Figure:
-    """גרף דונאט מקצועי"""
+    """גרף דונאט מקצועי עם gradient colors"""
     expenses = df[df['סכום'] < 0].copy()
     cat_data = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().reset_index()
     cat_data = cat_data.sort_values('סכום_מוחלט', ascending=False)
@@ -789,15 +1260,15 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     if cat_data.empty:
         fig = go.Figure()
         fig.add_annotation(
-            text="אין נתונים להצגה",
-            x=0.5, y=0.5, font=dict(size=14, color='#8b949e', family='Heebo'),
+            text="📭 אין נתונים",
+            x=0.5, y=0.5, font=dict(size=16, color='#718096', family='Heebo'),
             showarrow=False
         )
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             margin=dict(t=10, b=10, l=10, r=10),
-            height=260
+            height=280
         )
         return fig
 
@@ -810,132 +1281,223 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     else:
         cat_data = cat_data.copy()
     
+    # צבעי gradient מקצועיים
+    premium_colors = ['#667eea', '#38ef7d', '#f5576c', '#4facfe', '#fa709a', '#b794f4', '#a0aec0']
+    
     fig = go.Figure(data=[go.Pie(
         labels=cat_data['קטגוריה'],
         values=cat_data['סכום_מוחלט'],
-        hole=0.65,
-        marker=dict(colors=CATEGORY_COLORS[:len(cat_data)]),
+        hole=0.7,
+        marker=dict(
+            colors=premium_colors[:len(cat_data)],
+            line=dict(color='#0a0e14', width=2)
+        ),
         textinfo='none',
         hovertemplate='<b>%{label}</b><br>₪%{value:,.0f}<br>%{percent}<extra></extra>',
-        showlegend=False
+        showlegend=False,
+        rotation=90
     )])
     
     total = cat_data['סכום_מוחלט'].sum()
     fig.add_annotation(
-        text=f"<b>₪{total:,.0f}</b>",
-        x=0.5, y=0.55, font=dict(size=22, color='#f0f6fc', family='Heebo'),
+        text=f"<b style='font-size:24px;color:#fff'>₪{total:,.0f}</b>",
+        x=0.5, y=0.55, font=dict(size=24, color='#ffffff', family='Heebo'),
         showarrow=False
     )
     fig.add_annotation(
-        text="סה״כ הוצאות",
-        x=0.5, y=0.42, font=dict(size=12, color='#8b949e', family='Heebo'),
+        text="<span style='color:#a0aec0'>סה״כ הוצאות</span>",
+        x=0.5, y=0.42, font=dict(size=13, color='#a0aec0', family='Heebo'),
         showarrow=False
     )
     
     fig.update_layout(
         showlegend=False,
-        margin=dict(t=10, b=10, l=10, r=10),
+        margin=dict(t=15, b=15, l=15, r=15),
         paper_bgcolor='rgba(0,0,0,0)',
-        height=260
+        height=280
     )
     return fig
 
 
 def create_monthly_bars(df: pd.DataFrame) -> go.Figure:
-    """גרף עמודות חודשי"""
+    """גרף עמודות חודשי עם gradient"""
     expenses = df[df['סכום'] < 0].copy()
+    
+    if expenses.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="📭 אין נתונים", x=0.5, y=0.5, font=dict(size=16, color='#718096'), showarrow=False)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=260, margin=dict(t=10,b=10,l=10,r=10))
+        return fig
+    
     monthly = expenses.groupby(['חודש']).agg({'סכום_מוחלט': 'sum', 'תאריך': 'first'}).reset_index()
     monthly = monthly.sort_values('תאריך')
+    
+    # Gradient colors for bars
+    n_bars = len(monthly)
+    colors = [f'rgba(102, 126, 234, {0.5 + 0.5 * i / max(n_bars-1, 1)})' for i in range(n_bars)]
     
     fig = go.Figure(data=[go.Bar(
         x=monthly['חודש'],
         y=monthly['סכום_מוחלט'],
-        marker=dict(color='#58a6ff', cornerradius=4),
-        hovertemplate='%{x}<br>₪%{y:,.0f}<extra></extra>'
+        marker=dict(
+            color=colors,
+            line=dict(color='rgba(102, 126, 234, 0.8)', width=1),
+            cornerradius=6
+        ),
+        hovertemplate='<b>%{x}</b><br>₪%{y:,.0f}<extra></extra>'
     )])
     
     fig.update_layout(
-        xaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
-        yaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
+        xaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=11), showgrid=False),
+        yaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=10), showgrid=True),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=10, b=30, l=50, r=10), height=250,
-        font=dict(family='Heebo')
+        margin=dict(t=15, b=35, l=55, r=15), height=260,
+        font=dict(family='Heebo'),
+        bargap=0.3,
+        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#667eea')
     )
     return fig
 
 
 def create_weekday_chart(df: pd.DataFrame) -> go.Figure:
-    """גרף ימים בשבוע"""
-    days_heb = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']
+    """גרף ימים בשבוע עם צבעים מותאמים"""
+    days_heb = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
     expenses = df[df['סכום'] < 0].copy()
+    
+    if expenses.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="📭 אין נתונים", x=0.5, y=0.5, font=dict(size=16, color='#718096'), showarrow=False)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=230, margin=dict(t=10,b=10,l=10,r=10))
+        return fig
+    
     daily = expenses.groupby('יום_בשבוע')['סכום_מוחלט'].sum().reset_index()
     daily['יום'] = daily['יום_בשבוע'].apply(lambda x: days_heb[x] if x < 7 else '')
+    
+    # Purple gradient
+    colors = ['#b794f4', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95']
     
     fig = go.Figure(data=[go.Bar(
         x=daily['יום'],
         y=daily['סכום_מוחלט'],
-        marker=dict(color='#a371f7', cornerradius=4),
-        hovertemplate='יום %{x}<br>₪%{y:,.0f}<extra></extra>'
+        marker=dict(
+            color=[colors[int(d)] for d in daily['יום_בשבוע']],
+            line=dict(color='rgba(167, 139, 250, 0.5)', width=1),
+            cornerradius=6
+        ),
+        hovertemplate='<b>יום %{x}</b><br>₪%{y:,.0f}<extra></extra>'
     )])
     
     fig.update_layout(
-        xaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=11)),
-        yaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
+        xaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=11), showgrid=False),
+        yaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=10), showgrid=True),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=10, b=30, l=50, r=10), height=220,
-        font=dict(family='Heebo')
+        margin=dict(t=15, b=35, l=55, r=15), height=230,
+        font=dict(family='Heebo'),
+        bargap=0.25,
+        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#b794f4')
     )
     return fig
 
 
 def create_merchants_chart(df: pd.DataFrame, n: int = 8) -> go.Figure:
-    """גרף בתי עסק"""
+    """גרף בתי עסק מובילים"""
     expenses = df[df['סכום'] < 0].copy()
+    
+    if expenses.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="📭 אין נתונים", x=0.5, y=0.5, font=dict(size=16, color='#718096'), showarrow=False)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=280, margin=dict(t=10,b=10,l=10,r=10))
+        return fig
+    
     merchants = expenses.groupby('תיאור')['סכום_מוחלט'].sum().nlargest(n).reset_index()
     merchants = merchants.sort_values('סכום_מוחלט', ascending=True)
     
     # קיצור שמות ארוכים
-    merchants['תיאור_קצר'] = merchants['תיאור'].apply(lambda x: x[:25] + '...' if len(x) > 28 else x)
+    merchants['תיאור_קצר'] = merchants['תיאור'].apply(lambda x: x[:22] + '...' if len(x) > 25 else x)
+    
+    # Green gradient
+    n_bars = len(merchants)
+    colors = [f'rgba(56, 239, 125, {0.4 + 0.6 * i / max(n_bars-1, 1)})' for i in range(n_bars)]
     
     fig = go.Figure(data=[go.Bar(
         x=merchants['סכום_מוחלט'],
         y=merchants['תיאור_קצר'],
         orientation='h',
-        marker=dict(color='#3fb950', cornerradius=4),
-        hovertemplate='%{y}<br>₪%{x:,.0f}<extra></extra>'
+        marker=dict(
+            color=colors,
+            line=dict(color='rgba(56, 239, 125, 0.6)', width=1),
+            cornerradius=6
+        ),
+        hovertemplate='<b>%{y}</b><br>₪%{x:,.0f}<extra></extra>'
     )])
     
     fig.update_layout(
-        xaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
-        yaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#f0f6fc', size=10)),
+        xaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=10), showgrid=True),
+        yaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#e2e8f0', size=11), showgrid=False),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=10, b=30, l=140, r=10), height=max(220, n * 28),
-        font=dict(family='Heebo')
+        margin=dict(t=15, b=35, l=150, r=15), height=max(280, n * 32),
+        font=dict(family='Heebo'),
+        bargap=0.2,
+        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#38ef7d')
     )
     return fig
 
 
 def create_trend_chart(df: pd.DataFrame) -> go.Figure:
-    """גרף מגמה"""
+    """גרף מגמה מקצועי עם gradient fill"""
+    if df.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="📭 אין נתונים", x=0.5, y=0.5, font=dict(size=16, color='#718096'), showarrow=False)
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(t=10,b=10,l=10,r=10))
+        return fig
+    
     df_sorted = df.sort_values('תאריך').copy()
     df_sorted['מצטבר'] = df_sorted['סכום'].cumsum()
     
     fig = go.Figure()
+    
+    # Area with gradient
     fig.add_trace(go.Scatter(
         x=df_sorted['תאריך'], y=df_sorted['מצטבר'],
         mode='lines', fill='tozeroy',
-        line=dict(color='#58a6ff', width=2),
-        fillcolor='rgba(88, 166, 255, 0.1)',
-        hovertemplate='%{x|%d/%m}<br>₪%{y:,.0f}<extra></extra>'
+        line=dict(color='#667eea', width=3),
+        fillcolor='rgba(102, 126, 234, 0.15)',
+        hovertemplate='<b>%{x|%d/%m/%Y}</b><br>מאזן: ₪%{y:,.0f}<extra></extra>'
     ))
-    fig.add_hline(y=0, line_dash='dash', line_color='#f85149', line_width=1)
+    
+    # Zero line
+    fig.add_hline(y=0, line_dash='dash', line_color='#fc8181', line_width=2, opacity=0.7)
+    
+    # Add markers for min/max points
+    min_idx = df_sorted['מצטבר'].idxmin()
+    max_idx = df_sorted['מצטבר'].idxmax()
+    
+    fig.add_trace(go.Scatter(
+        x=[df_sorted.loc[min_idx, 'תאריך']],
+        y=[df_sorted.loc[min_idx, 'מצטבר']],
+        mode='markers',
+        marker=dict(size=12, color='#fc8181', symbol='diamond'),
+        hovertemplate='<b>נקודת מינימום</b><br>₪%{y:,.0f}<extra></extra>',
+        showlegend=False
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=[df_sorted.loc[max_idx, 'תאריך']],
+        y=[df_sorted.loc[max_idx, 'מצטבר']],
+        mode='markers',
+        marker=dict(size=12, color='#38ef7d', symbol='diamond'),
+        hovertemplate='<b>נקודת מקסימום</b><br>₪%{y:,.0f}<extra></extra>',
+        showlegend=False
+    ))
     
     fig.update_layout(
-        xaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
-        yaxis=dict(title='', gridcolor='#30363d', tickfont=dict(color='#8b949e', size=10)),
+        xaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=10), showgrid=True),
+        yaxis=dict(title='', gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color='#a0aec0', size=10), showgrid=True, zeroline=False),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=10, b=30, l=60, r=10), height=280,
-        font=dict(family='Heebo')
+        margin=dict(t=20, b=40, l=65, r=20), height=300,
+        font=dict(family='Heebo'),
+        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#667eea'),
+        hovermode='x unified'
     )
     return fig
 
@@ -945,38 +1507,71 @@ def create_trend_chart(df: pd.DataFrame) -> go.Figure:
 # =============================================================================
 
 def render_metrics(df: pd.DataFrame):
+    """רינדור כרטיסי מדדים מקצועיים עם אנימציות"""
     total = len(df)
-    spent = abs(df[df['סכום'] < 0]['סכום'].sum())
+    expenses = df[df['סכום'] < 0]
+    spent = abs(expenses['סכום'].sum()) if len(expenses) > 0 else 0
     income = df[df['סכום'] > 0]['סכום'].sum()
-    avg = df['סכום_מוחלט'].mean()
+    avg = df['סכום_מוחלט'].mean() if not df.empty else 0
+    
+    # חישוב מגמה (אם יש מספיק נתונים)
+    trend_text = ""
+    if len(df) > 10:
+        mid = len(df) // 2
+        first_half_avg = df.iloc[:mid]['סכום_מוחלט'].mean()
+        second_half_avg = df.iloc[mid:]['סכום_מוחלט'].mean()
+        if first_half_avg > 0:
+            trend_pct = ((second_half_avg - first_half_avg) / first_half_avg) * 100
+            if trend_pct > 0:
+                trend_text = f'<div class="metric-trend up">↑ {abs(trend_pct):.1f}%</div>'
+            else:
+                trend_text = f'<div class="metric-trend down">↓ {abs(trend_pct):.1f}%</div>'
+    
+    # צבעים לאייקונים
+    icon_colors = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',  # סגול
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',  # ורוד-אדום
+        'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',  # ירוק
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',  # כחול
+    ]
     
     st.markdown(f"""
     <div class="metrics-grid">
         <div class="metric-card">
-            <div class="metric-icon">💳</div>
-            <div class="metric-value">{total:,}</div>
+            <div class="metric-icon-wrapper" style="background: {icon_colors[0]}">
+                <span class="metric-icon">💳</span>
+            </div>
+            <span class="metric-value">{total:,}</span>
             <div class="metric-label">עסקאות</div>
         </div>
         <div class="metric-card">
-            <div class="metric-icon">📉</div>
-            <div class="metric-value">{format_currency(spent)}</div>
+            <div class="metric-icon-wrapper" style="background: {icon_colors[1]}">
+                <span class="metric-icon">📉</span>
+            </div>
+            <span class="metric-value">{format_currency(spent)}</span>
             <div class="metric-label">הוצאות</div>
+            {trend_text}
         </div>
         <div class="metric-card">
-            <div class="metric-icon">📈</div>
-            <div class="metric-value">{format_currency(income)}</div>
+            <div class="metric-icon-wrapper" style="background: {icon_colors[2]}">
+                <span class="metric-icon">📈</span>
+            </div>
+            <span class="metric-value">{format_currency(income)}</span>
             <div class="metric-label">הכנסות</div>
         </div>
         <div class="metric-card">
-            <div class="metric-icon">📊</div>
-            <div class="metric-value">{format_currency(avg)}</div>
-            <div class="metric-label">ממוצע</div>
+            <div class="metric-icon-wrapper" style="background: {icon_colors[3]}">
+                <span class="metric-icon">📊</span>
+            </div>
+            <span class="metric-value">{format_currency(avg)}</span>
+            <div class="metric-label">ממוצע לעסקה</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 
 def render_category_list(df: pd.DataFrame):
+    """רינדור רשימת קטגוריות מקצועית עם אנימציות"""
     expenses = df[df['סכום'] < 0].copy()
     total = expenses['סכום_מוחלט'].sum()
     
@@ -989,19 +1584,54 @@ def render_category_list(df: pd.DataFrame):
     cat_data = cat_data.sort_values('סכום', ascending=False).head(8)
     
     if cat_data.empty:
-        st.info("אין נתונים להצגה")
+        st.markdown('''
+        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+            <div>אין נתונים להצגה</div>
+        </div>
+        ''', unsafe_allow_html=True)
         return
-
-    for _, row in cat_data.iterrows():
-        col1, col2, col3 = st.columns([1, 6, 2])
-        with col1:
-            st.markdown(f"**{get_icon(row['קטגוריה'])}**")
-        with col2:
-            st.markdown(f"**{row['קטגוריה']}**")
-            st.progress(int(row['אחוז']))
-        with col3:
-            st.markdown(f"**{format_currency(row['סכום'])}**")
-            st.caption(f"{row['אחוז']}%")
+    
+    # צבעי gradient לאייקונים
+    icon_gradients = [
+        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+        'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+        'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+        'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    ]
+    
+    # צבעי progress bar
+    bar_colors = ['#667eea', '#38ef7d', '#f5576c', '#00f2fe', '#fee140', '#fed6e3', '#fef9d7', '#66a6ff']
+    
+    html_cards = ""
+    for i, (_, row) in enumerate(cat_data.iterrows()):
+        icon = get_icon(row['קטגוריה'])
+        gradient = icon_gradients[i % len(icon_gradients)]
+        bar_color = bar_colors[i % len(bar_colors)]
+        
+        html_cards += f'''
+        <div class="category-card">
+            <div class="category-icon-wrapper" style="background: {gradient}">
+                {icon}
+            </div>
+            <div class="category-info">
+                <div class="category-name">{row['קטגוריה']}</div>
+                <div class="category-bar-container">
+                    <div class="category-bar" style="width: {row['אחוז']}%; background: {bar_color};"></div>
+                </div>
+            </div>
+            <div class="category-stats">
+                <div class="category-amount">{format_currency(row['סכום'])}</div>
+                <div class="category-percent">{row['אחוז']}%</div>
+            </div>
+        </div>
+        '''
+    
+    st.markdown(html_cards, unsafe_allow_html=True)
 
 
 def export_excel(df: pd.DataFrame) -> bytes:
@@ -1016,66 +1646,105 @@ def export_excel(df: pd.DataFrame) -> bytes:
 # =============================================================================
 
 def main():
-    # כותרת
+    # כותרת ראשית
     st.markdown('''
     <div class="app-header">
         <h1 class="app-title">💳 מנתח עסקאות</h1>
-        <p class="app-subtitle">ניתוח חכם של הוצאות כרטיס האשראי</p>
+        <p class="app-subtitle">ניתוח חכם ומקצועי של הוצאות כרטיס האשראי שלך</p>
     </div>
     ''', unsafe_allow_html=True)
     
-    # סרגל צד
+    # סרגל צד מעוצב
     with st.sidebar:
-        st.markdown('<div class="sidebar-title">📁 העלאת קובץ</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-title">העלאת קובץ</div>', unsafe_allow_html=True)
         uploaded = st.file_uploader(
-            "העלה קובץ אקסל או CSV",
+            "גרור קובץ לכאן או לחץ לבחירה",
             type=['xlsx', 'xls', 'csv'],
             label_visibility='visible'
         )
+        
         st.markdown("---")
-        st.markdown('<p style="color: #8b949e; font-size: 0.85rem; text-align: right; direction: rtl;">תומך ב־MAX, לאומי, דיסקונט ועוד</p>', unsafe_allow_html=True)
+        
+        # מידע נוסף בסרגל צד
+        st.markdown('''
+        <div style="padding: 1rem; background: rgba(102, 126, 234, 0.1); border-radius: 10px; border: 1px solid rgba(102, 126, 234, 0.2);">
+            <div style="font-weight: 600; color: #667eea; margin-bottom: 0.5rem;">💡 פורמטים נתמכים</div>
+            <div style="color: #a0aec0; font-size: 0.85rem; line-height: 1.6;">
+                • MAX<br>
+                • לאומי<br>
+                • דיסקונט<br>
+                • ויזה כאל<br>
+                • CSV כללי
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
     
-    # מצב ריק
+    # מצב ריק - עיצוב מקצועי
     if not uploaded:
         st.markdown('''
         <div class="empty-state">
             <div class="empty-icon">📊</div>
-            <div class="empty-title">ברוכים הבאים!</div>
-            <div class="empty-text">העלה קובץ אקסל או CSV כדי להתחיל</div>
+            <div class="empty-title">ברוכים הבאים לדאשבורד!</div>
+            <div class="empty-text">העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח</div>
         </div>
         ''', unsafe_allow_html=True)
         
+        # Feature cards
         cols = st.columns(3)
         features = [
-            ("📊", "ניתוח ויזואלי", "גרפים אינטראקטיביים"),
-            ("🏷️", "קטגוריות", "סיווג אוטומטי"),
-            ("📑", "אקסל", "תמיכה במספר גליונות")
+            ("📊", "ניתוח ויזואלי", "גרפים אינטראקטיביים וחכמים לתובנות מיידיות"),
+            ("🏷️", "קטגוריות אוטומטיות", "זיהוי אוטומטי של קטגוריות מהקובץ המקורי"),
+            ("📑", "תמיכה מלאה", "Excel עם מספר גליונות, CSV בעברית מלאה")
         ]
+        
         for col, (icon, title, desc) in zip(cols, features):
             with col:
                 st.markdown(f'''
-                <div class="metric-card">
-                    <div class="metric-icon">{icon}</div>
-                    <div class="metric-label" style="color: #f0f6fc; font-weight: 600;">{title}</div>
-                    <div class="metric-label">{desc}</div>
+                <div class="feature-card">
+                    <div class="feature-icon">{icon}</div>
+                    <div class="feature-title">{title}</div>
+                    <div class="feature-desc">{desc}</div>
                 </div>
                 ''', unsafe_allow_html=True)
         return
     
-    # טעינה
-    sheets = load_excel(uploaded) if uploaded.name.endswith(('.xlsx', '.xls')) else {'main': load_csv(uploaded)}
+    # טעינת הקובץ
+    with st.spinner('🔄 טוען את הקובץ...'):
+        sheets = load_excel(uploaded) if uploaded.name.endswith(('.xlsx', '.xls')) else {'main': load_csv(uploaded)}
+    
     if not sheets:
-        st.error("❌ שגיאה בטעינת הקובץ")
-        return
-    if len(sheets) == 1 and list(sheets.values())[0].empty:
-        st.error("❌ הקובץ ריק או לא תקין")
+        st.markdown('''
+        <div style="background: rgba(252, 129, 129, 0.1); border: 1px solid rgba(252, 129, 129, 0.3); 
+                    border-radius: 12px; padding: 1.5rem; text-align: center; margin: 1rem 0;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">❌</div>
+            <div style="color: #fc8181; font-weight: 600; font-size: 1.1rem;">שגיאה בטעינת הקובץ</div>
+            <div style="color: #a0aec0; font-size: 0.9rem; margin-top: 0.5rem;">וודא שהקובץ בפורמט Excel או CSV תקין</div>
+        </div>
+        ''', unsafe_allow_html=True)
         return
     
-    # בחירת גליונות
+    if len(sheets) == 1 and list(sheets.values())[0].empty:
+        st.markdown('''
+        <div style="background: rgba(252, 129, 129, 0.1); border: 1px solid rgba(252, 129, 129, 0.3); 
+                    border-radius: 12px; padding: 1.5rem; text-align: center; margin: 1rem 0;">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+            <div style="color: #fc8181; font-weight: 600; font-size: 1.1rem;">הקובץ ריק או לא תקין</div>
+            <div style="color: #a0aec0; font-size: 0.9rem; margin-top: 0.5rem;">נסה להעלות קובץ אחר</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        return
+    
+    # בחירת גליונות (אם יש כמה)
     if len(sheets) > 1:
-        selected = st.multiselect("בחר גליונות", list(sheets.keys()), default=list(sheets.keys()))
+        st.markdown('<div class="section-title"><span>📑</span> בחירת גליונות</div>', unsafe_allow_html=True)
+        selected = st.multiselect("בחר גליונות לניתוח", list(sheets.keys()), default=list(sheets.keys()))
         if not selected:
-            st.warning("בחר לפחות גליון אחד")
+            st.markdown('''
+            <div style="background: rgba(237, 137, 54, 0.1); border: 1px solid rgba(237, 137, 54, 0.3); 
+                        border-radius: 10px; padding: 1rem; text-align: center;">
+                <span style="color: #ed8936;">⚠️ נא לבחור לפחות גליון אחד</span>
+            </div>
+            ''', unsafe_allow_html=True)
             return
         df_raw = pd.concat([sheets[s].assign(_sheet=s) for s in selected], ignore_index=True)
     else:
@@ -1088,42 +1757,86 @@ def main():
     cat_col = find_column(df_raw, ['קטגוריה'])
     
     if not all([date_col, amount_col, desc_col]):
-        st.error("❌ לא זוהו עמודות נדרשות - נא להגדיר ידנית:")
+        st.markdown('''
+        <div style="background: rgba(237, 137, 54, 0.1); border: 1px solid rgba(237, 137, 54, 0.3); 
+                    border-radius: 12px; padding: 1.5rem; margin: 1rem 0;">
+            <div style="font-weight: 600; color: #ed8936; margin-bottom: 1rem;">⚙️ הגדרה ידנית של עמודות</div>
+            <div style="color: #a0aec0; font-size: 0.9rem;">לא הצלחנו לזהות את כל העמודות באופן אוטומטי. נא להגדיר:</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
         cols = df_raw.columns.tolist()
         c1, c2 = st.columns(2)
         with c1:
-            date_col = st.selectbox("עמודת תאריך", cols)
-            amount_col = st.selectbox("עמודת סכום", cols)
+            date_col = st.selectbox("📅 עמודת תאריך", cols)
+            amount_col = st.selectbox("💰 עמודת סכום", cols)
         with c2:
-            desc_col = st.selectbox("עמודת תיאור", cols)
-            cat_col = st.selectbox("עמודת קטגוריה", ['אין'] + cols)
-            cat_col = None if cat_col == 'אין' else cat_col
-        if st.button("המשך"):
+            desc_col = st.selectbox("📝 עמודת תיאור", cols)
+            cat_col = st.selectbox("🏷️ עמודת קטגוריה", ['ללא'] + cols)
+            cat_col = None if cat_col == 'ללא' else cat_col
+        
+        if st.button("▶️ המשך לניתוח", use_container_width=True):
             pass
         else:
             st.stop()
     
-    # עיבוד
+    # עיבוד הנתונים
     try:
-        df = process_data(df_raw, date_col, amount_col, desc_col, cat_col)
+        with st.spinner('🔄 מעבד נתונים...'):
+            df = process_data(df_raw, date_col, amount_col, desc_col, cat_col)
+        
         if df.empty:
-            st.error("❌ לא נמצאו עסקאות")
+            st.markdown('''
+            <div style="background: rgba(252, 129, 129, 0.1); border: 1px solid rgba(252, 129, 129, 0.3); 
+                        border-radius: 12px; padding: 1.5rem; text-align: center; margin: 1rem 0;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+                <div style="color: #fc8181; font-weight: 600;">לא נמצאו עסקאות בקובץ</div>
+            </div>
+            ''', unsafe_allow_html=True)
             return
-        st.success(f"✅ נטענו {len(df):,} עסקאות")
+        
+        # הודעת הצלחה מעוצבת
+        date_range = f"{df['תאריך'].min().strftime('%d/%m/%Y')} - {df['תאריך'].max().strftime('%d/%m/%Y')}"
+        st.markdown(f'''
+        <div style="background: rgba(56, 239, 125, 0.1); border: 1px solid rgba(56, 239, 125, 0.3); 
+                    border-radius: 12px; padding: 1rem 1.5rem; margin: 1rem 0; display: flex; 
+                    align-items: center; justify-content: space-between; direction: rtl;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-size: 1.5rem;">✅</span>
+                <div>
+                    <div style="color: #38ef7d; font-weight: 600;">נטענו {len(df):,} עסקאות בהצלחה</div>
+                    <div style="color: #a0aec0; font-size: 0.85rem;">{date_range}</div>
+                </div>
+            </div>
+            <div style="color: #38ef7d; font-size: 0.9rem; background: rgba(56, 239, 125, 0.15); 
+                        padding: 0.4rem 0.8rem; border-radius: 20px;">
+                {df['קטגוריה'].nunique()} קטגוריות
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
     except Exception as e:
-        st.error(f"❌ שגיאה: {e}")
+        st.markdown(f'''
+        <div style="background: rgba(252, 129, 129, 0.1); border: 1px solid rgba(252, 129, 129, 0.3); 
+                    border-radius: 12px; padding: 1.5rem; margin: 1rem 0;">
+            <div style="font-weight: 600; color: #fc8181; margin-bottom: 0.5rem;">❌ שגיאה בעיבוד</div>
+            <div style="color: #a0aec0; font-size: 0.9rem;">{str(e)}</div>
+        </div>
+        ''', unsafe_allow_html=True)
         return
     
-    # סינון
-    st.markdown('<div class="section-title"><span>🔍</span> סינון</div>', unsafe_allow_html=True)
+    # סינון - עיצוב משופר
+    st.markdown('<div class="section-title"><span>🔍</span> סינון וחיפוש</div>', unsafe_allow_html=True)
+    
     c1, c2, c3 = st.columns(3)
     with c1:
-        dates = st.date_input("תאריכים", [df['תאריך'].min(), df['תאריך'].max()])
+        dates = st.date_input("📅 טווח תאריכים", [df['תאריך'].min(), df['תאריך'].max()])
     with c2:
-        cat_filter = st.selectbox("קטגוריה", ['הכל'] + sorted(df['קטגוריה'].unique().tolist()))
+        cat_filter = st.selectbox("🏷️ קטגוריה", ['הכל'] + sorted(df['קטגוריה'].unique().tolist()))
     with c3:
-        search = st.text_input("חיפוש")
+        search = st.text_input("🔎 חיפוש בית עסק", placeholder="הקלד לחיפוש...")
     
+    # החלת פילטרים
     df_f = df.copy()
     if len(dates) == 2:
         df_f = df_f[(df_f['תאריך'].dt.date >= dates[0]) & (df_f['תאריך'].dt.date <= dates[1])]
@@ -1133,133 +1846,163 @@ def main():
         df_f = df_f[df_f['תיאור'].str.contains(search, case=False, na=False)]
     
     if df_f.empty:
-        st.warning("אין תוצאות")
+        st.markdown('''
+        <div style="background: rgba(237, 137, 54, 0.1); border: 1px solid rgba(237, 137, 54, 0.3); 
+                    border-radius: 12px; padding: 2rem; text-align: center; margin: 1rem 0;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔍</div>
+            <div style="color: #ed8936; font-weight: 600; font-size: 1.1rem;">לא נמצאו תוצאות</div>
+            <div style="color: #a0aec0; font-size: 0.9rem; margin-top: 0.5rem;">נסה לשנות את הפילטרים</div>
+        </div>
+        ''', unsafe_allow_html=True)
         return
     
-    # מדדים
+    # מדדים ראשיים
     render_metrics(df_f)
     
-    # טאבים
-    tabs = st.tabs(["📊 סקירה", "📈 מגמות", "🏪 בתי עסק", "📋 עסקאות"])
+    # טאבים עם עיצוב מקצועי
+    tabs = st.tabs(["📊 סקירה כללית", "📈 מגמות ונתונים", "🏪 בתי עסק מובילים", "📋 רשימת עסקאות"])
     
     with tabs[0]:
-        c1, c2 = st.columns([2, 1])
+        # סקירה - layout שני עמודות
+        c1, c2 = st.columns([3, 2])
         
         with c1:
-            st.markdown('<div class="section-title"><span>📅</span> הוצאות חודשיות</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title"><span>📅</span> הוצאות לפי חודש</div>', unsafe_allow_html=True)
             st.plotly_chart(create_monthly_bars(df_f), use_container_width=True, key="monthly")
 
-            st.markdown('<div class="section-title"><span>📆</span> לפי יום בשבוע</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title"><span>📆</span> התפלגות לפי יום בשבוע</div>', unsafe_allow_html=True)
             st.plotly_chart(create_weekday_chart(df_f), use_container_width=True, key="weekday")
         
         with c2:
-            st.markdown('<div class="section-title"><span>🏷️</span> לפי קטגוריה</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title"><span>🥧</span> חלוקה לפי קטגוריה</div>', unsafe_allow_html=True)
             st.plotly_chart(create_donut_chart(df_f), use_container_width=True, key="donut")
 
-            st.markdown('<div class="section-title"><span>📊</span> פירוט קטגוריות</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title"><span>📋</span> פירוט קטגוריות</div>', unsafe_allow_html=True)
             render_category_list(df_f)
     
     with tabs[1]:
-        st.markdown('<div class="section-title"><span>📈</span> מגמת מאזן</div>', unsafe_allow_html=True)
+        # מגמות
+        st.markdown('<div class="section-title"><span>📈</span> מגמת מאזן מצטבר</div>', unsafe_allow_html=True)
         st.plotly_chart(create_trend_chart(df_f), use_container_width=True, key="trend")
         
-        # סטטיסטיקות
+        # סטטיסטיקות מפורטות
         exp = df_f[df_f['סכום'] < 0]
-        st.markdown('<div class="section-title"><span>📊</span> סטטיסטיקות</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><span>📊</span> סטטיסטיקות מפורטות</div>', unsafe_allow_html=True)
+        
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("הוצאה גדולה", format_currency(exp['סכום_מוחלט'].max()) if len(exp) > 0 else "₪0")
-        c2.metric("הוצאה קטנה", format_currency(exp['סכום_מוחלט'].min()) if len(exp) > 0 else "₪0")
-        c3.metric("חציון", format_currency(exp['סכום_מוחלט'].median()) if len(exp) > 0 else "₪0")
-        c4.metric("קטגוריות", df_f['קטגוריה'].nunique())
+        
+        with c1:
+            max_expense = exp['סכום_מוחלט'].max() if len(exp) > 0 else 0
+            st.markdown(f'''
+            <div class="metric-card" style="padding: 1rem;">
+                <div style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.5rem;">💰 הוצאה הגדולה ביותר</div>
+                <div style="color: #fc8181; font-size: 1.5rem; font-weight: 700;">{format_currency(max_expense)}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c2:
+            min_expense = exp['סכום_מוחלט'].min() if len(exp) > 0 else 0
+            st.markdown(f'''
+            <div class="metric-card" style="padding: 1rem;">
+                <div style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.5rem;">💵 הוצאה הקטנה ביותר</div>
+                <div style="color: #38ef7d; font-size: 1.5rem; font-weight: 700;">{format_currency(min_expense)}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c3:
+            median_expense = exp['סכום_מוחלט'].median() if len(exp) > 0 else 0
+            st.markdown(f'''
+            <div class="metric-card" style="padding: 1rem;">
+                <div style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.5rem;">📊 חציון הוצאות</div>
+                <div style="color: #667eea; font-size: 1.5rem; font-weight: 700;">{format_currency(median_expense)}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c4:
+            num_cats = df_f['קטגוריה'].nunique()
+            st.markdown(f'''
+            <div class="metric-card" style="padding: 1rem;">
+                <div style="color: #a0aec0; font-size: 0.8rem; margin-bottom: 0.5rem;">🏷️ מספר קטגוריות</div>
+                <div style="color: #b794f4; font-size: 1.5rem; font-weight: 700;">{num_cats}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        # תובנות נוספות
+        if len(exp) > 0:
+            st.markdown("---")
+            top_cat = exp.groupby('קטגוריה')['סכום_מוחלט'].sum().idxmax()
+            top_merchant = exp.groupby('תיאור')['סכום_מוחלט'].sum().idxmax()
+            
+            st.markdown(f'''
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="background: rgba(102, 126, 234, 0.1); border: 1px solid rgba(102, 126, 234, 0.2); 
+                            border-radius: 12px; padding: 1rem;">
+                    <div style="color: #667eea; font-weight: 600; margin-bottom: 0.5rem;">🏆 הקטגוריה המובילה</div>
+                    <div style="color: #fff; font-size: 1.1rem;">{top_cat}</div>
+                </div>
+                <div style="background: rgba(56, 239, 125, 0.1); border: 1px solid rgba(56, 239, 125, 0.2); 
+                            border-radius: 12px; padding: 1rem;">
+                    <div style="color: #38ef7d; font-weight: 600; margin-bottom: 0.5rem;">🏪 בית העסק המוביל</div>
+                    <div style="color: #fff; font-size: 1.1rem;">{top_merchant[:30]}{"..." if len(top_merchant) > 30 else ""}</div>
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
     
     with tabs[2]:
-        n = st.slider("מספר בתי עסק", 5, 15, 8)
-        st.markdown('<div class="section-title"><span>🏆</span> בתי עסק מובילים</div>', unsafe_allow_html=True)
+        # בתי עסק
+        st.markdown('<div class="section-title"><span>⚙️</span> הגדרות תצוגה</div>', unsafe_allow_html=True)
+        n = st.slider("מספר בתי עסק להצגה", 5, 15, 8, help="בחר כמה בתי עסק להציג בגרף")
+        
+        st.markdown('<div class="section-title"><span>🏆</span> בתי העסק המובילים בהוצאות</div>', unsafe_allow_html=True)
         st.plotly_chart(create_merchants_chart(df_f, n), use_container_width=True, key="merchants")
     
     with tabs[3]:
-        st.markdown('<div class="section-title"><span>📋</span> רשימת עסקאות</div>', unsafe_allow_html=True)
-        sort_opt = st.selectbox("מיון", ['תאריך ↓', 'תאריך ↑', 'סכום ↓', 'סכום ↑'])
+        # טבלת עסקאות
+        st.markdown('<div class="section-title"><span>📋</span> רשימת עסקאות מלאה</div>', unsafe_allow_html=True)
         
-        if sort_opt == 'תאריך ↓':
+        # שורת בקרה
+        col1, col2 = st.columns([2, 3])
+        with col1:
+            sort_opt = st.selectbox("🔀 מיון לפי", ['תאריך (חדש לישן)', 'תאריך (ישן לחדש)', 'סכום (גדול לקטן)', 'סכום (קטן לגדול)'])
+        
+        # מיון
+        if sort_opt == 'תאריך (חדש לישן)':
             display = df_f.sort_values('תאריך', ascending=False)
-        elif sort_opt == 'תאריך ↑':
+        elif sort_opt == 'תאריך (ישן לחדש)':
             display = df_f.sort_values('תאריך', ascending=True)
-        elif sort_opt == 'סכום ↓':
+        elif sort_opt == 'סכום (גדול לקטן)':
             display = df_f.sort_values('סכום_מוחלט', ascending=False)
         else:
             display = df_f.sort_values('סכום_מוחלט', ascending=True)
         
-        # הכנת הנתונים לתצוגה
-        view = display[['סכום', 'קטגוריה', 'תיאור', 'תאריך']].head(100).copy()
-        view['תאריך'] = view['תאריך'].dt.strftime('%d/%m/%Y')
-        view['סכום'] = view['סכום'].apply(lambda x: f"₪{x:,.0f}")
+        # הכנת הנתונים
+        max_rows = 100
+        view = display[['סכום', 'קטגוריה', 'תיאור', 'תאריך']].head(max_rows).copy()
+        view['תאריך_מעוצב'] = view['תאריך'].dt.strftime('%d/%m/%Y')
+        view['סכום_מעוצב'] = view['סכום'].apply(lambda x: f"₪{x:,.0f}")
         view = view.reset_index(drop=True)
         
-        # טבלת HTML עם יישור מלא לימין
-        st.markdown("""
-        <style>
-            .transactions-table {
-                width: 100%;
-                border-collapse: collapse;
-                direction: rtl;
-                background: #161b22;
-                border-radius: 8px;
-                overflow: hidden;
-                font-family: 'Heebo', sans-serif;
-            }
-            .transactions-table th {
-                background: #1c2128;
-                color: #58a6ff;
-                padding: 14px 16px;
-                text-align: right !important;
-                font-weight: 600;
-                border-bottom: 2px solid #30363d;
-            }
-            .transactions-table td {
-                padding: 12px 16px;
-                text-align: right !important;
-                border-bottom: 1px solid #30363d;
-                color: #f0f6fc;
-            }
-            .transactions-table tr:hover td {
-                background: #1c2128;
-            }
-            .transactions-table .col-amount {
-                font-weight: 600;
-                color: #f85149;
-            }
-            .transactions-table .col-date {
-                color: #8b949e;
-            }
-            .table-scroll {
-                max-height: 450px;
-                overflow-y: auto;
-                border: 1px solid #30363d;
-                border-radius: 8px;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # בניית הטבלה
+        # בניית טבלת HTML מקצועית
         rows_html = ""
-        for _, row in view.iterrows():
-            rows_html += f"""<tr>
-                <td class="col-amount">{row['סכום']}</td>
-                <td>{row['קטגוריה']}</td>
+        for i, (_, row) in enumerate(view.iterrows()):
+            bg_class = 'style="background: rgba(102, 126, 234, 0.03);"' if i % 2 == 0 else ''
+            icon = get_icon(row['קטגוריה'])
+            rows_html += f'''<tr {bg_class}>
+                <td class="col-amount">{row['סכום_מעוצב']}</td>
+                <td class="col-category"><span style="margin-left: 6px;">{icon}</span> {row['קטגוריה']}</td>
                 <td>{row['תיאור']}</td>
-                <td class="col-date">{row['תאריך']}</td>
-            </tr>"""
+                <td class="col-date">{row['תאריך_מעוצב']}</td>
+            </tr>'''
         
-        table_html = f"""
+        table_html = f'''
         <div class="table-scroll">
             <table class="transactions-table">
                 <thead>
                     <tr>
-                        <th>סכום</th>
-                        <th>קטגוריה</th>
-                        <th>תיאור</th>
-                        <th>תאריך</th>
+                        <th style="width: 12%;">סכום</th>
+                        <th style="width: 18%;">קטגוריה</th>
+                        <th style="width: 50%;">בית עסק</th>
+                        <th style="width: 12%;">תאריך</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1267,19 +2010,53 @@ def main():
                 </tbody>
             </table>
         </div>
-        """
+        '''
         st.markdown(table_html, unsafe_allow_html=True)
-        st.caption(f"מציג {len(view):,} עסקאות (מקסימום 100)")
+        
+        # מידע נוסף
+        total_shown = len(view)
+        total_available = len(display)
+        st.markdown(f'''
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; 
+                    padding: 0.75rem 1rem; background: rgba(102, 126, 234, 0.05); border-radius: 8px;">
+            <span style="color: #a0aec0; font-size: 0.9rem;">
+                מציג {total_shown:,} מתוך {total_available:,} עסקאות
+            </span>
+            <span style="color: #667eea; font-size: 0.85rem;">
+                💡 להורדת כל הנתונים - השתמש בכפתורי הייצוא למטה
+            </span>
+        </div>
+        ''', unsafe_allow_html=True)
     
-    # ייצוא
+    # ייצוא נתונים - עיצוב משופר
     st.markdown("---")
-    c1, c2 = st.columns(2)
+    st.markdown('<div class="section-title"><span>📥</span> ייצוא נתונים</div>', unsafe_allow_html=True)
+    
+    c1, c2, c3 = st.columns([2, 2, 3])
     with c1:
-        st.download_button("📥 הורד אקסל", export_excel(df_f), "עסקאות.xlsx", 
-                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(
+            "📊 הורד כקובץ Excel", 
+            export_excel(df_f), 
+            "עסקאות_מנותחות.xlsx", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
     with c2:
-        st.download_button("📥 הורד CSV", df_f.to_csv(index=False, encoding='utf-8-sig'), 
-                          "עסקאות.csv", "text/csv")
+        st.download_button(
+            "📄 הורד כקובץ CSV", 
+            df_f.to_csv(index=False, encoding='utf-8-sig'), 
+            "עסקאות_מנותחות.csv", 
+            "text/csv",
+            use_container_width=True
+        )
+    with c3:
+        st.markdown(f'''
+        <div style="color: #a0aec0; font-size: 0.85rem; padding: 0.75rem; 
+                    background: rgba(102, 126, 234, 0.05); border-radius: 8px; text-align: center;">
+            📊 סה"כ {len(df_f):,} עסקאות | 
+            💰 {format_currency(abs(df_f[df_f["סכום"] < 0]["סכום"].sum()))} הוצאות
+        </div>
+        ''', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
