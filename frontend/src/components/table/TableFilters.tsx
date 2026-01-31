@@ -10,7 +10,7 @@ interface TableFiltersProps {
   categories: string[]
 }
 
-export default function TableFilters({ filters, onFilterChange, onExport, total, categories }: TableFiltersProps) {
+export default function TableFilters({ filters, onFilterChange, onExport, categories }: TableFiltersProps) {
   const [search, setSearch] = useState(filters.search || '')
   const [category, setCategory] = useState(filters.category || '')
 

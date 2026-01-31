@@ -7,7 +7,7 @@ interface SidebarProps {
   onFileUploaded?: (sessionId: string) => void
 }
 
-export default function Sidebar({ sessionId, onFileUploaded }: SidebarProps) {
+export default function Sidebar({ onFileUploaded }: SidebarProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
