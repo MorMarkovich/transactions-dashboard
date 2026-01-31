@@ -2,6 +2,7 @@
 Data processing and cleaning functions
 """
 import pandas as pd
+import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
 
@@ -110,7 +111,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         # יצירת DataFrame ריק עם העמודות הנדרשות
         result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])
     
-    # Replace NaN with None to ensure valid JSON serialization
+    # Replace NaN and Infinity with None to ensure valid JSON serialization
+    result = result.replace([np.inf, -np.inf], None)
     result = result.where(pd.notnull(result), None)
     
     return result
