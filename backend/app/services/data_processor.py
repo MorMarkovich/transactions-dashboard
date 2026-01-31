@@ -26,7 +26,8 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     summary_keywords = ['סך הכל', 'סה"כ', 'total', 'סיכום', 'יתרה']
     
     def is_valid_row(row):
-        row_str = ' '.join(row.astype(str).str.lower())
+        # Create string representation safely handles mixed types/NaNs
+        row_str = ' '.join([str(x).lower() for x in row if pd.notna(x)])
         # בדיקה אם זו שורת סיכום
         if any(k in row_str for k in summary_keywords):
             return False
