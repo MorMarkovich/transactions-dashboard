@@ -1408,9 +1408,9 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     
     fig.update_layout(
         showlegend=False,
-        margin=dict(t=15, b=15, l=15, r=15),
+        margin=dict(t=20, b=20, l=20, r=20),
         paper_bgcolor='rgba(0,0,0,0)',
-        height=280
+        height=350
     )
     return fig
 
@@ -2072,7 +2072,8 @@ def main():
             display = df_f.sort_values('סכום_מוחלט', ascending=True)
         
         # הכנת הנתונים
-        view = display.copy()
+        # בחירת עמודות ספציפיות בלבד לתצוגה נקייה
+        view = display[['תאריך', 'תיאור', 'קטגוריה', 'סכום']].copy()
         
         # שימוש ב-st.dataframe לתצוגה מקצועית ואינטראקטיבית
         st.dataframe(
