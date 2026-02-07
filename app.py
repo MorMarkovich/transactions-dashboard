@@ -95,6 +95,27 @@ section[data-testid="stSidebar"] > div {{
     direction: rtl; text-align: right;
     padding: 2rem 1.25rem 3rem;
 }}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] {{
+    direction: rtl !important; text-align: right !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] section {{
+    direction: rtl !important; text-align: right !important;
+    background: {T['input']} !important;
+    border: 2px dashed {T['border_h']} !important;
+    border-radius: 10px !important; padding: 1.25rem !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] section:hover {{
+    border-color: {T['accent']} !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {{
+    background: {T['accent']} !important; color: #fff !important;
+    border: none !important; border-radius: 8px !important;
+    font-weight: 600 !important; padding: 0.6rem 1.25rem !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] small,
+section[data-testid="stSidebar"] [data-testid="stFileUploader"] section > div:first-child > div:first-child {{
+    display: none !important;
+}}
 
 /* === Typography === */
 .dash-header {{
@@ -187,6 +208,10 @@ section[data-testid="stSidebar"] > div {{
 /* === Form elements === */
 [data-testid="stWidgetLabel"] {{ direction: rtl !important; text-align: right !important; color: {T['text2']} !important; font-weight: 500 !important; }}
 [data-testid="stSelectbox"], [data-testid="stMultiSelect"], [data-testid="stTextInput"] {{ direction: rtl !important; }}
+[data-testid="stMarkdownContainer"] p, [data-testid="stMarkdownContainer"] div {{ direction: rtl; text-align: right; }}
+.stMultiSelect [data-baseweb="tag"] {{ direction: rtl !important; }}
+[data-testid="stFileUploader"] label {{ direction: rtl !important; text-align: right !important; }}
+.stSlider label, .stSlider [data-testid="stWidgetLabel"] {{ direction: rtl !important; text-align: right !important; }}
 [data-baseweb="select"] > div {{ background: {T['input']} !important; border: 1px solid {T['border']} !important; border-radius: 8px !important; color: {T['text1']} !important; }}
 [data-baseweb="select"] span, [data-baseweb="select"] div {{ color: {T['text1']} !important; }}
 [data-baseweb="popover"], [data-baseweb="menu"], ul[role="listbox"] {{ background: {T['surface']} !important; border: 1px solid {T['border']} !important; border-radius: 8px !important; direction: rtl !important; text-align: right !important; }}
@@ -217,6 +242,14 @@ div[data-testid="stPlotlyChart"] {{ background: {T['surface']}; border: 1px soli
 /* === Slider fix === */
 .stSlider [data-baseweb="slider"] div {{ background: {T['accent']} !important; }}
 .stSlider [data-baseweb="slider"] [role="slider"] {{ background: {T['accent']} !important; border-color: {T['accent']} !important; }}
+
+/* === Merchant count buttons === */
+[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"] {{
+    background: {T['surface2']} !important; color: {T['text1']} !important;
+    border: 1px solid {T['border']} !important; border-radius: 8px !important;
+    font-weight: 600 !important; font-size: 0.85rem !important;
+    padding: 0.35rem 0 !important;
+}}
 
 /* === Checkbox === */
 .stCheckbox label span {{ color: {T['text2']} !important; }}
@@ -566,7 +599,8 @@ def main():
     # Sidebar
     with st.sidebar:
         st.markdown(f'<div style="text-align:center;font-weight:700;font-size:1.15rem;color:{T["text1"]};padding-bottom:1rem;border-bottom:1px solid {T["border"]};margin-bottom:1rem">📁 העלאת קובץ</div>', unsafe_allow_html=True)
-        uploaded = st.file_uploader("גרור קובץ לכאן או לחץ לבחירה", type=['xlsx','xls','csv'], label_visibility='collapsed')
+        st.markdown(f'<div style="color:{T["text2"]};font-size:0.85rem;text-align:center;margin-bottom:0.5rem">גרור קובץ או לחץ לבחירה</div>', unsafe_allow_html=True)
+        uploaded = st.file_uploader("העלה קובץ", type=['xlsx','xls','csv'], label_visibility='collapsed')
 
         st.markdown("---")
 
@@ -710,9 +744,24 @@ def main():
                     </div>''', unsafe_allow_html=True)
 
     with tabs[2]:
-        n = st.slider("מספר בתי עסק", 5, 15, 8)
         st.markdown(f'<div class="section-label">🏆 בתי עסק מובילים</div>', unsafe_allow_html=True)
-        st.plotly_chart(chart_merchants(df_f, n), use_container_width=True, key="mr")
+        
+        # Professional count selector
+        if 'merchant_count' not in st.session_state:
+            st.session_state.merchant_count = 8
+        
+        st.markdown(f'<div style="color:{T["text2"]};font-size:0.85rem;margin-bottom:0.5rem">מספר בתי עסק להצגה:</div>', unsafe_allow_html=True)
+        bc1, bc2, bc3, bc4, spacer = st.columns([1,1,1,1,5])
+        with bc1:
+            if st.button("5", key="m5", use_container_width=True): st.session_state.merchant_count = 5; st.rerun()
+        with bc2:
+            if st.button("8", key="m8", use_container_width=True): st.session_state.merchant_count = 8; st.rerun()
+        with bc3:
+            if st.button("10", key="m10", use_container_width=True): st.session_state.merchant_count = 10; st.rerun()
+        with bc4:
+            if st.button("15", key="m15", use_container_width=True): st.session_state.merchant_count = 15; st.rerun()
+        
+        st.plotly_chart(chart_merchants(df_f, st.session_state.merchant_count), use_container_width=True, key="mr")
 
     with tabs[3]:
         st.markdown(f'<div class="section-label">📋 עסקאות</div>', unsafe_allow_html=True)
