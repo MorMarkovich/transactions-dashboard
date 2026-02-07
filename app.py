@@ -74,17 +74,13 @@ st.markdown(f"""
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
 
 /* === Reset & Base === */
-*, *::before, *::after {{
-    font-family: 'Heebo', sans-serif !important;
-    box-sizing: border-box;
-}}
-
-html, body, .stApp {{
-    background: {T['bg']} !important;
-    color: {T['text1']};
-    direction: rtl;
-    text-align: right;
-}}
+*, *::before, *::after {{ font-family: 'Heebo', sans-serif !important; box-sizing: border-box; }}
+html, body, .stApp {{ background: {T['bg']} !important; color: {T['text1']}; direction: rtl; text-align: right; }}
+/* Smooth rendering */
+* {{ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
+img, svg {{ display: block; max-width: 100%; }}
+/* Smooth transitions globally */
+.kpi, .cat-card, .feat, div[data-testid="stPlotlyChart"] {{ transition: all 0.2s cubic-bezier(0.4,0,0.2,1); }}
 
 /* === Hide Streamlit chrome === */
 #MainMenu, footer, header, .stDeployButton,
@@ -187,14 +183,16 @@ section[data-testid="stSidebar"] > div {{
 
 /* === Typography === */
 .dash-header {{
-    text-align: center; padding: 1.5rem 0 0.5rem;
+    text-align: center; padding: 1.25rem 0 0.25rem;
 }}
 .dash-title {{
-    font-size: 2rem; font-weight: 800;
-    color: {T['accent']}; margin: 0;
+    font-size: 1.75rem; font-weight: 800;
+    background: linear-gradient(135deg, {T['accent']}, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin: 0;
 }}
 .dash-subtitle {{
-    color: {T['text2']}; font-size: 0.95rem; margin-top: 4px;
+    color: {T['text2']}; font-size: 0.88rem; margin-top: 2px;
 }}
 .section-label {{
     display: flex; align-items: center; gap: 6px;
@@ -316,45 +314,47 @@ section[data-testid="stSidebar"] .stButton > button:hover {{
     background: {T['border_h']} !important; opacity: 1 !important;
 }}
 
-/* === Slider fix === */
+/* === Slider === */
 .stSlider [data-baseweb="slider"] div {{ background: {T['accent']} !important; }}
 .stSlider [data-baseweb="slider"] [role="slider"] {{ background: {T['accent']} !important; border-color: {T['accent']} !important; }}
 
-/* === Merchant count buttons === */
-[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) button[kind="secondary"] {{
-    background: {T['surface2']} !important; color: {T['text1']} !important;
-    border: 1px solid {T['border']} !important; border-radius: 8px !important;
-    font-weight: 600 !important; font-size: 0.85rem !important;
-    padding: 0.35rem 0 !important;
-}}
-
-/* === Checkbox === */
-.stCheckbox label span {{ color: {T['text2']} !important; }}
-
 /* === Scrollbar === */
-::-webkit-scrollbar {{ width: 6px; }}
+::-webkit-scrollbar {{ width: 5px; height: 5px; }}
 ::-webkit-scrollbar-track {{ background: transparent; }}
-::-webkit-scrollbar-thumb {{ background: {T['border']}; border-radius: 99px; }}
+::-webkit-scrollbar-thumb {{ background: {T['border_h']}; border-radius: 99px; }}
+::-webkit-scrollbar-thumb:hover {{ background: {T['text3']}; }}
 
 /* === Dataframe === */
 [data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; border: 1px solid {T['border']}; }}
 
 /* === Divider === */
-hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.5rem 0; }}
+hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }}
 
-/* === Number input in income === */
-[data-testid="stNumberInput"] input {{
-    background: {T['input']} !important;
-    border: 1px solid {T['border']} !important;
-    border-radius: 8px !important;
-    color: {T['text1']} !important;
-    direction: ltr !important;
-    text-align: right !important;
-}}
-[data-testid="stNumberInput"] button {{
-    background: {T['surface2']} !important;
-    color: {T['text1']} !important;
-    border: 1px solid {T['border']} !important;
+/* === Number input === */
+[data-testid="stNumberInput"] input {{ background: {T['input']} !important; border: 1px solid {T['border']} !important; border-radius: 8px !important; color: {T['text1']} !important; direction: ltr !important; text-align: right !important; }}
+[data-testid="stNumberInput"] button {{ background: {T['surface2']} !important; color: {T['text1']} !important; border: 1px solid {T['border']} !important; }}
+
+/* === Spinner === */
+.stSpinner > div {{ border-color: {T['accent']} transparent transparent transparent !important; }}
+
+/* === Expander === */
+[data-testid="stExpander"] {{ background: {T['surface']} !important; border: 1px solid {T['border']} !important; border-radius: 12px !important; }}
+[data-testid="stExpander"] summary {{ color: {T['text1']} !important; }}
+
+/* === Tab panel smooth entrance === */
+[data-baseweb="tab-panel"] {{ animation: fadeIn 0.25s ease-out; }}
+@keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(6px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+
+/* === KPI hover lift === */
+.kpi:hover {{ transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.15); }}
+.cat-card:hover {{ transform: translateX(-3px); }}
+
+/* === Responsive tweaks === */
+@media(max-width:768px) {{
+    .kpi-row {{ grid-template-columns: repeat(2,1fr) !important; gap: 0.75rem !important; }}
+    .kpi-val {{ font-size: 1.3rem !important; }}
+    .feat-row {{ grid-template-columns: 1fr !important; }}
+    section[data-testid="stSidebar"] {{ min-width: 240px !important; max-width: 260px !important; }}
 }}
 
 /* === Print === */
@@ -414,22 +414,26 @@ document.addEventListener('keydown', (e) => {{
     }}
 }});
 
-// === Init on load ===
-const initAll = () => {{
-    animateCounters();
-    initSmoothTabs();
-}};
-
-// Run after Streamlit renders
-if (document.readyState === 'complete') {{
-    setTimeout(initAll, 500);
-}} else {{
-    window.addEventListener('load', () => setTimeout(initAll, 500));
+// === Tooltip for KPI cards ===
+function addKpiTooltips() {{
+    document.querySelectorAll('.kpi').forEach(el => {{
+        if (el.dataset.tipped) return;
+        el.dataset.tipped = 'true';
+        el.style.cursor = 'default';
+        el.title = el.querySelector('.kpi-label')?.innerText || '';
+    }});
 }}
 
-// Re-run on Streamlit rerender
+// === Init ===
+const initAll = () => {{ animateCounters(); initSmoothTabs(); addKpiTooltips(); }};
+if (document.readyState === 'complete') setTimeout(initAll, 400);
+else window.addEventListener('load', () => setTimeout(initAll, 400));
+
+// Debounced observer for Streamlit rerenders
+let _animTimeout;
 const observer = new MutationObserver(() => {{
-    setTimeout(animateCounters, 200);
+    clearTimeout(_animTimeout);
+    _animTimeout = setTimeout(() => {{ animateCounters(); addKpiTooltips(); }}, 150);
 }});
 observer.observe(document.body, {{ childList: true, subtree: true }});
 </script>
@@ -457,14 +461,16 @@ def fmt(v):
 def icon_for(cat): return CATEGORY_ICONS.get(cat, '📋')
 
 def plotly_layout(**kw):
-    """Base layout for all charts."""
+    """Base layout for all charts -- optimized for speed and dark/light theme."""
     base = dict(
         paper_bgcolor=T['chart_bg'], plot_bgcolor=T['chart_bg'],
         font=dict(family='Heebo', color=T['text2'], size=12),
-        margin=dict(t=20, b=40, l=50, r=20),
-        hoverlabel=dict(bgcolor=T['surface'], font_size=13, font_family='Heebo', bordercolor=T['border_h']),
-        xaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=11), showgrid=False, zeroline=False),
-        yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=11), showgrid=True, zeroline=False),
+        margin=dict(t=16, b=36, l=48, r=16),
+        hoverlabel=dict(bgcolor=T['surface'], font_size=12, font_family='Heebo', bordercolor=T['border_h']),
+        xaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=False, zeroline=False),
+        yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=True, zeroline=False, gridwidth=1),
+        dragmode=False,  # Disable drag for faster interaction
+        modebar_remove=['zoom','pan','select','lasso','zoomIn','zoomOut','autoScale','resetScale'],
     )
     base.update(kw)
     return base
