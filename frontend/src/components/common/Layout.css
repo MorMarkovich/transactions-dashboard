@@ -1,29 +1,67 @@
+/* ========== Layout Shell ========== */
 .layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  direction: rtl;
 }
 
+/* Header + content wrapper below it */
 .layout-content {
   display: flex;
   flex: 1;
-  gap: var(--space-lg);
+  /* RTL: sidebar on the right, main on the left */
+  flex-direction: row;
+  min-height: calc(100vh - var(--header-height, 64px));
 }
 
+/* ========== Main Content ========== */
 .main-content {
   flex: 1;
   padding: var(--space-xl);
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
+  overflow-y: auto;
+  min-height: calc(100vh - var(--header-height, 64px));
+  max-width: 100%;
 }
 
-@media (max-width: 1024px) {
+/* ========== Sidebar Overlay (mobile) ========== */
+.sidebar-overlay {
+  display: none;
+}
+
+/* ========== Responsive: Mobile < 1024px ========== */
+@media (max-width: 1023px) {
   .layout-content {
-    flex-direction: column;
+    position: relative;
   }
-  
+
   .main-content {
     padding: var(--space-md);
+    min-height: calc(100vh - var(--header-height, 64px));
+  }
+
+  /* Mobile overlay backdrop */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: var(--z-overlay, 40);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+  }
+
+  .sidebar-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ========== Desktop >= 1024px ========== */
+@media (min-width: 1024px) {
+  .main-content {
+    max-width: calc(100vw - 280px);
   }
 }

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
   BarChart,
   Bar,
@@ -7,21 +7,40 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Cell,
 } from 'recharts'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-interface WeekdayChartProps {
-  data: { day: string; amount: number }[]
+interface ComparisonChartProps {
+  income: number
+  expenses: number
+  savings: number
   height?: number
 }
 
 interface PayloadEntry {
   name: string
   value: number
-  payload: { day: string; amount: number }
+  payload: { name: string; value: number; color: string }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const COLORS: Record<string, string> = {
+  income: '#34d399',   // green
+  expenses: '#f87171', // red
+  savings: '#818cf8',  // accent / blue-purple
+}
+
+const LABELS: Record<string, string> = {
+  income: 'הכנסות',
+  expenses: 'הוצאות',
+  savings: 'חיסכון',
 }
 
 /* ------------------------------------------------------------------ */
@@ -29,28 +48,40 @@ interface PayloadEntry {
 /* ------------------------------------------------------------------ */
 
 const formatShekel = (v: number): string =>
-  `₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
 const formatAxisShekel = (v: number): string => {
-  if (v >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
+  if (Math.abs(v) >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
   return `₪${v}`
 }
 
 /* ------------------------------------------------------------------ */
-/*  Gradient                                                           */
+/*  Gradients                                                          */
 /* ------------------------------------------------------------------ */
 
-const GRADIENT_ID = 'weekdayGradientFill'
-
-function WeekdayGradient() {
+function ComparisonGradients() {
   return (
     <defs>
-      <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
+      <linearGradient id="gradIncome" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#6ee7b7" stopOpacity={1} />
+        <stop offset="100%" stopColor="#34d399" stopOpacity={0.85} />
+      </linearGradient>
+      <linearGradient id="gradExpenses" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#fca5a5" stopOpacity={1} />
+        <stop offset="100%" stopColor="#f87171" stopOpacity={0.85} />
+      </linearGradient>
+      <linearGradient id="gradSavings" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor="#a78bfa" stopOpacity={1} />
         <stop offset="100%" stopColor="#818cf8" stopOpacity={0.85} />
       </linearGradient>
     </defs>
   )
+}
+
+const GRADIENT_MAP: Record<string, string> = {
+  income: 'url(#gradIncome)',
+  expenses: 'url(#gradExpenses)',
+  savings: 'url(#gradSavings)',
 }
 
 /* ------------------------------------------------------------------ */
@@ -60,11 +91,14 @@ function WeekdayGradient() {
 interface TooltipContentProps {
   active?: boolean
   payload?: PayloadEntry[]
-  label?: string
 }
 
-function ChartTooltip({ active, payload, label }: TooltipContentProps) {
+function ChartTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null
+  const entry = payload[0]
+  const key = entry.payload?.name ?? ''
+  const label = LABELS[key] ?? key
+  const color = COLORS[key] ?? 'var(--text-primary)'
 
   return (
     <div
@@ -78,11 +112,11 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
         fontFamily: 'var(--font-family)',
       }}
     >
-      <p style={{ color: 'var(--text-primary)', margin: 0, fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+      <p style={{ color, margin: 0, fontWeight: 600, fontSize: 'var(--text-sm)' }}>
         {label}
       </p>
       <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: 'var(--text-sm)' }}>
-        {formatShekel(payload[0].value)}
+        {formatShekel(entry.value)}
       </p>
     </div>
   )
@@ -92,25 +126,28 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayChart({
-  data,
-  height = 230,
+const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function ComparisonChart({
+  income,
+  expenses,
+  savings,
+  height = 260,
 }) {
-  if (!data.length) {
-    return (
-      <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-        אין נתונים להצגה
-      </div>
-    )
-  }
+  const chartData = useMemo(
+    () => [
+      { name: 'income', value: income, color: COLORS.income },
+      { name: 'expenses', value: expenses, color: COLORS.expenses },
+      { name: 'savings', value: savings, color: COLORS.savings },
+    ],
+    [income, expenses, savings],
+  )
 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart
-        data={data}
+        data={chartData}
         margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
       >
-        <WeekdayGradient />
+        <ComparisonGradients />
 
         <CartesianGrid
           strokeDasharray="3 3"
@@ -119,7 +156,8 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
         />
 
         <XAxis
-          dataKey="day"
+          dataKey="name"
+          tickFormatter={(key: string) => LABELS[key] ?? key}
           tick={{
             fill: 'var(--text-secondary)',
             fontSize: 13,
@@ -149,15 +187,18 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
         />
 
         <Bar
-          dataKey="amount"
-          fill={`url(#${GRADIENT_ID})`}
+          dataKey="value"
           radius={[4, 4, 0, 0]}
-          maxBarSize={44}
+          maxBarSize={56}
           animationDuration={0}
-        />
+        >
+          {chartData.map((entry) => (
+            <Cell key={entry.name} fill={GRADIENT_MAP[entry.name] ?? entry.color} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )
 })
 
-export default WeekdayChart
+export default ComparisonChart

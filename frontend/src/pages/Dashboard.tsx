@@ -1,136 +1,293 @@
-import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw } from 'lucide-react'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import DonutChart from '../components/charts/DonutChart'
 import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
 import CategoryList from '../components/category/CategoryList'
 import EmptyState from '../components/common/EmptyState'
+import Card from '../components/ui/Card'
+import Skeleton from '../components/ui/Skeleton'
+import Button from '../components/ui/Button'
 import { transactionsApi } from '../services/api'
-import type { MetricsData, ChartData, CategoryData } from '../services/types'
+import type {
+  MetricsData,
+  RawDonutData,
+  RawMonthlyData,
+  RawWeekdayData,
+  CategoryData,
+} from '../services/types'
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function Dashboard() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
-  
-  const [metrics, setMetrics] = useState<MetricsData | null>(null)
-  const [donutChart, setDonutChart] = useState<ChartData | null>(null)
-  const [monthlyChart, setMonthlyChart] = useState<ChartData | null>(null)
-  const [weekdayChart, setWeekdayChart] = useState<ChartData | null>(null)
-  const [categories, setCategories] = useState<CategoryData[]>([])
-  const [loading, setLoading] = useState(false)
 
+  // Data state
+  const [metrics, setMetrics] = useState<MetricsData | null>(null)
+  const [donutData, setDonutData] = useState<RawDonutData | null>(null)
+  const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
+  const [weekdayData, setWeekdayData] = useState<RawWeekdayData | null>(null)
+
+  // UI state
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // ---- Fetch data with AbortController ------------------------------------
   useEffect(() => {
     if (!sessionId) return
 
-    const loadData = async () => {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    const fetchData = async () => {
       setLoading(true)
+      setError(null)
+
       try {
-        const [metricsData, donutData, monthlyData, weekdayData] = await Promise.all([
-          transactionsApi.getMetrics(sessionId),
-          transactionsApi.getDonutChart(sessionId),
-          transactionsApi.getMonthlyChart(sessionId),
-          transactionsApi.getWeekdayChart(sessionId),
+        const [metricsRes, donutRes, monthlyRes, weekdayRes] = await Promise.all([
+          transactionsApi.getMetrics(sessionId, signal),
+          transactionsApi.getDonutChartV2(sessionId, signal),
+          transactionsApi.getMonthlyChartV2(sessionId, signal),
+          transactionsApi.getWeekdayChartV2(sessionId, signal),
         ])
 
-        setMetrics(metricsData)
-        setDonutChart(donutData)
-        setMonthlyChart(monthlyData)
-        setWeekdayChart(weekdayData)
-
-        // Extract categories from donut chart data
-        if (donutData.data && donutData.data[0]?.labels) {
-          const cats: CategoryData[] = donutData.data[0].labels.map((label, i) => ({
-            קטגוריה: label,
-            סכום_מוחלט: donutData.data[0].values?.[i] || 0,
-          }))
-          setCategories(cats)
-        }
-      } catch (error: any) {
-        console.error('Error loading dashboard data:', error)
-        // If session not found (404), redirect to home without session to prompt upload
-        if (error.response?.status === 404) {
-          navigate('/', { replace: true })
-        }
+        setMetrics(metricsRes)
+        setDonutData(donutRes)
+        setMonthlyData(monthlyRes)
+        setWeekdayData(weekdayRes)
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        const message =
+          err instanceof Error ? err.message : '\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05D4\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD'
+        setError(message)
       } finally {
         setLoading(false)
       }
     }
 
-    loadData()
+    fetchData()
+
+    return () => controller.abort()
   }, [sessionId])
 
+  // ---- Derive CategoryData[] from donut data via useMemo ------------------
+  const categories = useMemo<CategoryData[]>(() => {
+    if (!donutData?.categories) return []
+    return donutData.categories.map((cat) => ({
+      '\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4': cat.name,
+      '\u05E1\u05DB\u05D5\u05DD_\u05DE\u05D5\u05D7\u05DC\u05D8': cat.value,
+    }))
+  }, [donutData])
+
+  // ---- Transform monthly data for BarChart --------------------------------
+  const monthlyChartData = useMemo(() => {
+    if (!monthlyData?.months) return []
+    return monthlyData.months.map((m) => ({
+      label: m.month,
+      value: m.amount,
+    }))
+  }, [monthlyData])
+
+  // ---- Transform weekday data for WeekdayChart ----------------------------
+  const weekdayChartData = useMemo(() => {
+    if (!weekdayData?.days) return []
+    return weekdayData.days.map((d) => ({
+      day: d.day,
+      amount: d.amount,
+    }))
+  }, [weekdayData])
+
+  // ---- Transform donut data for DonutChart --------------------------------
+  const donutChartData = useMemo(() => {
+    if (!donutData?.categories) return { data: [], total: 0 }
+    return {
+      data: donutData.categories.map((c) => ({ name: c.name, value: c.value })),
+      total: donutData.total,
+    }
+  }, [donutData])
+
+  // ---- No session: show welcome screen ------------------------------------
   if (!sessionId) {
     return (
       <>
         <EmptyState
-          icon="📊"
-          title="ברוכים הבאים לדאשבורד!"
-          text="העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח"
+          icon="\u{1F4CA}"
+          title={'\u05D1\u05E8\u05D5\u05DB\u05D9\u05DD \u05D4\u05D1\u05D0\u05D9\u05DD \u05DC\u05D3\u05D0\u05E9\u05D1\u05D5\u05E8\u05D3!'}
+          text={'\u05D4\u05E2\u05DC\u05D4 \u05E7\u05D5\u05D1\u05E5 \u05D0\u05E7\u05E1\u05DC \u05D0\u05D5 CSV \u05DE\u05D7\u05D1\u05E8\u05EA \u05D4\u05D0\u05E9\u05E8\u05D0\u05D9 \u05E9\u05DC\u05DA \u05DB\u05D3\u05D9 \u05DC\u05D4\u05EA\u05D7\u05D9\u05DC \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7'}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 'var(--space-lg)',
+            marginTop: 'var(--space-xl)',
+          }}
+        >
           <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <div className="feature-title">ניתוח ויזואלי</div>
-            <div className="feature-desc">גרפים אינטראקטיביים וחכמים לתובנות מיידיות</div>
+            <div className="feature-icon">{'\u{1F4CA}'}</div>
+            <div className="feature-title">{'\u05E0\u05D9\u05EA\u05D5\u05D7 \u05D5\u05D9\u05D6\u05D5\u05D0\u05DC\u05D9'}</div>
+            <div className="feature-desc">
+              {'\u05D2\u05E8\u05E4\u05D9\u05DD \u05D0\u05D9\u05E0\u05D8\u05E8\u05D0\u05E7\u05D8\u05D9\u05D1\u05D9\u05D9\u05DD \u05D5\u05D7\u05DB\u05DE\u05D9\u05DD \u05DC\u05EA\u05D5\u05D1\u05E0\u05D5\u05EA \u05DE\u05D9\u05D9\u05D3\u05D9\u05D5\u05EA'}
+            </div>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">🏷️</div>
-            <div className="feature-title">קטגוריות אוטומטיות</div>
-            <div className="feature-desc">זיהוי אוטומטי של קטגוריות מהקובץ המקורי</div>
+            <div className="feature-icon">{'\u{1F3F7}\uFE0F'}</div>
+            <div className="feature-title">{'\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05D5\u05EA'}</div>
+            <div className="feature-desc">
+              {'\u05D6\u05D9\u05D4\u05D5\u05D9 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05DE\u05D4\u05E7\u05D5\u05D1\u05E5 \u05D4\u05DE\u05E7\u05D5\u05E8\u05D9'}
+            </div>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📑</div>
-            <div className="feature-title">תמיכה מלאה</div>
-            <div className="feature-desc">Excel עם מספר גליונות, CSV בעברית מלאה</div>
+            <div className="feature-icon">{'\u{1F4D1}'}</div>
+            <div className="feature-title">{'\u05EA\u05DE\u05D9\u05DB\u05D4 \u05DE\u05DC\u05D0\u05D4'}</div>
+            <div className="feature-desc">
+              {'Excel \u05E2\u05DD \u05DE\u05E1\u05E4\u05E8 \u05D2\u05DC\u05D9\u05D5\u05E0\u05D5\u05EA, CSV \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05DE\u05DC\u05D0\u05D4'}
+            </div>
           </div>
         </div>
       </>
     )
   }
 
+  // ---- Loading skeleton ---------------------------------------------------
   if (loading) {
-    return <div className="loading">טוען נתונים...</div>
+    return (
+      <div>
+        {/* 4 metric card skeletons */}
+        <div className="metrics-grid">
+          <Skeleton variant="card" count={4} />
+        </div>
+
+        {/* 2-column chart skeleton */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '3fr 2fr',
+            gap: 'var(--space-lg)',
+            marginTop: 'var(--space-xl)',
+          }}
+        >
+          <div>
+            <Skeleton variant="rectangular" height={260} />
+            <div style={{ marginTop: 'var(--space-lg)' }}>
+              <Skeleton variant="rectangular" height={230} />
+            </div>
+          </div>
+          <div>
+            <Skeleton variant="rectangular" height={340} />
+            <div style={{ marginTop: 'var(--space-lg)' }}>
+              <Skeleton variant="rectangular" height={200} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  if (!metrics) {
-    return <div className="error">שגיאה בטעינת הנתונים</div>
+  // ---- Error state --------------------------------------------------------
+  if (error) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--space-2xl)',
+          textAlign: 'center',
+        }}
+      >
+        <p
+          style={{
+            color: 'var(--accent-danger)',
+            fontSize: '1rem',
+            fontWeight: 600,
+            marginBottom: 'var(--space-md)',
+          }}
+        >
+          {error}
+        </p>
+        <Button
+          variant="secondary"
+          icon={<RefreshCw size={16} />}
+          onClick={() => window.location.reload()}
+        >
+          {'\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1'}
+        </Button>
+      </div>
+    )
   }
 
+  // ---- No data loaded yet -------------------------------------------------
+  if (!metrics) return null
+
+  // ---- Main dashboard view ------------------------------------------------
   return (
     <div>
       <MetricsGrid metrics={metrics} />
-      
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '3fr 2fr',
+          gap: 'var(--space-lg)',
+          marginTop: 'var(--space-xl)',
+        }}
+        className="dashboard-grid"
+      >
+        {/* Left column: Monthly + Weekday charts */}
         <div>
           <div className="section-title">
-            <span>📅</span> הוצאות לפי חודש
+            <Calendar size={20} />
+            <span>{'\u05D4\u05D5\u05E6\u05D0\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D7\u05D5\u05D3\u05E9'}</span>
           </div>
-          {monthlyChart && <BarChart data={monthlyChart} />}
+          <Card padding="md">
+            <BarChart data={monthlyChartData} />
+          </Card>
 
           <div className="section-title" style={{ marginTop: 'var(--space-lg)' }}>
-            <span>📆</span> התפלגות לפי יום בשבוע
+            <CalendarDays size={20} />
+            <span>{'\u05D4\u05EA\u05E4\u05DC\u05D2\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D9\u05D5\u05DD \u05D1\u05E9\u05D1\u05D5\u05E2'}</span>
           </div>
-          {weekdayChart && <WeekdayChart data={weekdayChart} />}
+          <Card padding="md">
+            <WeekdayChart data={weekdayChartData} />
+          </Card>
         </div>
 
+        {/* Right column: Donut + Category list */}
         <div>
           <div className="section-title">
-            <span>🥧</span> חלוקה לפי קטגוריה
+            <PieChart size={20} />
+            <span>{'\u05D7\u05DC\u05D5\u05E7\u05D4 \u05DC\u05E4\u05D9 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4'}</span>
           </div>
-          {donutChart && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px 0' }}>
-              <DonutChart data={donutChart} />
-            </div>
-          )}
+          <Card padding="md">
+            {donutChartData.data.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <DonutChart data={donutChartData.data} total={donutChartData.total} />
+              </div>
+            )}
+          </Card>
 
           <div className="section-title" style={{ marginTop: 'var(--space-lg)' }}>
-            <span>📋</span> פירוט קטגוריות
+            <BarChart3 size={20} />
+            <span>{'\u05E4\u05D9\u05E8\u05D5\u05D8 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA'}</span>
           </div>
           {categories.length > 0 && <CategoryList categories={categories} />}
         </div>
       </div>
+
+      {/* Responsive: single column on mobile */}
+      <style>{`
+        @media (max-width: 768px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

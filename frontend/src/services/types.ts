@@ -66,3 +66,99 @@ export interface TransactionFilters {
   page?: number;
   page_size?: number;
 }
+
+// V2 Chart Data (raw format for Recharts)
+export interface RawDonutData {
+  categories: { name: string; value: number }[];
+  total: number;
+}
+
+export interface RawMonthlyData {
+  months: { month: string; amount: number }[];
+}
+
+export interface RawWeekdayData {
+  days: { day: string; amount: number }[];
+}
+
+export interface RawTrendData {
+  points: { date: string; balance: number }[];
+}
+
+// Insights
+export interface InsightData {
+  biggest_expense: {
+    description: string;
+    amount: number;
+    date: string;
+    category: string;
+  };
+  top_merchant: {
+    name: string;
+    count: number;
+    total: number;
+  };
+  expensive_day: {
+    day: string;
+    average: number;
+  };
+  avg_transaction: number;
+  large_transactions: Transaction[];
+}
+
+// Merchants
+export interface MerchantData {
+  merchants: {
+    name: string;
+    total: number;
+    count: number;
+    average: number;
+  }[];
+}
+
+// Trend Statistics
+export interface TrendStats {
+  max_expense: number;
+  daily_avg: number;
+  median: number;
+  transaction_count: number;
+  monthly: {
+    month: string;
+    amount: number;
+    change_pct: number | null;
+  }[];
+}
+
+// Heatmap
+export interface HeatmapData {
+  categories: string[];
+  months: string[];
+  data: number[][];
+}
+
+// Income Management
+export interface Income {
+  id: string;
+  user_id: string;
+  description: string;
+  amount: number;
+  income_type: string;
+  recurring: string;
+  created_at: string;
+}
+
+export interface BudgetSummary {
+  total_income: number;
+  total_expenses: number;
+  balance: number;
+  utilization: number; // percentage 0-100
+}
+
+export interface UploadHistory {
+  id: string;
+  file_name: string;
+  row_count: number;
+  total_expenses: number;
+  total_income: number;
+  uploaded_at: string;
+}

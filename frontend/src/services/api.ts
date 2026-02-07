@@ -8,6 +8,14 @@ import type {
   FileUploadResponse,
   ChartData,
   TransactionFilters,
+  RawDonutData,
+  RawMonthlyData,
+  RawWeekdayData,
+  RawTrendData,
+  InsightData,
+  MerchantData,
+  TrendStats,
+  HeatmapData,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -23,16 +31,17 @@ export const transactionsApi = {
   /**
    * Upload transaction file
    */
-  uploadFile: async (file: File): Promise<FileUploadResponse> => {
+  uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await api.post<FileUploadResponse>('/api/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      signal,
     });
-    
+
     return response.data;
   },
 
@@ -41,11 +50,12 @@ export const transactionsApi = {
    */
   getTransactions: async (
     sessionId: string,
-    filters?: TransactionFilters
+    filters?: TransactionFilters,
+    signal?: AbortSignal
   ): Promise<TransactionResponse> => {
     const params = new URLSearchParams();
     params.append('sessionId', sessionId);
-    
+
     if (filters) {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
@@ -56,17 +66,20 @@ export const transactionsApi = {
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.page_size) params.append('page_size', filters.page_size.toString());
     }
-    
-    const response = await api.get<TransactionResponse>(`/api/transactions?${params.toString()}`);
+
+    const response = await api.get<TransactionResponse>(`/api/transactions?${params.toString()}`, {
+      signal,
+    });
     return response.data;
   },
 
   /**
    * Get metrics
    */
-  getMetrics: async (sessionId: string): Promise<MetricsData> => {
+  getMetrics: async (sessionId: string, signal?: AbortSignal): Promise<MetricsData> => {
     const response = await api.get<MetricsData>('/api/metrics', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
@@ -74,59 +87,65 @@ export const transactionsApi = {
   /**
    * Get categories list
    */
-  getCategories: async (sessionId: string): Promise<string[]> => {
+  getCategories: async (sessionId: string, signal?: AbortSignal): Promise<string[]> => {
     const response = await api.get<string[]>('/api/categories', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
 
   /**
-   * Get donut chart data
+   * Get donut chart data (v1 - Plotly format)
    */
-  getDonutChart: async (sessionId: string): Promise<ChartData> => {
+  getDonutChart: async (sessionId: string, signal?: AbortSignal): Promise<ChartData> => {
     const response = await api.get<ChartData>('/api/charts/donut', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
 
   /**
-   * Get monthly chart data
+   * Get monthly chart data (v1 - Plotly format)
    */
-  getMonthlyChart: async (sessionId: string): Promise<ChartData> => {
+  getMonthlyChart: async (sessionId: string, signal?: AbortSignal): Promise<ChartData> => {
     const response = await api.get<ChartData>('/api/charts/monthly', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
 
   /**
-   * Get weekday chart data
+   * Get weekday chart data (v1 - Plotly format)
    */
-  getWeekdayChart: async (sessionId: string): Promise<ChartData> => {
+  getWeekdayChart: async (sessionId: string, signal?: AbortSignal): Promise<ChartData> => {
     const response = await api.get<ChartData>('/api/charts/weekday', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
 
   /**
-   * Get trend chart data
+   * Get trend chart data (v1 - Plotly format)
    */
-  getTrendChart: async (sessionId: string): Promise<ChartData> => {
+  getTrendChart: async (sessionId: string, signal?: AbortSignal): Promise<ChartData> => {
     const response = await api.get<ChartData>('/api/charts/trend', {
-      params: { sessionId: sessionId },
+      params: { sessionId },
+      signal,
     });
     return response.data;
   },
 
   /**
-   * Get merchants chart data
+   * Get merchants chart data (v1 - Plotly format)
    */
-  getMerchantsChart: async (sessionId: string, n: number = 8): Promise<ChartData> => {
+  getMerchantsChart: async (sessionId: string, n: number = 8, signal?: AbortSignal): Promise<ChartData> => {
     const response = await api.get<ChartData>('/api/charts/merchants', {
-      params: { sessionId: sessionId, n },
+      params: { sessionId, n },
+      signal,
     });
     return response.data;
   },
@@ -136,21 +155,115 @@ export const transactionsApi = {
    */
   exportTransactions: async (
     sessionId: string,
-    filters?: { start_date?: string; end_date?: string; category?: string }
+    filters?: { start_date?: string; end_date?: string; category?: string },
+    signal?: AbortSignal
   ): Promise<Blob> => {
     const params = new URLSearchParams();
     params.append('sessionId', sessionId);
-    
+
     if (filters) {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
     }
-    
+
     const response = await api.get(`/api/export?${params.toString()}`, {
       responseType: 'blob',
+      signal,
     });
-    
+
+    return response.data;
+  },
+
+  // ─── V2 Chart Endpoints (raw format for Recharts) ─────────────────
+
+  /**
+   * Get donut chart data (v2 - raw Recharts format)
+   */
+  getDonutChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawDonutData> => {
+    const response = await api.get<RawDonutData>('/api/v2/charts/donut', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get monthly chart data (v2 - raw Recharts format)
+   */
+  getMonthlyChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawMonthlyData> => {
+    const response = await api.get<RawMonthlyData>('/api/v2/charts/monthly', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get weekday chart data (v2 - raw Recharts format)
+   */
+  getWeekdayChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawWeekdayData> => {
+    const response = await api.get<RawWeekdayData>('/api/v2/charts/weekday', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get trend chart data (v2 - raw Recharts format)
+   */
+  getTrendChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawTrendData> => {
+    const response = await api.get<RawTrendData>('/api/v2/charts/trend', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  // ─── Insights & Analytics ─────────────────────────────────────────
+
+  /**
+   * Get transaction insights (biggest expense, top merchant, etc.)
+   */
+  getInsights: async (sessionId: string, signal?: AbortSignal): Promise<InsightData> => {
+    const response = await api.get<InsightData>('/api/insights', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get top merchants with aggregated stats
+   */
+  getMerchants: async (sessionId: string, n?: number, signal?: AbortSignal): Promise<MerchantData> => {
+    const response = await api.get<MerchantData>('/api/merchants', {
+      params: { sessionId, ...(n !== undefined && { n }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get trend statistics (max expense, daily avg, median, monthly changes)
+   */
+  getTrendStats: async (sessionId: string, signal?: AbortSignal): Promise<TrendStats> => {
+    const response = await api.get<TrendStats>('/api/trends/stats', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get heatmap data (categories x months matrix)
+   */
+  getHeatmap: async (sessionId: string, signal?: AbortSignal): Promise<HeatmapData> => {
+    const response = await api.get<HeatmapData>('/api/charts/heatmap', {
+      params: { sessionId },
+      signal,
+    });
     return response.data;
   },
 };
