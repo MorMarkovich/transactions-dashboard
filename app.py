@@ -729,16 +729,22 @@ def chart_trend(df):
 # UI Components
 # =============================================================================
 def render_kpis(df):
+    init_income_state()
     total = len(df)
     exp = df[df['סכום'] < 0]
     spent = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
-    income = df[df['סכום'] > 0]['סכום'].sum()
+    # Income = transactions income + manually entered incomes
+    tx_income = df[df['סכום'] > 0]['סכום'].sum()
+    manual_income = get_total_income()
+    income = tx_income + manual_income
     avg = df['סכום_מוחלט'].mean() if not df.empty else 0
+    balance = income - spent
+    bal_color = T['green'] if balance >= 0 else T['red']
     cards = [
         ('💳', f'linear-gradient(135deg,{T["accent"]},#6d28d9)', f'{total:,}', 'עסקאות'),
         ('📉', f'linear-gradient(135deg,#f87171,#dc2626)', fmt(spent), 'הוצאות'),
         ('📈', f'linear-gradient(135deg,#34d399,#059669)', fmt(income), 'הכנסות'),
-        ('📊', f'linear-gradient(135deg,#38bdf8,#0284c7)', fmt(avg), 'ממוצע לעסקה'),
+        ('💰', f'linear-gradient(135deg,#38bdf8,#0284c7)', fmt(balance), 'מאזן'),
     ]
     html = '<div class="kpi-row">'
     for ic, bg, val, label in cards:
