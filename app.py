@@ -788,7 +788,16 @@ def export_excel(df):
 # =============================================================================
 def init_income_state():
     if 'incomes' not in st.session_state:
-        st.session_state.incomes = []
+        # Try loading from DB
+        db_incomes = load_incomes()
+        if db_incomes:
+            st.session_state.incomes = [
+                {'desc': i.get('description',''), 'amount': float(i.get('amount',0)),
+                 'type': i.get('income_type','אחר'), 'recurring': i.get('recurring','חד-פעמי')}
+                for i in db_incomes
+            ]
+        else:
+            st.session_state.incomes = []
 
 def get_total_income():
     return sum(item['amount'] for item in st.session_state.incomes)
@@ -812,37 +821,39 @@ def render_income_tab(df_f):
         
         if st.button("➕ הוסף הכנסה", use_container_width=True, key="add_income"):
             if inc_amount > 0 and inc_desc:
+                # Save to session
                 st.session_state.incomes.append({
-                    'desc': inc_desc,
-                    'amount': inc_amount,
-                    'type': inc_type,
-                    'recurring': inc_recurring,
+                    'desc': inc_desc, 'amount': inc_amount,
+                    'type': inc_type, 'recurring': inc_recurring,
                 })
+                # Save to DB
+                save_income(inc_desc, inc_amount, inc_type, inc_recurring)
                 st.rerun()
             else:
                 st.warning("נא למלא תיאור וסכום")
         
         # Income list
         if st.session_state.incomes:
-            st.markdown(f'<div class="section-label" style="margin-top:1.5rem">📋 הכנסות שהוזנו</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label" style="margin-top:1.5rem">📋 הכנסות ({len(st.session_state.incomes)})</div>', unsafe_allow_html=True)
+            type_icons = {'משכורת':'💼','פרילנס':'💻','השקעות':'📈','מתנה':'🎁','החזר':'🔄','אחר':'📌'}
             for i, item in enumerate(st.session_state.incomes):
-                type_icons = {'משכורת':'💼','פרילנס':'💻','השקעות':'📈','מתנה':'🎁','החזר':'🔄','אחר':'📌'}
                 ic = type_icons.get(item['type'], '📌')
-                rec_badge = f'<span style="background:{T["accent_bg"]};color:{T["accent"]};padding:2px 8px;border-radius:4px;font-size:0.7rem">{item["recurring"]}</span>' if item['recurring'] != 'חד-פעמי' else ''
-                
-                st.markdown(f'''<div class="cat-card" style="justify-content:space-between">
-                    <div style="display:flex;align-items:center;gap:0.75rem">
-                        <div class="cat-icon" style="background:{T['green']}22;color:{T['green']}">{ic}</div>
-                        <div>
-                            <div style="font-weight:600;color:{T['text1']};font-size:0.85rem">{item['desc']}</div>
-                            <div style="color:{T['text3']};font-size:0.75rem">{item['type']} {rec_badge}</div>
-                        </div>
-                    </div>
-                    <div style="font-weight:700;color:{T['green']};font-size:1rem;direction:ltr">₪{item['amount']:,.0f}</div>
-                </div>''', unsafe_allow_html=True)
+                amt_str = f"₪{item['amount']:,.0f}"
+                rec_text = item['recurring']
+                rec_html = ''
+                if rec_text != 'חד-פעמי':
+                    rec_html = f' <span style="background:{T["accent_bg"]};color:{T["accent"]};padding:1px 6px;border-radius:4px;font-size:0.68rem">{rec_text}</span>'
+                st.markdown(
+                    f'<div class="cat-card" style="justify-content:space-between">'
+                    f'<div style="display:flex;align-items:center;gap:0.75rem">'
+                    f'<div class="cat-icon" style="background:{T["green"]}22;color:{T["green"]}">{ic}</div>'
+                    f'<div><div style="font-weight:600;color:{T["text1"]};font-size:0.85rem">{item["desc"]}</div>'
+                    f'<div style="color:{T["text3"]};font-size:0.75rem">{item["type"]}{rec_html}</div></div></div>'
+                    f'<div style="font-weight:700;color:{T["green"]};font-size:1rem;direction:ltr">{amt_str}</div>'
+                    f'</div>', unsafe_allow_html=True)
             
-            # Delete button
             if st.button("🗑️ נקה הכל", key="clear_incomes"):
+                delete_all_incomes()
                 st.session_state.incomes = []
                 st.rerun()
     
@@ -1472,203 +1483,127 @@ def _render_dashboard(df):
 # Auth UI - Premium Design
 # =============================================================================
 def render_auth_page():
-    """Premium login/register page -- no broken HTML wrappers."""
+    """Compact login page -- two-column layout like modern SaaS."""
     init_auth_state()
     page = st.session_state.auth_page
 
-    # Auth-only CSS: style the COLUMN itself as the card, hide sidebar
+    # Auth CSS
     st.markdown(f"""
     <style>
-    /* Hide sidebar completely on auth */
     section[data-testid="stSidebar"],
     [data-testid="collapsedControl"],
     button[aria-label="Collapse sidebar"],
-    button[aria-label="Expand sidebar"] {{
-        display: none !important;
-    }}
-    /* Make the center column LOOK like a card */
-    [data-testid="stAppViewBlockContainer"] {{
-        max-width: 460px !important;
-        margin: 0 auto !important;
-        padding-top: 3rem !important;
-    }}
-    /* Glassmorphism card effect on the main block */
-    .stMainBlockContainer {{
-        max-width: 480px !important;
-        margin: 0 auto !important;
-    }}
-    /* Input styling */
-    [data-testid="stTextInput"] {{
-        margin-bottom: 0.25rem;
-    }}
+    button[aria-label="Expand sidebar"] {{ display: none !important; }}
+    [data-testid="stAppViewBlockContainer"] {{ max-width: 900px !important; margin: 0 auto !important; padding-top: 2rem !important; }}
+    [data-testid="stTextInput"] {{ margin-bottom: 0.2rem; }}
     [data-testid="stTextInput"] input {{
-        background: {T['surface2']} !important;
-        border: 1.5px solid {T['border']} !important;
-        border-radius: 12px !important;
-        padding: 0.8rem 1rem !important;
-        font-size: 0.95rem !important;
-        color: {T['text1']} !important;
-        transition: border-color 0.2s, box-shadow 0.2s !important;
+        background: {T['surface2']} !important; border: 1.5px solid {T['border']} !important;
+        border-radius: 10px !important; padding: 0.7rem 0.9rem !important;
+        font-size: 0.92rem !important; color: {T['text1']} !important;
     }}
-    [data-testid="stTextInput"] input:focus {{
-        border-color: {T['accent']} !important;
-        box-shadow: 0 0 0 3px rgba(129,140,248,0.12) !important;
-    }}
-    [data-testid="stTextInput"] input::placeholder {{
-        color: {T['text3']} !important;
-    }}
-    /* Primary button - gradient */
+    [data-testid="stTextInput"] input:focus {{ border-color: {T['accent']} !important; box-shadow: 0 0 0 3px rgba(129,140,248,0.1) !important; }}
+    [data-testid="stTextInput"] input::placeholder {{ color: {T['text3']} !important; }}
     .stButton > button {{
-        background: linear-gradient(135deg, #818cf8, #6d28d9) !important;
-        color: #fff !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 0.8rem !important;
-        font-size: 1rem !important;
-        font-weight: 700 !important;
-        box-shadow: 0 4px 20px rgba(129,140,248,0.3) !important;
-        transition: transform 0.15s, box-shadow 0.15s !important;
-        letter-spacing: 0.3px !important;
+        background: linear-gradient(135deg, #818cf8, #6d28d9) !important; color: #fff !important;
+        border: none !important; border-radius: 10px !important; padding: 0.7rem !important;
+        font-size: 0.95rem !important; font-weight: 700 !important;
+        box-shadow: 0 4px 16px rgba(129,140,248,0.25) !important;
     }}
-    .stButton > button:hover {{
-        transform: translateY(-2px) !important;
-        box-shadow: 0 8px 30px rgba(129,140,248,0.4) !important;
-    }}
-    .stButton > button:active {{
-        transform: translateY(0) !important;
-    }}
+    .stButton > button:hover {{ transform: translateY(-1px) !important; box-shadow: 0 6px 24px rgba(129,140,248,0.35) !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-    # ─── Logo ───
-    st.markdown(f'''
-    <div style="text-align:center;padding:1rem 0 0.5rem">
-        <div style="width:72px;height:72px;background:linear-gradient(135deg,#818cf8,#6d28d9);
-            border-radius:20px;display:inline-flex;align-items:center;justify-content:center;
-            font-size:2rem;box-shadow:0 8px 32px rgba(129,140,248,0.25);margin-bottom:1rem">💳</div>
-        <div style="font-size:1.7rem;font-weight:800;color:{T['text1']}">מנתח עסקאות</div>
-        <div style="color:{T['text2']};font-size:0.88rem;margin-top:4px">ניתוח חכם של הוצאות כרטיס האשראי שלך</div>
-    </div>
-    ''', unsafe_allow_html=True)
+    # Two-column layout: left = branding, right = form
+    col_brand, col_form = st.columns([1, 1], gap="large")
 
-    # ─── Card area (styled via column background) ───
-    st.markdown(f'''
-    <div style="background:{T['surface']};border:1px solid {T['border']};border-radius:20px;
-        padding:1.75rem 1.5rem 0.5rem;margin:1rem 0;box-shadow:0 8px 40px rgba(0,0,0,0.12)">
-    </div>
-    ''', unsafe_allow_html=True)
+    with col_brand:
+        st.markdown(f'''
+        <div style="display:flex;flex-direction:column;justify-content:center;height:100%;padding:2rem 1rem">
+            <div style="width:56px;height:56px;background:linear-gradient(135deg,#818cf8,#6d28d9);
+                border-radius:16px;display:flex;align-items:center;justify-content:center;
+                font-size:1.6rem;box-shadow:0 6px 24px rgba(129,140,248,0.2);margin-bottom:1.25rem">💳</div>
+            <div style="font-size:1.5rem;font-weight:800;color:{T['text1']};margin-bottom:0.4rem">מנתח עסקאות</div>
+            <div style="color:{T['text2']};font-size:0.88rem;line-height:1.6;margin-bottom:1.5rem">ניתוח חכם של הוצאות כרטיס האשראי שלך. העלה קובץ, קבל תובנות.</div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:0.4rem"><span style="font-size:1rem">🔒</span><span style="font-size:0.78rem;color:{T['text3']}">מאובטח</span></div>
+                <div style="display:flex;align-items:center;gap:0.4rem"><span style="font-size:1rem">☁️</span><span style="font-size:0.78rem;color:{T['text3']}">שמירה בענן</span></div>
+                <div style="display:flex;align-items:center;gap:0.4rem"><span style="font-size:1rem">📊</span><span style="font-size:0.78rem;color:{T['text3']}">ניתוח חכם</span></div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
-    # Since we can't wrap st widgets in HTML divs, we use CSS to style
-    # the entire page container as our "card". The visual card above is decorative.
-    # The real trick: constrain max-width to 460px and style all children.
-
-    # ─── LOGIN ───
-    if page == 'login':
-        st.markdown(f'<div style="text-align:center;font-size:1.15rem;font-weight:700;color:{T["text1"]};margin:0.5rem 0 1.25rem">👋 ברוך הבא!</div>', unsafe_allow_html=True)
-
-        email = st.text_input("אימייל", placeholder="name@example.com", key="login_email", label_visibility="collapsed")
-        password = st.text_input("סיסמה", type="password", placeholder="הסיסמה שלך", key="login_pass", label_visibility="collapsed")
-
-        if st.button("התחבר  →", use_container_width=True, key="login_btn"):
-            if not email or not password:
-                st.error("נא למלא אימייל וסיסמה")
-            elif not validate_email(email):
-                st.error("כתובת מייל לא תקינה")
-            else:
-                ok, msg = sign_in(email, password)
-                if ok:
-                    settings = load_user_settings()
-                    if settings.get('theme'):
-                        st.session_state.theme = settings['theme']
-                    st.rerun()
+    with col_form:
+        # ─── LOGIN ───
+        if page == 'login':
+            st.markdown(f'<div style="font-size:1.1rem;font-weight:700;color:{T["text1"]};margin-bottom:1rem">👋 התחברות</div>', unsafe_allow_html=True)
+            email = st.text_input("אימייל", placeholder="name@example.com", key="login_email", label_visibility="collapsed")
+            password = st.text_input("סיסמה", type="password", placeholder="סיסמה", key="login_pass", label_visibility="collapsed")
+            if st.button("התחבר →", use_container_width=True, key="login_btn"):
+                if not email or not password: st.error("נא למלא אימייל וסיסמה")
+                elif not validate_email(email): st.error("כתובת מייל לא תקינה")
                 else:
-                    st.error(msg)
-
-        st.markdown(f'<div style="display:flex;align-items:center;gap:1rem;margin:1.25rem 0"><div style="flex:1;height:1px;background:{T["border"]}"></div><span style="color:{T["text3"]};font-size:0.8rem">אין לך חשבון?</span><div style="flex:1;height:1px;background:{T["border"]}"></div></div>', unsafe_allow_html=True)
-
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("📝 צור חשבון", use_container_width=True, key="goto_register"):
-                st.session_state.auth_page = 'register'; st.rerun()
-        with c2:
-            if st.button("🔑 שכחתי סיסמה", use_container_width=True, key="goto_reset"):
-                st.session_state.auth_page = 'reset'; st.rerun()
-
-    # ─── REGISTER ───
-    elif page == 'register':
-        st.markdown(f'<div style="text-align:center;font-size:1.15rem;font-weight:700;color:{T["text1"]};margin:0.5rem 0 1.25rem">✨ יצירת חשבון</div>', unsafe_allow_html=True)
-
-        full_name = st.text_input("שם", placeholder="השם המלא שלך", key="reg_name", label_visibility="collapsed")
-        email = st.text_input("אימייל", placeholder="name@example.com", key="reg_email", label_visibility="collapsed")
-        password = st.text_input("סיסמה", type="password", placeholder="לפחות 6 תווים", key="reg_pass", label_visibility="collapsed")
-        password2 = st.text_input("אימות", type="password", placeholder="הקלד סיסמה שוב", key="reg_pass2", label_visibility="collapsed")
-
-        if st.button("צור חשבון  →", use_container_width=True, key="reg_btn"):
-            if not all([full_name, email, password, password2]):
-                st.error("נא למלא את כל השדות")
-            elif not validate_email(email):
-                st.error("כתובת מייל לא תקינה")
-            elif password != password2:
-                st.error("הסיסמאות לא תואמות")
-            else:
-                ok_p, msg_p = validate_password(password)
-                if not ok_p:
-                    st.error(msg_p)
-                else:
-                    ok, msg = sign_up(email, password, full_name)
+                    ok, msg = sign_in(email, password)
                     if ok:
-                        st.success(msg); st.session_state.auth_page = 'login'
+                        settings = load_user_settings()
+                        if settings.get('theme'): st.session_state.theme = settings['theme']
+                        st.rerun()
+                    else: st.error(msg)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("צור חשבון", use_container_width=True, key="goto_register"):
+                    st.session_state.auth_page = 'register'; st.rerun()
+            with c2:
+                if st.button("שכחתי סיסמה", use_container_width=True, key="goto_reset"):
+                    st.session_state.auth_page = 'reset'; st.rerun()
+
+        # ─── REGISTER ───
+        elif page == 'register':
+            st.markdown(f'<div style="font-size:1.1rem;font-weight:700;color:{T["text1"]};margin-bottom:1rem">✨ הרשמה</div>', unsafe_allow_html=True)
+            full_name = st.text_input("שם", placeholder="שם מלא", key="reg_name", label_visibility="collapsed")
+            email = st.text_input("אימייל", placeholder="name@example.com", key="reg_email", label_visibility="collapsed")
+            c1, c2 = st.columns(2)
+            with c1: password = st.text_input("סיסמה", type="password", placeholder="6+ תווים", key="reg_pass", label_visibility="collapsed")
+            with c2: password2 = st.text_input("אימות", type="password", placeholder="שוב", key="reg_pass2", label_visibility="collapsed")
+            if st.button("צור חשבון →", use_container_width=True, key="reg_btn"):
+                if not all([full_name, email, password, password2]): st.error("נא למלא את כל השדות")
+                elif not validate_email(email): st.error("מייל לא תקין")
+                elif password != password2: st.error("הסיסמאות לא תואמות")
+                else:
+                    ok_p, msg_p = validate_password(password)
+                    if not ok_p: st.error(msg_p)
                     else:
-                        st.error(msg)
+                        ok, msg = sign_up(email, password, full_name)
+                        if ok: st.success(msg); st.session_state.auth_page = 'login'
+                        else: st.error(msg)
+            if st.button("← חזור", use_container_width=True, key="back_login"):
+                st.session_state.auth_page = 'login'; st.rerun()
 
-        st.markdown(f'<div style="display:flex;align-items:center;gap:1rem;margin:1.25rem 0"><div style="flex:1;height:1px;background:{T["border"]}"></div><span style="color:{T["text3"]};font-size:0.8rem">כבר יש לך חשבון?</span><div style="flex:1;height:1px;background:{T["border"]}"></div></div>', unsafe_allow_html=True)
+        # ─── RESET ───
+        elif page == 'reset':
+            st.markdown(f'<div style="font-size:1.1rem;font-weight:700;color:{T["text1"]};margin-bottom:0.5rem">🔑 איפוס סיסמה</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="color:{T["text2"]};font-size:0.82rem;margin-bottom:0.75rem">נשלח לך קישור למייל</div>', unsafe_allow_html=True)
+            email = st.text_input("אימייל", placeholder="name@example.com", key="reset_email", label_visibility="collapsed")
+            if st.button("שלח →", use_container_width=True, key="reset_btn"):
+                if not email: st.error("נא להזין מייל")
+                elif not validate_email(email): st.error("מייל לא תקין")
+                else:
+                    ok, msg = reset_password(email)
+                    if ok: st.success(msg)
+                    else: st.error(msg)
+            if st.button("← חזור", use_container_width=True, key="back_login2"):
+                st.session_state.auth_page = 'login'; st.rerun()
 
-        if st.button("← חזור להתחברות", use_container_width=True, key="back_login"):
-            st.session_state.auth_page = 'login'; st.rerun()
-
-    # ─── RESET ───
-    elif page == 'reset':
-        st.markdown(f'<div style="text-align:center;font-size:1.15rem;font-weight:700;color:{T["text1"]};margin:0.5rem 0 0.5rem">🔑 איפוס סיסמה</div>', unsafe_allow_html=True)
-        st.markdown(f'<div style="text-align:center;color:{T["text2"]};font-size:0.85rem;margin-bottom:1.25rem">נשלח לך קישור לאיפוס למייל</div>', unsafe_allow_html=True)
-
-        email = st.text_input("אימייל", placeholder="name@example.com", key="reset_email", label_visibility="collapsed")
-
-        if st.button("שלח קישור  →", use_container_width=True, key="reset_btn"):
-            if not email:
-                st.error("נא להזין כתובת מייל")
-            elif not validate_email(email):
-                st.error("כתובת מייל לא תקינה")
-            else:
-                ok, msg = reset_password(email)
-                if ok: st.success(msg)
-                else: st.error(msg)
-
-        if st.button("← חזור להתחברות", use_container_width=True, key="back_login2"):
-            st.session_state.auth_page = 'login'; st.rerun()
-
-    # ─── Guest option ───
-    st.markdown(f'<div style="display:flex;align-items:center;gap:1rem;margin:1.5rem 0 1rem"><div style="flex:1;height:1px;background:{T["border"]}"></div><span style="color:{T["text3"]};font-size:0.8rem">או</span><div style="flex:1;height:1px;background:{T["border"]}"></div></div>', unsafe_allow_html=True)
-
-    if st.button("🚀 המשך ללא חשבון", use_container_width=True, key="skip_auth"):
-        st.session_state.auth_user = {"id": "guest", "email": "guest", "name": "אורח"}
-        st.rerun()
-
-    # ─── Theme toggle on auth page ───
-    theme_icon = "☀️" if IS_DARK else "🌙"
-    theme_txt = "מצב בהיר" if IS_DARK else "מצב כהה"
-    if st.button(f"{theme_icon} {theme_txt}", use_container_width=True, key="auth_theme"):
-        st.session_state.theme = 'light' if IS_DARK else 'dark'
-        st.rerun()
-    
-    # ─── Feature badges ───
-    st.markdown(f'''
-    <div style="display:flex;justify-content:center;gap:2.5rem;margin:2rem 0 1rem;flex-wrap:wrap">
-        <div style="text-align:center"><div style="font-size:1.3rem">🔒</div><div style="font-size:0.7rem;color:{T['text3']}">מאובטח</div></div>
-        <div style="text-align:center"><div style="font-size:1.3rem">📊</div><div style="font-size:0.7rem;color:{T['text3']}">ניתוח חכם</div></div>
-        <div style="text-align:center"><div style="font-size:1.3rem">☁️</div><div style="font-size:0.7rem;color:{T['text3']}">שמירה בענן</div></div>
-        <div style="text-align:center"><div style="font-size:1.3rem">🇮🇱</div><div style="font-size:0.7rem;color:{T['text3']}">עברית מלאה</div></div>
-    </div>
-    ''', unsafe_allow_html=True)
+        # Guest + theme
+        st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1rem 0 0.75rem"></div>', unsafe_allow_html=True)
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            if st.button("🚀 המשך כאורח", use_container_width=True, key="skip_auth"):
+                st.session_state.auth_user = {"id": "guest", "email": "guest", "name": "אורח"}; st.rerun()
+        with gc2:
+            theme_icon = "☀️" if IS_DARK else "🌙"
+            theme_txt = "בהיר" if IS_DARK else "כהה"
+            if st.button(f"{theme_icon} {theme_txt}", use_container_width=True, key="auth_theme"):
+                st.session_state.theme = 'light' if IS_DARK else 'dark'; st.rerun()
 
 
 # =============================================================================
