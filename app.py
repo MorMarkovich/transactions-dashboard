@@ -618,44 +618,37 @@ def render_donut(df):
         stops.append(f"{c} {start}% {cumulative}%")
     gradient = ", ".join(stops)
     
-    # Legend items
-    legend_html = ""
+    # Render donut circle
+    donut_html = (
+        '<div style="display:flex;flex-direction:column;align-items:center;padding:0.5rem 0">'
+        '<div style="position:relative;width:200px;height:200px;margin-bottom:1.25rem">'
+        '<div style="width:200px;height:200px;border-radius:50%;'
+        f'background:conic-gradient({gradient});'
+        'display:flex;align-items:center;justify-content:center">'
+        f'<div style="width:130px;height:130px;border-radius:50%;background:{T["surface"]};'
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;'
+        'box-shadow:0 0 20px rgba(0,0,0,0.15)">'
+        f'<div style="font-size:1.25rem;font-weight:800;color:{T["text1"]};direction:ltr">'
+        f'₪{total:,.0f}</div>'
+        f'<div style="font-size:0.72rem;color:{T["text3"]};margin-top:2px">סה״כ הוצאות</div>'
+        '</div></div></div></div>'
+    )
+    st.markdown(donut_html, unsafe_allow_html=True)
+    
+    # Render legend separately
     for i, (_, row) in enumerate(cd.iterrows()):
         c = colors_used[i]
-        legend_html += f'''
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-            <div style="width:10px;height:10px;border-radius:3px;background:{c};flex-shrink:0"></div>
-            <div style="flex:1;font-size:0.8rem;color:{T['text1']};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row['קטגוריה']}</div>
-            <div style="font-size:0.78rem;color:{T['text2']};font-weight:600;direction:ltr;flex-shrink:0">₪{row['סכום_מוחלט']:,.0f}</div>
-            <div style="font-size:0.7rem;color:{T['text3']};flex-shrink:0;min-width:35px;text-align:left">{row['pct']}%</div>
-        </div>'''
-    
-    st.markdown(f'''
-    <div style="display:flex;flex-direction:column;align-items:center;padding:0.5rem 0">
-        <!-- Donut -->
-        <div style="position:relative;width:200px;height:200px;margin-bottom:1.25rem">
-            <div style="
-                width:200px;height:200px;border-radius:50%;
-                background:conic-gradient({gradient});
-                display:flex;align-items:center;justify-content:center;
-            ">
-                <div style="
-                    width:130px;height:130px;border-radius:50%;
-                    background:{T['surface']};
-                    display:flex;flex-direction:column;align-items:center;justify-content:center;
-                    box-shadow:0 0 20px rgba(0,0,0,0.15);
-                ">
-                    <div style="font-size:1.25rem;font-weight:800;color:{T['text1']};direction:ltr">₪{total:,.0f}</div>
-                    <div style="font-size:0.72rem;color:{T['text3']};margin-top:2px">סה״כ הוצאות</div>
-                </div>
-            </div>
-        </div>
-        <!-- Legend -->
-        <div style="width:100%;direction:rtl">
-            {legend_html}
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+        amount_str = f'₪{row["סכום_מוחלט"]:,.0f}'
+        pct_str = f'{row["pct"]}%'
+        line = (
+            '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;direction:rtl">'
+            f'<div style="width:10px;height:10px;border-radius:3px;background:{c};flex-shrink:0"></div>'
+            f'<div style="flex:1;font-size:0.82rem;color:{T["text1"]};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{row["קטגוריה"]}</div>'
+            f'<div style="font-size:0.8rem;color:{T["text2"]};font-weight:600;direction:ltr;flex-shrink:0">{amount_str}</div>'
+            f'<div style="font-size:0.72rem;color:{T["text3"]};flex-shrink:0;min-width:36px;text-align:left">{pct_str}</div>'
+            '</div>'
+        )
+        st.markdown(line, unsafe_allow_html=True)
 
 def chart_monthly(df):
     exp = df[df['סכום'] < 0].copy()
