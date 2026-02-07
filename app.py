@@ -9,38 +9,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 from io import BytesIO
 import re
 from typing import Optional, Dict
 import warnings
-import json
-import time
-import os
 
 warnings.filterwarnings('ignore')
-
-# #region agent log
-def log_debug(message, data, hypothesis_id, location):
-    try:
-        log_dir = r"d:\Transactions\.cursor"
-        os.makedirs(log_dir, exist_ok=True)
-        log_entry = {
-            "sessionId": "debug-session",
-            "runId": "run1",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": int(time.time() * 1000)
-        }
-        with open(os.path.join(log_dir, "debug.log"), "a", encoding="utf-8") as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 # =============================================================================
 # הגדרות
@@ -202,17 +178,17 @@ st.markdown("""
     }
     
     html, body, .stApp {
-        background: #1a1f2e !important;
-        color: #ffffff;
+        background: #0b1120 !important;
+        color: #f1f5f9;
         direction: rtl;
         text-align: right;
     }
     
     .stApp {
         background: 
-            radial-gradient(ellipse at center, rgba(129, 140, 248, 0.06) 0%, transparent 60%),
-            radial-gradient(ellipse at top right, rgba(167, 139, 250, 0.05) 0%, transparent 50%),
-            var(--bg-primary) !important;
+            radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+            #0b1120 !important;
         background-attachment: fixed;
     }
     
@@ -295,14 +271,14 @@ st.markdown("""
     }
     
     .metric-card {
-        background: linear-gradient(180deg, rgba(129, 140, 248, 0.08) 0%, rgba(167, 139, 250, 0.04) 100%), #2a3347;
-        border: 1px solid rgba(255,255,255,0.12);
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.06) 0%, rgba(30, 41, 59, 0.4) 100%), #111827;
+        border: 1px solid rgba(255,255,255,0.08);
         border-radius: 16px;
         padding: 1.5rem;
         text-align: center;
         position: relative;
         overflow: hidden;
-        transition: all 0.25s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
     .metric-card:nth-child(1) { animation-delay: 0.05s; }
@@ -407,8 +383,8 @@ st.markdown("""
     
     /* ========== Chart Containers ========== */
     div[data-testid="stPlotlyChart"] {
-        background: #2a3347;
-        border: 1px solid rgba(255,255,255,0.1);
+        background: #111827;
+        border: 1px solid rgba(255,255,255,0.06);
         border-radius: 12px;
         padding: 1rem;
         margin-bottom: 1rem;
@@ -427,8 +403,8 @@ st.markdown("""
     
     /* ========== Sidebar - Premium Design ========== */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #232a3b 0%, #2a3347 100%) !important;
-        border-left: 1px solid rgba(255,255,255,0.1);
+        background: linear-gradient(180deg, #0f172a 0%, #111827 100%) !important;
+        border-left: 1px solid rgba(255,255,255,0.06);
         direction: rtl;
         min-width: 280px;
         max-width: 320px;
@@ -469,8 +445,8 @@ st.markdown("""
     [data-testid="stFileUploader"] section {
         direction: rtl !important;
         text-align: right !important;
-        background: #333d52 !important;
-        border: 2px dashed rgba(255,255,255,0.2) !important;
+        background: #1f2937 !important;
+        border: 2px dashed rgba(255,255,255,0.12) !important;
         border-radius: 10px !important;
         padding: 1.5rem !important;
         transition: all 0.2s ease !important;
@@ -538,15 +514,15 @@ st.markdown("""
     [data-baseweb="select"] > div {
         direction: rtl !important;
         text-align: right !important;
-        background: #3a4560 !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
+        background: #1f2937 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: var(--radius-sm) !important;
-        color: #ffffff !important;
+        color: #f1f5f9 !important;
     }
     
     [data-baseweb="select"] span,
     [data-baseweb="select"] div {
-        color: #ffffff !important;
+        color: #f1f5f9 !important;
     }
     
     [data-baseweb="select"] [data-baseweb="icon"] {
@@ -561,8 +537,8 @@ st.markdown("""
     ul[role="listbox"] {
         direction: rtl !important;
         text-align: right !important;
-        background: #3a4560 !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
+        background: #1f2937 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: var(--radius-sm) !important;
         box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
     }
@@ -575,12 +551,12 @@ st.markdown("""
     }
     
     ul[role="listbox"] li:hover {
-        background: #4a5873 !important;
+        background: #334155 !important;
     }
     
     ul[role="listbox"] li[aria-selected="true"] {
-        background: #818cf8 !important;
-        color: #ffffff !important;
+        background: #6366f1 !important;
+        color: #f1f5f9 !important;
     }
     
     [data-testid="stDateInput"] > div {
@@ -590,20 +566,20 @@ st.markdown("""
     [data-testid="stDateInput"] input {
         direction: ltr !important;
         text-align: center !important;
-        background: #3a4560 !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
+        background: #1f2937 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: 6px !important;
-        color: #ffffff !important;
+        color: #f1f5f9 !important;
         padding: 10px 12px !important;
     }
     
     [data-testid="stTextInput"] input {
         direction: rtl !important;
         text-align: right !important;
-        background: #3a4560 !important;
-        border: 1px solid rgba(255,255,255,0.15) !important;
+        background: #1f2937 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
         border-radius: 6px !important;
-        color: #ffffff !important;
+        color: #f1f5f9 !important;
         padding: 10px 12px !important;
     }
     
@@ -624,17 +600,17 @@ st.markdown("""
     /* ========== Tabs - Modern Design ========== */
     .stTabs [data-baseweb="tab-list"] {
         gap: 4px;
-        background: #2a3347;
+        background: #111827;
         border-radius: 10px;
         padding: 4px;
         direction: rtl;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.06);
     }
     
     .stTabs [data-baseweb="tab"] {
         background: transparent;
         border-radius: 6px;
-        color: #c5cdd9;
+        color: #94a3b8;
         padding: 0.5rem 1rem;
         font-size: 0.9rem;
         font-weight: 500;
@@ -642,8 +618,8 @@ st.markdown("""
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        color: #ffffff;
-        background: #3a4560;
+        color: #f1f5f9;
+        background: #1f2937;
     }
     
     .stTabs [aria-selected="true"] {
@@ -657,33 +633,33 @@ st.markdown("""
         background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
         color: white;
         border: none;
-        border-radius: 6px;
-        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        padding: 0.6rem 1.5rem;
         font-weight: 600;
         transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);
+        box-shadow: 0 2px 8px rgba(129, 140, 248, 0.25);
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(129, 140, 248, 0.4);
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-glow-sm);
+        box-shadow: 0 6px 20px rgba(129, 140, 248, 0.35);
     }
     
     .stDownloadButton > button {
         background: var(--gradient-secondary);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    }
+    
+    .stDownloadButton > button:hover {
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
     }
     
     /* ========== Category List - Premium ========== */
     .category-card {
-        background: #2a3347;
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px;
-        padding: 1rem;
+        background: #111827;
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
         margin-bottom: 0.5rem;
         display: flex;
         align-items: center;
@@ -692,23 +668,10 @@ st.markdown("""
     }
     
     .category-card:hover {
-        background: #333d52;
-        border-color: rgba(129, 140, 248, 0.4);
-    }
-    
-    .category-card:nth-child(1) { animation-delay: 0.02s; }
-    .category-card:nth-child(2) { animation-delay: 0.04s; }
-    .category-card:nth-child(3) { animation-delay: 0.06s; }
-    .category-card:nth-child(4) { animation-delay: 0.2s; }
-    .category-card:nth-child(5) { animation-delay: 0.25s; }
-    .category-card:nth-child(6) { animation-delay: 0.3s; }
-    .category-card:nth-child(7) { animation-delay: 0.35s; }
-    .category-card:nth-child(8) { animation-delay: 0.4s; }
-    
-    .category-card:hover {
-        border-color: var(--border-accent);
+        background: #1f2937;
+        border-color: rgba(99, 102, 241, 0.3);
         transform: translateX(-4px);
-        box-shadow: var(--shadow-md);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
     
     .category-icon-wrapper {
@@ -791,8 +754,8 @@ st.markdown("""
     
     /* ========== Feature Cards ========== */
     .feature-card {
-        background: linear-gradient(180deg, rgba(129, 140, 248, 0.08) 0%, rgba(167, 139, 250, 0.04) 100%), #2a3347;
-        border: 1px solid rgba(255,255,255,0.1);
+        background: linear-gradient(180deg, rgba(99, 102, 241, 0.06) 0%, rgba(30, 41, 59, 0.4) 100%), #111827;
+        border: 1px solid rgba(255,255,255,0.06);
         border-radius: 16px;
         padding: 2rem;
         text-align: center;
@@ -805,7 +768,6 @@ st.markdown("""
     
     .feature-card:hover {
         transform: translateY(-4px);
-        border-color: rgba(129, 140, 248, 0.4);
         border-color: var(--border-accent);
         box-shadow: var(--shadow-glow-sm);
     }
@@ -854,14 +816,14 @@ st.markdown("""
         border-collapse: separate !important;
         border-spacing: 0 !important;
         direction: rtl !important;
-        background: #2a3347 !important;
+        background: #111827 !important;
         border-radius: 12px !important;
         overflow: hidden !important;
         font-family: 'Heebo', sans-serif !important;
     }
     
     .transactions-table th {
-        background: #333d52 !important;
+        background: #1f2937 !important;
         color: #a5b4fc !important;
         padding: 14px 18px !important;
         text-align: right !important;
@@ -878,8 +840,8 @@ st.markdown("""
         text-align: right !important;
         direction: rtl !important;
         border-bottom: 1px solid rgba(255,255,255,0.08);
-        color: #ffffff;
-        background: #2a3347;
+        color: #e2e8f0;
+        background: #111827;
         unicode-bidi: embed;
         vertical-align: middle !important;
     }
@@ -896,11 +858,11 @@ st.markdown("""
     }
     
     .transactions-table tr:nth-child(even) td {
-        background: #2f3a4d;
+        background: #0f172a;
     }
     
     .transactions-table tr:hover td {
-        background: #3a4560 !important;
+        background: #1f2937 !important;
     }
     
     .transactions-table tr:last-child td {
@@ -936,9 +898,9 @@ st.markdown("""
     .table-scroll {
         max-height: 500px;
         overflow-y: auto;
-        border: 1px solid rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.06);
         border-radius: 12px;
-        background: #2a3347;
+        background: #111827;
     }
     
     /* ========== Metrics in Tabs ========== */
@@ -1413,25 +1375,16 @@ def load_csv(file) -> pd.DataFrame:
 # =============================================================================
 
 def create_donut_chart(df: pd.DataFrame) -> go.Figure:
-    """גרף דונאט מקצועי עם gradient colors"""
+    """גרף דונאט מקצועי"""
     expenses = df[df['סכום'] < 0].copy()
     cat_data = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().reset_index()
     cat_data = cat_data.sort_values('סכום_מוחלט', ascending=False)
 
-    # #region agent log
-    log_debug(
-        "Donut input summary",
-        {"rows": len(df), "expense_rows": len(expenses), "cat_rows": len(cat_data)},
-        "H3",
-        "create_donut_chart:start"
-    )
-    # #endregion
-
     if cat_data.empty:
         fig = go.Figure()
         fig.add_annotation(
-            text="📭 אין נתונים",
-            x=0.5, y=0.5, font=dict(size=16, color='#718096', family='Heebo'),
+            text="אין נתונים",
+            x=0.5, y=0.5, font=dict(size=16, color='#64748b', family='Heebo'),
             showarrow=False
         )
         fig.update_layout(
@@ -1451,47 +1404,51 @@ def create_donut_chart(df: pd.DataFrame) -> go.Figure:
     else:
         cat_data = cat_data.copy()
     
-    # צבעי gradient מקצועיים
-    premium_colors = ['#667eea', '#38ef7d', '#f5576c', '#4facfe', '#fa709a', '#b794f4', '#a0aec0']
+    # Cohesive color palette
+    premium_colors = ['#818cf8', '#34d399', '#f87171', '#38bdf8', '#fbbf24', '#a78bfa', '#94a3b8']
     
     fig = go.Figure(data=[go.Pie(
         labels=cat_data['קטגוריה'],
         values=cat_data['סכום_מוחלט'],
-        hole=0.7,
+        hole=0.72,
         marker=dict(
             colors=premium_colors[:len(cat_data)],
-            line=dict(color='#0a0e14', width=2)
+            line=dict(color='#0b1120', width=3)
         ),
         textinfo='none',
         hovertemplate='<b>%{label}</b><br>₪%{value:,.0f}<br>%{percent}<extra></extra>',
-        showlegend=False,
+        showlegend=True,
         rotation=90
     )])
     
     total = cat_data['סכום_מוחלט'].sum()
     fig.add_annotation(
-        text=f"<b style='font-size:24px;color:#fff'>₪{total:,.0f}</b>",
-        x=0.5, y=0.55, font=dict(size=24, color='#ffffff', family='Heebo'),
+        text=f"<b style='font-size:22px;color:#f1f5f9'>₪{total:,.0f}</b>",
+        x=0.5, y=0.55, font=dict(size=22, color='#f1f5f9', family='Heebo'),
         showarrow=False
     )
     fig.add_annotation(
-        text="<span style='color:#a0aec0'>סה״כ הוצאות</span>",
-        x=0.5, y=0.42, font=dict(size=13, color='#a0aec0', family='Heebo'),
+        text="<span style='color:#94a3b8;font-size:12px'>סה״כ הוצאות</span>",
+        x=0.5, y=0.42, font=dict(size=12, color='#94a3b8', family='Heebo'),
         showarrow=False
     )
     
     fig.update_layout(
-        showlegend=False,
-        margin=dict(t=40, b=40, l=40, r=40),
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.15,
+            xanchor="center",
+            x=0.5,
+            font=dict(color='#cbd5e1', size=11, family='Heebo'),
+            bgcolor='rgba(0,0,0,0)'
+        ),
+        margin=dict(t=20, b=60, l=20, r=20),
         paper_bgcolor='rgba(0,0,0,0)',
-        height=400,
-        width=400,
-        autosize=False
+        height=380,
+        autosize=True
     )
-
-    # #region agent log
-    log_debug("Donut chart layout config", {"layout": fig.layout.to_plotly_json()}, "H3", "create_donut_chart:end")
-    # #endregion
 
     return fig
 
@@ -1531,7 +1488,7 @@ def create_monthly_bars(df: pd.DataFrame) -> go.Figure:
         margin=dict(t=15, b=35, l=55, r=15), height=260,
         font=dict(family='Heebo'),
         bargap=0.3,
-        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#667eea')
+        hoverlabel=dict(bgcolor='#111827', font_size=13, font_family='Heebo', bordercolor='#818cf8')
     )
     return fig
 
@@ -1571,7 +1528,7 @@ def create_weekday_chart(df: pd.DataFrame) -> go.Figure:
         margin=dict(t=15, b=35, l=55, r=15), height=230,
         font=dict(family='Heebo'),
         bargap=0.25,
-        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#b794f4')
+        hoverlabel=dict(bgcolor='#111827', font_size=13, font_family='Heebo', bordercolor='#a78bfa')
     )
     return fig
 
@@ -1615,7 +1572,7 @@ def create_merchants_chart(df: pd.DataFrame, n: int = 8) -> go.Figure:
         margin=dict(t=15, b=35, l=150, r=15), height=max(280, n * 32),
         font=dict(family='Heebo'),
         bargap=0.2,
-        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#38ef7d')
+        hoverlabel=dict(bgcolor='#111827', font_size=13, font_family='Heebo', bordercolor='#34d399')
     )
     return fig
 
@@ -1673,7 +1630,7 @@ def create_trend_chart(df: pd.DataFrame) -> go.Figure:
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=20, b=40, l=65, r=20), height=300,
         font=dict(family='Heebo'),
-        hoverlabel=dict(bgcolor='#1e2530', font_size=13, font_family='Heebo', bordercolor='#667eea'),
+        hoverlabel=dict(bgcolor='#111827', font_size=13, font_family='Heebo', bordercolor='#818cf8'),
         hovermode='x unified'
     )
     return fig
@@ -2021,16 +1978,6 @@ def main():
     if len(dates) == 2:
         df_f = df_f[(df_f['תאריך'].dt.date >= dates[0]) & (df_f['תאריך'].dt.date <= dates[1])]
     
-    # פילטר חכם - הסתרת נתוני זבל (אופציונלי)
-    col_filter1, col_filter2 = st.columns([1, 1])
-    with col_filter1:
-        show_technical = st.checkbox("הצג עסקאות טכניות (0 ש\"ח / המרות)", value=False)
-    
-    if not show_technical:
-        df_f = df_f[df_f['סכום'] != 0]
-        # הסרת שורות המרה אם יש תיאור מתאים
-        df_f = df_f[~df_f['תיאור'].astype(str).str.contains('המרת|עמלת', na=False)]
-
     if cat_filter != 'הכל':
         df_f = df_f[df_f['קטגוריה'] == cat_filter]
     if search:
@@ -2069,50 +2016,7 @@ def main():
             
             # Center the chart using CSS wrapper
             donut_fig = create_donut_chart(df_f)
-            
-            # #region agent log
-            log_debug("Donut chart rendering", {"fig_width": donut_fig.layout.width, "fig_height": donut_fig.layout.height, "use_container_width": False}, "H3", "main:donut_render")
-            # #endregion
-            
-            # Center chart with CSS wrapper
-            st.markdown("""
-            <style>
-            div[data-testid="stPlotlyChart"]:has(> div > div[data-testid="stPlotlyChart"]) {
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                width: 100% !important;
-            }
-            div[data-testid="stPlotlyChart"] > div {
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                width: 100% !important;
-            }
-            </style>
-            <div style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; padding: 20px 0 !important;">
-            """, unsafe_allow_html=True)
-            
-            # Add interactivity - click event
-            try:
-                selection = st.plotly_chart(donut_fig, use_container_width=False, key="donut", on_select="rerun", selection_mode="points")
-                
-                # Handle selection logic
-                if selection and len(selection.selection["points"]) > 0:
-                    selected_point = selection.selection["points"][0]
-                    # Plotly pie chart points have 'label' or 'text' depending on config
-                    # Try to get category name
-                    if "label" in selected_point:
-                        selected_category = selected_point["label"]
-                        st.toast(f"מסנן לפי: {selected_category}")
-                        # We can't easily update the 'cat_filter' widget state from here in a clean way without session state
-                        # But we can display a filtered drill-down below
-                        st.session_state['temp_cat_filter'] = selected_category
-            except Exception as e:
-                # Fallback for older streamlit versions
-                st.plotly_chart(donut_fig, use_container_width=False, key="donut")
-            
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.plotly_chart(donut_fig, use_container_width=True, key="donut")
 
             st.markdown('<div class="section-title"><span>📋</span> פירוט קטגוריות</div>', unsafe_allow_html=True)
             render_category_list(df_f)
@@ -2214,34 +2118,27 @@ def main():
         
         # הכנת הנתונים
         view = display[['תאריך', 'תיאור', 'קטגוריה', 'סכום']].copy()
-        
-        # הזרקת CSS מותאם אישית לטבלה עם צביעה מותנית
-        def highlight_amount(val):
-            color = '#10b981' if val > 0 else '#ef4444'
-            weight = '700'
-            return f'color: {color}; font-weight: {weight}'
 
         st.dataframe(
-            view.style.format({
-                'סכום': '₪{:,.2f}',
-                'תאריך': lambda x: x.strftime('%d/%m/%Y')
-            }).applymap(highlight_amount, subset=['סכום']),
+            view,
             column_config={
-                "תאריך": st.column_config.Column(
+                "תאריך": st.column_config.DateColumn(
                     "תאריך",
-                    width="small"
+                    format="DD/MM/YYYY",
+                    width="small",
                 ),
-                "תיאור": st.column_config.Column(
+                "תיאור": st.column_config.TextColumn(
                     "בית עסק",
-                    width="large"
+                    width="large",
                 ),
-                "קטגוריה": st.column_config.Column(
+                "קטגוריה": st.column_config.TextColumn(
                     "קטגוריה",
-                    width="medium"
+                    width="medium",
                 ),
-                "סכום": st.column_config.Column(
-                    "סכום",
-                    width="small"
+                "סכום": st.column_config.NumberColumn(
+                    "סכום (₪)",
+                    format="₪%.2f",
+                    width="small",
                 ),
             },
             hide_index=True,
