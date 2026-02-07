@@ -12,7 +12,6 @@ from typing import Optional, Dict
 import warnings
 from auth import (
     init_auth_state, is_configured, is_logged_in, get_current_user,
-    cookies_ready, get_cookies,
     sign_in, sign_up, reset_password, logout,
     save_income, load_incomes, delete_all_incomes,
     save_upload_history, load_upload_history,
@@ -1655,11 +1654,6 @@ def render_auth_page():
 # Entry Point
 # =============================================================================
 if __name__ == "__main__":
-    # Wait for cookies to load (required for session persistence)
-    if not cookies_ready():
-        st.spinner("טוען...")
-        st.stop()
-    
     init_auth_state()
     
     if is_configured() and not is_logged_in():
