@@ -64,13 +64,13 @@ st.markdown("""
     
     /* ========== CSS Variables - Design System (Slate Theme) ========== */
     :root {
-        /* Background Colors - Slate Palette */
-        --bg-primary: #0f172a; /* slate-900 */
+        /* Background Colors - Slate Palette - Slightly Darker for better contrast */
+        --bg-primary: #0b1120; /* slate-950 */
         --bg-secondary: #1e293b; /* slate-800 */
         --bg-card: #1e293b; /* slate-800 */
         --bg-card-hover: #334155; /* slate-700 */
         --bg-elevated: #334155; /* slate-700 */
-        --bg-overlay: rgba(15, 23, 42, 0.7);
+        --bg-overlay: rgba(15, 23, 42, 0.85);
         
         /* Text Colors - High Contrast */
         --text-primary: #f8fafc; /* slate-50 */
@@ -78,7 +78,7 @@ st.markdown("""
         --text-muted: #94a3b8; /* slate-400 */
         --text-disabled: #64748b; /* slate-500 */
         
-        /* Accent Colors - Indigo & Emerald */
+        /* Accent Colors - Indigo & Emerald - Increased Vibrancy */
         --accent-primary: #6366f1; /* indigo-500 */
         --accent-primary-light: #818cf8; /* indigo-400 */
         --accent-primary-dark: #4f46e5; /* indigo-600 */
@@ -90,12 +90,12 @@ st.markdown("""
         --accent-pink: #ec4899; /* pink-500 */
         --accent-cyan: #06b6d4; /* cyan-500 */
         
-        /* Gradients */
+        /* Gradients - More Subtle */
         --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         --gradient-secondary: linear-gradient(135deg, #10b981 0%, #34d399 100%);
         --gradient-danger: linear-gradient(135deg, #f43f5e 0%, #ef4444 100%);
-        --gradient-card: linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(30, 41, 59, 0) 100%);
-        --gradient-glow: radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+        --gradient-card: linear-gradient(180deg, rgba(99, 102, 241, 0.03) 0%, rgba(30, 41, 59, 0) 100%);
+        --gradient-glow: radial-gradient(circle at center, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
         
         /* Borders */
         --border-color: #334155; /* slate-700 */
@@ -103,12 +103,12 @@ st.markdown("""
         --border-accent: rgba(99, 102, 241, 0.5);
         
         /* Shadows */
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
-        --shadow-glow-sm: 0 0 10px rgba(99, 102, 241, 0.15);
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.15);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.15);
+        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+        --shadow-glow-sm: 0 0 10px rgba(99, 102, 241, 0.1);
         
         /* Spacing */
         --space-xs: 0.25rem;
@@ -280,7 +280,18 @@ st.markdown("""
     }
     
     @media (max-width: 600px) {
-        .metrics-grid { grid-template-columns: 1fr; }
+        .metrics-grid { 
+            grid-template-columns: 1fr; 
+            gap: var(--space-md);
+        }
+        
+        .metric-card {
+            padding: 1.25rem;
+        }
+        
+        .metric-value {
+            font-size: 1.5rem;
+        }
     }
     
     .metric-card {
@@ -837,7 +848,7 @@ st.markdown("""
         color: var(--accent-warning) !important;
     }
     
-    /* ========== Transactions Table ========== */
+        /* ========== Transactions Table - Improved ========== */
     .transactions-table {
         width: 100% !important;
         border-collapse: separate !important;
@@ -859,6 +870,7 @@ st.markdown("""
         font-size: 0.85rem !important;
         letter-spacing: 0.3px !important;
         border-bottom: 2px solid rgba(255,255,255,0.1) !important;
+        white-space: nowrap !important;
     }
     
     .transactions-table td {
@@ -869,6 +881,18 @@ st.markdown("""
         color: #ffffff;
         background: #2a3347;
         unicode-bidi: embed;
+        vertical-align: middle !important;
+    }
+    
+    /* Conditional coloring classes */
+    .amount-positive {
+        color: var(--accent-secondary) !important;
+        font-weight: 700 !important;
+    }
+    
+    .amount-negative {
+        color: var(--accent-danger) !important;
+        font-weight: 700 !important;
     }
     
     .transactions-table tr:nth-child(even) td {
@@ -1996,6 +2020,17 @@ def main():
     df_f = df.copy()
     if len(dates) == 2:
         df_f = df_f[(df_f['תאריך'].dt.date >= dates[0]) & (df_f['תאריך'].dt.date <= dates[1])]
+    
+    # פילטר חכם - הסתרת נתוני זבל (אופציונלי)
+    col_filter1, col_filter2 = st.columns([1, 1])
+    with col_filter1:
+        show_technical = st.checkbox("הצג עסקאות טכניות (0 ש\"ח / המרות)", value=False)
+    
+    if not show_technical:
+        df_f = df_f[df_f['סכום'] != 0]
+        # הסרת שורות המרה אם יש תיאור מתאים
+        df_f = df_f[~df_f['תיאור'].astype(str).str.contains('המרת|עמלת', na=False)]
+
     if cat_filter != 'הכל':
         df_f = df_f[df_f['קטגוריה'] == cat_filter]
     if search:
@@ -2057,7 +2092,26 @@ def main():
             </style>
             <div style="display: flex !important; justify-content: center !important; align-items: center !important; width: 100% !important; padding: 20px 0 !important;">
             """, unsafe_allow_html=True)
-            st.plotly_chart(donut_fig, use_container_width=False, key="donut")
+            
+            # Add interactivity - click event
+            try:
+                selection = st.plotly_chart(donut_fig, use_container_width=False, key="donut", on_select="rerun", selection_mode="points")
+                
+                # Handle selection logic
+                if selection and len(selection.selection["points"]) > 0:
+                    selected_point = selection.selection["points"][0]
+                    # Plotly pie chart points have 'label' or 'text' depending on config
+                    # Try to get category name
+                    if "label" in selected_point:
+                        selected_category = selected_point["label"]
+                        st.toast(f"מסנן לפי: {selected_category}")
+                        # We can't easily update the 'cat_filter' widget state from here in a clean way without session state
+                        # But we can display a filtered drill-down below
+                        st.session_state['temp_cat_filter'] = selected_category
+            except Exception as e:
+                # Fallback for older streamlit versions
+                st.plotly_chart(donut_fig, use_container_width=False, key="donut")
+            
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown('<div class="section-title"><span>📋</span> פירוט קטגוריות</div>', unsafe_allow_html=True)
@@ -2158,68 +2212,42 @@ def main():
         else:
             display = df_f.sort_values('סכום_מוחלט', ascending=True)
         
-        # #region agent log
-        log_debug("Columns in display dataframe before selection", {"columns": display.columns.tolist(), "shape": display.shape}, "H1", "main:before_view_creation")
-        # #endregion
-
         # הכנת הנתונים
-        # בחירת עמודות ספציפיות בלבד לתצוגה נקייה
         view = display[['תאריך', 'תיאור', 'קטגוריה', 'סכום']].copy()
-
-        # #region agent log
-        log_debug("Columns in view dataframe after selection", {"columns": view.columns.tolist(), "shape": view.shape}, "H1", "main:after_view_creation")
-        # #endregion
-
-        # #region agent log
-        log_debug(
-            "Dataframe dtypes before rendering",
-            {"dtypes": {k: str(v) for k, v in view.dtypes.items()}},
-            "H2",
-            "main:before_dataframe_render"
-        )
-        # #endregion
         
-        # רינדור טבלה עם st.dataframe ו-CSS לייש ור לימין
-        # #region agent log
-        log_debug("Table rendering with st.dataframe", {
-            "rows_count": len(view), 
-            "columns": view.columns.tolist(),
-            "first_row": view.iloc[0].to_dict() if len(view) > 0 else None
-        }, "H2", "main:table_dataframe_render")
-        # #endregion
-        
+        # הזרקת CSS מותאם אישית לטבלה עם צביעה מותנית
+        def highlight_amount(val):
+            color = '#10b981' if val > 0 else '#ef4444'
+            weight = '700'
+            return f'color: {color}; font-weight: {weight}'
+
         st.dataframe(
-            view,
+            view.style.format({
+                'סכום': '₪{:,.2f}',
+                'תאריך': lambda x: x.strftime('%d/%m/%Y')
+            }).applymap(highlight_amount, subset=['סכום']),
             column_config={
-                "תאריך": st.column_config.DateColumn(
+                "תאריך": st.column_config.Column(
                     "תאריך",
-                    help="תאריך ביצוע העסקה",
-                    format="DD/MM/YYYY",
+                    width="small"
                 ),
-                "תיאור": st.column_config.TextColumn(
+                "תיאור": st.column_config.Column(
                     "בית עסק",
-                    help="שם בית העסק ותיאור העסקה",
-                    width="large",
+                    width="large"
                 ),
-                "קטגוריה": st.column_config.TextColumn(
+                "קטגוריה": st.column_config.Column(
                     "קטגוריה",
-                    help="קטגוריית ההוצאה",
-                    width="medium",
+                    width="medium"
                 ),
-                "סכום": st.column_config.NumberColumn(
+                "סכום": st.column_config.Column(
                     "סכום",
-                    help="סכום העסקה בשקלים",
-                    format="₪%.2f",
+                    width="small"
                 ),
             },
             hide_index=True,
             use_container_width=True,
             height=500
         )
-        
-        # #region agent log
-        log_debug("After dataframe render", {"success": True}, "H2", "main:after_dataframe_render")
-        # #endregion
         
         # מידע נוסף
         total_shown = len(view)
