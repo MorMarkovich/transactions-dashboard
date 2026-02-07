@@ -1360,14 +1360,20 @@ def main():
             sort = st.selectbox("מיון", ['תאריך ↓','תאריך ↑','סכום ↓','סכום ↑'])
         smap = {'תאריך ↓':('תאריך',False),'תאריך ↑':('תאריך',True),'סכום ↓':('סכום_מוחלט',False),'סכום ↑':('סכום_מוחלט',True)}
         sc, sa = smap[sort]
-        view = df_f.sort_values(sc, ascending=sa)[['תאריך','תיאור','קטגוריה','סכום']].copy()
-        st.dataframe(view,
-            column_config={
-                "תאריך": st.column_config.DateColumn("תאריך", format="DD/MM/YYYY", width="small"),
-                "תיאור": st.column_config.TextColumn("בית עסק", width="large"),
-                "קטגוריה": st.column_config.TextColumn("קטגוריה", width="medium"),
-                "סכום": st.column_config.NumberColumn("סכום (₪)", format="₪%.2f", width="small"),
-            },
+        # Include source file column if multiple files were uploaded
+        cols_to_show = ['תאריך','תיאור','קטגוריה','סכום']
+        col_config = {
+            "תאריך": st.column_config.DateColumn("תאריך", format="DD/MM/YYYY", width="small"),
+            "תיאור": st.column_config.TextColumn("בית עסק", width="large"),
+            "קטגוריה": st.column_config.TextColumn("קטגוריה", width="medium"),
+            "סכום": st.column_config.NumberColumn("סכום (₪)", format="₪%.2f", width="small"),
+        }
+        if '_מקור' in df_f.columns and df_f['_מקור'].nunique() > 1:
+            cols_to_show = ['תאריך','תיאור','קטגוריה','סכום','_מקור']
+            col_config["_מקור"] = st.column_config.TextColumn("מקור (קובץ)", width="medium")
+        
+        view = df_f.sort_values(sc, ascending=sa)[cols_to_show].copy()
+        st.dataframe(view, column_config=col_config,
             hide_index=True, use_container_width=True, height=500)
         st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:0.5rem;text-align:center">{len(view):,} עסקאות</div>', unsafe_allow_html=True)
 
