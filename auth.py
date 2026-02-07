@@ -30,8 +30,58 @@ def is_configured() -> bool:
 
 
 # =============================================================================
-# Auth State - with session persistence
+# Auth State - with localStorage persistence across refreshes
 # =============================================================================
+def _inject_localstorage_bridge():
+    """Inject JS to bridge localStorage <-> Streamlit query params for session persistence."""
+    import streamlit.components.v1 as components
+    # This JS reads refresh_token from localStorage and writes it to a hidden element
+    # On load, if we have a stored token, it auto-submits to restore session
+    components.html("""
+    <script>
+    const KEY = 'txdash_refresh_token';
+    const stored = localStorage.getItem(KEY);
+    if (stored) {
+        // Write to parent's sessionStorage so Streamlit can read via query params
+        const url = new URL(window.parent.location);
+        if (!url.searchParams.has('_rt')) {
+            url.searchParams.set('_rt', stored);
+            // Only redirect if we don't already have the param
+            if (!window.parent.location.search.includes('_rt=')) {
+                window.parent.location.search = url.searchParams.toString();
+            }
+        }
+    }
+    </script>
+    """, height=0)
+
+
+def _save_token_to_browser(refresh_token: str):
+    """Save refresh token to browser localStorage via JS."""
+    import streamlit.components.v1 as components
+    components.html(f"""
+    <script>
+    localStorage.setItem('txdash_refresh_token', '{refresh_token}');
+    </script>
+    """, height=0)
+
+
+def _clear_token_from_browser():
+    """Clear refresh token from browser localStorage."""
+    import streamlit.components.v1 as components
+    components.html("""
+    <script>
+    localStorage.removeItem('txdash_refresh_token');
+    // Clean URL
+    const url = new URL(window.parent.location);
+    url.searchParams.delete('_rt');
+    if (window.parent.location.search.includes('_rt')) {
+        window.parent.history.replaceState({}, '', url.pathname);
+    }
+    </script>
+    """, height=0)
+
+
 def init_auth_state():
     if 'auth_user' not in st.session_state:
         st.session_state.auth_user = None
@@ -41,17 +91,23 @@ def init_auth_state():
         st.session_state.auth_page = 'login'
     if 'auth_refresh' not in st.session_state:
         st.session_state.auth_refresh = None
-    # Try to restore session from refresh token
-    if st.session_state.auth_user is None and st.session_state.auth_refresh:
-        _try_restore_session()
+    
+    # Try to restore from query param (set by localStorage JS bridge)
+    if st.session_state.auth_user is None:
+        rt = st.query_params.get("_rt")
+        if rt:
+            st.session_state.auth_refresh = rt
+            _try_restore_session()
+
 
 def _try_restore_session():
     """Try to restore user session using refresh token."""
     sb = get_supabase()
-    if not sb or not st.session_state.auth_refresh:
+    token = st.session_state.auth_refresh
+    if not sb or not token:
         return
     try:
-        res = sb.auth.refresh_session(st.session_state.auth_refresh)
+        res = sb.auth.refresh_session(token)
         if res and res.user:
             st.session_state.auth_user = {
                 "id": res.user.id,
@@ -62,6 +118,9 @@ def _try_restore_session():
             st.session_state.auth_refresh = res.session.refresh_token
     except:
         st.session_state.auth_refresh = None
+        # Clear bad token from URL
+        try: st.query_params.clear()
+        except: pass
 
 def get_current_user():
     return st.session_state.get('auth_user')
@@ -77,9 +136,14 @@ def logout():
     st.session_state.auth_user = None
     st.session_state.auth_token = None
     st.session_state.auth_refresh = None
-    # Clear saved transactions
+    # Clear saved transactions from session
     if 'saved_transactions' in st.session_state:
         del st.session_state['saved_transactions']
+    # Clear browser localStorage token
+    _clear_token_from_browser()
+    # Clear URL params
+    try: st.query_params.clear()
+    except: pass
 
 
 # =============================================================================
@@ -121,6 +185,8 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
             }
             st.session_state.auth_token = res.session.access_token
             st.session_state.auth_refresh = res.session.refresh_token
+            # Persist to browser localStorage
+            _save_token_to_browser(res.session.refresh_token)
             return True, "התחברת בהצלחה!"
         return False, "שגיאה בהתחברות"
     except Exception as e:

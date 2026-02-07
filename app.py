@@ -980,16 +980,34 @@ def main():
         # -- Data Management --
         if user and user.get('id') != 'guest' and is_configured():
             st.markdown(f'''<div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>''', unsafe_allow_html=True)
-            if st.button("🗑️ מחק נתונים שמורים", use_container_width=True, key="del_data"):
+            
+            if st.button("🗑️ מחק עסקאות שמורות", use_container_width=True, key="del_data"):
                 delete_transactions()
-                if 'saved_transactions' in st.session_state:
-                    del st.session_state['saved_transactions']
-                st.success("הנתונים נמחקו")
+                st.success("העסקאות נמחקו")
                 st.rerun()
-            if st.button("⚠️ מחק את כל המידע שלי", use_container_width=True, key="del_all"):
-                delete_all_user_data()
-                st.success("כל המידע נמחק")
-                st.rerun()
+            
+            # Two-step confirmation for full delete
+            if 'confirm_delete_all' not in st.session_state:
+                st.session_state.confirm_delete_all = False
+            
+            if not st.session_state.confirm_delete_all:
+                if st.button("⚠️ מחק את כל המידע", use_container_width=True, key="del_all_step1"):
+                    st.session_state.confirm_delete_all = True
+                    st.rerun()
+            else:
+                st.markdown(f'<div style="color:{T["red"]};font-size:0.8rem;text-align:center;margin-bottom:0.5rem;font-weight:600">בטוח? הפעולה בלתי הפיכה!</div>', unsafe_allow_html=True)
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("✅ כן, מחק", use_container_width=True, key="del_confirm"):
+                        delete_all_user_data()
+                        st.session_state.confirm_delete_all = False
+                        st.success("כל המידע נמחק")
+                        st.rerun()
+                with dc2:
+                    if st.button("❌ ביטול", use_container_width=True, key="del_cancel"):
+                        st.session_state.confirm_delete_all = False
+                        st.rerun()
+            
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
         # -- Supported formats --
