@@ -463,7 +463,7 @@ def plotly_layout(**kw):
 # Data Functions
 # =============================================================================
 def detect_header_row(df):
-    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה']
+    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'רכישה', 'פרטי', 'Date', 'Amount']
     for idx in range(min(20, len(df))):
         vals = [str(v).strip() for v in df.iloc[idx].tolist() if pd.notna(v)]
         hits = sum(1 for k in keywords if any(k in v for v in vals))
@@ -949,11 +949,11 @@ def main():
         # -- Upload section --
         st.markdown(f'''
         <div style="margin-bottom:0.6rem">
-            <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.4rem">📁 העלאת קובץ</div>
-            <div style="font-size:0.78rem;color:{T['text3']}">Excel או CSV מחברת האשראי</div>
+            <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.4rem">📁 העלאת קבצים</div>
+            <div style="font-size:0.78rem;color:{T['text3']}">ניתן להעלות מספר קבצים בו-זמנית</div>
         </div>
         ''', unsafe_allow_html=True)
-        uploaded = st.file_uploader("upload", type=['xlsx','xls','csv'], label_visibility='collapsed')
+        uploaded_files = st.file_uploader("upload", type=['xlsx','xls','csv'], label_visibility='collapsed', accept_multiple_files=True)
 
         st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
@@ -991,7 +991,7 @@ def main():
         ''', unsafe_allow_html=True)
 
     # Empty state
-    if not uploaded:
+    if not uploaded_files:
         st.markdown(f'''<div style="text-align:center;padding:3rem 1rem">
             <div style="font-size:3.5rem;margin-bottom:1rem">📊</div>
             <div style="font-size:1.4rem;font-weight:700;color:{T['text1']}">ברוכים הבאים!</div>
@@ -999,7 +999,7 @@ def main():
         </div>''', unsafe_allow_html=True)
         feats = [("📊","ניתוח ויזואלי","גרפים אינטראקטיביים לתובנות מיידיות"),
                  ("🏷️","קטגוריות","זיהוי אוטומטי של קטגוריות מהקובץ"),
-                 ("📑","תמיכה מלאה","Excel, CSV, מרובה גליונות")]
+                 ("📑","תמיכה מלאה","מספר קבצים בו-זמנית, Excel, CSV")]
         html = '<div class="feat-row">'
         for ic, t, d in feats:
             html += f'<div class="feat"><div class="feat-icon">{ic}</div><div class="feat-title">{t}</div><div class="feat-desc">{d}</div></div>'
@@ -1007,26 +1007,47 @@ def main():
         st.markdown(html, unsafe_allow_html=True)
         return
 
-    # Load
-    with st.spinner('טוען...'):
-        sheets = load_excel(uploaded) if uploaded.name.endswith(('.xlsx','.xls')) else {'main': load_csv(uploaded)}
-    if not sheets or (len(sheets)==1 and list(sheets.values())[0].empty):
-        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">❌</span><div><div class="alert-text">שגיאה בטעינה</div><div class="alert-sub">וודא שהקובץ תקין</div></div></div>', unsafe_allow_html=True)
+    # Load all files and merge
+    all_sheets = {}
+    with st.spinner('טוען קבצים...'):
+        for file_idx, uploaded in enumerate(uploaded_files):
+            fname = uploaded.name
+            if fname.endswith(('.xlsx', '.xls')):
+                file_sheets = load_excel(uploaded)
+                for sname, sdf in file_sheets.items():
+                    key = f"{fname} → {sname}" if len(uploaded_files) > 1 else sname
+                    all_sheets[key] = sdf
+            else:
+                csv_df = load_csv(uploaded)
+                if not csv_df.empty:
+                    key = fname if len(uploaded_files) > 1 else 'main'
+                    all_sheets[key] = csv_df
+
+    if not all_sheets:
+        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">❌</span><div><div class="alert-text">שגיאה בטעינה</div><div class="alert-sub">וודא שהקבצים תקינים</div></div></div>', unsafe_allow_html=True)
         return
 
-    # Sheet selection
-    if len(sheets) > 1:
-        selected = st.multiselect("בחר גליונות", list(sheets.keys()), default=list(sheets.keys()))
-        if not selected: st.warning("בחר לפחות גליון אחד"); return
-        df_raw = pd.concat([sheets[s].assign(_s=s) for s in selected], ignore_index=True)
-    else:
-        df_raw = list(sheets.values())[0]
+    # Show loaded files summary
+    if len(uploaded_files) > 1:
+        file_names = ", ".join([f.name for f in uploaded_files])
+        st.markdown(f'''<div style="background:{T['accent_bg']};border:1px solid rgba(129,140,248,0.15);border-radius:10px;padding:0.7rem 1rem;margin-bottom:0.75rem;direction:rtl">
+            <span style="color:{T['accent']};font-weight:600;font-size:0.85rem">📂 {len(uploaded_files)} קבצים נטענו:</span>
+            <span style="color:{T['text2']};font-size:0.8rem;margin-right:0.5rem">{file_names}</span>
+        </div>''', unsafe_allow_html=True)
 
-    # Detect columns
-    date_col = find_column(df_raw, ['תאריך עסקה','תאריך'])
+    # Sheet selection
+    if len(all_sheets) > 1:
+        selected = st.multiselect("בחר גליונות לניתוח", list(all_sheets.keys()), default=list(all_sheets.keys()))
+        if not selected: st.warning("בחר לפחות גליון אחד"); return
+        df_raw = pd.concat([all_sheets[s].assign(_source=s) for s in selected], ignore_index=True)
+    else:
+        df_raw = list(all_sheets.values())[0]
+
+    # Detect columns (supports multiple bank formats)
+    date_col = find_column(df_raw, ['תאריך עסקה','תאריך','תאריך רכישה','תאריך חיוב','Date'])
     amount_col = detect_amount_column(df_raw)
-    desc_col = find_column(df_raw, ['שם בית העסק','תיאור'])
-    cat_col = find_column(df_raw, ['קטגוריה'])
+    desc_col = find_column(df_raw, ['שם בית העסק','תיאור','שם בית עסק','פרטי העסקה','Description'])
+    cat_col = find_column(df_raw, ['קטגוריה','סוג עסקה','Category'])
 
     if not all([date_col, amount_col, desc_col]):
         st.markdown(f'<div class="section-label">⚙️ הגדרה ידנית</div>', unsafe_allow_html=True)
