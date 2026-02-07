@@ -81,40 +81,99 @@ html, body, .stApp {{
 #MainMenu, footer, header, .stDeployButton,
 [data-testid="stElementToolbar"],
 [data-testid="StyledFullScreenButton"],
-[data-testid="stBaseButton-minimal"] {{
+[data-testid="stBaseButton-minimal"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"],
+button[aria-label="Collapse sidebar"],
+button[aria-label="Expand sidebar"],
+.stSidebarCollapsedControl {{
     display: none !important;
+    visibility: hidden !important;
+    width: 0 !important; height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
 }}
 
 /* === Sidebar === */
 section[data-testid="stSidebar"] {{
     background: {T['sidebar']} !important;
     border-left: 1px solid {T['border']};
-    width: 300px;
+    min-width: 280px !important;
+    max-width: 310px !important;
+    width: 295px !important;
 }}
 section[data-testid="stSidebar"] > div {{
     direction: rtl; text-align: right;
-    padding: 2rem 1.25rem 3rem;
+    padding: 1.75rem 1.25rem 3rem;
 }}
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] {{
-    direction: rtl !important; text-align: right !important;
+
+/* -- File uploader complete override -- */
+[data-testid="stFileUploader"] {{
+    direction: rtl !important;
+    text-align: right !important;
 }}
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] section {{
-    direction: rtl !important; text-align: right !important;
+/* Hide ALL default English text from uploader */
+[data-testid="stFileUploader"] section > div:first-child {{
+    display: none !important;
+}}
+[data-testid="stFileUploader"] small {{
+    display: none !important;
+}}
+[data-testid="stFileUploader"] section {{
     background: {T['input']} !important;
     border: 2px dashed {T['border_h']} !important;
-    border-radius: 10px !important; padding: 1.25rem !important;
+    border-radius: 12px !important;
+    padding: 1rem 1rem 0.75rem !important;
+    transition: border-color 0.2s !important;
+    min-height: auto !important;
 }}
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] section:hover {{
+[data-testid="stFileUploader"] section:hover {{
     border-color: {T['accent']} !important;
+    background: {T['accent_bg']} !important;
 }}
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {{
-    background: {T['accent']} !important; color: #fff !important;
-    border: none !important; border-radius: 8px !important;
-    font-weight: 600 !important; padding: 0.6rem 1.25rem !important;
+/* Style the Browse button */
+[data-testid="stFileUploader"] button {{
+    background: {T['accent']} !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 0.55rem 1.5rem !important;
+    width: 100% !important;
+    margin: 0 !important;
+    font-size: 0.9rem !important;
 }}
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] small,
-section[data-testid="stSidebar"] [data-testid="stFileUploader"] section > div:first-child > div:first-child {{
-    display: none !important;
+[data-testid="stFileUploader"] button:hover {{
+    opacity: 0.9 !important;
+}}
+/* Uploaded file chip */
+[data-testid="stFileUploaderFile"] {{
+    direction: rtl !important;
+    background: {T['surface2']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 8px !important;
+    padding: 0.4rem 0.75rem !important;
+    margin-top: 0.5rem !important;
+    font-size: 0.8rem !important;
+    color: {T['text2']} !important;
+}}
+[data-testid="stFileUploaderFile"] span {{
+    color: {T['text2']} !important;
+    direction: ltr !important;
+    unicode-bidi: embed !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 180px !important;
+    display: inline-block !important;
+}}
+[data-testid="stFileUploaderFile"] button {{
+    background: transparent !important;
+    color: {T['red']} !important;
+    border: none !important;
+    padding: 2px !important;
+    width: auto !important;
+    min-width: auto !important;
 }}
 
 /* === Typography === */
@@ -598,23 +657,52 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.markdown(f'<div style="text-align:center;font-weight:700;font-size:1.15rem;color:{T["text1"]};padding-bottom:1rem;border-bottom:1px solid {T["border"]};margin-bottom:1rem">📁 העלאת קובץ</div>', unsafe_allow_html=True)
-        st.markdown(f'<div style="color:{T["text2"]};font-size:0.85rem;text-align:center;margin-bottom:0.5rem">גרור קובץ או לחץ לבחירה</div>', unsafe_allow_html=True)
-        uploaded = st.file_uploader("העלה קובץ", type=['xlsx','xls','csv'], label_visibility='collapsed')
+        # -- Logo / Brand --
+        st.markdown(f'''
+        <div style="text-align:center;padding:0.5rem 0 1.25rem">
+            <div style="font-size:2rem;margin-bottom:0.25rem">💳</div>
+            <div style="font-weight:800;font-size:1.1rem;color:{T['text1']}">מנתח עסקאות</div>
+            <div style="font-size:0.75rem;color:{T['text3']};margin-top:2px">v2.0</div>
+        </div>
+        <div style="height:1px;background:{T['border']};margin-bottom:1.25rem"></div>
+        ''', unsafe_allow_html=True)
 
-        st.markdown("---")
+        # -- Upload section --
+        st.markdown(f'''
+        <div style="margin-bottom:0.6rem">
+            <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.4rem">📁 העלאת קובץ</div>
+            <div style="font-size:0.78rem;color:{T['text3']}">Excel או CSV מחברת האשראי</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        uploaded = st.file_uploader("upload", type=['xlsx','xls','csv'], label_visibility='collapsed')
 
-        # Theme toggle
-        theme_label = "🌙 מצב כהה" if IS_DARK else "☀️ מצב בהיר"
-        if st.button(theme_label, use_container_width=True, key="theme_btn"):
+        st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+
+        # -- Theme toggle --
+        theme_icon = "🌙" if IS_DARK else "☀️"
+        theme_text = "עבור למצב בהיר" if IS_DARK else "עבור למצב כהה"
+        st.markdown(f'''
+        <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🎨 ערכת נושא</div>
+        ''', unsafe_allow_html=True)
+        if st.button(f"{theme_icon} {theme_text}", use_container_width=True, key="theme_btn"):
             st.session_state.theme = 'light' if IS_DARK else 'dark'
             st.rerun()
 
-        st.markdown("---")
-        st.markdown(f'''<div style="padding:0.85rem;background:{T['accent_bg']};border-radius:10px;border:1px solid rgba(129,140,248,0.15)">
-            <div style="font-weight:600;color:{T['accent']};margin-bottom:0.4rem">💡 פורמטים נתמכים</div>
-            <div style="color:{T['text2']};font-size:0.82rem;line-height:1.7">MAX &bull; לאומי &bull; דיסקונט &bull; ויזה כאל &bull; CSV</div>
-        </div>''', unsafe_allow_html=True)
+        st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+
+        # -- Supported formats --
+        st.markdown(f'''
+        <div style="padding:0.85rem;background:{T['accent_bg']};border-radius:10px;border:1px solid rgba(129,140,248,0.12)">
+            <div style="font-weight:600;font-size:0.85rem;color:{T['accent']};margin-bottom:0.5rem">💡 פורמטים נתמכים</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+                <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">MAX</span>
+                <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">לאומי</span>
+                <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">דיסקונט</span>
+                <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">כאל</span>
+                <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">CSV</span>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
     # Empty state
     if not uploaded:
