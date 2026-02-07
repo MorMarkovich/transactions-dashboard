@@ -1192,20 +1192,34 @@ def main():
             # Show change %
             monthly['שינוי'] = monthly['סה״כ'].pct_change(periods=-1) * 100
             for _, row in monthly.iterrows():
-                change_str = ''
-                if pd.notna(row['שינוי']):
+                month_label = str(row['חודש'])
+                tx_count = int(row['עסקאות'])
+                total_str = fmt(row['סה״כ'])
+                # Build change badge
+                badge = ''
+                if pd.notna(row['שינוי']) and row['שינוי'] != 0:
                     ch = row['שינוי']
                     arrow = '↑' if ch > 0 else '↓'
                     ch_color = T['red'] if ch > 0 else T['green']
-                    change_str = f'<span style="color:{ch_color};font-weight:600;font-size:0.8rem">{arrow} {abs(ch):.0f}%</span>'
-                st.markdown(f'''<div class="cat-card" style="justify-content:space-between">
-                    <div style="display:flex;align-items:center;gap:0.75rem">
-                        <div style="font-weight:700;color:{T['text1']};font-size:0.9rem;min-width:65px">{row['חודש']}</div>
-                        <div style="color:{T['text2']};font-size:0.8rem">{int(row['עסקאות'])} עסקאות</div>
-                        {change_str}
-                    </div>
-                    <div style="font-weight:700;color:{T['red']};font-size:0.95rem;direction:ltr">{fmt(row['סה״כ'])}</div>
-                </div>''', unsafe_allow_html=True)
+                    badge = f'{arrow} {abs(ch):.0f}%'
+                    st.markdown(
+                        f'<div class="cat-card" style="justify-content:space-between">'
+                        f'<div style="display:flex;align-items:center;gap:0.75rem">'
+                        f'<div style="font-weight:700;color:{T["text1"]};font-size:0.9rem;min-width:65px">{month_label}</div>'
+                        f'<div style="color:{T["text2"]};font-size:0.8rem">{tx_count} עסקאות</div>'
+                        f'<span style="color:{ch_color};font-weight:600;font-size:0.8rem">{badge}</span>'
+                        f'</div>'
+                        f'<div style="font-weight:700;color:{T["red"]};font-size:0.95rem;direction:ltr">{total_str}</div>'
+                        f'</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(
+                        f'<div class="cat-card" style="justify-content:space-between">'
+                        f'<div style="display:flex;align-items:center;gap:0.75rem">'
+                        f'<div style="font-weight:700;color:{T["text1"]};font-size:0.9rem;min-width:65px">{month_label}</div>'
+                        f'<div style="color:{T["text2"]};font-size:0.8rem">{tx_count} עסקאות</div>'
+                        f'</div>'
+                        f'<div style="font-weight:700;color:{T["red"]};font-size:0.95rem;direction:ltr">{total_str}</div>'
+                        f'</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
     # TAB 2: Merchants - Enhanced
@@ -1559,6 +1573,13 @@ def render_auth_page():
         st.session_state.auth_user = {"id": "guest", "email": "guest", "name": "אורח"}
         st.rerun()
 
+    # ─── Theme toggle on auth page ───
+    theme_icon = "☀️" if IS_DARK else "🌙"
+    theme_txt = "מצב בהיר" if IS_DARK else "מצב כהה"
+    if st.button(f"{theme_icon} {theme_txt}", use_container_width=True, key="auth_theme"):
+        st.session_state.theme = 'light' if IS_DARK else 'dark'
+        st.rerun()
+    
     # ─── Feature badges ───
     st.markdown(f'''
     <div style="display:flex;justify-content:center;gap:2.5rem;margin:2rem 0 1rem;flex-wrap:wrap">
