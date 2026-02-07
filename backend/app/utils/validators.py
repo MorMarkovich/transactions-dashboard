@@ -39,11 +39,11 @@ def clean_amount(value) -> float:
     s_val = str(value).strip()
     
     # הסרת סימן שקל ורווחים
-    s_val = s_val.replace('₪', '').replace('NIS', '').strip()
+    s_val = s_val.replace('₪', '').replace('NIS', '').replace('nis', '').strip()
     
-    # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף)
-    is_negative = '-' in s_val
-    s_val = s_val.replace('-', '').strip()
+    # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף, או תווי מינוס מיוחדים)
+    is_negative = '-' in s_val or '−' in s_val
+    s_val = s_val.replace('-', '').replace('−', '').strip()
     
     # הסרת כל התווים שאינם מספרים או נקודה/פסיק
     s_val = re.sub(r'[^\d.,]', '', s_val)

@@ -61,7 +61,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     
     # ניקוי סכומים
     try:
-        result['סכום'] = result[amount_col].apply(clean_amount)
+        # וידוא שהערכים הם מספריים
+        result['סכום'] = pd.to_numeric(result[amount_col].apply(clean_amount), errors='coerce').fillna(0.0)
     except Exception:
         result['סכום'] = 0.0
 
@@ -69,8 +70,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     amount_col_clean = str(amount_col).strip() if amount_col else ''
     if amount_col_clean == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
         try:
-            fallback = result['סכום עסקה מקורי'].apply(clean_amount)
-            result.loc[result['סכום'] == 0, 'סכום'] = fallback
+            fallback = pd.to_numeric(result['סכום עסקה מקורי'].apply(clean_amount), errors='coerce').fillna(0.0)
+            # עדכון רק היכן שהסכום הוא 0
+            mask_zero = result['סכום'] == 0
+            if mask_zero.any():
+                result.loc[mask_zero, 'סכום'] = fallback[mask_zero]
         except Exception:
             pass
     
