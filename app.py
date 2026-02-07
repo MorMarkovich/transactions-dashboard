@@ -593,41 +593,69 @@ def load_csv(file):
 # =============================================================================
 # Charts
 # =============================================================================
-def chart_donut(df):
+def render_donut(df):
+    """Pure HTML/CSS donut chart - no Plotly bugs."""
     exp = df[df['סכום'] < 0].copy()
     cd = exp.groupby('קטגוריה')['סכום_מוחלט'].sum().reset_index().sort_values('סכום_מוחלט', ascending=False)
     if cd.empty:
-        fig = go.Figure()
-        fig.add_annotation(text="אין נתונים", x=0.5, y=0.5, showarrow=False, font=dict(size=15, color=T['text3']))
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(t=10,b=10,l=10,r=10))
-        return fig
+        st.markdown(f'<div style="text-align:center;padding:2rem;color:{T["text3"]}">אין נתונים</div>', unsafe_allow_html=True)
+        return
     if len(cd) > 6:
         top = cd.head(6).copy()
-        other_sum = cd.iloc[6:]['סכום_מוחלט'].sum()
-        cd = pd.concat([top, pd.DataFrame([{'קטגוריה':'אחר','סכום_מוחלט':other_sum}])], ignore_index=True)
+        cd = pd.concat([top, pd.DataFrame([{'קטגוריה':'אחר','סכום_מוחלט':cd.iloc[6:]['סכום_מוחלט'].sum()}])], ignore_index=True)
     total = cd['סכום_מוחלט'].sum()
-    cd['pct_label'] = (cd['סכום_מוחלט'] / total * 100).round(1).astype(str) + '%'
-    fig = go.Figure(go.Pie(
-        labels=cd['קטגוריה'], values=cd['סכום_מוחלט'], hole=0.65,
-        marker=dict(colors=CHART_COLORS[:len(cd)], line=dict(color=T['bg'], width=2)),
-        textinfo='label+percent',
-        textposition='outside',
-        textfont=dict(size=11, color=T['text2'], family='Heebo'),
-        hovertemplate='<b>%{label}</b><br>₪%{value:,.0f}<br>%{percent}<extra></extra>',
-        pull=[0.03]*len(cd),
-    ))
-    fig.add_annotation(text=f"<b style='font-size:20px'>₪{total:,.0f}</b>", x=0.5, y=0.55, showarrow=False,
-                       font=dict(size=20, color=T['text1'], family='Heebo'))
-    fig.add_annotation(text=f"<span style='font-size:11px'>סה״כ הוצאות</span>", x=0.5, y=0.43, showarrow=False,
-                       font=dict(size=11, color=T['text2'], family='Heebo'))
-    fig.update_layout(
-        showlegend=False,
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=30, b=30, l=30, r=30),
-        height=350,
-        uniformtext_minsize=10, uniformtext_mode='hide',
-    )
-    return fig
+    cd['pct'] = (cd['סכום_מוחלט'] / total * 100).round(1)
+    
+    # Build conic-gradient stops
+    stops = []
+    cumulative = 0
+    colors_used = []
+    for i, (_, row) in enumerate(cd.iterrows()):
+        c = CHART_COLORS[i % len(CHART_COLORS)]
+        colors_used.append(c)
+        start = cumulative
+        cumulative += row['pct']
+        stops.append(f"{c} {start}% {cumulative}%")
+    gradient = ", ".join(stops)
+    
+    # Legend items
+    legend_html = ""
+    for i, (_, row) in enumerate(cd.iterrows()):
+        c = colors_used[i]
+        legend_html += f'''
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+            <div style="width:10px;height:10px;border-radius:3px;background:{c};flex-shrink:0"></div>
+            <div style="flex:1;font-size:0.8rem;color:{T['text1']};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{row['קטגוריה']}</div>
+            <div style="font-size:0.78rem;color:{T['text2']};font-weight:600;direction:ltr;flex-shrink:0">₪{row['סכום_מוחלט']:,.0f}</div>
+            <div style="font-size:0.7rem;color:{T['text3']};flex-shrink:0;min-width:35px;text-align:left">{row['pct']}%</div>
+        </div>'''
+    
+    st.markdown(f'''
+    <div style="display:flex;flex-direction:column;align-items:center;padding:0.5rem 0">
+        <!-- Donut -->
+        <div style="position:relative;width:200px;height:200px;margin-bottom:1.25rem">
+            <div style="
+                width:200px;height:200px;border-radius:50%;
+                background:conic-gradient({gradient});
+                display:flex;align-items:center;justify-content:center;
+            ">
+                <div style="
+                    width:130px;height:130px;border-radius:50%;
+                    background:{T['surface']};
+                    display:flex;flex-direction:column;align-items:center;justify-content:center;
+                    box-shadow:0 0 20px rgba(0,0,0,0.15);
+                ">
+                    <div style="font-size:1.25rem;font-weight:800;color:{T['text1']};direction:ltr">₪{total:,.0f}</div>
+                    <div style="font-size:0.72rem;color:{T['text3']};margin-top:2px">סה״כ הוצאות</div>
+                </div>
+            </div>
+        </div>
+        <!-- Legend -->
+        <div style="width:100%;direction:rtl">
+            {legend_html}
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
 def chart_monthly(df):
     exp = df[df['סכום'] < 0].copy()
@@ -1049,7 +1077,7 @@ def main():
             st.plotly_chart(chart_weekday(df_f), use_container_width=True, key="w")
         with c2:
             st.markdown(f'<div class="section-label">🥧 לפי קטגוריה</div>', unsafe_allow_html=True)
-            st.plotly_chart(chart_donut(df_f), use_container_width=True, key="d")
+            render_donut(df_f)
             st.markdown(f'<div class="section-label">📋 פירוט</div>', unsafe_allow_html=True)
             render_categories(df_f)
 
