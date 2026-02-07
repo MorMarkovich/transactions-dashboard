@@ -789,6 +789,206 @@ def export_excel(df):
         df.to_excel(w, sheet_name='עסקאות', index=False)
     return out.getvalue()
 
+
+def render_data_management_tab(df_f):
+    """Full data management page with view, edit, delete capabilities."""
+    init_income_state()
+    user = get_current_user()
+    is_guest = not user or user.get('id') == 'guest'
+    
+    # ── Overview ──
+    st.markdown(f'<div class="section-label">📊 סיכום נתונים שמורים</div>', unsafe_allow_html=True)
+    
+    exp = df_f[df_f['סכום'] < 0]
+    n_tx = len(df_f)
+    n_incomes = len(st.session_state.get('incomes', []))
+    n_categories = df_f['קטגוריה'].nunique() if not df_f.empty else 0
+    total_exp = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
+    total_inc = get_total_income()
+    
+    # Stats cards
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    overview = [
+        (sc1, '📋', f'{n_tx:,}', 'עסקאות', T['accent']),
+        (sc2, '💰', f'{n_incomes}', 'הכנסות', T['green']),
+        (sc3, '🏷️', f'{n_categories}', 'קטגוריות', T['amber']),
+        (sc4, '📂', f'{len(set(df_f["_מקור"].tolist())) if "_מקור" in df_f.columns else 1}', 'קבצים', T['accent']),
+    ]
+    for col, icon, val, label, color in overview:
+        with col:
+            st.markdown(
+                f'<div class="kpi" style="padding:0.85rem">'
+                f'<div style="font-size:1.2rem;margin-bottom:4px">{icon}</div>'
+                f'<div style="font-size:1.2rem;font-weight:700;color:{color}">{val}</div>'
+                f'<div style="font-size:0.75rem;color:{T["text2"]}">{label}</div>'
+                f'</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div style="height:1rem"></div>', unsafe_allow_html=True)
+    
+    # ── Section: Transactions ──
+    st.markdown(f'<div class="section-label">📋 עסקאות שמורות ({n_tx:,})</div>', unsafe_allow_html=True)
+    
+    if not df_f.empty:
+        # Filter tools
+        fc1, fc2, fc3 = st.columns([2, 2, 1])
+        with fc1:
+            dm_cat = st.selectbox("סנן לפי קטגוריה", ['הכל'] + sorted(df_f['קטגוריה'].unique().tolist()), key="dm_cat")
+        with fc2:
+            dm_search = st.text_input("חיפוש", placeholder="שם בית עסק...", key="dm_search")
+        with fc3:
+            dm_sort = st.selectbox("מיון", ['תאריך ↓', 'סכום ↓'], key="dm_sort")
+        
+        # Apply filters
+        dm_df = df_f.copy()
+        if dm_cat != 'הכל':
+            dm_df = dm_df[dm_df['קטגוריה'] == dm_cat]
+        if dm_search:
+            dm_df = dm_df[dm_df['תיאור'].str.contains(dm_search, case=False, na=False)]
+        
+        sort_col = 'תאריך' if 'תאריך' in dm_sort else 'סכום_מוחלט'
+        dm_df = dm_df.sort_values(sort_col, ascending=False)
+        
+        st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin-bottom:0.5rem">{len(dm_df):,} עסקאות מוצגות</div>', unsafe_allow_html=True)
+        
+        # Show table
+        view_cols = ['תאריך', 'תיאור', 'קטגוריה', 'סכום']
+        if '_מקור' in dm_df.columns and dm_df['_מקור'].nunique() > 1:
+            view_cols.append('_מקור')
+        
+        st.dataframe(
+            dm_df[view_cols],
+            column_config={
+                "תאריך": st.column_config.DateColumn("תאריך", format="DD/MM/YYYY", width="small"),
+                "תיאור": st.column_config.TextColumn("בית עסק", width="large"),
+                "קטגוריה": st.column_config.TextColumn("קטגוריה", width="medium"),
+                "סכום": st.column_config.NumberColumn("סכום (₪)", format="₪%.2f", width="small"),
+                "_מקור": st.column_config.TextColumn("מקור", width="medium"),
+            },
+            hide_index=True, use_container_width=True, height=350)
+        
+        # Delete filtered transactions
+        if dm_cat != 'הכל' or dm_search:
+            st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin:0.5rem 0">💡 הפילטרים מציגים תת-קבוצה. המחיקה מוחקת את <b>כל</b> העסקאות השמורות.</div>', unsafe_allow_html=True)
+        
+        if not is_guest:
+            if st.button("🗑️ מחק את כל העסקאות", key="dm_del_tx", use_container_width=True):
+                delete_transactions()
+                st.session_state['dm_msg'] = "כל העסקאות נמחקו"
+                st.rerun()
+    else:
+        st.markdown(f'<div style="text-align:center;padding:1.5rem;color:{T["text3"]}">אין עסקאות שמורות</div>', unsafe_allow_html=True)
+
+    st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.5rem 0"></div>', unsafe_allow_html=True)
+
+    # ── Section: Incomes ──
+    st.markdown(f'<div class="section-label">💰 הכנסות ({n_incomes})</div>', unsafe_allow_html=True)
+    
+    incomes = st.session_state.get('incomes', [])
+    if incomes:
+        type_icons = {'משכורת':'💼','פרילנס':'💻','השקעות':'📈','מתנה':'🎁','החזר':'🔄','אחר':'📌'}
+        
+        for i, item in enumerate(incomes):
+            ic = type_icons.get(item.get('type',''), '📌')
+            desc = item.get('desc', '')
+            amt = item.get('amount', 0)
+            typ = item.get('type', '')
+            rec = item.get('recurring', 'חד-פעמי')
+            amt_str = f"₪{amt:,.0f}"
+            
+            rec_html = ''
+            if rec != 'חד-פעמי':
+                rec_html = f' <span style="background:{T["accent_bg"]};color:{T["accent"]};padding:1px 6px;border-radius:4px;font-size:0.68rem">{rec}</span>'
+            
+            col_info, col_del = st.columns([6, 1])
+            with col_info:
+                st.markdown(
+                    f'<div class="cat-card" style="margin-bottom:0.25rem">'
+                    f'<div style="display:flex;align-items:center;gap:0.75rem;flex:1">'
+                    f'<div class="cat-icon" style="background:{T["green"]}22;color:{T["green"]}">{ic}</div>'
+                    f'<div><div style="font-weight:600;color:{T["text1"]};font-size:0.85rem">{desc}</div>'
+                    f'<div style="color:{T["text3"]};font-size:0.75rem">{typ}{rec_html}</div></div></div>'
+                    f'<div style="font-weight:700;color:{T["green"]};font-size:0.95rem;direction:ltr">{amt_str}</div>'
+                    f'</div>', unsafe_allow_html=True)
+            with col_del:
+                if not is_guest:
+                    if st.button("🗑️", key=f"del_inc_{i}"):
+                        # Delete from DB
+                        sb = get_supabase()
+                        uid = user["id"] if user else None
+                        if sb and uid:
+                            # Load from DB, find matching, delete
+                            try:
+                                db_incomes = sb.table("incomes").select("id,description,amount").eq("user_id", uid).execute()
+                                if db_incomes.data:
+                                    for db_item in db_incomes.data:
+                                        if db_item['description'] == desc and float(db_item['amount']) == float(amt):
+                                            sb.table("incomes").delete().eq("id", db_item['id']).execute()
+                                            break
+                            except:
+                                pass
+                        # Remove from session
+                        st.session_state.incomes.pop(i)
+                        st.rerun()
+        
+        # Total
+        total_inc_display = sum(x.get('amount', 0) for x in incomes)
+        st.markdown(
+            f'<div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;'
+            f'background:{T["green"]}11;border:1px solid {T["green"]}33;border-radius:10px;margin-top:0.5rem">'
+            f'<div style="color:{T["text1"]};font-weight:600;font-size:0.9rem">סה״כ הכנסות</div>'
+            f'<div style="color:{T["green"]};font-weight:700;font-size:1.1rem;direction:ltr">₪{total_inc_display:,.0f}</div>'
+            f'</div>', unsafe_allow_html=True)
+        
+        if not is_guest:
+            if st.button("🗑️ מחק את כל ההכנסות", key="dm_del_all_inc", use_container_width=True):
+                delete_all_incomes()
+                st.session_state.incomes = []
+                st.rerun()
+    else:
+        st.markdown(f'<div style="text-align:center;padding:1.5rem;color:{T["text3"]}">אין הכנסות. הוסף בטאב "תקציב".</div>', unsafe_allow_html=True)
+    
+    st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.5rem 0"></div>', unsafe_allow_html=True)
+
+    # ── Section: Storage info ──
+    if not is_guest:
+        st.markdown(f'<div class="section-label">☁️ אחסון בענן</div>', unsafe_allow_html=True)
+        
+        st.markdown(
+            f'<div class="kpi" style="padding:1rem">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">'
+            f'<div style="color:{T["text1"]};font-weight:600;font-size:0.9rem">סטטוס חשבון</div>'
+            f'<div style="background:{T["green"]}22;color:{T["green"]};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:600">מחובר</div>'
+            f'</div>'
+            f'<div style="display:flex;gap:2rem;flex-wrap:wrap">'
+            f'<div><div style="color:{T["text3"]};font-size:0.75rem">משתמש</div><div style="color:{T["text1"]};font-size:0.85rem">{user.get("email","")}</div></div>'
+            f'<div><div style="color:{T["text3"]};font-size:0.75rem">עסקאות</div><div style="color:{T["text1"]};font-size:0.85rem">{n_tx:,}</div></div>'
+            f'<div><div style="color:{T["text3"]};font-size:0.75rem">הכנסות</div><div style="color:{T["text1"]};font-size:0.85rem">{n_incomes}</div></div>'
+            f'</div>'
+            f'</div>', unsafe_allow_html=True)
+        
+        st.markdown(f'<div style="height:0.75rem"></div>', unsafe_allow_html=True)
+        
+        # Danger zone
+        st.markdown(
+            f'<div style="background:{T["red"]}08;border:1px solid {T["red"]}22;border-radius:12px;padding:1rem">'
+            f'<div style="font-weight:600;color:{T["red"]};font-size:0.9rem;margin-bottom:0.5rem">⚠️ אזור מסוכן</div>'
+            f'<div style="color:{T["text2"]};font-size:0.8rem;margin-bottom:0.75rem">מחיקת כל המידע מהחשבון לצמיתות. פעולה בלתי הפיכה.</div>'
+            f'</div>', unsafe_allow_html=True)
+        
+        confirm_del = st.text_input("הקלד 'מחק הכל' לאישור", key="dm_danger_confirm", placeholder="מחק הכל", label_visibility="collapsed")
+        if confirm_del == "מחק הכל":
+            if st.button("🚨 מחק את כל המידע שלי", key="dm_danger_go", use_container_width=True):
+                delete_all_user_data()
+                st.session_state.incomes = []
+                st.success("כל המידע נמחק לצמיתות")
+                st.rerun()
+    else:
+        st.markdown(
+            f'<div style="text-align:center;padding:1.5rem;color:{T["text3"]}">'
+            f'<div style="font-size:1.5rem;margin-bottom:0.5rem">🔒</div>'
+            f'<div>התחבר כדי לשמור ולנהל נתונים בענן</div>'
+            f'</div>', unsafe_allow_html=True)
+
 # =============================================================================
 # Income Manager
 # =============================================================================
@@ -1003,48 +1203,6 @@ def main():
                 st.rerun()
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
         
-        # -- Data Management --
-        if user and user.get('id') != 'guest' and is_configured():
-            st.markdown(f'<div style="font-weight:600;font-size:0.9rem;color:{T["text1"]};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>', unsafe_allow_html=True)
-            
-            # Show delete result message if exists
-            if 'dm_msg' in st.session_state and st.session_state.dm_msg:
-                st.success(st.session_state.dm_msg)
-                st.session_state.dm_msg = None
-            
-            # Let user pick what to delete
-            del_choices = st.multiselect(
-                "בחר מה למחוק",
-                ["עסקאות שמורות", "הכנסות", "היסטוריית העלאות", "הגדרות"],
-                key="dm_choices",
-                placeholder="בחר..."
-            )
-            
-            if del_choices:
-                if st.button(f"🗑️ מחק ({len(del_choices)})", use_container_width=True, key="dm_go"):
-                    sb = get_supabase()
-                    uid = user["id"]
-                    deleted = []
-                    if sb and uid:
-                        if "עסקאות שמורות" in del_choices:
-                            try: sb.table("saved_transactions").delete().eq("user_id", uid).execute(); deleted.append("עסקאות")
-                            except: pass
-                        if "הכנסות" in del_choices:
-                            try: sb.table("incomes").delete().eq("user_id", uid).execute(); deleted.append("הכנסות"); st.session_state.incomes = []
-                            except: pass
-                        if "היסטוריית העלאות" in del_choices:
-                            try: sb.table("upload_history").delete().eq("user_id", uid).execute(); deleted.append("היסטוריה")
-                            except: pass
-                        if "הגדרות" in del_choices:
-                            try: sb.table("user_settings").delete().eq("user_id", uid).execute(); deleted.append("הגדרות")
-                            except: pass
-                    
-                    if deleted:
-                        st.session_state.dm_msg = f"נמחקו: {', '.join(deleted)}"
-                    st.rerun()
-            
-            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
-
         # -- Supported formats --
         st.markdown(f'''
         <div style="padding:0.85rem;background:{T['accent_bg']};border-radius:10px;border:1px solid rgba(129,140,248,0.12)">
@@ -1227,7 +1385,7 @@ def _render_dashboard(df):
     render_kpis(df_f)
 
     # Tabs
-    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב"])
+    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב","🗄️ ניהול נתונים"])
 
     # ══════════════════════════════════════════════
     # TAB 0: Overview
@@ -1473,6 +1631,9 @@ def _render_dashboard(df):
     # ══════════════════════════════════════════════
     with tabs[5]:
         render_income_tab(df_f)
+
+    with tabs[6]:
+        render_data_management_tab(df_f)
 
     # Export
     st.markdown("---")
