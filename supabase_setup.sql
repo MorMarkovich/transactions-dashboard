@@ -68,7 +68,20 @@ ALTER TABLE public.upload_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own uploads" ON public.upload_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own uploads" ON public.upload_history FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- 4. User settings / preferences
+-- 4. Saved transactions (persistent data)
+CREATE TABLE IF NOT EXISTS public.saved_transactions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.saved_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own transactions" ON public.saved_transactions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own transactions" ON public.saved_transactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own transactions" ON public.saved_transactions FOR DELETE USING (auth.uid() = user_id);
+
+-- 5. User settings / preferences
 CREATE TABLE IF NOT EXISTS public.user_settings (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     theme TEXT DEFAULT 'dark',

@@ -5,13 +5,14 @@ import streamlit as st
 from supabase import create_client, Client
 from typing import Optional
 import re
+import json
 
 
 # =============================================================================
-# Supabase Client
+# Supabase Client (cached)
 # =============================================================================
-def get_supabase() -> Optional[Client]:
-    """Get Supabase client from secrets."""
+@st.cache_resource
+def _get_client():
     try:
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["key"]
@@ -21,46 +22,70 @@ def get_supabase() -> Optional[Client]:
     except Exception:
         return None
 
+def get_supabase() -> Optional[Client]:
+    return _get_client()
 
 def is_configured() -> bool:
-    """Check if Supabase is properly configured."""
     return get_supabase() is not None
 
 
 # =============================================================================
-# Auth State
+# Auth State - with session persistence
 # =============================================================================
 def init_auth_state():
-    """Initialize session state for auth."""
     if 'auth_user' not in st.session_state:
         st.session_state.auth_user = None
     if 'auth_token' not in st.session_state:
         st.session_state.auth_token = None
     if 'auth_page' not in st.session_state:
         st.session_state.auth_page = 'login'
+    if 'auth_refresh' not in st.session_state:
+        st.session_state.auth_refresh = None
+    # Try to restore session from refresh token
+    if st.session_state.auth_user is None and st.session_state.auth_refresh:
+        _try_restore_session()
 
+def _try_restore_session():
+    """Try to restore user session using refresh token."""
+    sb = get_supabase()
+    if not sb or not st.session_state.auth_refresh:
+        return
+    try:
+        res = sb.auth.refresh_session(st.session_state.auth_refresh)
+        if res and res.user:
+            st.session_state.auth_user = {
+                "id": res.user.id,
+                "email": res.user.email,
+                "name": res.user.user_metadata.get("full_name", res.user.email.split("@")[0]),
+            }
+            st.session_state.auth_token = res.session.access_token
+            st.session_state.auth_refresh = res.session.refresh_token
+    except:
+        st.session_state.auth_refresh = None
 
 def get_current_user():
-    """Get the currently logged in user."""
     return st.session_state.get('auth_user')
 
-
 def is_logged_in() -> bool:
-    """Check if user is logged in."""
     return st.session_state.get('auth_user') is not None
 
-
 def logout():
-    """Clear auth state."""
+    sb = get_supabase()
+    if sb:
+        try: sb.auth.sign_out()
+        except: pass
     st.session_state.auth_user = None
     st.session_state.auth_token = None
+    st.session_state.auth_refresh = None
+    # Clear saved transactions
+    if 'saved_transactions' in st.session_state:
+        del st.session_state['saved_transactions']
 
 
 # =============================================================================
 # Auth Actions
 # =============================================================================
 def sign_up(email: str, password: str, full_name: str) -> tuple[bool, str]:
-    """Register a new user."""
     sb = get_supabase()
     if not sb:
         return False, "Supabase לא מוגדר"
@@ -83,7 +108,6 @@ def sign_up(email: str, password: str, full_name: str) -> tuple[bool, str]:
 
 
 def sign_in(email: str, password: str) -> tuple[bool, str]:
-    """Sign in with email and password."""
     sb = get_supabase()
     if not sb:
         return False, "Supabase לא מוגדר"
@@ -96,6 +120,7 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
                 "name": res.user.user_metadata.get("full_name", res.user.email.split("@")[0]),
             }
             st.session_state.auth_token = res.session.access_token
+            st.session_state.auth_refresh = res.session.refresh_token
             return True, "התחברת בהצלחה!"
         return False, "שגיאה בהתחברות"
     except Exception as e:
@@ -106,7 +131,6 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
 
 
 def reset_password(email: str) -> tuple[bool, str]:
-    """Send password reset email."""
     sb = get_supabase()
     if not sb:
         return False, "Supabase לא מוגדר"
@@ -118,10 +142,90 @@ def reset_password(email: str) -> tuple[bool, str]:
 
 
 # =============================================================================
-# Database Operations
+# Transaction Data Persistence
+# =============================================================================
+def save_transactions(df) -> bool:
+    """Save processed transactions to Supabase as JSON."""
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user or user.get('id') == 'guest':
+        return False
+    try:
+        # Convert to JSON-safe format
+        data = df[['תאריך','תיאור','קטגוריה','סכום','סכום_מוחלט']].copy()
+        data['תאריך'] = data['תאריך'].dt.strftime('%Y-%m-%d')
+        records = data.to_dict('records')
+        
+        # Delete old data first
+        sb.table("saved_transactions").delete().eq("user_id", user["id"]).execute()
+        
+        # Insert in batches of 500
+        for i in range(0, len(records), 500):
+            batch = records[i:i+500]
+            rows = [{"user_id": user["id"], "data": json.dumps(r, ensure_ascii=False)} for r in batch]
+            sb.table("saved_transactions").insert(rows).execute()
+        return True
+    except:
+        return False
+
+
+def load_transactions():
+    """Load saved transactions from Supabase."""
+    import pandas as pd
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user or user.get('id') == 'guest':
+        return None
+    try:
+        res = sb.table("saved_transactions").select("data").eq("user_id", user["id"]).execute()
+        if not res.data:
+            return None
+        records = [json.loads(r['data']) for r in res.data]
+        df = pd.DataFrame(records)
+        df['תאריך'] = pd.to_datetime(df['תאריך'])
+        df['סכום'] = pd.to_numeric(df['סכום'], errors='coerce').fillna(0)
+        df['סכום_מוחלט'] = pd.to_numeric(df['סכום_מוחלט'], errors='coerce').fillna(0)
+        df['חודש'] = df['תאריך'].dt.strftime('%m/%Y')
+        df['יום_בשבוע'] = df['תאריך'].dt.dayofweek
+        return df if not df.empty else None
+    except:
+        return None
+
+
+def delete_transactions() -> bool:
+    """Delete all saved transactions for current user."""
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user:
+        return False
+    try:
+        sb.table("saved_transactions").delete().eq("user_id", user["id"]).execute()
+        return True
+    except:
+        return False
+
+
+def delete_all_user_data() -> bool:
+    """Delete ALL user data (transactions, incomes, uploads, settings)."""
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user:
+        return False
+    try:
+        uid = user["id"]
+        sb.table("saved_transactions").delete().eq("user_id", uid).execute()
+        sb.table("incomes").delete().eq("user_id", uid).execute()
+        sb.table("upload_history").delete().eq("user_id", uid).execute()
+        sb.table("user_settings").delete().eq("user_id", uid).execute()
+        return True
+    except:
+        return False
+
+
+# =============================================================================
+# Income Operations
 # =============================================================================
 def save_income(description: str, amount: float, income_type: str, recurring: str) -> bool:
-    """Save income to database."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -140,7 +244,6 @@ def save_income(description: str, amount: float, income_type: str, recurring: st
 
 
 def load_incomes() -> list:
-    """Load user's incomes from database."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -153,7 +256,6 @@ def load_incomes() -> list:
 
 
 def delete_all_incomes() -> bool:
-    """Delete all user's incomes."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -165,9 +267,11 @@ def delete_all_incomes() -> bool:
         return False
 
 
+# =============================================================================
+# Other DB Operations
+# =============================================================================
 def save_upload_history(file_name: str, row_count: int, total_expenses: float,
                         total_income: float, date_start, date_end) -> bool:
-    """Save file upload record."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -186,9 +290,7 @@ def save_upload_history(file_name: str, row_count: int, total_expenses: float,
     except:
         return False
 
-
 def load_upload_history() -> list:
-    """Load user's upload history."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -199,9 +301,7 @@ def load_upload_history() -> list:
     except:
         return []
 
-
 def save_user_settings(theme: str) -> bool:
-    """Save user preferences."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -215,9 +315,7 @@ def save_user_settings(theme: str) -> bool:
     except:
         return False
 
-
 def load_user_settings() -> dict:
-    """Load user preferences."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -235,7 +333,6 @@ def load_user_settings() -> dict:
 def validate_email(email: str) -> bool:
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return bool(re.match(pattern, email))
-
 
 def validate_password(password: str) -> tuple[bool, str]:
     if len(password) < 6:

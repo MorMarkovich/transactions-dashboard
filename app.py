@@ -16,6 +16,7 @@ from auth import (
     save_income, load_incomes, delete_all_incomes,
     save_upload_history, load_upload_history,
     save_user_settings, load_user_settings,
+    save_transactions, load_transactions, delete_transactions, delete_all_user_data,
     validate_email, validate_password
 )
 
@@ -976,6 +977,21 @@ def main():
                 st.rerun()
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
         
+        # -- Data Management --
+        if user and user.get('id') != 'guest' and is_configured():
+            st.markdown(f'''<div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>''', unsafe_allow_html=True)
+            if st.button("🗑️ מחק נתונים שמורים", use_container_width=True, key="del_data"):
+                delete_transactions()
+                if 'saved_transactions' in st.session_state:
+                    del st.session_state['saved_transactions']
+                st.success("הנתונים נמחקו")
+                st.rerun()
+            if st.button("⚠️ מחק את כל המידע שלי", use_container_width=True, key="del_all"):
+                delete_all_user_data()
+                st.success("כל המידע נמחק")
+                st.rerun()
+            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+
         # -- Supported formats --
         st.markdown(f'''
         <div style="padding:0.85rem;background:{T['accent_bg']};border-radius:10px;border:1px solid rgba(129,140,248,0.12)">
@@ -990,22 +1006,32 @@ def main():
         </div>
         ''', unsafe_allow_html=True)
 
-    # Empty state
+    # Empty state -- try loading saved data first
     if not uploaded_files:
-        st.markdown(f'''<div style="text-align:center;padding:3rem 1rem">
-            <div style="font-size:3.5rem;margin-bottom:1rem">📊</div>
-            <div style="font-size:1.4rem;font-weight:700;color:{T['text1']}">ברוכים הבאים!</div>
-            <div style="color:{T['text2']};margin-top:0.5rem">העלה קובץ אקסל או CSV מחברת האשראי כדי להתחיל</div>
-        </div>''', unsafe_allow_html=True)
-        feats = [("📊","ניתוח ויזואלי","גרפים אינטראקטיביים לתובנות מיידיות"),
-                 ("🏷️","קטגוריות","זיהוי אוטומטי של קטגוריות מהקובץ"),
-                 ("📑","תמיכה מלאה","מספר קבצים בו-זמנית, Excel, CSV")]
-        html = '<div class="feat-row">'
-        for ic, t, d in feats:
-            html += f'<div class="feat"><div class="feat-icon">{ic}</div><div class="feat-title">{t}</div><div class="feat-desc">{d}</div></div>'
-        html += '</div>'
-        st.markdown(html, unsafe_allow_html=True)
-        return
+        saved_df = load_transactions()
+        if saved_df is not None and not saved_df.empty:
+            # Jump directly to dashboard with saved data
+            st.markdown(f'''<div class="alert alert-ok">
+                <span class="alert-icon">☁️</span>
+                <div><div class="alert-text">נטענו {len(saved_df):,} עסקאות שמורות</div><div class="alert-sub">הנתונים נשמרו מההעלאה הקודמת שלך. העלה קבצים חדשים כדי לעדכן.</div></div>
+            </div>''', unsafe_allow_html=True)
+            _render_dashboard(saved_df)
+            return
+        else:
+            st.markdown(f'''<div style="text-align:center;padding:3rem 1rem">
+                <div style="font-size:3.5rem;margin-bottom:1rem">📊</div>
+                <div style="font-size:1.4rem;font-weight:700;color:{T['text1']}">ברוכים הבאים!</div>
+                <div style="color:{T['text2']};margin-top:0.5rem">העלה קובץ אקסל או CSV מחברת האשראי כדי להתחיל</div>
+            </div>''', unsafe_allow_html=True)
+            feats = [("📊","ניתוח ויזואלי","גרפים אינטראקטיביים לתובנות מיידיות"),
+                     ("🏷️","קטגוריות","זיהוי אוטומטי של קטגוריות מהקובץ"),
+                     ("📑","תמיכה מלאה","מספר קבצים בו-זמנית, Excel, CSV")]
+            html = '<div class="feat-row">'
+            for ic, t, d in feats:
+                html += f'<div class="feat"><div class="feat-icon">{ic}</div><div class="feat-title">{t}</div><div class="feat-desc">{d}</div></div>'
+            html += '</div>'
+            st.markdown(html, unsafe_allow_html=True)
+            return
 
     # Load all files, process EACH independently, then merge results
     all_processed = []
@@ -1114,7 +1140,15 @@ def main():
         <div><div class="alert-text">נטענו {len(df):,} עסקאות{f" מ-{total_files} קבצים" if total_files > 1 else ""}</div><div class="alert-sub">{dr}</div></div>
         <div class="alert-badge">{df['קטגוריה'].nunique()} קטגוריות</div>
     </div>''', unsafe_allow_html=True)
+    
+    # Save to DB for persistence
+    save_transactions(df)
 
+    _render_dashboard(df)
+
+
+def _render_dashboard(df):
+    """Render the main dashboard (filters, KPIs, tabs)."""
     # Filters
     st.markdown(f'<div class="section-label">🔍 סינון</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
@@ -1344,11 +1378,15 @@ def main():
             if len(large_tx) > 0:
                 st.markdown(f'<div class="section-label">⚠️ עסקאות חריגות (עשירון עליון)</div>', unsafe_allow_html=True)
                 for _, row in large_tx.iterrows():
-                    st.markdown(f'''<div class="cat-card">
-                        <div style="font-weight:600;color:{T['text1']};font-size:0.85rem;flex:1">{row['תיאור'][:35]}</div>
-                        <div style="color:{T['text3']};font-size:0.78rem">{row['תאריך'].strftime('%d/%m/%Y')}</div>
-                        <div style="font-weight:700;color:{T['red']};font-size:0.9rem;direction:ltr;min-width:70px;text-align:left">{fmt(row['סכום_מוחלט'])}</div>
-                    </div>''', unsafe_allow_html=True)
+                    desc_short = str(row['תיאור'])[:35]
+                    date_str = row['תאריך'].strftime('%d/%m/%Y')
+                    amount_str = fmt(row['סכום_מוחלט'])
+                    st.markdown(
+                        f'<div class="cat-card">'
+                        f'<div style="font-weight:600;color:{T["text1"]};font-size:0.85rem;flex:1">{desc_short}</div>'
+                        f'<div style="color:{T["text3"]};font-size:0.78rem">{date_str}</div>'
+                        f'<div style="font-weight:700;color:{T["red"]};font-size:0.9rem;direction:ltr;min-width:70px;text-align:left">{amount_str}</div>'
+                        f'</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
     # TAB 4: Transactions
