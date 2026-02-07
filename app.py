@@ -75,7 +75,10 @@ st.markdown(f"""
 
 /* === Reset & Base === */
 *, *::before, *::after {{ font-family: 'Heebo', sans-serif !important; box-sizing: border-box; }}
-html, body, .stApp {{ background: {T['bg']} !important; color: {T['text1']}; direction: rtl; text-align: right; }}
+html, body, .stApp {{
+    background: {T['bg']} !important; color: {T['text1']}; direction: rtl; text-align: right;
+    {'background-image: radial-gradient(ellipse at 70% 10%, rgba(129,140,248,0.04) 0%, transparent 50%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.03) 0%, transparent 50%) !important;' if IS_DARK else ''}
+}}
 /* Smooth rendering */
 * {{ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
 img, svg {{ display: block; max-width: 100%; }}
@@ -101,15 +104,14 @@ button[aria-label="Expand sidebar"],
 
 /* === Sidebar === */
 section[data-testid="stSidebar"] {{
-    background: {T['sidebar']} !important;
+    background: {'linear-gradient(180deg, #0f1525 0%, #0c111d 100%)' if IS_DARK else '#ffffff'} !important;
     border-left: 1px solid {T['border']};
-    min-width: 280px !important;
-    max-width: 310px !important;
-    width: 295px !important;
+    min-width: 280px !important; max-width: 310px !important; width: 295px !important;
+    box-shadow: {'-4px 0 20px rgba(0,0,0,0.15)' if IS_DARK else '-2px 0 10px rgba(0,0,0,0.04)'};
 }}
 section[data-testid="stSidebar"] > div {{
     direction: rtl; text-align: right;
-    padding: 1.75rem 1.25rem 3rem;
+    padding: 1.5rem 1.25rem 3rem;
 }}
 
 /* -- File uploader complete override -- */
@@ -195,10 +197,11 @@ section[data-testid="stSidebar"] > div {{
     color: {T['text2']}; font-size: 0.88rem; margin-top: 2px;
 }}
 .section-label {{
-    display: flex; align-items: center; gap: 6px;
-    color: {T['text1']}; font-weight: 600; font-size: 1rem;
-    margin: 0.5rem 0 0.75rem; padding-bottom: 0.5rem;
-    border-bottom: 1px solid {T['border']};
+    display: flex; align-items: center; gap: 8px;
+    color: {T['text1']}; font-weight: 700; font-size: 0.95rem;
+    margin: 0.75rem 0 0.85rem; padding-bottom: 0.6rem;
+    border-bottom: 2px solid {T['border']};
+    letter-spacing: 0.2px;
 }}
 
 /* === KPI Cards === */
@@ -208,29 +211,36 @@ section[data-testid="stSidebar"] > div {{
 .kpi {{
     background: {T['surface']};
     border: 1px solid {T['border']};
-    border-radius: 14px; padding: 1.25rem; text-align: center;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    border-radius: 16px; padding: 1.25rem 1rem; text-align: center;
+    position: relative; overflow: hidden;
 }}
-.kpi:hover {{ border-color: {T['border_h']}; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }}
+.kpi::before {{
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, {T['accent']}, #a78bfa);
+    opacity: 0; transition: opacity 0.2s;
+}}
+.kpi:hover::before {{ opacity: 1; }}
 .kpi-icon {{
-    width: 44px; height: 44px; border-radius: 10px; margin: 0 auto 10px;
-    display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+    width: 48px; height: 48px; border-radius: 14px; margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }}
-.kpi-val {{ font-size: 1.6rem; font-weight: 700; color: {T['text1']}; direction: ltr; }}
-.kpi-label {{ font-size: 0.8rem; color: {T['text2']}; margin-top: 2px; letter-spacing: 0.3px; }}
+.kpi-val {{ font-size: 1.65rem; font-weight: 800; color: {T['text1']}; direction: ltr; letter-spacing: -0.5px; }}
+.kpi-label {{ font-size: 0.78rem; color: {T['text2']}; margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }}
 
 /* === Category Cards === */
 .cat-card {{
     background: {T['surface']};
     border: 1px solid {T['border']};
-    border-radius: 12px; padding: 0.85rem 1rem;
-    margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.85rem;
-    transition: border-color 0.2s;
+    border-radius: 14px; padding: 0.9rem 1.1rem;
+    margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.9rem;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    cursor: default;
 }}
-.cat-card:hover {{ border-color: {T['border_h']}; }}
+.cat-card:hover {{ border-color: {T['accent']}40; background: {T['surface2']}; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
 .cat-icon {{
-    width: 38px; height: 38px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;
 }}
 .cat-info {{ flex: 1; min-width: 0; }}
 .cat-name {{ font-weight: 600; font-size: 0.85rem; color: {T['text1']}; margin-bottom: 4px; }}
@@ -255,20 +265,21 @@ section[data-testid="stSidebar"] > div {{
 
 /* === Alerts === */
 .alert {{
-    border-radius: 12px; padding: 0.85rem 1.25rem; margin: 0.75rem 0;
-    display: flex; align-items: center; gap: 0.75rem; direction: rtl;
+    border-radius: 14px; padding: 0.9rem 1.25rem; margin: 0.75rem 0;
+    display: flex; align-items: center; gap: 0.85rem; direction: rtl;
+    backdrop-filter: blur(8px);
 }}
-.alert-ok {{ background: {T['green_bg']}; border: 1px solid rgba(52,211,153,0.25); }}
+.alert-ok {{ background: {T['green_bg']}; border: 1px solid rgba(52,211,153,0.2); box-shadow: 0 2px 8px rgba(52,211,153,0.06); }}
 .alert-ok .alert-text {{ color: {T['green']}; }}
-.alert-err {{ background: {T['red_bg']}; border: 1px solid rgba(248,113,113,0.25); }}
+.alert-err {{ background: {T['red_bg']}; border: 1px solid rgba(248,113,113,0.2); box-shadow: 0 2px 8px rgba(248,113,113,0.06); }}
 .alert-err .alert-text {{ color: {T['red']}; }}
-.alert-icon {{ font-size: 1.3rem; }}
-.alert-text {{ font-weight: 600; font-size: 0.9rem; }}
-.alert-sub {{ color: {T['text2']}; font-size: 0.8rem; }}
+.alert-icon {{ font-size: 1.25rem; }}
+.alert-text {{ font-weight: 700; font-size: 0.88rem; }}
+.alert-sub {{ color: {T['text2']}; font-size: 0.78rem; }}
 .alert-badge {{
     margin-right: auto; margin-left: 0;
-    background: {T['green_bg']}; color: {T['green']};
-    padding: 0.3rem 0.7rem; border-radius: 99px; font-size: 0.8rem; font-weight: 600;
+    background: rgba(52,211,153,0.15); color: {T['green']};
+    padding: 0.3rem 0.75rem; border-radius: 99px; font-size: 0.78rem; font-weight: 700;
 }}
 
 /* === Form elements === */
@@ -291,19 +302,46 @@ ul[role="listbox"] li[aria-selected="true"] {{ background: {T['accent']} !import
 [data-testid="column"] {{ direction: rtl !important; }}
 
 /* === Tabs === */
-.stTabs [data-baseweb="tab-list"] {{ gap: 4px; background: {T['surface']}; border-radius: 10px; padding: 4px; direction: rtl; border: 1px solid {T['border']}; }}
-.stTabs [data-baseweb="tab"] {{ background: transparent; border-radius: 8px; color: {T['text2']}; padding: 0.5rem 1rem; font-weight: 500; }}
+.stTabs [data-baseweb="tab-list"] {{
+    gap: 2px; background: {T['surface']}; border-radius: 12px; padding: 4px;
+    direction: rtl; border: 1px solid {T['border']};
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}}
+.stTabs [data-baseweb="tab"] {{
+    background: transparent; border-radius: 10px; color: {T['text3']};
+    padding: 0.55rem 0.9rem; font-weight: 500; font-size: 0.85rem;
+    transition: all 0.15s ease;
+}}
 .stTabs [data-baseweb="tab"]:hover {{ color: {T['text1']}; background: {T['surface2']}; }}
-.stTabs [aria-selected="true"] {{ background: {T['accent']} !important; color: #fff !important; box-shadow: 0 2px 8px rgba(129,140,248,0.25); }}
+.stTabs [aria-selected="true"] {{
+    background: linear-gradient(135deg, {T['accent']}, #a78bfa) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 12px rgba(129,140,248,0.3);
+    font-weight: 600 !important;
+}}
 
 /* === Chart containers === */
-div[data-testid="stPlotlyChart"] {{ background: {T['surface']}; border: 1px solid {T['border']}; border-radius: 12px; padding: 0.75rem; margin-bottom: 0.75rem; }}
+div[data-testid="stPlotlyChart"] {{
+    background: {T['surface']}; border: 1px solid {T['border']};
+    border-radius: 16px; padding: 1rem; margin-bottom: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}}
 
 /* === Buttons === */
-.stButton > button {{ background: {T['accent']}; color: #fff; border: none; border-radius: 8px; font-weight: 600; padding: 0.5rem 1.5rem; transition: opacity 0.15s; }}
-.stButton > button:hover {{ opacity: 0.88; }}
-.stDownloadButton > button {{ background: {T['green']}; color: #0f172a; border: none; border-radius: 8px; font-weight: 600; }}
-.stDownloadButton > button:hover {{ opacity: 0.88; }}
+.stButton > button {{
+    background: linear-gradient(135deg, {T['accent']}, #a78bfa); color: #fff;
+    border: none; border-radius: 10px; font-weight: 600; padding: 0.55rem 1.5rem;
+    box-shadow: 0 2px 8px rgba(129,140,248,0.2);
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+}}
+.stButton > button:hover {{ transform: translateY(-1px); box-shadow: 0 4px 16px rgba(129,140,248,0.3); }}
+.stButton > button:active {{ transform: translateY(0); }}
+.stDownloadButton > button {{
+    background: linear-gradient(135deg, {T['green']}, #059669); color: #fff;
+    border: none; border-radius: 10px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(52,211,153,0.2);
+}}
+.stDownloadButton > button:hover {{ transform: translateY(-1px); box-shadow: 0 4px 16px rgba(52,211,153,0.3); }}
 /* Sidebar buttons - more subtle */
 section[data-testid="stSidebar"] .stButton > button {{
     background: {T['surface2']} !important; color: {T['text1']} !important;
