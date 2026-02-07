@@ -324,9 +324,97 @@ div[data-testid="stPlotlyChart"] {{ background: {T['surface']}; border: 1px soli
 /* === Divider === */
 hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.5rem 0; }}
 
+/* === Number input in income === */
+[data-testid="stNumberInput"] input {{
+    background: {T['input']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 8px !important;
+    color: {T['text1']} !important;
+    direction: ltr !important;
+    text-align: right !important;
+}}
+[data-testid="stNumberInput"] button {{
+    background: {T['surface2']} !important;
+    color: {T['text1']} !important;
+    border: 1px solid {T['border']} !important;
+}}
+
 /* === Print === */
 @media print {{ section[data-testid="stSidebar"] {{ display: none !important; }} }}
 </style>
+""", unsafe_allow_html=True)
+
+# =============================================================================
+# JavaScript enhancements
+# =============================================================================
+st.markdown(f"""
+<script>
+// === Animated counter for KPI values ===
+function animateCounters() {{
+    document.querySelectorAll('.kpi-val').forEach(el => {{
+        if (el.dataset.animated) return;
+        el.dataset.animated = 'true';
+        const text = el.innerText;
+        const match = text.match(/[\\d,]+/);
+        if (!match) return;
+        const target = parseInt(match[0].replace(/,/g, ''));
+        if (isNaN(target) || target === 0) return;
+        const prefix = text.slice(0, text.indexOf(match[0]));
+        const suffix = text.slice(text.indexOf(match[0]) + match[0].length);
+        const duration = 800;
+        const start = performance.now();
+        function step(now) {{
+            const progress = Math.min((now - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(target * ease);
+            el.innerText = prefix + current.toLocaleString() + suffix;
+            if (progress < 1) requestAnimationFrame(step);
+        }}
+        requestAnimationFrame(step);
+    }});
+}}
+
+// === Smooth scroll for tab changes ===
+function initSmoothTabs() {{
+    document.querySelectorAll('[data-baseweb="tab"]').forEach(tab => {{
+        tab.addEventListener('click', () => {{
+            setTimeout(() => {{
+                const panel = document.querySelector('[data-baseweb="tab-panel"]');
+                if (panel) panel.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}, 100);
+        }});
+    }});
+}}
+
+// === Keyboard shortcuts ===
+document.addEventListener('keydown', (e) => {{
+    // Ctrl+K = Focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {{
+        e.preventDefault();
+        const searchInput = document.querySelector('[data-testid="stTextInput"] input');
+        if (searchInput) searchInput.focus();
+    }}
+}});
+
+// === Init on load ===
+const initAll = () => {{
+    animateCounters();
+    initSmoothTabs();
+}};
+
+// Run after Streamlit renders
+if (document.readyState === 'complete') {{
+    setTimeout(initAll, 500);
+}} else {{
+    window.addEventListener('load', () => setTimeout(initAll, 500));
+}}
+
+// Re-run on Streamlit rerender
+const observer = new MutationObserver(() => {{
+    setTimeout(animateCounters, 200);
+}});
+observer.observe(document.body, {{ childList: true, subtree: true }});
+</script>
 """, unsafe_allow_html=True)
 
 # =============================================================================
@@ -511,25 +599,33 @@ def chart_donut(df):
     if cd.empty:
         fig = go.Figure()
         fig.add_annotation(text="אין נתונים", x=0.5, y=0.5, showarrow=False, font=dict(size=15, color=T['text3']))
-        fig.update_layout(**plotly_layout(height=300))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, margin=dict(t=10,b=10,l=10,r=10))
         return fig
-    if len(cd) > 7:
-        top = cd.head(7).copy()
-        top = pd.concat([top, pd.DataFrame([{'קטגוריה':'אחר','סכום_מוחלט':cd.iloc[7:]['סכום_מוחלט'].sum()}])], ignore_index=True)
-        cd = top
-    fig = go.Figure(go.Pie(
-        labels=cd['קטגוריה'], values=cd['סכום_מוחלט'], hole=0.7,
-        marker=dict(colors=CHART_COLORS[:len(cd)], line=dict(color=T['bg'], width=3)),
-        textinfo='none',
-        hovertemplate='<b>%{label}</b><br>₪%{value:,.0f}<br>%{percent}<extra></extra>',
-    ))
+    if len(cd) > 6:
+        top = cd.head(6).copy()
+        other_sum = cd.iloc[6:]['סכום_מוחלט'].sum()
+        cd = pd.concat([top, pd.DataFrame([{'קטגוריה':'אחר','סכום_מוחלט':other_sum}])], ignore_index=True)
     total = cd['סכום_מוחלט'].sum()
-    fig.add_annotation(text=f"<b>₪{total:,.0f}</b>", x=0.5, y=0.53, showarrow=False, font=dict(size=22, color=T['text1'], family='Heebo'))
-    fig.add_annotation(text="סה״כ הוצאות", x=0.5, y=0.42, showarrow=False, font=dict(size=11, color=T['text2'], family='Heebo'))
+    cd['pct_label'] = (cd['סכום_מוחלט'] / total * 100).round(1).astype(str) + '%'
+    fig = go.Figure(go.Pie(
+        labels=cd['קטגוריה'], values=cd['סכום_מוחלט'], hole=0.65,
+        marker=dict(colors=CHART_COLORS[:len(cd)], line=dict(color=T['bg'], width=2)),
+        textinfo='label+percent',
+        textposition='outside',
+        textfont=dict(size=11, color=T['text2'], family='Heebo'),
+        hovertemplate='<b>%{label}</b><br>₪%{value:,.0f}<br>%{percent}<extra></extra>',
+        pull=[0.03]*len(cd),
+    ))
+    fig.add_annotation(text=f"<b style='font-size:20px'>₪{total:,.0f}</b>", x=0.5, y=0.55, showarrow=False,
+                       font=dict(size=20, color=T['text1'], family='Heebo'))
+    fig.add_annotation(text=f"<span style='font-size:11px'>סה״כ הוצאות</span>", x=0.5, y=0.43, showarrow=False,
+                       font=dict(size=11, color=T['text2'], family='Heebo'))
     fig.update_layout(
-        showlegend=True,
-        legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(color=T['text2'], size=11)),
-        **plotly_layout(height=380, margin=dict(t=10, b=60, l=10, r=10))
+        showlegend=False,
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(t=30, b=30, l=30, r=30),
+        height=350,
+        uniformtext_minsize=10, uniformtext_mode='hide',
     )
     return fig
 
@@ -647,6 +743,152 @@ def export_excel(df):
     with pd.ExcelWriter(out, engine='xlsxwriter') as w:
         df.to_excel(w, sheet_name='עסקאות', index=False)
     return out.getvalue()
+
+# =============================================================================
+# Income Manager
+# =============================================================================
+def init_income_state():
+    if 'incomes' not in st.session_state:
+        st.session_state.incomes = []
+
+def get_total_income():
+    return sum(item['amount'] for item in st.session_state.incomes)
+
+def render_income_tab(df_f):
+    """Tab for managing income entries and showing budget overview."""
+    init_income_state()
+    
+    c_left, c_right = st.columns([3, 2])
+    
+    with c_left:
+        st.markdown(f'<div class="section-label">💰 הוספת הכנסה</div>', unsafe_allow_html=True)
+        
+        ic1, ic2 = st.columns(2)
+        with ic1:
+            inc_desc = st.text_input("תיאור ההכנסה", placeholder="משכורת, פרילנס...", key="inc_desc")
+            inc_amount = st.number_input("סכום (₪)", min_value=0, max_value=999999, value=0, step=100, key="inc_amount")
+        with ic2:
+            inc_type = st.selectbox("סוג", ['משכורת', 'פרילנס', 'השקעות', 'מתנה', 'החזר', 'אחר'], key="inc_type")
+            inc_recurring = st.selectbox("תדירות", ['חד-פעמי', 'חודשי', 'שנתי'], key="inc_recurring")
+        
+        if st.button("➕ הוסף הכנסה", use_container_width=True, key="add_income"):
+            if inc_amount > 0 and inc_desc:
+                st.session_state.incomes.append({
+                    'desc': inc_desc,
+                    'amount': inc_amount,
+                    'type': inc_type,
+                    'recurring': inc_recurring,
+                })
+                st.rerun()
+            else:
+                st.warning("נא למלא תיאור וסכום")
+        
+        # Income list
+        if st.session_state.incomes:
+            st.markdown(f'<div class="section-label" style="margin-top:1.5rem">📋 הכנסות שהוזנו</div>', unsafe_allow_html=True)
+            for i, item in enumerate(st.session_state.incomes):
+                type_icons = {'משכורת':'💼','פרילנס':'💻','השקעות':'📈','מתנה':'🎁','החזר':'🔄','אחר':'📌'}
+                ic = type_icons.get(item['type'], '📌')
+                rec_badge = f'<span style="background:{T["accent_bg"]};color:{T["accent"]};padding:2px 8px;border-radius:4px;font-size:0.7rem">{item["recurring"]}</span>' if item['recurring'] != 'חד-פעמי' else ''
+                
+                st.markdown(f'''<div class="cat-card" style="justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.75rem">
+                        <div class="cat-icon" style="background:{T['green']}22;color:{T['green']}">{ic}</div>
+                        <div>
+                            <div style="font-weight:600;color:{T['text1']};font-size:0.85rem">{item['desc']}</div>
+                            <div style="color:{T['text3']};font-size:0.75rem">{item['type']} {rec_badge}</div>
+                        </div>
+                    </div>
+                    <div style="font-weight:700;color:{T['green']};font-size:1rem;direction:ltr">₪{item['amount']:,.0f}</div>
+                </div>''', unsafe_allow_html=True)
+            
+            # Delete button
+            if st.button("🗑️ נקה הכל", key="clear_incomes"):
+                st.session_state.incomes = []
+                st.rerun()
+    
+    with c_right:
+        # Budget overview
+        total_income = get_total_income()
+        expenses = df_f[df_f['סכום'] < 0]
+        total_expenses = abs(expenses['סכום'].sum()) if len(expenses) > 0 else 0
+        balance = total_income - total_expenses
+        balance_color = T['green'] if balance >= 0 else T['red']
+        savings_rate = (balance / total_income * 100) if total_income > 0 else 0
+        
+        st.markdown(f'<div class="section-label">📊 סיכום תקציב</div>', unsafe_allow_html=True)
+        
+        # Budget summary cards
+        st.markdown(f'''
+        <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <div class="kpi" style="padding:1rem;text-align:right">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:1.3rem;font-weight:700;color:{T['green']};direction:ltr">₪{total_income:,.0f}</div>
+                    <div style="color:{T['text2']};font-size:0.82rem">💰 סה״כ הכנסות</div>
+                </div>
+            </div>
+            <div class="kpi" style="padding:1rem;text-align:right">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:1.3rem;font-weight:700;color:{T['red']};direction:ltr">₪{total_expenses:,.0f}</div>
+                    <div style="color:{T['text2']};font-size:0.82rem">📉 סה״כ הוצאות</div>
+                </div>
+            </div>
+            <div class="kpi" style="padding:1rem;text-align:right;border-color:{balance_color}44">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:1.3rem;font-weight:700;color:{balance_color};direction:ltr">₪{balance:,.0f}</div>
+                    <div style="color:{T['text2']};font-size:0.82rem">{'✅' if balance >= 0 else '⚠️'} מאזן</div>
+                </div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Progress bar
+        if total_income > 0:
+            pct_used = min(total_expenses / total_income * 100, 100)
+            bar_color = T['green'] if pct_used < 80 else T['amber'] if pct_used < 100 else T['red']
+            st.markdown(f'''
+            <div style="margin-top:1.25rem">
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">
+                    <div style="color:{T['text2']};font-size:0.8rem">ניצול תקציב</div>
+                    <div style="color:{bar_color};font-weight:700;font-size:0.85rem">{pct_used:.0f}%</div>
+                </div>
+                <div style="height:10px;background:{T['surface2']};border-radius:99px;overflow:hidden">
+                    <div style="height:100%;width:{pct_used}%;background:{bar_color};border-radius:99px;transition:width 0.5s"></div>
+                </div>
+                <div style="color:{T['text3']};font-size:0.75rem;margin-top:0.4rem;text-align:center">
+                    {'מצוין! חוסך ' + f'{savings_rate:.0f}%' if savings_rate > 0 else 'חריגה מהתקציב!'}
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.markdown(f'''
+            <div style="text-align:center;padding:1.5rem;color:{T['text3']};margin-top:1rem">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem">💡</div>
+                <div style="font-size:0.85rem">הוסף הכנסות כדי לראות את מאזן התקציב</div>
+            </div>
+            ''', unsafe_allow_html=True)
+
+        # Income vs Expenses chart
+        if total_income > 0:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=['הכנסות'], y=[total_income], name='הכנסות',
+                                marker=dict(color=T['green'], cornerradius=5)))
+            fig.add_trace(go.Bar(x=['הוצאות'], y=[total_expenses], name='הוצאות',
+                                marker=dict(color=T['red'], cornerradius=5)))
+            if balance > 0:
+                fig.add_trace(go.Bar(x=['חיסכון'], y=[balance], name='חיסכון',
+                                    marker=dict(color=T['accent'], cornerradius=5)))
+            fig.update_layout(
+                showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=10, b=30, l=40, r=10), height=200,
+                yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=True),
+                xaxis=dict(tickfont=dict(color=T['text2'], size=11)),
+                font=dict(family='Heebo'),
+                bargap=0.4,
+            )
+            st.plotly_chart(fig, use_container_width=True, key="budget_chart")
+
 
 # =============================================================================
 # Main
@@ -796,7 +1038,7 @@ def main():
     render_kpis(df_f)
 
     # Tabs
-    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","📋 עסקאות"])
+    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","📋 עסקאות","💰 הכנסות ותקציב"])
 
     with tabs[0]:
         c1, c2 = st.columns([3, 2])
@@ -868,6 +1110,9 @@ def main():
             },
             hide_index=True, use_container_width=True, height=500)
         st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:0.5rem;text-align:center">{len(view):,} עסקאות</div>', unsafe_allow_html=True)
+
+    with tabs[4]:
+        render_income_tab(df_f)
 
     # Export
     st.markdown("---")
