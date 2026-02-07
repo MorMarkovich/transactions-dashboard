@@ -1174,11 +1174,11 @@ def clean_amount(value) -> float:
     s_val = str(value).strip()
     
     # הסרת סימן שקל ורווחים
-    s_val = s_val.replace('₪', '').replace('NIS', '').strip()
+    s_val = s_val.replace('₪', '').replace('NIS', '').replace('nis', '').strip()
     
-    # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף)
-    is_negative = '-' in s_val
-    s_val = s_val.replace('-', '').strip()
+    # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף, או תווי מינוס מיוחדים)
+    is_negative = '-' in s_val or '−' in s_val
+    s_val = s_val.replace('-', '').replace('−', '').strip()
     
     # הסרת כל התווים שאינם מספרים או נקודה/פסיק
     s_val = re.sub(r'[^\d.,]', '', s_val)
@@ -1299,7 +1299,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     
     # ניקוי סכומים
     try:
-        result['סכום'] = result[amount_col].apply(clean_amount)
+        # וידוא שהערכים הם מספריים
+        result['סכום'] = pd.to_numeric(result[amount_col].apply(clean_amount), errors='coerce').fillna(0.0)
     except Exception:
         result['סכום'] = 0.0
 
@@ -1307,8 +1308,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     amount_col_clean = str(amount_col).strip() if amount_col else ''
     if amount_col_clean == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
         try:
-            fallback = result['סכום עסקה מקורי'].apply(clean_amount)
-            result.loc[result['סכום'] == 0, 'סכום'] = fallback
+            fallback = pd.to_numeric(result['סכום עסקה מקורי'].apply(clean_amount), errors='coerce').fillna(0.0)
+            # עדכון רק היכן שהסכום הוא 0
+            mask_zero = result['סכום'] == 0
+            if mask_zero.any():
+                result.loc[mask_zero, 'סכום'] = fallback[mask_zero]
         except Exception:
             pass
     
@@ -1722,6 +1726,9 @@ def render_metrics(df: pd.DataFrame):
 def render_category_list(df: pd.DataFrame):
     """רינדור רשימת קטגוריות מקצועית עם אנימציות"""
     expenses = df[df['סכום'] < 0].copy()
+    # Ensure numeric
+    expenses['סכום_מוחלט'] = pd.to_numeric(expenses['סכום_מוחלט'], errors='coerce').fillna(0)
+    
     total = expenses['סכום_מוחלט'].sum()
     
     cat_data = expenses.groupby('קטגוריה').agg({'סכום_מוחלט': ['sum', 'count']}).reset_index()
