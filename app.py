@@ -10,6 +10,14 @@ from io import BytesIO
 import re
 from typing import Optional, Dict
 import warnings
+from auth import (
+    init_auth_state, is_configured, is_logged_in, get_current_user,
+    sign_in, sign_up, reset_password, logout,
+    save_income, load_incomes, delete_all_incomes,
+    save_upload_history, load_upload_history,
+    save_user_settings, load_user_settings,
+    validate_email, validate_password
+)
 
 warnings.filterwarnings('ignore')
 
@@ -920,12 +928,20 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        # -- Logo / Brand --
+        # -- Logo / Brand + User --
+        user = get_current_user()
+        user_name = user.get('name', '') if user else ''
+        user_badge = ''
+        if user and user.get('id') != 'guest':
+            user_badge = f'<div style="font-size:0.72rem;color:{T["green"]};margin-top:4px">👤 {user_name}</div>'
+        elif user and user.get('id') == 'guest':
+            user_badge = f'<div style="font-size:0.72rem;color:{T["amber"]};margin-top:4px">👤 מצב אורח</div>'
+        
         st.markdown(f'''
         <div style="text-align:center;padding:0.5rem 0 1.25rem">
             <div style="font-size:2rem;margin-bottom:0.25rem">💳</div>
             <div style="font-weight:800;font-size:1.1rem;color:{T['text1']}">מנתח עסקאות</div>
-            <div style="font-size:0.75rem;color:{T['text3']};margin-top:2px">v2.0</div>
+            {user_badge}
         </div>
         <div style="height:1px;background:{T['border']};margin-bottom:1.25rem"></div>
         ''', unsafe_allow_html=True)
@@ -953,6 +969,13 @@ def main():
 
         st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
+        # -- Logout --
+        if user and user.get('id') != 'guest' and is_configured():
+            if st.button("🚪 התנתק", use_container_width=True, key="logout_btn"):
+                logout()
+                st.rerun()
+            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+        
         # -- Supported formats --
         st.markdown(f'''
         <div style="padding:0.85rem;background:{T['accent_bg']};border-radius:10px;border:1px solid rgba(129,140,248,0.12)">
@@ -1146,5 +1169,141 @@ def main():
         st.download_button("📄 CSV", df_f.to_csv(index=False, encoding='utf-8-sig'), "עסקאות.csv", "text/csv", use_container_width=True)
 
 
+# =============================================================================
+# Auth UI
+# =============================================================================
+def render_auth_page():
+    """Professional login/register page."""
+    init_auth_state()
+    page = st.session_state.auth_page
+    
+    # Center container
+    col_l, col_m, col_r = st.columns([1, 2, 1])
+    with col_m:
+        st.markdown(f'''
+        <div style="text-align:center;padding:2rem 0 1.5rem">
+            <div style="font-size:3rem;margin-bottom:0.5rem">💳</div>
+            <div style="font-size:1.6rem;font-weight:800;color:{T['accent']}">מנתח עסקאות</div>
+            <div style="color:{T['text2']};font-size:0.9rem;margin-top:4px">ניתוח חכם של הוצאות כרטיס האשראי</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Card wrapper
+        st.markdown(f'''
+        <div style="background:{T['surface']};border:1px solid {T['border']};border-radius:16px;padding:2rem;max-width:420px;margin:0 auto">
+        ''', unsafe_allow_html=True)
+        
+        if page == 'login':
+            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">התחברות</div>', unsafe_allow_html=True)
+            
+            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="login_email")
+            password = st.text_input("🔒 סיסמה", type="password", placeholder="הסיסמה שלך", key="login_pass")
+            
+            if st.button("התחבר", use_container_width=True, key="login_btn"):
+                if not email or not password:
+                    st.error("נא למלא את כל השדות")
+                elif not validate_email(email):
+                    st.error("כתובת מייל לא תקינה")
+                else:
+                    ok, msg = sign_in(email, password)
+                    if ok:
+                        st.success(msg)
+                        # Load user settings
+                        settings = load_user_settings()
+                        if settings.get('theme'):
+                            st.session_state.theme = settings['theme']
+                        st.rerun()
+                    else:
+                        st.error(msg)
+            
+            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("📝 הרשמה", use_container_width=True, key="goto_register"):
+                    st.session_state.auth_page = 'register'
+                    st.rerun()
+            with c2:
+                if st.button("🔑 שכחתי סיסמה", use_container_width=True, key="goto_reset"):
+                    st.session_state.auth_page = 'reset'
+                    st.rerun()
+        
+        elif page == 'register':
+            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">הרשמה</div>', unsafe_allow_html=True)
+            
+            full_name = st.text_input("👤 שם מלא", placeholder="ישראל ישראלי", key="reg_name")
+            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="reg_email")
+            password = st.text_input("🔒 סיסמה", type="password", placeholder="לפחות 6 תווים", key="reg_pass")
+            password2 = st.text_input("🔒 אימות סיסמה", type="password", placeholder="הקלד שוב", key="reg_pass2")
+            
+            if st.button("צור חשבון", use_container_width=True, key="reg_btn"):
+                if not all([full_name, email, password, password2]):
+                    st.error("נא למלא את כל השדות")
+                elif not validate_email(email):
+                    st.error("כתובת מייל לא תקינה")
+                elif password != password2:
+                    st.error("הסיסמאות לא תואמות")
+                else:
+                    ok_p, msg_p = validate_password(password)
+                    if not ok_p:
+                        st.error(msg_p)
+                    else:
+                        ok, msg = sign_up(email, password, full_name)
+                        if ok:
+                            st.success(msg)
+                            st.session_state.auth_page = 'login'
+                        else:
+                            st.error(msg)
+            
+            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+            if st.button("⬅️ חזור להתחברות", use_container_width=True, key="back_login"):
+                st.session_state.auth_page = 'login'
+                st.rerun()
+        
+        elif page == 'reset':
+            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">איפוס סיסמה</div>', unsafe_allow_html=True)
+            
+            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="reset_email")
+            
+            if st.button("שלח קישור איפוס", use_container_width=True, key="reset_btn"):
+                if not email:
+                    st.error("נא להזין כתובת מייל")
+                elif not validate_email(email):
+                    st.error("כתובת מייל לא תקינה")
+                else:
+                    ok, msg = reset_password(email)
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+            
+            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+            if st.button("⬅️ חזור להתחברות", use_container_width=True, key="back_login2"):
+                st.session_state.auth_page = 'login'
+                st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Skip login option
+        st.markdown(f'''
+        <div style="text-align:center;margin-top:1.5rem">
+            <div style="color:{T['text3']};font-size:0.8rem">או</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        if st.button("🚀 המשך ללא חשבון", use_container_width=True, key="skip_auth"):
+            st.session_state.auth_user = {"id": "guest", "email": "guest", "name": "אורח"}
+            st.rerun()
+
+
+# =============================================================================
+# Entry Point
+# =============================================================================
 if __name__ == "__main__":
-    main()
+    init_auth_state()
+    
+    if is_configured() and not is_logged_in():
+        # Show auth page
+        render_auth_page()
+    else:
+        # Show dashboard (works without Supabase too)
+        main()
