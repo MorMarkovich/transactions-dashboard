@@ -302,10 +302,19 @@ ul[role="listbox"] li[aria-selected="true"] {{ background: {T['accent']} !import
 div[data-testid="stPlotlyChart"] {{ background: {T['surface']}; border: 1px solid {T['border']}; border-radius: 12px; padding: 0.75rem; margin-bottom: 0.75rem; }}
 
 /* === Buttons === */
-.stButton > button {{ background: {T['accent']}; color: #fff; border: none; border-radius: 8px; font-weight: 600; padding: 0.5rem 1.5rem; }}
-.stButton > button:hover {{ opacity: 0.9; }}
+.stButton > button {{ background: {T['accent']}; color: #fff; border: none; border-radius: 8px; font-weight: 600; padding: 0.5rem 1.5rem; transition: opacity 0.15s; }}
+.stButton > button:hover {{ opacity: 0.88; }}
 .stDownloadButton > button {{ background: {T['green']}; color: #0f172a; border: none; border-radius: 8px; font-weight: 600; }}
-.stDownloadButton > button:hover {{ opacity: 0.9; }}
+.stDownloadButton > button:hover {{ opacity: 0.88; }}
+/* Sidebar buttons - more subtle */
+section[data-testid="stSidebar"] .stButton > button {{
+    background: {T['surface2']} !important; color: {T['text1']} !important;
+    border: 1px solid {T['border']} !important; font-size: 0.85rem !important;
+    padding: 0.45rem 1rem !important; font-weight: 500 !important;
+}}
+section[data-testid="stSidebar"] .stButton > button:hover {{
+    background: {T['border_h']} !important; opacity: 1 !important;
+}}
 
 /* === Slider fix === */
 .stSlider [data-baseweb="slider"] div {{ background: {T['accent']} !important; }}
@@ -979,31 +988,37 @@ def main():
         
         # -- Data Management --
         if user and user.get('id') != 'guest' and is_configured():
-            with st.expander("🗄️ ניהול נתונים"):
-                st.markdown(f'<div style="font-size:0.8rem;color:{T["text2"]};margin-bottom:0.75rem">מחיקת נתונים שמורים בחשבון</div>', unsafe_allow_html=True)
-                
-                if st.button("🗑️ מחק עסקאות", use_container_width=True, key="del_data"):
-                    if delete_transactions():
-                        st.success("העסקאות נמחקו בהצלחה")
-                    else:
-                        st.error("שגיאה במחיקה")
-                
-                if st.button("🗑️ מחק הכנסות", use_container_width=True, key="del_incomes"):
-                    if delete_all_incomes():
-                        st.session_state.incomes = []
-                        st.success("ההכנסות נמחקו")
-                    else:
-                        st.error("שגיאה במחיקה")
-                
-                st.markdown(f'<div style="height:1px;background:{T["border"]};margin:0.75rem 0"></div>', unsafe_allow_html=True)
-                
-                confirm = st.checkbox("אני מבין שזה בלתי הפיך", key="del_confirm_check")
-                if st.button("⚠️ מחק את כל המידע שלי", use_container_width=True, key="del_all", disabled=not confirm):
-                    if delete_all_user_data():
-                        st.success("כל המידע נמחק")
-                        st.rerun()
-                    else:
-                        st.error("שגיאה במחיקה")
+            st.markdown(f'''
+            <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>
+            ''', unsafe_allow_html=True)
+            
+            dm_action = st.selectbox("בחר פעולה", [
+                "—",
+                "מחק עסקאות שמורות",
+                "מחק הכנסות",
+                "מחק את כל המידע שלי",
+            ], key="dm_select", label_visibility="collapsed")
+            
+            if dm_action == "מחק עסקאות שמורות":
+                st.markdown(f'<div style="font-size:0.78rem;color:{T["text2"]};margin:0.25rem 0 0.5rem">ימחק את כל העסקאות השמורות מקבצים שהעלית</div>', unsafe_allow_html=True)
+                if st.button("אישור מחיקה", key="dm_exec_tx", use_container_width=True):
+                    delete_transactions()
+                    st.success("נמחק"); st.rerun()
+            
+            elif dm_action == "מחק הכנסות":
+                st.markdown(f'<div style="font-size:0.78rem;color:{T["text2"]};margin:0.25rem 0 0.5rem">ימחק את כל ההכנסות שהזנת ידנית</div>', unsafe_allow_html=True)
+                if st.button("אישור מחיקה", key="dm_exec_inc", use_container_width=True):
+                    delete_all_incomes()
+                    st.session_state.incomes = []
+                    st.success("נמחק"); st.rerun()
+            
+            elif dm_action == "מחק את כל המידע שלי":
+                st.markdown(f'<div style="font-size:0.78rem;color:{T["red"]};margin:0.25rem 0 0.5rem;font-weight:600">פעולה בלתי הפיכה! כל הנתונים יימחקו לצמיתות</div>', unsafe_allow_html=True)
+                confirm_text = st.text_input("הקלד 'מחק' לאישור", key="dm_confirm_txt", label_visibility="collapsed", placeholder="הקלד 'מחק' לאישור")
+                if confirm_text == "מחק":
+                    if st.button("מחק הכל לצמיתות", key="dm_exec_all", use_container_width=True):
+                        delete_all_user_data()
+                        st.success("כל המידע נמחק"); st.rerun()
             
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
