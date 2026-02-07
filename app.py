@@ -1170,45 +1170,167 @@ def main():
 
 
 # =============================================================================
-# Auth UI
+# Auth UI - Premium Design
 # =============================================================================
+
+# Auth page CSS (injected only on auth page)
+AUTH_CSS = f"""
+<style>
+/* Hide sidebar on auth page */
+section[data-testid="stSidebar"] {{ display: none !important; }}
+[data-testid="collapsedControl"] {{ display: none !important; }}
+
+/* Auth page layout */
+.auth-page {{
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}}
+.auth-container {{
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+}}
+.auth-logo {{
+    text-align: center;
+    margin-bottom: 2rem;
+}}
+.auth-logo-icon {{
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, {T['accent']}, #6d28d9);
+    border-radius: 20px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    box-shadow: 0 8px 32px rgba(129,140,248,0.3);
+    margin-bottom: 1rem;
+}}
+.auth-logo-title {{
+    font-size: 1.8rem; font-weight: 800; color: {T['text1']};
+}}
+.auth-logo-sub {{
+    color: {T['text2']}; font-size: 0.9rem; margin-top: 4px;
+}}
+.auth-card {{
+    background: {T['surface']};
+    border: 1px solid {T['border']};
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+}}
+.auth-title {{
+    font-size: 1.2rem; font-weight: 700; color: {T['text1']};
+    text-align: center; margin-bottom: 1.5rem;
+}}
+.auth-divider {{
+    display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0;
+}}
+.auth-divider::before, .auth-divider::after {{
+    content: ''; flex: 1; height: 1px; background: {T['border']};
+}}
+.auth-divider span {{
+    color: {T['text3']}; font-size: 0.8rem; white-space: nowrap;
+}}
+.auth-footer {{
+    text-align: center; margin-top: 1.5rem;
+}}
+.auth-footer-text {{
+    color: {T['text3']}; font-size: 0.8rem;
+}}
+.auth-features {{
+    display: flex; justify-content: center; gap: 2rem; margin-top: 2.5rem;
+    flex-wrap: wrap;
+}}
+.auth-feat {{
+    text-align: center; flex: 0 0 auto;
+}}
+.auth-feat-icon {{
+    font-size: 1.3rem; margin-bottom: 4px;
+}}
+.auth-feat-text {{
+    font-size: 0.72rem; color: {T['text3']};
+}}
+
+/* Override Streamlit form inputs on auth page */
+.stApp [data-testid="stTextInput"] {{
+    margin-bottom: 0.5rem;
+}}
+.stApp [data-testid="stTextInput"] input {{
+    background: {T['surface2']} !important;
+    border: 1.5px solid {T['border']} !important;
+    border-radius: 12px !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 0.95rem !important;
+    color: {T['text1']} !important;
+    transition: border-color 0.2s !important;
+}}
+.stApp [data-testid="stTextInput"] input:focus {{
+    border-color: {T['accent']} !important;
+    box-shadow: 0 0 0 3px rgba(129,140,248,0.15) !important;
+}}
+.stApp [data-testid="stTextInput"] input::placeholder {{
+    color: {T['text3']} !important;
+}}
+/* Primary auth button */
+.stApp .stButton > button {{
+    background: linear-gradient(135deg, {T['accent']}, #6d28d9) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 0.75rem !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 16px rgba(129,140,248,0.3) !important;
+    transition: transform 0.15s, box-shadow 0.15s !important;
+}}
+.stApp .stButton > button:hover {{
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 24px rgba(129,140,248,0.4) !important;
+}}
+</style>
+"""
+
 def render_auth_page():
-    """Professional login/register page."""
+    """Premium login/register page."""
     init_auth_state()
     page = st.session_state.auth_page
     
-    # Center container
-    col_l, col_m, col_r = st.columns([1, 2, 1])
-    with col_m:
+    # Inject auth-specific CSS
+    st.markdown(AUTH_CSS, unsafe_allow_html=True)
+    
+    # Spacer for vertical centering feel
+    st.markdown('<div style="height:4vh"></div>', unsafe_allow_html=True)
+    
+    # Center everything
+    _, col_center, _ = st.columns([1.2, 2, 1.2])
+    
+    with col_center:
+        # Logo
         st.markdown(f'''
-        <div style="text-align:center;padding:2rem 0 1.5rem">
-            <div style="font-size:3rem;margin-bottom:0.5rem">💳</div>
-            <div style="font-size:1.6rem;font-weight:800;color:{T['accent']}">מנתח עסקאות</div>
-            <div style="color:{T['text2']};font-size:0.9rem;margin-top:4px">ניתוח חכם של הוצאות כרטיס האשראי</div>
+        <div class="auth-logo">
+            <div class="auth-logo-icon">💳</div>
+            <div class="auth-logo-title">מנתח עסקאות</div>
+            <div class="auth-logo-sub">ניתוח חכם של הוצאות כרטיס האשראי שלך</div>
         </div>
         ''', unsafe_allow_html=True)
         
-        # Card wrapper
-        st.markdown(f'''
-        <div style="background:{T['surface']};border:1px solid {T['border']};border-radius:16px;padding:2rem;max-width:420px;margin:0 auto">
-        ''', unsafe_allow_html=True)
-        
+        # === LOGIN ===
         if page == 'login':
-            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">התחברות</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-title">ברוך הבא! 👋</div>', unsafe_allow_html=True)
             
-            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="login_email")
-            password = st.text_input("🔒 סיסמה", type="password", placeholder="הסיסמה שלך", key="login_pass")
+            email = st.text_input("אימייל", placeholder="name@example.com", key="login_email", label_visibility="collapsed")
+            password = st.text_input("סיסמה", type="password", placeholder="סיסמה", key="login_pass", label_visibility="collapsed")
             
-            if st.button("התחבר", use_container_width=True, key="login_btn"):
+            if st.button("התחבר →", use_container_width=True, key="login_btn"):
                 if not email or not password:
-                    st.error("נא למלא את כל השדות")
+                    st.error("נא למלא אימייל וסיסמה")
                 elif not validate_email(email):
                     st.error("כתובת מייל לא תקינה")
                 else:
                     ok, msg = sign_in(email, password)
                     if ok:
-                        st.success(msg)
-                        # Load user settings
                         settings = load_user_settings()
                         if settings.get('theme'):
                             st.session_state.theme = settings['theme']
@@ -1216,27 +1338,31 @@ def render_auth_page():
                     else:
                         st.error(msg)
             
-            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-divider"><span>אין לך חשבון?</span></div>', unsafe_allow_html=True)
             
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("📝 הרשמה", use_container_width=True, key="goto_register"):
+                if st.button("צור חשבון", use_container_width=True, key="goto_register"):
                     st.session_state.auth_page = 'register'
                     st.rerun()
             with c2:
-                if st.button("🔑 שכחתי סיסמה", use_container_width=True, key="goto_reset"):
+                if st.button("שכחתי סיסמה", use_container_width=True, key="goto_reset"):
                     st.session_state.auth_page = 'reset'
                     st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
         
+        # === REGISTER ===
         elif page == 'register':
-            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">הרשמה</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-title">יצירת חשבון חדש ✨</div>', unsafe_allow_html=True)
             
-            full_name = st.text_input("👤 שם מלא", placeholder="ישראל ישראלי", key="reg_name")
-            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="reg_email")
-            password = st.text_input("🔒 סיסמה", type="password", placeholder="לפחות 6 תווים", key="reg_pass")
-            password2 = st.text_input("🔒 אימות סיסמה", type="password", placeholder="הקלד שוב", key="reg_pass2")
+            full_name = st.text_input("שם", placeholder="השם המלא שלך", key="reg_name", label_visibility="collapsed")
+            email = st.text_input("אימייל", placeholder="name@example.com", key="reg_email", label_visibility="collapsed")
+            password = st.text_input("סיסמה", type="password", placeholder="לפחות 6 תווים", key="reg_pass", label_visibility="collapsed")
+            password2 = st.text_input("אימות", type="password", placeholder="הקלד סיסמה שוב", key="reg_pass2", label_visibility="collapsed")
             
-            if st.button("צור חשבון", use_container_width=True, key="reg_btn"):
+            if st.button("צור חשבון →", use_container_width=True, key="reg_btn"):
                 if not all([full_name, email, password, password2]):
                     st.error("נא למלא את כל השדות")
                 elif not validate_email(email):
@@ -1255,17 +1381,21 @@ def render_auth_page():
                         else:
                             st.error(msg)
             
-            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
-            if st.button("⬅️ חזור להתחברות", use_container_width=True, key="back_login"):
+            st.markdown(f'<div class="auth-divider"><span>כבר יש לך חשבון?</span></div>', unsafe_allow_html=True)
+            if st.button("← חזור להתחברות", use_container_width=True, key="back_login"):
                 st.session_state.auth_page = 'login'
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         
+        # === RESET ===
         elif page == 'reset':
-            st.markdown(f'<div style="font-weight:700;font-size:1.15rem;color:{T["text1"]};margin-bottom:1rem;text-align:center">איפוס סיסמה</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="auth-title">איפוס סיסמה 🔑</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center;color:{T["text2"]};font-size:0.85rem;margin-bottom:1rem">הזן את כתובת המייל שלך ונשלח לך קישור לאיפוס</div>', unsafe_allow_html=True)
             
-            email = st.text_input("📧 אימייל", placeholder="name@example.com", key="reset_email")
+            email = st.text_input("אימייל", placeholder="name@example.com", key="reset_email", label_visibility="collapsed")
             
-            if st.button("שלח קישור איפוס", use_container_width=True, key="reset_btn"):
+            if st.button("שלח קישור →", use_container_width=True, key="reset_btn"):
                 if not email:
                     st.error("נא להזין כתובת מייל")
                 elif not validate_email(email):
@@ -1277,22 +1407,39 @@ def render_auth_page():
                     else:
                         st.error(msg)
             
-            st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
-            if st.button("⬅️ חזור להתחברות", use_container_width=True, key="back_login2"):
+            st.markdown(f'<div class="auth-divider"><span></span></div>', unsafe_allow_html=True)
+            if st.button("← חזור להתחברות", use_container_width=True, key="back_login2"):
                 st.session_state.auth_page = 'login'
                 st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Skip login option
-        st.markdown(f'''
-        <div style="text-align:center;margin-top:1.5rem">
-            <div style="color:{T['text3']};font-size:0.8rem">או</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        if st.button("🚀 המשך ללא חשבון", use_container_width=True, key="skip_auth"):
+        # Skip option
+        st.markdown(f'<div class="auth-divider"><span>או</span></div>', unsafe_allow_html=True)
+        if st.button("המשך כאורח  →", use_container_width=True, key="skip_auth"):
             st.session_state.auth_user = {"id": "guest", "email": "guest", "name": "אורח"}
             st.rerun()
+        
+        # Feature badges
+        st.markdown(f'''
+        <div class="auth-features">
+            <div class="auth-feat">
+                <div class="auth-feat-icon">🔒</div>
+                <div class="auth-feat-text">מאובטח</div>
+            </div>
+            <div class="auth-feat">
+                <div class="auth-feat-icon">📊</div>
+                <div class="auth-feat-text">ניתוח חכם</div>
+            </div>
+            <div class="auth-feat">
+                <div class="auth-feat-icon">☁️</div>
+                <div class="auth-feat-text">שמירה בענן</div>
+            </div>
+            <div class="auth-feat">
+                <div class="auth-feat-icon">🇮🇱</div>
+                <div class="auth-feat-text">עברית מלאה</div>
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
 
 # =============================================================================
