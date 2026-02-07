@@ -1140,8 +1140,11 @@ def main():
     render_kpis(df_f)
 
     # Tabs
-    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","📋 עסקאות","💰 הכנסות ותקציב"])
+    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב"])
 
+    # ══════════════════════════════════════════════
+    # TAB 0: Overview
+    # ══════════════════════════════════════════════
     with tabs[0]:
         c1, c2 = st.columns([3, 2])
         with c1:
@@ -1155,18 +1158,24 @@ def main():
             st.markdown(f'<div class="section-label">📋 פירוט</div>', unsafe_allow_html=True)
             render_categories(df_f)
 
+    # ══════════════════════════════════════════════
+    # TAB 1: Trends - Enhanced
+    # ══════════════════════════════════════════════
     with tabs[1]:
         st.markdown(f'<div class="section-label">📈 מאזן מצטבר</div>', unsafe_allow_html=True)
         st.plotly_chart(chart_trend(df_f), use_container_width=True, key="t")
+
         exp = df_f[df_f['סכום'] < 0]
         if len(exp) > 0:
+            # Stats row
             st.markdown(f'<div class="section-label">📊 סטטיסטיקות</div>', unsafe_allow_html=True)
             c1,c2,c3,c4 = st.columns(4)
+            avg_daily = exp['סכום_מוחלט'].sum() / max((df_f['תאריך'].max() - df_f['תאריך'].min()).days, 1)
             stats = [
                 ('הוצאה מקסימלית', fmt(exp['סכום_מוחלט'].max()), T['red']),
-                ('הוצאה מינימלית', fmt(exp['סכום_מוחלט'].min()), T['green']),
-                ('חציון', fmt(exp['סכום_מוחלט'].median()), T['accent']),
-                ('קטגוריות', str(df_f['קטגוריה'].nunique()), T['amber']),
+                ('ממוצע יומי', fmt(avg_daily), T['accent']),
+                ('חציון', fmt(exp['סכום_מוחלט'].median()), T['amber']),
+                ('מספר עסקאות', f'{len(exp):,}', T['green']),
             ]
             for col, (label, val, color) in zip([c1,c2,c3,c4], stats):
                 with col:
@@ -1175,14 +1184,37 @@ def main():
                         <div style="color:{color};font-size:1.4rem;font-weight:700">{val}</div>
                     </div>''', unsafe_allow_html=True)
 
+            # Monthly comparison table
+            st.markdown(f'<div class="section-label">📅 השוואה חודשית</div>', unsafe_allow_html=True)
+            monthly = exp.groupby('חודש').agg({'סכום_מוחלט':['sum','count','mean'],'תאריך':'first'}).reset_index()
+            monthly.columns = ['חודש','סה״כ','עסקאות','ממוצע','_d']
+            monthly = monthly.sort_values('_d', ascending=False).drop('_d', axis=1)
+            # Show change %
+            monthly['שינוי'] = monthly['סה״כ'].pct_change(periods=-1) * 100
+            for _, row in monthly.iterrows():
+                change_str = ''
+                if pd.notna(row['שינוי']):
+                    ch = row['שינוי']
+                    arrow = '↑' if ch > 0 else '↓'
+                    ch_color = T['red'] if ch > 0 else T['green']
+                    change_str = f'<span style="color:{ch_color};font-weight:600;font-size:0.8rem">{arrow} {abs(ch):.0f}%</span>'
+                st.markdown(f'''<div class="cat-card" style="justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:0.75rem">
+                        <div style="font-weight:700;color:{T['text1']};font-size:0.9rem;min-width:65px">{row['חודש']}</div>
+                        <div style="color:{T['text2']};font-size:0.8rem">{int(row['עסקאות'])} עסקאות</div>
+                        {change_str}
+                    </div>
+                    <div style="font-weight:700;color:{T['red']};font-size:0.95rem;direction:ltr">{fmt(row['סה״כ'])}</div>
+                </div>''', unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════
+    # TAB 2: Merchants - Enhanced
+    # ══════════════════════════════════════════════
     with tabs[2]:
         st.markdown(f'<div class="section-label">🏆 בתי עסק מובילים</div>', unsafe_allow_html=True)
-        
-        # Professional count selector
         if 'merchant_count' not in st.session_state:
             st.session_state.merchant_count = 8
-        
-        st.markdown(f'<div style="color:{T["text2"]};font-size:0.85rem;margin-bottom:0.5rem">מספר בתי עסק להצגה:</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="color:{T["text2"]};font-size:0.85rem;margin-bottom:0.5rem">מספר בתי עסק:</div>', unsafe_allow_html=True)
         bc1, bc2, bc3, bc4, spacer = st.columns([1,1,1,1,5])
         with bc1:
             if st.button("5", key="m5", use_container_width=True): st.session_state.merchant_count = 5; st.rerun()
@@ -1192,10 +1224,122 @@ def main():
             if st.button("10", key="m10", use_container_width=True): st.session_state.merchant_count = 10; st.rerun()
         with bc4:
             if st.button("15", key="m15", use_container_width=True): st.session_state.merchant_count = 15; st.rerun()
-        
         st.plotly_chart(chart_merchants(df_f, st.session_state.merchant_count), use_container_width=True, key="mr")
 
+        # Merchant detail cards
+        if len(exp) > 0:
+            st.markdown(f'<div class="section-label">📊 פירוט בתי עסק</div>', unsafe_allow_html=True)
+            merch = exp.groupby('תיאור').agg({'סכום_מוחלט':['sum','count','mean']}).reset_index()
+            merch.columns = ['בית עסק','סה״כ','ביקורים','ממוצע']
+            merch = merch.sort_values('סה״כ', ascending=False).head(10)
+            for _, row in merch.iterrows():
+                name = row['בית עסק'][:30] + ('...' if len(row['בית עסק']) > 30 else '')
+                st.markdown(f'''<div class="cat-card" style="justify-content:space-between">
+                    <div>
+                        <div style="font-weight:600;color:{T['text1']};font-size:0.85rem">{name}</div>
+                        <div style="color:{T['text3']};font-size:0.75rem">{int(row['ביקורים'])} ביקורים &bull; ממוצע {fmt(row['ממוצע'])}</div>
+                    </div>
+                    <div style="font-weight:700;color:{T['red']};font-size:0.95rem;direction:ltr">{fmt(row['סה״כ'])}</div>
+                </div>''', unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════
+    # TAB 3: Insights (NEW!)
+    # ══════════════════════════════════════════════
     with tabs[3]:
+        if len(exp) > 0:
+            total_exp = exp['סכום_מוחלט'].sum()
+            num_days = max((df_f['תאריך'].max() - df_f['תאריך'].min()).days, 1)
+
+            # Top insights
+            st.markdown(f'<div class="section-label">💡 תובנות חכמות</div>', unsafe_allow_html=True)
+
+            # 1. Biggest single expense
+            biggest = exp.loc[exp['סכום_מוחלט'].idxmax()]
+            st.markdown(f'''<div class="cat-card">
+                <div class="cat-icon" style="background:{T['red']}22;color:{T['red']}">🔥</div>
+                <div class="cat-info">
+                    <div class="cat-name">ההוצאה הגדולה ביותר</div>
+                    <div style="color:{T['text2']};font-size:0.8rem">{biggest['תיאור']} • {biggest['תאריך'].strftime('%d/%m/%Y')}</div>
+                </div>
+                <div class="cat-stats"><div class="cat-amount" style="color:{T['red']}">{fmt(biggest['סכום_מוחלט'])}</div></div>
+            </div>''', unsafe_allow_html=True)
+
+            # 2. Most visited merchant
+            top_merch = exp.groupby('תיאור').size().idxmax()
+            top_merch_count = exp.groupby('תיאור').size().max()
+            top_merch_sum = exp[exp['תיאור'] == top_merch]['סכום_מוחלט'].sum()
+            st.markdown(f'''<div class="cat-card">
+                <div class="cat-icon" style="background:{T['accent']}22;color:{T['accent']}">🔄</div>
+                <div class="cat-info">
+                    <div class="cat-name">בית העסק עם הכי הרבה ביקורים</div>
+                    <div style="color:{T['text2']};font-size:0.8rem">{top_merch} • {top_merch_count} ביקורים</div>
+                </div>
+                <div class="cat-stats"><div class="cat-amount">{fmt(top_merch_sum)}</div></div>
+            </div>''', unsafe_allow_html=True)
+
+            # 3. Most expensive day of week
+            days_heb = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']
+            day_totals = exp.groupby('יום_בשבוע')['סכום_מוחלט'].sum()
+            expensive_day = day_totals.idxmax()
+            st.markdown(f'''<div class="cat-card">
+                <div class="cat-icon" style="background:{T['amber']}22;color:{T['amber']}">📅</div>
+                <div class="cat-info">
+                    <div class="cat-name">היום הכי יקר בשבוע</div>
+                    <div style="color:{T['text2']};font-size:0.8rem">יום {days_heb[expensive_day]}</div>
+                </div>
+                <div class="cat-stats"><div class="cat-amount">{fmt(day_totals[expensive_day])}</div></div>
+            </div>''', unsafe_allow_html=True)
+
+            # 4. Average per transaction
+            avg_tx = exp['סכום_מוחלט'].mean()
+            st.markdown(f'''<div class="cat-card">
+                <div class="cat-icon" style="background:{T['green']}22;color:{T['green']}">📊</div>
+                <div class="cat-info">
+                    <div class="cat-name">ממוצע לעסקה</div>
+                    <div style="color:{T['text2']};font-size:0.8rem">{len(exp):,} עסקאות ב-{num_days} ימים</div>
+                </div>
+                <div class="cat-stats"><div class="cat-amount">{fmt(avg_tx)}</div></div>
+            </div>''', unsafe_allow_html=True)
+
+            # Spending heatmap by category & month
+            st.markdown(f'<div class="section-label">🗓️ מפת חום: קטגוריות x חודשים</div>', unsafe_allow_html=True)
+            heatmap_data = exp.groupby(['קטגוריה','חודש'])['סכום_מוחלט'].sum().reset_index()
+            if not heatmap_data.empty:
+                pivot = heatmap_data.pivot_table(index='קטגוריה', columns='חודש', values='סכום_מוחלט', fill_value=0)
+                # Sort by total
+                pivot['_total'] = pivot.sum(axis=1)
+                pivot = pivot.sort_values('_total', ascending=False).drop('_total', axis=1).head(8)
+                fig_heat = go.Figure(go.Heatmap(
+                    z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
+                    colorscale=[[0,'#0c111d'],[0.5,'#818cf8'],[1,'#c084fc']],
+                    hovertemplate='<b>%{y}</b><br>%{x}<br>₪%{z:,.0f}<extra></extra>',
+                    showscale=False,
+                ))
+                fig_heat.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=10, b=40, l=120, r=10), height=max(250, len(pivot)*35),
+                    font=dict(family='Heebo', color=T['text2']),
+                    xaxis=dict(tickfont=dict(color=T['text2'], size=10), side='bottom'),
+                    yaxis=dict(tickfont=dict(color=T['text1'], size=11), autorange='reversed'),
+                )
+                st.plotly_chart(fig_heat, use_container_width=True, key="heatmap")
+
+            # Large transactions alert
+            threshold = exp['סכום_מוחלט'].quantile(0.9)
+            large_tx = exp[exp['סכום_מוחלט'] >= threshold].sort_values('סכום_מוחלט', ascending=False).head(5)
+            if len(large_tx) > 0:
+                st.markdown(f'<div class="section-label">⚠️ עסקאות חריגות (עשירון עליון)</div>', unsafe_allow_html=True)
+                for _, row in large_tx.iterrows():
+                    st.markdown(f'''<div class="cat-card">
+                        <div style="font-weight:600;color:{T['text1']};font-size:0.85rem;flex:1">{row['תיאור'][:35]}</div>
+                        <div style="color:{T['text3']};font-size:0.78rem">{row['תאריך'].strftime('%d/%m/%Y')}</div>
+                        <div style="font-weight:700;color:{T['red']};font-size:0.9rem;direction:ltr;min-width:70px;text-align:left">{fmt(row['סכום_מוחלט'])}</div>
+                    </div>''', unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════
+    # TAB 4: Transactions
+    # ══════════════════════════════════════════════
+    with tabs[4]:
         st.markdown(f'<div class="section-label">📋 עסקאות</div>', unsafe_allow_html=True)
         col1, _ = st.columns([2, 3])
         with col1:
@@ -1213,7 +1357,10 @@ def main():
             hide_index=True, use_container_width=True, height=500)
         st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:0.5rem;text-align:center">{len(view):,} עסקאות</div>', unsafe_allow_html=True)
 
-    with tabs[4]:
+    # ══════════════════════════════════════════════
+    # TAB 5: Budget
+    # ══════════════════════════════════════════════
+    with tabs[5]:
         render_income_tab(df_f)
 
     # Export
