@@ -1,11 +1,43 @@
 """
-Authentication & Database module using Supabase
+Authentication & Database module using Supabase + Cookie persistence
 """
 import streamlit as st
 from supabase import create_client, Client
 from typing import Optional
 import re
 import json
+import os
+
+# =============================================================================
+# Cookie Manager - survives page refresh
+# =============================================================================
+try:
+    from streamlit_cookies_manager import EncryptedCookieManager
+    HAS_COOKIES = True
+except ImportError:
+    HAS_COOKIES = False
+
+_cookie_mgr = None
+
+def get_cookies():
+    """Get cookie manager singleton."""
+    global _cookie_mgr
+    if not HAS_COOKIES:
+        return None
+    if _cookie_mgr is None:
+        _cookie_mgr = EncryptedCookieManager(
+            prefix="txdash/",
+            password=os.environ.get("COOKIES_PASSWORD", "txdash-secret-2026"),
+        )
+    return _cookie_mgr
+
+
+def cookies_ready() -> bool:
+    """Check if cookies are loaded (must be called early in app)."""
+    c = get_cookies()
+    if c is None:
+        return True  # No cookie lib = skip
+    return c.ready()
 
 
 # =============================================================================
@@ -30,58 +62,8 @@ def is_configured() -> bool:
 
 
 # =============================================================================
-# Auth State - with localStorage persistence across refreshes
+# Auth State - with cookie persistence
 # =============================================================================
-def _inject_localstorage_bridge():
-    """Inject JS to bridge localStorage <-> Streamlit query params for session persistence."""
-    import streamlit.components.v1 as components
-    # This JS reads refresh_token from localStorage and writes it to a hidden element
-    # On load, if we have a stored token, it auto-submits to restore session
-    components.html("""
-    <script>
-    const KEY = 'txdash_refresh_token';
-    const stored = localStorage.getItem(KEY);
-    if (stored) {
-        // Write to parent's sessionStorage so Streamlit can read via query params
-        const url = new URL(window.parent.location);
-        if (!url.searchParams.has('_rt')) {
-            url.searchParams.set('_rt', stored);
-            // Only redirect if we don't already have the param
-            if (!window.parent.location.search.includes('_rt=')) {
-                window.parent.location.search = url.searchParams.toString();
-            }
-        }
-    }
-    </script>
-    """, height=0)
-
-
-def _save_token_to_browser(refresh_token: str):
-    """Save refresh token to browser localStorage via JS."""
-    import streamlit.components.v1 as components
-    components.html(f"""
-    <script>
-    localStorage.setItem('txdash_refresh_token', '{refresh_token}');
-    </script>
-    """, height=0)
-
-
-def _clear_token_from_browser():
-    """Clear refresh token from browser localStorage."""
-    import streamlit.components.v1 as components
-    components.html("""
-    <script>
-    localStorage.removeItem('txdash_refresh_token');
-    // Clean URL
-    const url = new URL(window.parent.location);
-    url.searchParams.delete('_rt');
-    if (window.parent.location.search.includes('_rt')) {
-        window.parent.history.replaceState({}, '', url.pathname);
-    }
-    </script>
-    """, height=0)
-
-
 def init_auth_state():
     if 'auth_user' not in st.session_state:
         st.session_state.auth_user = None
@@ -92,35 +74,68 @@ def init_auth_state():
     if 'auth_refresh' not in st.session_state:
         st.session_state.auth_refresh = None
     
-    # Try to restore from query param (set by localStorage JS bridge)
+    # Restore from cookie if session is empty
     if st.session_state.auth_user is None:
-        rt = st.query_params.get("_rt")
-        if rt:
-            st.session_state.auth_refresh = rt
-            _try_restore_session()
+        _try_restore_from_cookie()
 
 
-def _try_restore_session():
-    """Try to restore user session using refresh token."""
-    sb = get_supabase()
-    token = st.session_state.auth_refresh
-    if not sb or not token:
+def _try_restore_from_cookie():
+    """Restore session from browser cookie."""
+    c = get_cookies()
+    if c is None or not HAS_COOKIES:
         return
     try:
-        res = sb.auth.refresh_session(token)
-        if res and res.user:
-            st.session_state.auth_user = {
-                "id": res.user.id,
-                "email": res.user.email,
-                "name": res.user.user_metadata.get("full_name", res.user.email.split("@")[0]),
-            }
-            st.session_state.auth_token = res.session.access_token
-            st.session_state.auth_refresh = res.session.refresh_token
+        if not c.ready():
+            return
+        token = c.get("refresh_token")
+        if token and token != "":
+            sb = get_supabase()
+            if not sb:
+                return
+            res = sb.auth.refresh_session(token)
+            if res and res.user:
+                st.session_state.auth_user = {
+                    "id": res.user.id,
+                    "email": res.user.email,
+                    "name": res.user.user_metadata.get("full_name", res.user.email.split("@")[0]),
+                }
+                st.session_state.auth_token = res.session.access_token
+                st.session_state.auth_refresh = res.session.refresh_token
+                # Update cookie with new token
+                c["refresh_token"] = res.session.refresh_token
+                c.save()
     except:
-        st.session_state.auth_refresh = None
-        # Clear bad token from URL
-        try: st.query_params.clear()
-        except: pass
+        # Bad token, clear it
+        try:
+            c["refresh_token"] = ""
+            c.save()
+        except:
+            pass
+
+
+def _save_token_cookie(refresh_token: str):
+    """Save refresh token to cookie."""
+    c = get_cookies()
+    if c is None:
+        return
+    try:
+        c["refresh_token"] = refresh_token
+        c.save()
+    except:
+        pass
+
+
+def _clear_token_cookie():
+    """Clear refresh token from cookie."""
+    c = get_cookies()
+    if c is None:
+        return
+    try:
+        c["refresh_token"] = ""
+        c.save()
+    except:
+        pass
+
 
 def get_current_user():
     return st.session_state.get('auth_user')
@@ -136,14 +151,7 @@ def logout():
     st.session_state.auth_user = None
     st.session_state.auth_token = None
     st.session_state.auth_refresh = None
-    # Clear saved transactions from session
-    if 'saved_transactions' in st.session_state:
-        del st.session_state['saved_transactions']
-    # Clear browser localStorage token
-    _clear_token_from_browser()
-    # Clear URL params
-    try: st.query_params.clear()
-    except: pass
+    _clear_token_cookie()
 
 
 # =============================================================================
@@ -185,8 +193,8 @@ def sign_in(email: str, password: str) -> tuple[bool, str]:
             }
             st.session_state.auth_token = res.session.access_token
             st.session_state.auth_refresh = res.session.refresh_token
-            # Persist to browser localStorage
-            _save_token_to_browser(res.session.refresh_token)
+            # Save to cookie for persistence
+            _save_token_cookie(res.session.refresh_token)
             return True, "התחברת בהצלחה!"
         return False, "שגיאה בהתחברות"
     except Exception as e:
@@ -211,21 +219,17 @@ def reset_password(email: str) -> tuple[bool, str]:
 # Transaction Data Persistence
 # =============================================================================
 def save_transactions(df) -> bool:
-    """Save processed transactions to Supabase as JSON."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user or user.get('id') == 'guest':
         return False
     try:
-        # Convert to JSON-safe format
         data = df[['תאריך','תיאור','קטגוריה','סכום','סכום_מוחלט']].copy()
         data['תאריך'] = data['תאריך'].dt.strftime('%Y-%m-%d')
         records = data.to_dict('records')
-        
-        # Delete old data first
+        # Delete old
         sb.table("saved_transactions").delete().eq("user_id", user["id"]).execute()
-        
-        # Insert in batches of 500
+        # Insert batches
         for i in range(0, len(records), 500):
             batch = records[i:i+500]
             rows = [{"user_id": user["id"], "data": json.dumps(r, ensure_ascii=False)} for r in batch]
@@ -236,7 +240,6 @@ def save_transactions(df) -> bool:
 
 
 def load_transactions():
-    """Load saved transactions from Supabase."""
     import pandas as pd
     sb = get_supabase()
     user = get_current_user()
@@ -259,7 +262,6 @@ def load_transactions():
 
 
 def delete_transactions() -> bool:
-    """Delete all saved transactions for current user."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -272,7 +274,6 @@ def delete_transactions() -> bool:
 
 
 def delete_all_user_data() -> bool:
-    """Delete ALL user data (transactions, incomes, uploads, settings)."""
     sb = get_supabase()
     user = get_current_user()
     if not sb or not user:
@@ -308,7 +309,6 @@ def save_income(description: str, amount: float, income_type: str, recurring: st
     except:
         return False
 
-
 def load_incomes() -> list:
     sb = get_supabase()
     user = get_current_user()
@@ -319,7 +319,6 @@ def load_incomes() -> list:
         return res.data or []
     except:
         return []
-
 
 def delete_all_incomes() -> bool:
     sb = get_supabase()
@@ -334,39 +333,8 @@ def delete_all_incomes() -> bool:
 
 
 # =============================================================================
-# Other DB Operations
+# Settings
 # =============================================================================
-def save_upload_history(file_name: str, row_count: int, total_expenses: float,
-                        total_income: float, date_start, date_end) -> bool:
-    sb = get_supabase()
-    user = get_current_user()
-    if not sb or not user:
-        return False
-    try:
-        sb.table("upload_history").insert({
-            "user_id": user["id"],
-            "file_name": file_name,
-            "row_count": row_count,
-            "total_expenses": total_expenses,
-            "total_income": total_income,
-            "date_range_start": str(date_start) if date_start else None,
-            "date_range_end": str(date_end) if date_end else None,
-        }).execute()
-        return True
-    except:
-        return False
-
-def load_upload_history() -> list:
-    sb = get_supabase()
-    user = get_current_user()
-    if not sb or not user:
-        return []
-    try:
-        res = sb.table("upload_history").select("*").eq("user_id", user["id"]).order("uploaded_at", desc=True).limit(10).execute()
-        return res.data or []
-    except:
-        return []
-
 def save_user_settings(theme: str) -> bool:
     sb = get_supabase()
     user = get_current_user()
@@ -392,13 +360,39 @@ def load_user_settings() -> dict:
     except:
         return {}
 
+def save_upload_history(file_name, row_count, total_expenses, total_income, date_start, date_end):
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user:
+        return False
+    try:
+        sb.table("upload_history").insert({
+            "user_id": user["id"], "file_name": file_name, "row_count": row_count,
+            "total_expenses": total_expenses, "total_income": total_income,
+            "date_range_start": str(date_start) if date_start else None,
+            "date_range_end": str(date_end) if date_end else None,
+        }).execute()
+        return True
+    except:
+        return False
+
+def load_upload_history() -> list:
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user:
+        return []
+    try:
+        res = sb.table("upload_history").select("*").eq("user_id", user["id"]).order("uploaded_at", desc=True).limit(10).execute()
+        return res.data or []
+    except:
+        return []
+
 
 # =============================================================================
 # Validation
 # =============================================================================
 def validate_email(email: str) -> bool:
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
+    return bool(re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email))
 
 def validate_password(password: str) -> tuple[bool, str]:
     if len(password) < 6:

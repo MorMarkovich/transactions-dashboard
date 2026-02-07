@@ -12,6 +12,7 @@ from typing import Optional, Dict
 import warnings
 from auth import (
     init_auth_state, is_configured, is_logged_in, get_current_user,
+    cookies_ready, get_cookies,
     sign_in, sign_up, reset_password, logout,
     save_income, load_incomes, delete_all_incomes,
     save_upload_history, load_upload_history,
@@ -979,34 +980,31 @@ def main():
         
         # -- Data Management --
         if user and user.get('id') != 'guest' and is_configured():
-            st.markdown(f'''<div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>''', unsafe_allow_html=True)
-            
-            if st.button("🗑️ מחק עסקאות שמורות", use_container_width=True, key="del_data"):
-                delete_transactions()
-                st.success("העסקאות נמחקו")
-                st.rerun()
-            
-            # Two-step confirmation for full delete
-            if 'confirm_delete_all' not in st.session_state:
-                st.session_state.confirm_delete_all = False
-            
-            if not st.session_state.confirm_delete_all:
-                if st.button("⚠️ מחק את כל המידע", use_container_width=True, key="del_all_step1"):
-                    st.session_state.confirm_delete_all = True
-                    st.rerun()
-            else:
-                st.markdown(f'<div style="color:{T["red"]};font-size:0.8rem;text-align:center;margin-bottom:0.5rem;font-weight:600">בטוח? הפעולה בלתי הפיכה!</div>', unsafe_allow_html=True)
-                dc1, dc2 = st.columns(2)
-                with dc1:
-                    if st.button("✅ כן, מחק", use_container_width=True, key="del_confirm"):
-                        delete_all_user_data()
-                        st.session_state.confirm_delete_all = False
+            with st.expander("🗄️ ניהול נתונים"):
+                st.markdown(f'<div style="font-size:0.8rem;color:{T["text2"]};margin-bottom:0.75rem">מחיקת נתונים שמורים בחשבון</div>', unsafe_allow_html=True)
+                
+                if st.button("🗑️ מחק עסקאות", use_container_width=True, key="del_data"):
+                    if delete_transactions():
+                        st.success("העסקאות נמחקו בהצלחה")
+                    else:
+                        st.error("שגיאה במחיקה")
+                
+                if st.button("🗑️ מחק הכנסות", use_container_width=True, key="del_incomes"):
+                    if delete_all_incomes():
+                        st.session_state.incomes = []
+                        st.success("ההכנסות נמחקו")
+                    else:
+                        st.error("שגיאה במחיקה")
+                
+                st.markdown(f'<div style="height:1px;background:{T["border"]};margin:0.75rem 0"></div>', unsafe_allow_html=True)
+                
+                confirm = st.checkbox("אני מבין שזה בלתי הפיך", key="del_confirm_check")
+                if st.button("⚠️ מחק את כל המידע שלי", use_container_width=True, key="del_all", disabled=not confirm):
+                    if delete_all_user_data():
                         st.success("כל המידע נמחק")
                         st.rerun()
-                with dc2:
-                    if st.button("❌ ביטול", use_container_width=True, key="del_cancel"):
-                        st.session_state.confirm_delete_all = False
-                        st.rerun()
+                    else:
+                        st.error("שגיאה במחיקה")
             
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
@@ -1657,11 +1655,14 @@ def render_auth_page():
 # Entry Point
 # =============================================================================
 if __name__ == "__main__":
+    # Wait for cookies to load (required for session persistence)
+    if not cookies_ready():
+        st.spinner("טוען...")
+        st.stop()
+    
     init_auth_state()
     
     if is_configured() and not is_logged_in():
-        # Show auth page
         render_auth_page()
     else:
-        # Show dashboard (works without Supabase too)
         main()
