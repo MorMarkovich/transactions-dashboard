@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw, TrendingUp, Zap } from 'lucide-react'
+import AnimatedNumber from '../components/ui/AnimatedNumber'
+import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import DonutChart from '../components/charts/DonutChart'
 import BarChart from '../components/charts/BarChart'
@@ -10,6 +13,7 @@ import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
+import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import type {
   MetricsData,
@@ -17,6 +21,9 @@ import type {
   RawMonthlyData,
   RawWeekdayData,
   CategoryData,
+  WeeklySummaryData,
+  ForecastData,
+  SpendingVelocityData,
 } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -31,6 +38,9 @@ export default function Dashboard() {
   const [donutData, setDonutData] = useState<RawDonutData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
   const [weekdayData, setWeekdayData] = useState<RawWeekdayData | null>(null)
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummaryData | null>(null)
+  const [forecast, setForecast] = useState<ForecastData | null>(null)
+  const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -48,17 +58,23 @@ export default function Dashboard() {
       setError(null)
 
       try {
-        const [metricsRes, donutRes, monthlyRes, weekdayRes] = await Promise.all([
+        const results = await Promise.all([
           transactionsApi.getMetrics(sessionId, signal),
           transactionsApi.getDonutChartV2(sessionId, signal),
           transactionsApi.getMonthlyChartV2(sessionId, signal),
           transactionsApi.getWeekdayChartV2(sessionId, signal),
+          transactionsApi.getWeeklySummary(sessionId, signal).catch(() => null),
+          transactionsApi.getForecast(sessionId, signal).catch(() => null),
+          transactionsApi.getSpendingVelocity(sessionId, signal).catch(() => null),
         ])
 
-        setMetrics(metricsRes)
-        setDonutData(donutRes)
-        setMonthlyData(monthlyRes)
-        setWeekdayData(weekdayRes)
+        setMetrics(results[0] as MetricsData)
+        setDonutData(results[1] as RawDonutData)
+        setMonthlyData(results[2] as RawMonthlyData)
+        setWeekdayData(results[3] as RawWeekdayData)
+        if (results[4]) setWeeklySummary(results[4] as WeeklySummaryData)
+        if (results[5]) setForecast(results[5] as ForecastData)
+        if (results[6]) setVelocity(results[6] as SpendingVelocityData)
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message =
@@ -227,8 +243,76 @@ export default function Dashboard() {
 
   // ---- Main dashboard view ------------------------------------------------
   return (
-    <div>
+    <div style={{ direction: 'rtl', position: 'relative' }}>
+      {/* Mesh gradient background */}
+      <div
+        className="mesh-gradient-bg"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '300px',
+          pointerEvents: 'none',
+          zIndex: 0,
+          opacity: 0.6,
+        }}
+      />
+
       <MetricsGrid metrics={metrics} />
+
+      {weeklySummary && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 'var(--space-md)',
+            marginTop: 'var(--space-lg)',
+            marginBottom: 'var(--space-lg)',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
+          {/* This week */}
+          <div className="glass-card" style={{ padding: '16px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)' }}>השבוע</span>
+              {weeklySummary.change_pct !== 0 && (
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)',
+                  color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
+                }}>
+                  {weeklySummary.change_pct > 0 ? '\u2191' : '\u2193'} {Math.abs(weeklySummary.change_pct)}%
+                </span>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>
+              {formatCurrency(weeklySummary.this_week.total)}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {weeklySummary.this_week.count} \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u00B7 {weeklySummary.this_week.top_category}
+            </p>
+          </div>
+
+          {/* Last week */}
+          <div className="glass-card" style={{ padding: '16px 20px' }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>\u05E9\u05D1\u05D5\u05E2 \u05E9\u05E2\u05D1\u05E8</span>
+            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>
+              {formatCurrency(weeklySummary.last_week.total)}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {weeklySummary.last_week.count} \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u00B7 {weeklySummary.last_week.top_category}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       <div
         style={{
@@ -245,7 +329,7 @@ export default function Dashboard() {
             <Calendar size={20} />
             <span>{'\u05D4\u05D5\u05E6\u05D0\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D7\u05D5\u05D3\u05E9'}</span>
           </div>
-          <Card padding="md">
+          <Card className="glass-card" padding="md">
             <BarChart data={monthlyChartData} />
           </Card>
 
@@ -253,7 +337,7 @@ export default function Dashboard() {
             <CalendarDays size={20} />
             <span>{'\u05D4\u05EA\u05E4\u05DC\u05D2\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D9\u05D5\u05DD \u05D1\u05E9\u05D1\u05D5\u05E2'}</span>
           </div>
-          <Card padding="md">
+          <Card className="glass-card" padding="md">
             <WeekdayChart data={weekdayChartData} />
           </Card>
         </div>
@@ -264,7 +348,7 @@ export default function Dashboard() {
             <PieChart size={20} />
             <span>{'\u05D7\u05DC\u05D5\u05E7\u05D4 \u05DC\u05E4\u05D9 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4'}</span>
           </div>
-          <Card padding="md">
+          <Card className="glass-card" padding="md">
             {donutChartData.data.length > 0 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 <DonutChart data={donutChartData.data} total={donutChartData.total} />
@@ -280,10 +364,131 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* ── Forecast & Velocity premium row ──────────────────────────── */}
+      {(forecast || velocity) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.35 }}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: forecast && velocity ? '1fr 1fr' : '1fr',
+            gap: 'var(--space-md)',
+            marginTop: 'var(--space-xl)',
+          }}
+          className="dashboard-premium-row"
+        >
+          {/* Forecast card */}
+          {forecast && (
+            <Card variant="glass" padding="md">
+              <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+                <TrendingUp size={18} />
+                <span>תחזית חודש הבא</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
+                <AnimatedNumber
+                  value={forecast.forecast_amount}
+                  formatter={formatCurrency}
+                  style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                />
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background:
+                    forecast.trend_direction === 'up'
+                      ? 'rgba(239, 68, 68, 0.12)'
+                      : forecast.trend_direction === 'down'
+                        ? 'rgba(52, 211, 153, 0.12)'
+                        : 'rgba(148, 163, 184, 0.12)',
+                  color:
+                    forecast.trend_direction === 'up'
+                      ? 'var(--accent-danger, #ef4444)'
+                      : forecast.trend_direction === 'down'
+                        ? 'var(--accent-secondary, #10b981)'
+                        : 'var(--text-muted)',
+                }}>
+                  {forecast.trend_direction === 'up' ? '↑' : forecast.trend_direction === 'down' ? '↓' : '→'} {forecast.trend_direction === 'up' ? 'עלייה' : forecast.trend_direction === 'down' ? 'ירידה' : 'יציב'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  ביטחון: {forecast.confidence === 'high' ? 'גבוה' : forecast.confidence === 'medium' ? 'בינוני' : 'נמוך'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  ממוצע חודשי: {formatCurrency(forecast.avg_monthly)}
+                </span>
+              </div>
+              {forecast.monthly_data.length > 1 && (
+                <div style={{ marginTop: '12px' }}>
+                  <SparklineChart
+                    data={forecast.monthly_data.map(m => m.amount)}
+                    color="var(--neon-cyan, var(--accent-primary))"
+                    width={280}
+                    height={40}
+                  />
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Spending velocity card */}
+          {velocity && (
+            <Card variant="glass" padding="md">
+              <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+                <Zap size={18} />
+                <span>קצב הוצאות</span>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יומי</div>
+                  <AnimatedNumber
+                    value={velocity.daily_avg}
+                    formatter={formatCurrency}
+                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>7 ימים</div>
+                  <AnimatedNumber
+                    value={velocity.rolling_7day}
+                    formatter={formatCurrency}
+                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>30 יום</div>
+                  <AnimatedNumber
+                    value={velocity.rolling_30day}
+                    formatter={formatCurrency}
+                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
+                  />
+                </div>
+              </div>
+              {velocity.daily_data.length > 1 && (
+                <div style={{ marginTop: '12px' }}>
+                  <SparklineChart
+                    data={velocity.daily_data.map(d => d.amount)}
+                    color="var(--neon-purple, var(--accent-primary))"
+                    width={280}
+                    height={40}
+                  />
+                </div>
+              )}
+            </Card>
+          )}
+        </motion.div>
+      )}
+
       {/* Responsive: single column on mobile */}
       <style>{`
         @media (max-width: 768px) {
           .dashboard-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .dashboard-premium-row {
             grid-template-columns: 1fr !important;
           }
         }

@@ -13,6 +13,7 @@ import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
 import { transactionsApi } from '../services/api'
 import type { Income as IncomeType, MetricsData } from '../services/types'
+import AnimatedNumber from '../components/ui/AnimatedNumber'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
@@ -86,12 +87,14 @@ interface SummaryCardProps {
   iconBg: string
   label: string
   value: string
+  numericValue?: number
+  formatter?: (v: number) => string
   valueColor?: string
 }
 
-function SummaryCard({ icon, iconBg, label, value, valueColor }: SummaryCardProps) {
+function SummaryCard({ icon, iconBg, label, value, numericValue, formatter, valueColor }: SummaryCardProps) {
   return (
-    <Card hover>
+    <Card className="glass-card" hover>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div
           style={{
@@ -129,7 +132,11 @@ function SummaryCard({ icon, iconBg, label, value, valueColor }: SummaryCardProp
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {value}
+            {numericValue !== undefined && formatter ? (
+              <AnimatedNumber value={numericValue} formatter={formatter} />
+            ) : (
+              value
+            )}
           </p>
         </div>
       </div>
@@ -333,7 +340,7 @@ export default function Income() {
       >
         {/* ═══ Right column (RTL): Add income form + list ═══ */}
         <div>
-          <Card>
+          <Card className="glass-card">
             <h3
               style={{
                 margin: '0 0 16px',
@@ -403,7 +410,7 @@ export default function Income() {
               animate={{ opacity: 1 }}
               style={{ marginTop: 'var(--space-md)' }}
             >
-              <Card>
+              <Card className="glass-card">
                 <div
                   style={{
                     display: 'flex',
@@ -553,6 +560,8 @@ export default function Income() {
               iconBg="rgba(16, 185, 129, 0.12)"
               label="סה״כ הכנסות"
               value={formatCurrency(totalIncome)}
+              numericValue={totalIncome}
+              formatter={formatCurrency}
               valueColor="var(--accent-secondary, #10b981)"
             />
 
@@ -561,6 +570,8 @@ export default function Income() {
               iconBg="rgba(239, 68, 68, 0.12)"
               label="סה״כ הוצאות"
               value={formatCurrency(totalExpenses)}
+              numericValue={totalExpenses}
+              formatter={formatCurrency}
               valueColor="var(--accent-danger, #ef4444)"
             />
 
@@ -569,6 +580,8 @@ export default function Income() {
               iconBg={balance >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'}
               label="מאזן"
               value={formatCurrency(balance)}
+              numericValue={balance}
+              formatter={formatCurrency}
               valueColor={
                 balance >= 0
                   ? 'var(--accent-secondary, #10b981)'
@@ -584,7 +597,7 @@ export default function Income() {
             transition={{ delay: 0.2, duration: 0.35 }}
             style={{ marginTop: 'var(--space-md)' }}
           >
-            <Card>
+            <Card className="glass-card">
               <div
                 style={{
                   display: 'flex',
@@ -653,7 +666,7 @@ export default function Income() {
               transition={{ delay: 0.3, duration: 0.35 }}
               style={{ marginTop: 'var(--space-md)' }}
             >
-              <Card>
+              <Card className="glass-card">
                 <h4
                   style={{
                     margin: '0 0 8px',

@@ -5,6 +5,8 @@ import type { MetricsData } from '../../services/types'
 import { formatCurrency, formatNumber } from '../../utils/formatting'
 import Card from '../ui/Card'
 import Badge from '../ui/Badge'
+import AnimatedNumber from '../ui/AnimatedNumber'
+import SparklineChart from '../charts/SparklineChart'
 import './MetricsGrid.css'
 
 interface MetricsGridProps {
@@ -16,7 +18,9 @@ interface MetricCardConfig {
   label: string
   icon: React.ReactNode
   gradient: string
-  getValue: (m: MetricsData) => string
+  sparklineColor: string
+  getRawValue: (m: MetricsData) => number
+  formatter: (v: number) => string
   isCurrency: boolean
 }
 
@@ -41,7 +45,9 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
         label: 'סך עסקאות',
         icon: <Receipt size={24} color="#fff" />,
         gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        getValue: (m) => formatNumber(m.total_transactions),
+        sparklineColor: '#818cf8',
+        getRawValue: (m) => m.total_transactions,
+        formatter: formatNumber,
         isCurrency: false,
       },
       {
@@ -49,7 +55,9 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
         label: 'סך הוצאות',
         icon: <TrendingDown size={24} color="#fff" />,
         gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-        getValue: (m) => formatCurrency(Math.abs(m.total_expenses)),
+        sparklineColor: '#f5576c',
+        getRawValue: (m) => Math.abs(m.total_expenses),
+        formatter: formatCurrency,
         isCurrency: true,
       },
       {
@@ -57,7 +65,9 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
         label: 'סך הכנסות',
         icon: <TrendingUp size={24} color="#fff" />,
         gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-        getValue: (m) => formatCurrency(m.total_income),
+        sparklineColor: '#4facfe',
+        getRawValue: (m) => m.total_income,
+        formatter: formatCurrency,
         isCurrency: true,
       },
       {
@@ -65,15 +75,17 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
         label: 'ממוצע לעסקה',
         icon: <Calculator size={24} color="#fff" />,
         gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-        getValue: (m) => formatCurrency(Math.abs(m.average_transaction)),
+        sparklineColor: '#43e97b',
+        getRawValue: (m) => Math.abs(m.average_transaction),
+        formatter: formatCurrency,
         isCurrency: true,
       },
     ],
     [],
   )
 
-  const formattedValues = useMemo(
-    () => cards.map((card) => card.getValue(metrics)),
+  const rawValues = useMemo(
+    () => cards.map((card) => card.getRawValue(metrics)),
     [cards, metrics],
   )
 
@@ -87,7 +99,7 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
           initial="hidden"
           animate="visible"
         >
-          <Card className="metric-card" hover padding="lg">
+          <Card className="metric-card glass-card" hover padding="lg">
             <div
               className="metric-icon-wrapper"
               style={{ background: card.gradient }}
@@ -95,7 +107,16 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
               {card.icon}
             </div>
 
-            <span className="metric-value">{formattedValues[index]}</span>
+            <span className="metric-value">
+              <AnimatedNumber value={rawValues[index]} formatter={card.formatter} />
+            </span>
+
+            <SparklineChart
+              data={[3, 5, 4, 7, 6, 8, 7]}
+              color={card.sparklineColor}
+              width={60}
+              height={20}
+            />
 
             <div className="metric-label">{card.label}</div>
 

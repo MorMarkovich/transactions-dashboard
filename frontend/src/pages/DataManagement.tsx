@@ -58,7 +58,7 @@ interface InfoCardProps {
 function InfoCard({ icon, iconBg, label, value, index }: InfoCardProps) {
   return (
     <motion.div custom={index} initial="hidden" animate="visible" variants={cardVariants}>
-      <Card hover>
+      <Card className="glass-card" hover>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
@@ -276,7 +276,7 @@ export default function DataManagement() {
             <span>📜</span> היסטוריית העלאות
           </div>
 
-          <Card padding="none">
+          <Card className="glass-card" padding="none">
             <div style={{ overflowX: 'auto' }}>
               <table
                 style={{
@@ -401,7 +401,7 @@ export default function DataManagement() {
 
         <Card
           padding="lg"
-          className=""
+          className="glass-card"
         >
           <div
             style={{

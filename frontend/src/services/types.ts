@@ -162,3 +162,59 @@ export interface UploadHistory {
   total_income: number;
   uploaded_at: string;
 }
+
+// ─── Analytics (Premium) ──────────────────────────────────────────
+
+export interface RecurringTransaction {
+  merchant: string;
+  average_amount: number;
+  frequency: string;
+  count: number;
+  next_expected: string;
+  total: number;
+  interval_days: number;
+}
+
+export interface RecurringData {
+  recurring: RecurringTransaction[];
+}
+
+export interface ForecastData {
+  forecast_amount: number;
+  confidence: 'low' | 'medium' | 'high';
+  trend_direction: 'up' | 'down' | 'stable';
+  monthly_data: { month: string; amount: number }[];
+  avg_monthly: number;
+}
+
+export interface WeeklySummaryData {
+  this_week: { total: number; count: number; top_category: string };
+  last_week: { total: number; count: number; top_category: string };
+  change_pct: number;
+}
+
+export interface SpendingVelocityData {
+  daily_avg: number;
+  rolling_7day: number;
+  rolling_30day: number;
+  daily_data: { date: string; amount: number }[];
+}
+
+export interface AnomalyItem {
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  deviation: number;
+  category_mean: number;
+  category_std: number;
+}
+
+export interface AnomalyData {
+  anomalies: AnomalyItem[];
+}
+
+export interface SearchResult {
+  results: Transaction[];
+  total: number;
+}

@@ -71,6 +71,43 @@
   --scrollbar-track: #151c2c;
   --scrollbar-thumb: #2d3a50;
   --scrollbar-thumb-hover: #3d4f6a;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(15, 23, 42, 0.65);
+  --glass-bg-hover: rgba(15, 23, 42, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --glass-blur: 16px;
+
+  /* Elevation System */
+  --elevation-0: none;
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --elevation-2: 0 4px 12px -2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
+  --elevation-3: 0 12px 28px -4px rgba(0, 0, 0, 0.4), 0 4px 10px -2px rgba(0, 0, 0, 0.25);
+  --elevation-4: 0 24px 48px -8px rgba(0, 0, 0, 0.5), 0 8px 16px -4px rgba(0, 0, 0, 0.3);
+
+  /* Neon Accent */
+  --neon-cyan: #22D3EE;
+  --neon-cyan-muted: rgba(34, 211, 238, 0.15);
+  --neon-cyan-glow: 0 0 20px rgba(34, 211, 238, 0.3);
+  --neon-purple: #A78BFA;
+  --neon-purple-muted: rgba(167, 139, 250, 0.15);
+  --neon-green: #34D399;
+  --neon-green-muted: rgba(52, 211, 153, 0.15);
+
+  /* Mesh Gradient */
+  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(129, 140, 248, 0.12) 0%, transparent 50%),
+                   radial-gradient(ellipse at 80% 80%, rgba(167, 139, 250, 0.08) 0%, transparent 50%),
+                   radial-gradient(ellipse at 50% 50%, rgba(52, 211, 153, 0.05) 0%, transparent 60%);
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-wide: 0.05em;
+
+  /* Card hover glow */
+  --card-glow: 0 0 0 1px var(--glass-border), 0 0 20px rgba(129, 140, 248, 0.08);
+  --card-glow-hover: 0 0 0 1px var(--glass-border-hover), 0 0 30px rgba(129, 140, 248, 0.15);
 }
 
 /* ========== Light Theme ========== */
@@ -143,6 +180,43 @@
   --scrollbar-track: #f1f5f9;
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-thumb-hover: #94a3b8;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-hover: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-hover: rgba(0, 0, 0, 0.12);
+  --glass-blur: 16px;
+
+  /* Elevation System */
+  --elevation-0: none;
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --elevation-2: 0 4px 12px -2px rgba(0, 0, 0, 0.1), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
+  --elevation-3: 0 12px 28px -4px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.07);
+  --elevation-4: 0 24px 48px -8px rgba(0, 0, 0, 0.15), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+
+  /* Neon Accent (toned down for light) */
+  --neon-cyan: #0891B2;
+  --neon-cyan-muted: rgba(8, 145, 178, 0.1);
+  --neon-cyan-glow: 0 0 20px rgba(8, 145, 178, 0.15);
+  --neon-purple: #7C3AED;
+  --neon-purple-muted: rgba(124, 58, 237, 0.1);
+  --neon-green: #059669;
+  --neon-green-muted: rgba(5, 150, 105, 0.1);
+
+  /* Mesh Gradient */
+  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(129, 140, 248, 0.06) 0%, transparent 50%),
+                   radial-gradient(ellipse at 80% 80%, rgba(167, 139, 250, 0.04) 0%, transparent 50%),
+                   radial-gradient(ellipse at 50% 50%, rgba(52, 211, 153, 0.03) 0%, transparent 60%);
+
+  /* Typography (same as dark) */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-wide: 0.05em;
+
+  /* Card hover glow */
+  --card-glow: 0 0 0 1px var(--glass-border), 0 0 15px rgba(99, 102, 241, 0.05);
+  --card-glow-hover: 0 0 0 1px var(--glass-border-hover), 0 0 25px rgba(99, 102, 241, 0.1);
 }
 
 /* ========== Shared Properties (Theme-Independent) ========== */

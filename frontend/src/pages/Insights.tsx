@@ -47,7 +47,7 @@ interface InsightCardProps {
 function InsightCard({ icon, iconBg, title, value, subtitle, extra, index }: InsightCardProps) {
   return (
     <motion.div custom={index} initial="hidden" animate="visible" variants={cardVariants}>
-      <Card className="insight-card" hover>
+      <Card className="insight-card glass-card" hover>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
           <div
             style={{
@@ -291,7 +291,7 @@ export default function Insights() {
           <div className="section-title">
             <span>🗺️</span> מפת חום - הוצאות לפי קטגוריה וחודש
           </div>
-          <Card padding="md">
+          <Card className="glass-card" padding="md">
             <HeatmapChart
               categories={heatmap.categories}
               months={heatmap.months}
@@ -327,7 +327,7 @@ export default function Insights() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 + idx * 0.05, duration: 0.3 }}
               >
-                <Card padding="sm">
+                <Card className="glass-card" padding="sm">
                   <div
                     style={{
                       display: 'flex',

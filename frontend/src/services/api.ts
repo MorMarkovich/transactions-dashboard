@@ -16,6 +16,12 @@ import type {
   MerchantData,
   TrendStats,
   HeatmapData,
+  RecurringData,
+  ForecastData,
+  WeeklySummaryData,
+  SpendingVelocityData,
+  AnomalyData,
+  SearchResult,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -262,6 +268,73 @@ export const transactionsApi = {
   getHeatmap: async (sessionId: string, signal?: AbortSignal): Promise<HeatmapData> => {
     const response = await api.get<HeatmapData>('/api/charts/heatmap', {
       params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+  // ─── Premium Analytics ───────────────────────────────────────────
+
+  /**
+   * Get recurring/subscription transactions
+   */
+  getRecurring: async (sessionId: string, signal?: AbortSignal): Promise<RecurringData> => {
+    const response = await api.get<RecurringData>('/api/analytics/recurring', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get spending forecast for next month
+   */
+  getForecast: async (sessionId: string, signal?: AbortSignal): Promise<ForecastData> => {
+    const response = await api.get<ForecastData>('/api/analytics/forecast', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get weekly summary (this week vs last week)
+   */
+  getWeeklySummary: async (sessionId: string, signal?: AbortSignal): Promise<WeeklySummaryData> => {
+    const response = await api.get<WeeklySummaryData>('/api/analytics/weekly-summary', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get spending velocity (daily rates + rolling averages)
+   */
+  getSpendingVelocity: async (sessionId: string, signal?: AbortSignal): Promise<SpendingVelocityData> => {
+    const response = await api.get<SpendingVelocityData>('/api/analytics/spending-velocity', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get anomaly detection (transactions > 2σ from category mean)
+   */
+  getAnomalies: async (sessionId: string, signal?: AbortSignal): Promise<AnomalyData> => {
+    const response = await api.get<AnomalyData>('/api/analytics/anomalies', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Search transactions
+   */
+  searchTransactions: async (sessionId: string, query: string, limit?: number, signal?: AbortSignal): Promise<SearchResult> => {
+    const response = await api.get<SearchResult>('/api/search', {
+      params: { sessionId, q: query, ...(limit !== undefined && { limit }) },
       signal,
     });
     return response.data;

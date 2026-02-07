@@ -3,8 +3,10 @@
   width: 280px;
   min-width: 280px;
   max-width: 280px;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
+  border-left: 1px solid var(--glass-border);
   direction: rtl;
   display: flex;
   flex-direction: column;
@@ -50,6 +52,8 @@
   color: #ffffff;
   font-weight: 600;
   box-shadow: var(--shadow-glow-sm);
+  border-right: 3px solid var(--accent-primary, #818cf8);
+  box-shadow: var(--shadow-glow-sm), inset 4px 0 12px -4px rgba(129, 140, 248, 0.3);
 }
 
 .sidebar-nav-link .nav-icon {
@@ -102,8 +106,10 @@
   justify-content: center;
   gap: var(--space-2, 0.5rem);
   padding: var(--space-lg) var(--space-md);
-  background: var(--bg-card);
-  border: 2px dashed var(--border-hover);
+  background: var(--glass-bg, var(--bg-card));
+  backdrop-filter: blur(var(--glass-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
+  border: 2px dashed var(--glass-border, var(--border-hover));
   border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: center;

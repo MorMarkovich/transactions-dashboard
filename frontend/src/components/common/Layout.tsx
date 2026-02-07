@@ -1,7 +1,10 @@
 import { type ReactNode, useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import CommandPalette from './CommandPalette'
+import QuickActions from './QuickActions'
 import './Layout.css'
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -13,6 +16,8 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   // Sidebar defaults: open on desktop, closed on mobile
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -37,6 +42,18 @@ export default function Layout({ children }: LayoutProps) {
       clearTimeout(resizeTimer)
       window.removeEventListener('resize', handleResize)
     }
+  }, [])
+
+  // Global Ctrl+K / Cmd+K keyboard shortcut for command palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -67,6 +84,7 @@ export default function Layout({ children }: LayoutProps) {
       <Header
         onToggleSidebar={toggleSidebar}
         sidebarOpen={sidebarOpen}
+        onCommandPalette={() => setCommandPaletteOpen(true)}
       />
 
       <div className="layout-content">
@@ -86,9 +104,25 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main content area */}
         <main className="main-content">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
+
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+      <QuickActions />
     </div>
   )
 }

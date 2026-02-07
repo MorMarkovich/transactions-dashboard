@@ -1,14 +1,16 @@
-import { Sun, Moon, LogOut, Menu, X, CreditCard } from 'lucide-react'
+import { Sun, Moon, LogOut, Menu, X, CreditCard, Command } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../lib/AuthContext'
+import NotificationCenter from './NotificationCenter'
 
 // ─── Types ────────────────────────────────────────────────────────────
 interface HeaderProps {
   onToggleSidebar?: () => void
   sidebarOpen?: boolean
+  onCommandPalette?: () => void
 }
 
-export default function Header({ onToggleSidebar, sidebarOpen }: HeaderProps) {
+export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
   const { user, signOut } = useAuth()
 
@@ -26,8 +28,10 @@ export default function Header({ onToggleSidebar, sidebarOpen }: HeaderProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 var(--space-lg)',
-        background: 'var(--bg-secondary)',
-        borderBottom: '1px solid var(--border)',
+        background: 'var(--glass-bg)',
+        backdropFilter: 'blur(var(--glass-blur, 16px))',
+        WebkitBackdropFilter: 'blur(var(--glass-blur, 16px))',
+        borderBottom: '1px solid var(--glass-border)',
         position: 'sticky',
         top: 0,
         zIndex: 'var(--z-sticky, 20)' as any,
@@ -106,6 +110,28 @@ export default function Header({ onToggleSidebar, sidebarOpen }: HeaderProps) {
             </p>
           </div>
         </div>
+
+        {/* Ctrl+K command palette hint */}
+        <div
+          onClick={() => onCommandPalette?.()}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '4px 10px',
+            fontSize: '0.6875rem',
+            color: 'var(--text-muted)',
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            transition: 'all 150ms ease',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <Command size={12} />
+          <span>K</span>
+        </div>
       </div>
 
       {/* ─── Left side: theme toggle + user menu ─── */}
@@ -117,6 +143,9 @@ export default function Header({ onToggleSidebar, sidebarOpen }: HeaderProps) {
           flexShrink: 0,
         }}
       >
+        {/* Notifications */}
+        <NotificationCenter />
+
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}

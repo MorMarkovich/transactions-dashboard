@@ -1,5 +1,6 @@
 /* ========== Google Fonts ========== */
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* ========== Keyframe Animations ========== */
 @keyframes fadeInUp {
@@ -526,4 +527,153 @@ input:focus, select:focus, textarea:focus {
     text-align: center;
     padding: var(--space-xl);
     color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PREMIUM UPGRADE - New Animations & Utilities
+   ═══════════════════════════════════════════════════════════════ */
+
+/* -- Micro-interaction keyframes -- */
+@keyframes pressDown {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes numberReveal {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes meshDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(15px, -10px) scale(1.02); }
+  66% { transform: translate(-10px, 8px) scale(0.98); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes borderGlow {
+  0%, 100% { border-color: var(--glass-border); }
+  50% { border-color: var(--glass-border-hover); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(129, 140, 248, 0.1); }
+}
+
+/* -- Glass card utility -- */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--elevation-1);
+  transition: all var(--transition-normal, 250ms) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--elevation-2);
+  transform: translateY(-2px);
+}
+
+/* -- Monospace number typography -- */
+.font-mono-numbers {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tight);
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+/* -- Enhanced shimmer loading -- */
+.shimmer-premium {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    var(--glass-bg-hover) 20%,
+    var(--bg-elevated, #253046) 40%,
+    var(--glass-bg-hover) 60%,
+    var(--bg-card) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* -- Mesh gradient background -- */
+.mesh-gradient-bg {
+  position: relative;
+}
+
+.mesh-gradient-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-mesh);
+  animation: meshDrift 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+/* -- Neon text glow -- */
+.neon-text-cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px var(--neon-cyan-muted);
+}
+
+.neon-text-purple {
+  color: var(--neon-purple);
+  text-shadow: 0 0 10px var(--neon-purple-muted);
+}
+
+.neon-text-green {
+  color: var(--neon-green);
+  text-shadow: 0 0 10px var(--neon-green-muted);
+}
+
+/* -- Interactive elements -- */
+.interactive-press:active:not(:disabled) {
+  animation: pressDown 150ms ease;
+}
+
+.interactive-hover {
+  transition: transform var(--transition-fast, 150ms) ease,
+              box-shadow var(--transition-normal, 250ms) ease;
+}
+
+.interactive-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-2);
+}
+
+/* -- Focus glow for inputs -- */
+.focus-glow:focus {
+  outline: none;
+  border-color: var(--accent-primary, #818cf8) !important;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15), 0 0 12px rgba(129, 140, 248, 0.1) !important;
+}
+
+/* -- Reduced motion support -- */
+@media (prefers-reduced-motion: reduce) {
+  .glass-card:hover {
+    transform: none;
+  }
+  .mesh-gradient-bg::before {
+    animation: none;
+  }
+  .interactive-hover:hover {
+    transform: none;
+  }
+  .shimmer-premium {
+    animation: none;
+  }
 }

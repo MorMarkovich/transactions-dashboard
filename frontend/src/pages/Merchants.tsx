@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Store, ShoppingBag, Hash, TrendingUp } from 'lucide-react'
 import { transactionsApi } from '../services/api'
 import type { MerchantData } from '../services/types'
+import AnimatedNumber from '../components/ui/AnimatedNumber'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
@@ -188,7 +189,7 @@ export default function Merchants() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <Card padding="md">
+        <Card className="glass-card" padding="md">
           <MerchantChart data={merchants} />
         </Card>
       </motion.div>
@@ -216,7 +217,7 @@ export default function Merchants() {
             animate="visible"
             variants={cardVariants}
           >
-            <Card hover>
+            <Card className="glass-card" hover>
               {/* Merchant name header */}
               <div
                 style={{
@@ -284,11 +285,9 @@ export default function Merchants() {
                       fontWeight: 700,
                       color: 'var(--text-primary)',
                       marginRight: 'auto',
-                      direction: 'ltr',
-                      fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {formatCurrency(merchant.total)}
+                    <AnimatedNumber value={merchant.total} formatter={formatCurrency} />
                   </span>
                 </div>
 
@@ -339,11 +338,9 @@ export default function Merchants() {
                       fontWeight: 600,
                       color: 'var(--text-primary)',
                       marginRight: 'auto',
-                      direction: 'ltr',
-                      fontVariantNumeric: 'tabular-nums',
                     }}
                   >
-                    {formatCurrency(merchant.average)}
+                    <AnimatedNumber value={merchant.average} formatter={formatCurrency} />
                   </span>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
+import AnimatedNumber from '../components/ui/AnimatedNumber'
 import { transactionsApi } from '../services/api'
 import { formatCurrency } from '../utils/formatting'
 import type { RawTrendData, TrendStats } from '../services/types'
@@ -19,7 +20,8 @@ interface StatCard {
   label: string
   icon: React.ReactNode
   gradient: string
-  getValue: (s: TrendStats) => string
+  getNumericValue: (s: TrendStats) => number
+  formatter: (v: number) => string
 }
 
 const STAT_CARDS: StatCard[] = [
@@ -28,28 +30,32 @@ const STAT_CARDS: StatCard[] = [
     label: '\u05D4\u05D5\u05E6\u05D0\u05D4 \u05D2\u05D3\u05D5\u05DC\u05D4',
     icon: <ArrowUpRight size={22} color="#fff" />,
     gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    getValue: (s) => formatCurrency(Math.abs(s.max_expense)),
+    getNumericValue: (s) => Math.abs(s.max_expense),
+    formatter: formatCurrency,
   },
   {
     key: 'daily_avg',
     label: '\u05DE\u05DE\u05D5\u05E6\u05E2 \u05D9\u05D5\u05DE\u05D9',
     icon: <Calculator size={22} color="#fff" />,
     gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    getValue: (s) => formatCurrency(Math.abs(s.daily_avg)),
+    getNumericValue: (s) => Math.abs(s.daily_avg),
+    formatter: formatCurrency,
   },
   {
     key: 'median',
     label: '\u05D7\u05E6\u05D9\u05D5\u05DF',
     icon: <Activity size={22} color="#fff" />,
     gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-    getValue: (s) => formatCurrency(Math.abs(s.median)),
+    getNumericValue: (s) => Math.abs(s.median),
+    formatter: formatCurrency,
   },
   {
     key: 'transaction_count',
     label: '\u05DE\u05E1\u05E4\u05E8 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA',
     icon: <Hash size={22} color="#fff" />,
     gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    getValue: (s) => s.transaction_count.toLocaleString('he-IL'),
+    getNumericValue: (s) => s.transaction_count,
+    formatter: (v) => v.toLocaleString('he-IL'),
   },
 ]
 
@@ -164,14 +170,16 @@ export default function Trends() {
               initial="hidden"
               animate="visible"
             >
-              <Card className="metric-card" hover padding="lg">
+              <Card className="metric-card glass-card" hover padding="lg">
                 <div
                   className="metric-icon-wrapper"
                   style={{ background: card.gradient }}
                 >
                   {card.icon}
                 </div>
-                <span className="metric-value">{card.getValue(trendStats)}</span>
+                <span className="metric-value">
+                  <AnimatedNumber value={card.getNumericValue(trendStats)} formatter={card.formatter} />
+                </span>
                 <div className="metric-label">{card.label}</div>
               </Card>
             </motion.div>
@@ -184,7 +192,7 @@ export default function Trends() {
         <TrendingUp size={20} />
         <span>{'\u05DE\u05D2\u05DE\u05EA \u05DE\u05D0\u05D6\u05DF \u05DE\u05E6\u05D8\u05D1\u05E8'}</span>
       </div>
-      <Card padding="md">
+      <Card className="glass-card" padding="md">
         <LineChart data={lineChartData} height={300} />
       </Card>
 
@@ -195,7 +203,7 @@ export default function Trends() {
             <Receipt size={20} />
             <span>{'\u05D4\u05E9\u05D5\u05D5\u05D0\u05D4 \u05D7\u05D5\u05D3\u05E9\u05D9\u05EA'}</span>
           </div>
-          <Card padding="none">
+          <Card className="glass-card" padding="none">
             <div className="table-scroll">
               <table
                 className="transactions-table"

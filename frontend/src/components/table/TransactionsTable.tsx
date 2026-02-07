@@ -13,6 +13,7 @@ interface TransactionsTableProps {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onRowClick?: (transaction: Transaction) => void
 }
 
 export default function TransactionsTable({
@@ -21,6 +22,7 @@ export default function TransactionsTable({
   page,
   pageSize,
   onPageChange,
+  onRowClick,
 }: TransactionsTableProps) {
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -94,6 +96,8 @@ export default function TransactionsTable({
                       duration: 0.2,
                       delay: index * 0.02,
                     }}
+                    onClick={() => onRowClick?.(tx)}
+                    style={{ cursor: onRowClick ? 'pointer' : undefined }}
                   >
                     <td className="col-date">{formatDate(tx.תאריך)}</td>
                     <td>{tx.תיאור}</td>

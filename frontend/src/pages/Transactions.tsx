@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { List } from 'lucide-react'
 import TransactionsTable from '../components/table/TransactionsTable'
-import TableFilters from '../components/table/TableFilters'
+import TransactionDrawer from '../components/table/TransactionDrawer'
+import AdvancedFilters from '../components/table/AdvancedFilters'
 import EmptyState from '../components/common/EmptyState'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
@@ -24,6 +25,10 @@ export default function Transactions() {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(50)
   const [filters, setFilters] = useState<{ search?: string; category?: string }>({})
+
+  // Drawer state
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -85,7 +90,7 @@ export default function Transactions() {
   // ---- Handlers -----------------------------------------------------------
 
   const handleFilterChange = useCallback(
-    (newFilters: { search?: string; category?: string }) => {
+    (newFilters: { search?: string; category?: string; startDate?: string; endDate?: string; minAmount?: number; maxAmount?: number }) => {
       setFilters(newFilters)
       setPage(1) // reset to first page on filter change
     },
@@ -134,7 +139,7 @@ export default function Transactions() {
         <span>{'\u05E8\u05E9\u05D9\u05DE\u05EA \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA'}</span>
       </div>
 
-      <TableFilters
+      <AdvancedFilters
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}
@@ -154,8 +159,15 @@ export default function Transactions() {
           page={page}
           pageSize={pageSize}
           onPageChange={handlePageChange}
+          onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}
         />
       )}
+
+      <TransactionDrawer
+        transaction={selectedTransaction}
+        isOpen={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setSelectedTransaction(null) }}
+      />
     </div>
   )
 }

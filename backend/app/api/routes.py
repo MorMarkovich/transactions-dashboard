@@ -635,3 +635,345 @@ async def get_heatmap_v2(sessionId: str = Query(...)):
     ]
 
     return {"categories": categories, "months": months, "data": data}
+
+
+# ---------------------------------------------------------------------------
+# Analytics endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/recurring")
+async def get_recurring_transactions(sessionId: str = Query(...)):
+    """Detect recurring/subscription transactions."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {"recurring": []}
+
+    expenses = df[df["סכום"] < 0].copy()
+    if expenses.empty:
+        return {"recurring": []}
+
+    recurring = []
+
+    # Group by description (merchant)
+    for desc, group in expenses.groupby("תיאור"):
+        if len(group) < 3:
+            continue
+
+        amounts = group["סכום"].abs()
+        mean_amount = amounts.mean()
+        std_amount = amounts.std()
+
+        # Check amount consistency: std < 20% of mean
+        if mean_amount > 0 and (std_amount / mean_amount) > 0.2:
+            continue
+
+        # Check date regularity
+        dates = pd.to_datetime(group["תאריך"], dayfirst=True, errors="coerce").dropna().sort_values()
+        if len(dates) < 3:
+            continue
+
+        deltas = dates.diff().dropna().dt.days
+        if deltas.empty:
+            continue
+
+        mean_delta = deltas.mean()
+        std_delta = deltas.std()
+
+        # Classify frequency
+        frequency = "לא ידוע"
+        if 5 <= mean_delta <= 10:
+            frequency = "שבועי"
+        elif 12 <= mean_delta <= 18:
+            frequency = "דו-שבועי"
+        elif 25 <= mean_delta <= 35:
+            frequency = "חודשי"
+        elif 55 <= mean_delta <= 70:
+            frequency = "דו-חודשי"
+        elif 80 <= mean_delta <= 100:
+            frequency = "רבעוני"
+        else:
+            # Skip if interval is too irregular (std > 7 days)
+            if std_delta > 7:
+                continue
+
+        # Estimate next expected date
+        last_date = dates.iloc[-1]
+        next_expected = (last_date + pd.Timedelta(days=int(mean_delta))).strftime("%Y-%m-%d")
+
+        recurring.append({
+            "merchant": str(desc),
+            "average_amount": _sanitize(round(mean_amount, 2)),
+            "frequency": frequency,
+            "count": int(len(group)),
+            "next_expected": next_expected,
+            "total": _sanitize(round(amounts.sum(), 2)),
+            "interval_days": _sanitize(round(mean_delta, 1)),
+        })
+
+    # Sort by total descending
+    recurring.sort(key=lambda x: x["total"], reverse=True)
+
+    return {"recurring": recurring[:20]}
+
+
+@router.get("/analytics/forecast")
+async def get_spending_forecast(sessionId: str = Query(...)):
+    """Linear forecast of next month's spending."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
+
+    expenses = df[df["סכום"] < 0].copy()
+    if expenses.empty:
+        return {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
+
+    expenses["date"] = pd.to_datetime(expenses["תאריך"], dayfirst=True, errors="coerce")
+    expenses = expenses.dropna(subset=["date"])
+    expenses["month_key"] = expenses["date"].dt.to_period("M")
+
+    monthly = expenses.groupby("month_key")["סכום"].sum().abs().reset_index()
+    monthly.columns = ["month", "amount"]
+    monthly = monthly.sort_values("month")
+
+    monthly_data = [
+        {"month": str(row["month"]), "amount": _sanitize(round(row["amount"], 2))}
+        for _, row in monthly.iterrows()
+    ]
+
+    avg_monthly = _sanitize(round(monthly["amount"].mean(), 2))
+
+    if len(monthly) < 2:
+        return {
+            "forecast_amount": avg_monthly,
+            "confidence": "low",
+            "trend_direction": "stable",
+            "monthly_data": monthly_data,
+            "avg_monthly": avg_monthly,
+        }
+
+    # Linear regression
+    x = np.arange(len(monthly), dtype=float)
+    y = monthly["amount"].values.astype(float)
+
+    coeffs = np.polyfit(x, y, 1)
+    slope, intercept = coeffs
+    forecast = float(slope * len(monthly) + intercept)
+    forecast = max(forecast, 0)  # Can't be negative spending
+
+    # Confidence based on R² and data points
+    y_pred = np.polyval(coeffs, x)
+    ss_res = np.sum((y - y_pred) ** 2)
+    ss_tot = np.sum((y - np.mean(y)) ** 2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+    confidence = "low"
+    if len(monthly) >= 6 and r_squared > 0.7:
+        confidence = "high"
+    elif len(monthly) >= 3 and r_squared > 0.4:
+        confidence = "medium"
+
+    trend_direction = "up" if slope > 50 else ("down" if slope < -50 else "stable")
+
+    return {
+        "forecast_amount": _sanitize(round(forecast, 2)),
+        "confidence": confidence,
+        "trend_direction": trend_direction,
+        "monthly_data": monthly_data,
+        "avg_monthly": avg_monthly,
+    }
+
+
+@router.get("/analytics/weekly-summary")
+async def get_weekly_summary(sessionId: str = Query(...)):
+    """This week vs last week comparison."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {
+            "this_week": {"total": 0, "count": 0, "top_category": ""},
+            "last_week": {"total": 0, "count": 0, "top_category": ""},
+            "change_pct": 0,
+        }
+
+    df_copy = df.copy()
+    df_copy["date"] = pd.to_datetime(df_copy["תאריך"], dayfirst=True, errors="coerce")
+    df_copy = df_copy.dropna(subset=["date"])
+
+    if df_copy.empty:
+        return {
+            "this_week": {"total": 0, "count": 0, "top_category": ""},
+            "last_week": {"total": 0, "count": 0, "top_category": ""},
+            "change_pct": 0,
+        }
+
+    # Use the last date in data as "today" reference
+    max_date = df_copy["date"].max()
+
+    # This week: last 7 days from max_date
+    this_week_start = max_date - pd.Timedelta(days=6)
+    last_week_start = this_week_start - pd.Timedelta(days=7)
+    last_week_end = this_week_start - pd.Timedelta(days=1)
+
+    this_week = df_copy[(df_copy["date"] >= this_week_start) & (df_copy["date"] <= max_date) & (df_copy["סכום"] < 0)]
+    last_week = df_copy[(df_copy["date"] >= last_week_start) & (df_copy["date"] <= last_week_end) & (df_copy["סכום"] < 0)]
+
+    def week_summary(week_df):
+        if week_df.empty:
+            return {"total": 0, "count": 0, "top_category": ""}
+        total = abs(week_df["סכום"].sum())
+        count = len(week_df)
+        top_cat = ""
+        if "קטגוריה" in week_df.columns:
+            cats = week_df.groupby("קטגוריה")["סכום"].sum().abs()
+            if not cats.empty:
+                top_cat = str(cats.idxmax())
+        return {
+            "total": _sanitize(round(total, 2)),
+            "count": int(count),
+            "top_category": top_cat,
+        }
+
+    tw = week_summary(this_week)
+    lw = week_summary(last_week)
+
+    change_pct = 0
+    if lw["total"] > 0:
+        change_pct = round(((tw["total"] - lw["total"]) / lw["total"]) * 100, 1)
+
+    return {
+        "this_week": tw,
+        "last_week": lw,
+        "change_pct": _sanitize(change_pct),
+    }
+
+
+@router.get("/analytics/spending-velocity")
+async def get_spending_velocity(sessionId: str = Query(...)):
+    """Daily spending rate and rolling averages."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+
+    expenses = df[df["סכום"] < 0].copy()
+    if expenses.empty:
+        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+
+    expenses["date"] = pd.to_datetime(expenses["תאריך"], dayfirst=True, errors="coerce")
+    expenses = expenses.dropna(subset=["date"])
+
+    daily = expenses.groupby(expenses["date"].dt.date)["סכום"].sum().abs()
+    daily = daily.sort_index()
+
+    if daily.empty:
+        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+
+    daily_avg = daily.mean()
+    rolling_7 = daily.tail(7).mean() if len(daily) >= 7 else daily.mean()
+    rolling_30 = daily.tail(30).mean() if len(daily) >= 30 else daily.mean()
+
+    # Return last 30 daily data points for sparkline
+    daily_data = [
+        {"date": str(date), "amount": _sanitize(round(float(amt), 2))}
+        for date, amt in daily.tail(30).items()
+    ]
+
+    return {
+        "daily_avg": _sanitize(round(float(daily_avg), 2)),
+        "rolling_7day": _sanitize(round(float(rolling_7), 2)),
+        "rolling_30day": _sanitize(round(float(rolling_30), 2)),
+        "daily_data": daily_data,
+    }
+
+
+@router.get("/analytics/anomalies")
+async def get_anomalies(sessionId: str = Query(...)):
+    """Find transactions beyond 2 standard deviations from category mean."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {"anomalies": []}
+
+    expenses = df[df["סכום"] < 0].copy()
+    if expenses.empty or "קטגוריה" not in expenses.columns:
+        return {"anomalies": []}
+
+    anomalies = []
+
+    for cat, group in expenses.groupby("קטגוריה"):
+        if len(group) < 5:
+            continue
+
+        amounts = group["סכום"].abs()
+        mean_amt = amounts.mean()
+        std_amt = amounts.std()
+
+        if std_amt == 0:
+            continue
+
+        for _, row in group.iterrows():
+            amt = abs(row["סכום"])
+            deviation = (amt - mean_amt) / std_amt
+
+            if deviation > 2:
+                anomalies.append({
+                    "description": str(row.get("תיאור", "")),
+                    "amount": _sanitize(round(amt, 2)),
+                    "category": str(cat),
+                    "date": str(row.get("תאריך", "")),
+                    "deviation": _sanitize(round(deviation, 2)),
+                    "category_mean": _sanitize(round(mean_amt, 2)),
+                    "category_std": _sanitize(round(std_amt, 2)),
+                })
+
+    # Sort by deviation descending, limit to 15
+    anomalies.sort(key=lambda x: x["deviation"], reverse=True)
+
+    return {"anomalies": anomalies[:15]}
+
+
+@router.get("/search")
+async def search_transactions(
+    sessionId: str = Query(...),
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=20, le=50),
+):
+    """Full-text search across transaction descriptions and categories."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if df.empty:
+        return {"results": [], "total": 0}
+
+    q_lower = q.lower()
+
+    mask = df["תיאור"].astype(str).str.lower().str.contains(q_lower, na=False)
+
+    if "קטגוריה" in df.columns:
+        mask = mask | df["קטגוריה"].astype(str).str.lower().str.contains(q_lower, na=False)
+
+    results_df = df[mask].head(limit)
+
+    results = []
+    for _, row in results_df.iterrows():
+        results.append({
+            "תאריך": str(row.get("תאריך", "")),
+            "תיאור": str(row.get("תיאור", "")),
+            "סכום": _sanitize(round(float(row.get("סכום", 0)), 2)),
+            "קטגוריה": str(row.get("קטגוריה", "")) if "קטגוריה" in row.index else "",
+        })
+
+    return {"results": results, "total": int(mask.sum())}
