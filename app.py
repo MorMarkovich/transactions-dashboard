@@ -1007,76 +1007,113 @@ def main():
         st.markdown(html, unsafe_allow_html=True)
         return
 
-    # Load all files and merge
-    all_sheets = {}
-    with st.spinner('טוען קבצים...'):
-        for file_idx, uploaded in enumerate(uploaded_files):
+    # Load all files, process EACH independently, then merge results
+    all_processed = []
+    file_results = []
+    
+    date_kws = ['תאריך עסקה','תאריך','תאריך רכישה','תאריך חיוב','Date']
+    desc_kws = ['שם בית העסק','תיאור','שם בית עסק','פרטי העסקה','Description']
+    cat_kws = ['קטגוריה','סוג עסקה','Category']
+    
+    with st.spinner('טוען ומעבד קבצים...'):
+        for uploaded in uploaded_files:
             fname = uploaded.name
+            # Load raw sheets
             if fname.endswith(('.xlsx', '.xls')):
-                file_sheets = load_excel(uploaded)
-                for sname, sdf in file_sheets.items():
-                    key = f"{fname} → {sname}" if len(uploaded_files) > 1 else sname
-                    all_sheets[key] = sdf
+                raw_sheets = load_excel(uploaded)
             else:
                 csv_df = load_csv(uploaded)
-                if not csv_df.empty:
-                    key = fname if len(uploaded_files) > 1 else 'main'
-                    all_sheets[key] = csv_df
+                raw_sheets = {fname: csv_df} if not csv_df.empty else {}
+            
+            if not raw_sheets:
+                file_results.append((fname, 0, False, "קובץ ריק"))
+                continue
+            
+            # Combine all sheets from this file
+            combined = pd.concat(list(raw_sheets.values()), ignore_index=True) if len(raw_sheets) > 1 else list(raw_sheets.values())[0]
+            
+            # Detect columns for THIS file
+            dc = find_column(combined, date_kws)
+            ac = detect_amount_column(combined)
+            dsc = find_column(combined, desc_kws)
+            cc = find_column(combined, cat_kws)
+            
+            if not all([dc, ac, dsc]):
+                file_results.append((fname, len(combined), False, "לא זוהו עמודות"))
+                continue
+            
+            # Process this file
+            try:
+                processed = process_data(combined, dc, ac, dsc, cc)
+                if not processed.empty:
+                    processed['_מקור'] = fname
+                    all_processed.append(processed)
+                    file_results.append((fname, len(processed), True, ""))
+                else:
+                    file_results.append((fname, 0, False, "אין עסקאות"))
+            except Exception as e:
+                file_results.append((fname, 0, False, str(e)))
 
-    if not all_sheets:
-        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">❌</span><div><div class="alert-text">שגיאה בטעינה</div><div class="alert-sub">וודא שהקבצים תקינים</div></div></div>', unsafe_allow_html=True)
-        return
+    if not all_processed:
+        # No file succeeded -- show manual config for the first file
+        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">❌</span><div><div class="alert-text">לא הצלחנו לנתח אף קובץ</div></div></div>', unsafe_allow_html=True)
+        
+        # Try manual column selection for the first file
+        uploaded = uploaded_files[0]
+        fname = uploaded.name
+        if fname.endswith(('.xlsx','.xls')):
+            raw_sheets = load_excel(uploaded)
+        else:
+            csv_df = load_csv(uploaded)
+            raw_sheets = {fname: csv_df} if not csv_df.empty else {}
+        
+        if raw_sheets:
+            df_raw = pd.concat(list(raw_sheets.values()), ignore_index=True) if len(raw_sheets) > 1 else list(raw_sheets.values())[0]
+            st.markdown(f'<div class="section-label">⚙️ הגדרה ידנית עבור {fname}</div>', unsafe_allow_html=True)
+            cols = df_raw.columns.tolist()
+            c1, c2 = st.columns(2)
+            with c1:
+                date_col = st.selectbox("📅 תאריך", cols, key="man_date")
+                amount_col = st.selectbox("💰 סכום", cols, key="man_amount")
+            with c2:
+                desc_col = st.selectbox("📝 תיאור", cols, key="man_desc")
+                cat_col = st.selectbox("🏷️ קטגוריה", ['ללא'] + cols, key="man_cat")
+                cat_col = None if cat_col == 'ללא' else cat_col
+            if st.button("▶️ המשך", use_container_width=True, key="man_go"):
+                try:
+                    df = process_data(df_raw, date_col, amount_col, desc_col, cat_col)
+                    if not df.empty:
+                        df['_מקור'] = fname
+                        all_processed.append(df)
+                    else:
+                        st.error("אין עסקאות בקובץ"); return
+                except Exception as e:
+                    st.error(f"שגיאה: {e}"); return
+            else:
+                st.stop()
 
-    # Show loaded files summary
+    # Merge all processed data
+    df = pd.concat(all_processed, ignore_index=True)
+    
+    # Show results per file
     if len(uploaded_files) > 1:
-        file_names = ", ".join([f.name for f in uploaded_files])
-        st.markdown(f'''<div style="background:{T['accent_bg']};border:1px solid rgba(129,140,248,0.15);border-radius:10px;padding:0.7rem 1rem;margin-bottom:0.75rem;direction:rtl">
-            <span style="color:{T['accent']};font-weight:600;font-size:0.85rem">📂 {len(uploaded_files)} קבצים נטענו:</span>
-            <span style="color:{T['text2']};font-size:0.8rem;margin-right:0.5rem">{file_names}</span>
-        </div>''', unsafe_allow_html=True)
-
-    # Sheet selection
-    if len(all_sheets) > 1:
-        selected = st.multiselect("בחר גליונות לניתוח", list(all_sheets.keys()), default=list(all_sheets.keys()))
-        if not selected: st.warning("בחר לפחות גליון אחד"); return
-        df_raw = pd.concat([all_sheets[s].assign(_source=s) for s in selected], ignore_index=True)
-    else:
-        df_raw = list(all_sheets.values())[0]
-
-    # Detect columns (supports multiple bank formats)
-    date_col = find_column(df_raw, ['תאריך עסקה','תאריך','תאריך רכישה','תאריך חיוב','Date'])
-    amount_col = detect_amount_column(df_raw)
-    desc_col = find_column(df_raw, ['שם בית העסק','תיאור','שם בית עסק','פרטי העסקה','Description'])
-    cat_col = find_column(df_raw, ['קטגוריה','סוג עסקה','Category'])
-
-    if not all([date_col, amount_col, desc_col]):
-        st.markdown(f'<div class="section-label">⚙️ הגדרה ידנית</div>', unsafe_allow_html=True)
-        cols = df_raw.columns.tolist()
-        c1, c2 = st.columns(2)
-        with c1:
-            date_col = st.selectbox("📅 תאריך", cols)
-            amount_col = st.selectbox("💰 סכום", cols)
-        with c2:
-            desc_col = st.selectbox("📝 תיאור", cols)
-            cat_col = st.selectbox("🏷️ קטגוריה", ['ללא'] + cols)
-            cat_col = None if cat_col == 'ללא' else cat_col
-        if not st.button("▶️ המשך", use_container_width=True): st.stop()
-
-    # Process
-    try:
-        df = process_data(df_raw, date_col, amount_col, desc_col, cat_col)
-        if df.empty:
-            st.markdown(f'<div class="alert alert-err"><span class="alert-icon">📭</span><div><div class="alert-text">לא נמצאו עסקאות</div></div></div>', unsafe_allow_html=True)
-            return
-        dr = f"{df['תאריך'].min().strftime('%d/%m/%Y')} — {df['תאריך'].max().strftime('%d/%m/%Y')}"
-        st.markdown(f'''<div class="alert alert-ok">
-            <span class="alert-icon">✅</span>
-            <div><div class="alert-text">נטענו {len(df):,} עסקאות</div><div class="alert-sub">{dr}</div></div>
-            <div class="alert-badge">{df['קטגוריה'].nunique()} קטגוריות</div>
-        </div>''', unsafe_allow_html=True)
-    except Exception as e:
-        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">❌</span><div><div class="alert-text">שגיאה</div><div class="alert-sub">{e}</div></div></div>', unsafe_allow_html=True)
+        for fname, count, ok, err in file_results:
+            if ok:
+                st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;direction:rtl"><span style="color:{T["green"]}">✅</span><span style="color:{T["text1"]};font-size:0.85rem;font-weight:600">{fname}</span><span style="color:{T["text2"]};font-size:0.8rem">{count:,} עסקאות</span></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;direction:rtl"><span style="color:{T["red"]}">❌</span><span style="color:{T["text1"]};font-size:0.85rem">{fname}</span><span style="color:{T["text3"]};font-size:0.8rem">{err}</span></div>', unsafe_allow_html=True)
+    
+    if df.empty:
+        st.markdown(f'<div class="alert alert-err"><span class="alert-icon">📭</span><div><div class="alert-text">לא נמצאו עסקאות</div></div></div>', unsafe_allow_html=True)
         return
+    
+    dr = f"{df['תאריך'].min().strftime('%d/%m/%Y')} — {df['תאריך'].max().strftime('%d/%m/%Y')}"
+    total_files = sum(1 for _,_,ok,_ in file_results if ok)
+    st.markdown(f'''<div class="alert alert-ok">
+        <span class="alert-icon">✅</span>
+        <div><div class="alert-text">נטענו {len(df):,} עסקאות{f" מ-{total_files} קבצים" if total_files > 1 else ""}</div><div class="alert-sub">{dr}</div></div>
+        <div class="alert-badge">{df['קטגוריה'].nunique()} קטגוריות</div>
+    </div>''', unsafe_allow_html=True)
 
     # Filters
     st.markdown(f'<div class="section-label">🔍 סינון</div>', unsafe_allow_html=True)
