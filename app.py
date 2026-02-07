@@ -11,7 +11,7 @@ import re
 from typing import Optional, Dict
 import warnings
 from auth import (
-    init_auth_state, is_configured, is_logged_in, get_current_user,
+    init_auth_state, is_configured, is_logged_in, get_current_user, get_supabase,
     sign_in, sign_up, reset_password, logout,
     save_income, load_incomes, delete_all_incomes,
     save_upload_history, load_upload_history,
@@ -988,37 +988,43 @@ def main():
         
         # -- Data Management --
         if user and user.get('id') != 'guest' and is_configured():
-            st.markdown(f'''
-            <div style="font-weight:600;font-size:0.9rem;color:{T['text1']};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>
-            ''', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-weight:600;font-size:0.9rem;color:{T["text1"]};margin-bottom:0.5rem">🗄️ ניהול נתונים</div>', unsafe_allow_html=True)
             
-            dm_action = st.selectbox("בחר פעולה", [
-                "—",
-                "מחק עסקאות שמורות",
-                "מחק הכנסות",
-                "מחק את כל המידע שלי",
-            ], key="dm_select", label_visibility="collapsed")
+            # Show delete result message if exists
+            if 'dm_msg' in st.session_state and st.session_state.dm_msg:
+                st.success(st.session_state.dm_msg)
+                st.session_state.dm_msg = None
             
-            if dm_action == "מחק עסקאות שמורות":
-                st.markdown(f'<div style="font-size:0.78rem;color:{T["text2"]};margin:0.25rem 0 0.5rem">ימחק את כל העסקאות השמורות מקבצים שהעלית</div>', unsafe_allow_html=True)
-                if st.button("אישור מחיקה", key="dm_exec_tx", use_container_width=True):
-                    delete_transactions()
-                    st.success("נמחק"); st.rerun()
+            # Let user pick what to delete
+            del_choices = st.multiselect(
+                "בחר מה למחוק",
+                ["עסקאות שמורות", "הכנסות", "היסטוריית העלאות", "הגדרות"],
+                key="dm_choices",
+                placeholder="בחר..."
+            )
             
-            elif dm_action == "מחק הכנסות":
-                st.markdown(f'<div style="font-size:0.78rem;color:{T["text2"]};margin:0.25rem 0 0.5rem">ימחק את כל ההכנסות שהזנת ידנית</div>', unsafe_allow_html=True)
-                if st.button("אישור מחיקה", key="dm_exec_inc", use_container_width=True):
-                    delete_all_incomes()
-                    st.session_state.incomes = []
-                    st.success("נמחק"); st.rerun()
-            
-            elif dm_action == "מחק את כל המידע שלי":
-                st.markdown(f'<div style="font-size:0.78rem;color:{T["red"]};margin:0.25rem 0 0.5rem;font-weight:600">פעולה בלתי הפיכה! כל הנתונים יימחקו לצמיתות</div>', unsafe_allow_html=True)
-                confirm_text = st.text_input("הקלד 'מחק' לאישור", key="dm_confirm_txt", label_visibility="collapsed", placeholder="הקלד 'מחק' לאישור")
-                if confirm_text == "מחק":
-                    if st.button("מחק הכל לצמיתות", key="dm_exec_all", use_container_width=True):
-                        delete_all_user_data()
-                        st.success("כל המידע נמחק"); st.rerun()
+            if del_choices:
+                if st.button(f"🗑️ מחק ({len(del_choices)})", use_container_width=True, key="dm_go"):
+                    sb = get_supabase()
+                    uid = user["id"]
+                    deleted = []
+                    if sb and uid:
+                        if "עסקאות שמורות" in del_choices:
+                            try: sb.table("saved_transactions").delete().eq("user_id", uid).execute(); deleted.append("עסקאות")
+                            except: pass
+                        if "הכנסות" in del_choices:
+                            try: sb.table("incomes").delete().eq("user_id", uid).execute(); deleted.append("הכנסות"); st.session_state.incomes = []
+                            except: pass
+                        if "היסטוריית העלאות" in del_choices:
+                            try: sb.table("upload_history").delete().eq("user_id", uid).execute(); deleted.append("היסטוריה")
+                            except: pass
+                        if "הגדרות" in del_choices:
+                            try: sb.table("user_settings").delete().eq("user_id", uid).execute(); deleted.append("הגדרות")
+                            except: pass
+                    
+                    if deleted:
+                        st.session_state.dm_msg = f"נמחקו: {', '.join(deleted)}"
+                    st.rerun()
             
             st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
 
