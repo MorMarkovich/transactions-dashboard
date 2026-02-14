@@ -7,13 +7,15 @@ import {
   CalendarDays,
   BarChart3,
   AlertTriangle,
+  TrendingUp,
+  Minus,
+  Percent,
 } from 'lucide-react'
 import { transactionsApi } from '../services/api'
-import type { InsightData, HeatmapData } from '../services/types'
+import type { InsightData, TrendStats } from '../services/types'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
-import HeatmapChart from '../components/charts/HeatmapChart'
 import EmptyState from '../components/common/EmptyState'
 import { formatCurrency, formatDate } from '../utils/formatting'
 
@@ -133,11 +135,6 @@ function InsightsSkeleton() {
         <Skeleton variant="card" />
       </div>
 
-      {/* Skeleton heatmap */}
-      <div style={{ marginTop: 'var(--space-xl)' }}>
-        <Skeleton variant="rectangular" height={220} />
-      </div>
-
       {/* Skeleton alerts */}
       <div style={{ marginTop: 'var(--space-xl)' }}>
         <Skeleton variant="rectangular" height={160} />
@@ -155,7 +152,7 @@ export default function Insights() {
   const sessionId = searchParams.get('session_id')
 
   const [insights, setInsights] = useState<InsightData | null>(null)
-  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null)
+  const [trendStats, setTrendStats] = useState<TrendStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -169,12 +166,12 @@ export default function Insights() {
       setLoading(true)
       setError(null)
       try {
-        const [insightsData, heatmapData] = await Promise.all([
+        const [insightsData, trendStatsData] = await Promise.all([
           transactionsApi.getInsights(sessionId, signal),
-          transactionsApi.getHeatmap(sessionId, signal),
+          transactionsApi.getTrendStats(sessionId, signal),
         ])
         setInsights(insightsData)
-        setHeatmap(heatmapData)
+        setTrendStats(trendStatsData)
       } catch (err: any) {
         if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
           console.error('Error loading insights:', err)
@@ -280,8 +277,8 @@ export default function Insights() {
         />
       </div>
 
-      {/* ─── Spending heatmap ───────────────────────────────────────── */}
-      {heatmap && (
+      {/* ─── Extra insights from trend stats ────────────────────────── */}
+      {trendStats && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -289,15 +286,65 @@ export default function Insights() {
           style={{ marginTop: 'var(--space-xl)' }}
         >
           <div className="section-title">
-            <span>🗺️</span> מפת חום - הוצאות לפי קטגוריה וחודש
+            <span>📊</span> תובנות נוספות
           </div>
-          <Card className="glass-card" padding="md">
-            <HeatmapChart
-              categories={heatmap.categories}
-              months={heatmap.months}
-              data={heatmap.data}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 'var(--space-md)',
+            }}
+          >
+            <InsightCard
+              index={4}
+              icon={<TrendingUp size={22} style={{ color: '#06b6d4' }} />}
+              iconBg="rgba(6, 182, 212, 0.12)"
+              title="ממוצע יומי"
+              value={formatCurrency(trendStats.daily_avg)}
+              subtitle="הוצאה ממוצעת ליום עם עסקאות"
             />
-          </Card>
+            <InsightCard
+              index={5}
+              icon={<Minus size={22} style={{ color: '#8b5cf6' }} />}
+              iconBg="rgba(139, 92, 246, 0.12)"
+              title="חציון לעסקה"
+              value={formatCurrency(trendStats.median)}
+              subtitle="ערך חציון לכל עסקה"
+            />
+            {(() => {
+              const lastMonth = trendStats.monthly?.length
+                ? trendStats.monthly[trendStats.monthly.length - 1]
+                : undefined
+              const changePct = lastMonth?.change_pct
+              return trendStats.monthly?.length > 0 && changePct != null ? (
+                <InsightCard
+                  index={6}
+                  icon={<Percent size={22} style={{ color: '#ec4899' }} />}
+                  iconBg="rgba(236, 72, 153, 0.12)"
+                  title="שינוי חודשי"
+                  value={changePct >= 0 ? `+${changePct}%` : `${changePct}%`}
+                  subtitle="השוואה לחודש הקודם"
+                />
+              ) : (
+                <InsightCard
+                  index={6}
+                  icon={<Flame size={22} style={{ color: '#f97316' }} />}
+                  iconBg="rgba(249, 115, 22, 0.12)"
+                  title="הוצאה מקסימלית"
+                  value={formatCurrency(trendStats.max_expense)}
+                  subtitle="העסקה היקרה ביותר"
+                />
+              )
+            })()}
+            <InsightCard
+              index={7}
+              icon={<BarChart3 size={22} style={{ color: '#10b981' }} />}
+              iconBg="rgba(16, 185, 129, 0.12)"
+              title="סה״כ עסקאות"
+              value={String(trendStats.transaction_count)}
+              subtitle="מספר עסקאות הוצאה"
+            />
+          </div>
         </motion.div>
       )}
 

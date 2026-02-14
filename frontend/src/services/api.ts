@@ -255,7 +255,7 @@ export const transactionsApi = {
    * Get trend statistics (max expense, daily avg, median, monthly changes)
    */
   getTrendStats: async (sessionId: string, signal?: AbortSignal): Promise<TrendStats> => {
-    const response = await api.get<TrendStats>('/api/trends/stats', {
+    const response = await api.get<TrendStats>('/api/trend-stats', {
       params: { sessionId },
       signal,
     });
