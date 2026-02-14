@@ -17,6 +17,7 @@ from auth import (
     save_upload_history, load_upload_history,
     save_user_settings, load_user_settings,
     save_transactions, load_transactions, delete_transactions, delete_all_user_data,
+    save_file_transactions, delete_file_transactions, list_saved_files,
     validate_email, validate_password
 )
 
@@ -1512,7 +1513,15 @@ def render_data_management_tab(df_f):
     init_income_state()
     user = get_current_user()
     is_guest = not user or user.get('id') == 'guest'
-    
+
+    # Show status message from previous action (file delete, etc.)
+    if 'dm_msg' in st.session_state:
+        st.markdown(f'''<div class="alert alert-ok">
+            <span class="alert-icon">✅</span>
+            <div><div class="alert-text">{st.session_state.dm_msg}</div></div>
+        </div>''', unsafe_allow_html=True)
+        del st.session_state['dm_msg']
+
     # ── Overview ──
     st.markdown(f'<div class="section-label">📊 סיכום נתונים שמורים</div>', unsafe_allow_html=True)
     
@@ -1541,10 +1550,61 @@ def render_data_management_tab(df_f):
                 f'</div>', unsafe_allow_html=True)
     
     st.markdown(f'<div style="height:1rem"></div>', unsafe_allow_html=True)
-    
+
+    # ── Section: File Manager ──
+    file_list = []
+    if '_מקור' in df_f.columns:
+        for fname in df_f['_מקור'].unique():
+            fdata = df_f[df_f['_מקור'] == fname]
+            total = fdata['סכום'].sum()
+            dates = fdata['תאריך']
+            file_list.append({
+                'name': fname,
+                'count': len(fdata),
+                'total': total,
+                'date_range': f"{dates.min().strftime('%d/%m/%Y')} — {dates.max().strftime('%d/%m/%Y')}" if not dates.empty else "",
+            })
+
+    n_files = len(file_list)
+    st.markdown(f'<div class="section-label">📂 ניהול קבצים ({n_files})</div>', unsafe_allow_html=True)
+
+    if file_list:
+        for i, f in enumerate(file_list):
+            amt_abs = abs(f['total'])
+            amt_color = T['red'] if f['total'] < 0 else T['green']
+            amt_sign = '-' if f['total'] < 0 else '+'
+            ext = f['name'].rsplit('.', 1)[-1].upper() if '.' in f['name'] else '?'
+            ext_color = T['green'] if ext in ('XLSX', 'XLS') else T['accent']
+
+            col_info, col_del = st.columns([6, 1])
+            with col_info:
+                st.markdown(f'''<div class="cat-card" style="margin-bottom:0.35rem">
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex:1">
+                        <div class="cat-icon" style="background:{ext_color}22;color:{ext_color};font-size:0.7rem;font-weight:700">{ext}</div>
+                        <div style="flex:1">
+                            <div style="font-weight:600;color:{T['text1']};font-size:0.85rem">{f['name']}</div>
+                            <div style="color:{T['text3']};font-size:0.73rem">{f['count']:,} עסקאות &bull; {f['date_range']}</div>
+                        </div>
+                    </div>
+                    <div style="font-weight:700;color:{amt_color};font-size:0.9rem;direction:ltr">{amt_sign}₪{amt_abs:,.0f}</div>
+                </div>''', unsafe_allow_html=True)
+            with col_del:
+                if not is_guest:
+                    if st.button("🗑️", key=f"del_file_{i}", help=f"מחק {f['name']}"):
+                        delete_file_transactions(f['name'])
+                        st.session_state.pop('cached_df', None)
+                        st.session_state['dm_msg'] = f"הקובץ {f['name']} נמחק"
+                        st.rerun()
+
+        st.markdown(f'<div style="color:{T["text3"]};font-size:0.75rem;margin-top:0.5rem">💡 מחיקת קובץ מסירה רק את העסקאות שלו. קבצים אחרים לא מושפעים.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="text-align:center;padding:1rem;color:{T["text3"]}">אין קבצים שמורים</div>', unsafe_allow_html=True)
+
+    st.markdown(f'<div style="height:1px;background:{T["border"]};margin:1.25rem 0"></div>', unsafe_allow_html=True)
+
     # ── Section: Transactions ──
     st.markdown(f'<div class="section-label">📋 עסקאות שמורות ({n_tx:,})</div>', unsafe_allow_html=True)
-    
+
     if not df_f.empty:
         # Filter tools
         fc1, fc2, fc3 = st.columns([2, 2, 1])
@@ -1554,24 +1614,24 @@ def render_data_management_tab(df_f):
             dm_search = st.text_input("חיפוש", placeholder="שם בית עסק...", key="dm_search")
         with fc3:
             dm_sort = st.selectbox("מיון", ['תאריך ↓', 'סכום ↓'], key="dm_sort")
-        
+
         # Apply filters
         dm_df = df_f.copy()
         if dm_cat != 'הכל':
             dm_df = dm_df[dm_df['קטגוריה'] == dm_cat]
         if dm_search:
             dm_df = dm_df[dm_df['תיאור'].str.contains(dm_search, case=False, na=False)]
-        
+
         sort_col = 'תאריך' if 'תאריך' in dm_sort else 'סכום_מוחלט'
         dm_df = dm_df.sort_values(sort_col, ascending=False)
-        
+
         st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin-bottom:0.5rem">{len(dm_df):,} עסקאות מוצגות</div>', unsafe_allow_html=True)
-        
+
         # Show table
         view_cols = ['תאריך', 'תיאור', 'קטגוריה', 'סכום']
         if '_מקור' in dm_df.columns and dm_df['_מקור'].nunique() > 1:
             view_cols.append('_מקור')
-        
+
         st.dataframe(
             dm_df[view_cols],
             column_config={
@@ -1582,14 +1642,11 @@ def render_data_management_tab(df_f):
                 "_מקור": st.column_config.TextColumn("מקור", width="medium"),
             },
             hide_index=True, use_container_width=True, height=350)
-        
-        # Delete filtered transactions
-        if dm_cat != 'הכל' or dm_search:
-            st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin:0.5rem 0">💡 הפילטרים מציגים תת-קבוצה. המחיקה מוחקת את <b>כל</b> העסקאות השמורות.</div>', unsafe_allow_html=True)
-        
+
         if not is_guest:
             if st.button("🗑️ מחק את כל העסקאות", key="dm_del_tx", use_container_width=True):
                 delete_transactions()
+                st.session_state.pop('cached_df', None)
                 st.session_state['dm_msg'] = "כל העסקאות נמחקו"
                 st.rerun()
     else:
@@ -1697,6 +1754,7 @@ def render_data_management_tab(df_f):
             if st.button("🚨 מחק את כל המידע שלי", key="dm_danger_go", use_container_width=True):
                 delete_all_user_data()
                 st.session_state.incomes = []
+                st.session_state.pop('cached_df', None)
                 st.success("כל המידע נמחק לצמיתות")
                 st.rerun()
     else:
@@ -1938,14 +1996,18 @@ def main():
         </div>
         ''', unsafe_allow_html=True)
 
-    # Empty state -- try loading saved data first
+    # Empty state -- try session cache first, then DB
     if not uploaded_files:
-        saved_df = load_transactions()
+        saved_df = st.session_state.get('cached_df')
+        if saved_df is None:
+            saved_df = load_transactions()
+            if saved_df is not None:
+                st.session_state.cached_df = saved_df
         if saved_df is not None and not saved_df.empty:
-            # Jump directly to dashboard with saved data
+            n_files = saved_df['_מקור'].nunique() if '_מקור' in saved_df.columns else 1
             st.markdown(f'''<div class="alert alert-ok">
                 <span class="alert-icon">☁️</span>
-                <div><div class="alert-text">נטענו {len(saved_df):,} עסקאות שמורות</div><div class="alert-sub">הנתונים נשמרו מההעלאה הקודמת שלך. העלה קבצים חדשים כדי לעדכן.</div></div>
+                <div><div class="alert-text">נטענו {len(saved_df):,} עסקאות מ-{n_files} קבצים</div><div class="alert-sub">העלה קבצים נוספים כדי להוסיף, או נהל את הקבצים בטאב "ניהול נתונים"</div></div>
             </div>''', unsafe_allow_html=True)
             _render_dashboard(saved_df)
             return
@@ -2073,8 +2135,28 @@ def main():
         <div class="alert-badge">{df['קטגוריה'].nunique()} קטגוריות</div>
     </div>''', unsafe_allow_html=True)
     
-    # Save to DB for persistence
-    save_transactions(df)
+    # Save each file separately (preserves previously uploaded files)
+    files_dict = {}
+    for proc_df in all_processed:
+        if '_מקור' in proc_df.columns:
+            for fname in proc_df['_מקור'].unique():
+                files_dict[fname] = proc_df[proc_df['_מקור'] == fname]
+    if files_dict:
+        save_file_transactions(files_dict)
+
+    # Reload ALL saved data (existing + newly uploaded) for a complete view
+    full_df = load_transactions()
+    if full_df is not None and not full_df.empty:
+        n_total_files = full_df['_מקור'].nunique() if '_מקור' in full_df.columns else total_files
+        if n_total_files > total_files:
+            st.markdown(f'''<div class="alert alert-ok" style="margin-top:0.5rem">
+                <span class="alert-icon">☁️</span>
+                <div><div class="alert-text">סה״כ {len(full_df):,} עסקאות מ-{n_total_files} קבצים (כולל קבצים קודמים)</div></div>
+            </div>''', unsafe_allow_html=True)
+        df = full_df
+
+    # Update session cache
+    st.session_state.cached_df = df
 
     _render_dashboard(df)
 
