@@ -838,7 +838,7 @@ def clean_dataframe(df):
         df = df.iloc[hr+1:].reset_index(drop=True)
     df.columns = [str(c).strip() for c in df.columns]
     bad = ['סך הכל', 'סה"כ', 'total', 'סיכום', 'יתרה']
-    mask = df.apply(lambda r: not any(k in ' '.join(r.astype(str).str.lower()) for k in bad) and r.isnull().sum() <= len(r)*0.8, axis=1)
+    mask = df.apply(lambda r: not any(k in ' '.join(str(x).lower() for x in r if pd.notna(x)) for k in bad) and r.isnull().sum() <= len(r)*0.8, axis=1)
     return df[mask].reset_index(drop=True).dropna(axis=1, how='all')
 
 def clean_amount(v):
@@ -864,7 +864,7 @@ def has_valid_amounts(df, col):
     except: return False
 
 def detect_amount_column(df):
-    for n in ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', 'אם זכות/חובה']:
+    for n in ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', '₪ זכות/חובה', 'אם זכות/חובה']:
         for c in df.columns:
             if str(c).strip() == n and has_valid_amounts(df, c): return c
     for c in df.columns:
@@ -911,8 +911,10 @@ def process_data(df, date_col, amount_col, desc_col, cat_col):
             z = r['סכום'] == 0
             if z.any(): r.loc[z, 'סכום'] = fb[z]
         except: pass
+    # Auto-negate only for credit card statements (not bank accounts which have mixed +/-)
+    is_bank_statement = 'זכות/חובה' in ac
     nz = r['סכום'][r['סכום'] != 0]
-    if len(nz) > 0 and (nz > 0).sum() / len(nz) > 0.8:
+    if not is_bank_statement and len(nz) > 0 and (nz > 0).sum() / len(nz) > 0.8:
         r['סכום'] = -r['סכום'].abs()
     try:
         r['תיאור'] = r[desc_col].astype(str).str.strip()
