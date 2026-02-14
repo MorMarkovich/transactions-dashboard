@@ -604,6 +604,133 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 
 /* === Print === */
 @media print {{ section[data-testid="stSidebar"] {{ display: none !important; }} }}
+
+/* === Cash Flow Cards === */
+.flow-row {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin: 1.25rem 0; }}
+@media(max-width:768px) {{ .flow-row {{ grid-template-columns: 1fr; }} }}
+.flow-card {{
+    background: {T['surface']};
+    border: 1px solid {T['border']};
+    border-radius: 18px;
+    padding: 1.5rem 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+}}
+.flow-card::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    border-radius: 18px 18px 0 0;
+}}
+.flow-card:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}}
+.flow-card.income::before {{ background: linear-gradient(90deg, #34d399, #059669); }}
+.flow-card.expense::before {{ background: linear-gradient(90deg, #f87171, #dc2626); }}
+.flow-card.balance::before {{ background: linear-gradient(90deg, #818cf8, #6d28d9); }}
+.flow-card.income:hover {{ box-shadow: 0 12px 40px rgba(52,211,153,0.15); }}
+.flow-card.expense:hover {{ box-shadow: 0 12px 40px rgba(248,113,113,0.15); }}
+.flow-card.balance:hover {{ box-shadow: 0 12px 40px rgba(129,140,248,0.15); }}
+.flow-icon {{
+    width: 52px; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; margin-bottom: 1rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}}
+.flow-val {{
+    font-size: 2rem; font-weight: 800; direction: ltr;
+    letter-spacing: -1px; line-height: 1.2;
+}}
+.flow-label {{
+    font-size: 0.82rem; color: {T['text2']}; margin-top: 4px;
+    font-weight: 500; letter-spacing: 0.3px;
+}}
+.flow-mini {{
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 0.75rem; padding-top: 0.75rem;
+    border-top: 1px solid {T['border']};
+    font-size: 0.78rem; color: {T['text3']};
+}}
+.flow-mini-badge {{
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 0.72rem; font-weight: 700;
+}}
+
+/* === Income vs Expense Bar === */
+.ie-bar-container {{
+    display: flex; height: 10px; border-radius: 99px;
+    overflow: hidden; background: {T['surface2']};
+    margin: 0.5rem 0;
+}}
+.ie-bar-income {{ background: linear-gradient(90deg, #34d399, #059669); height: 100%; transition: width 0.6s ease; }}
+.ie-bar-expense {{ background: linear-gradient(90deg, #f87171, #dc2626); height: 100%; transition: width 0.6s ease; }}
+
+/* === Gauge Chart === */
+.gauge-container {{
+    display: flex; flex-direction: column; align-items: center;
+    padding: 1.25rem;
+}}
+.gauge-ring {{
+    width: 140px; height: 140px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+}}
+.gauge-inner {{
+    width: 110px; height: 110px; border-radius: 50%;
+    background: {T['surface']};
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+}}
+
+/* === Staggered card entrance === */
+@keyframes slideInUp {{
+    from {{ opacity: 0; transform: translateY(20px); }}
+    to {{ opacity: 1; transform: translateY(0); }}
+}}
+.stagger-1 {{ animation: slideInUp 0.4s ease-out 0.05s both; }}
+.stagger-2 {{ animation: slideInUp 0.4s ease-out 0.12s both; }}
+.stagger-3 {{ animation: slideInUp 0.4s ease-out 0.19s both; }}
+.stagger-4 {{ animation: slideInUp 0.4s ease-out 0.26s both; }}
+
+/* === Insight Highlight Cards === */
+.insight-highlight {{
+    background: linear-gradient(135deg, {T['surface']}, {T['surface2']});
+    border: 1px solid {T['border']};
+    border-radius: 18px;
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}}
+.insight-highlight::after {{
+    content: '';
+    position: absolute;
+    top: -50%; right: -50%;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle, rgba(129,140,248,0.06) 0%, transparent 70%);
+    pointer-events: none;
+}}
+
+/* === Pulse glow for important numbers === */
+@keyframes pulseGlow {{
+    0%, 100% {{ text-shadow: 0 0 0 transparent; }}
+    50% {{ text-shadow: 0 0 20px rgba(129,140,248,0.3); }}
+}}
+.glow-number {{ animation: pulseGlow 3s ease-in-out infinite; }}
+
+/* === Monthly flow mini-bars === */
+.minibar-row {{
+    display: flex; gap: 3px; align-items: flex-end;
+    height: 40px; margin-top: 0.5rem;
+}}
+.minibar {{
+    flex: 1; border-radius: 3px 3px 0 0;
+    min-width: 4px; transition: height 0.4s ease;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -612,9 +739,9 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 # =============================================================================
 st.markdown(f"""
 <script>
-// === Animated counter for KPI values ===
+// === Animated counter for KPI values with easing ===
 function animateCounters() {{
-    document.querySelectorAll('.kpi-val').forEach(el => {{
+    document.querySelectorAll('.kpi-val, .flow-val').forEach(el => {{
         if (el.dataset.animated) return;
         el.dataset.animated = 'true';
         const text = el.innerText;
@@ -624,11 +751,12 @@ function animateCounters() {{
         if (isNaN(target) || target === 0) return;
         const prefix = text.slice(0, text.indexOf(match[0]));
         const suffix = text.slice(text.indexOf(match[0]) + match[0].length);
-        const duration = 800;
+        const duration = 1000;
         const start = performance.now();
         function step(now) {{
             const progress = Math.min((now - start) / duration, 1);
-            const ease = 1 - Math.pow(1 - progress, 3);
+            // Exponential ease-out for professional feel
+            const ease = 1 - Math.pow(1 - progress, 4);
             const current = Math.round(target * ease);
             el.innerText = prefix + current.toLocaleString() + suffix;
             if (progress < 1) requestAnimationFrame(step);
@@ -651,7 +779,6 @@ function initSmoothTabs() {{
 
 // === Keyboard shortcuts ===
 document.addEventListener('keydown', (e) => {{
-    // Ctrl+K = Focus search
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {{
         e.preventDefault();
         const searchInput = document.querySelector('[data-testid="stTextInput"] input');
@@ -659,18 +786,72 @@ document.addEventListener('keydown', (e) => {{
     }}
 }});
 
+// === Scroll-reveal animations ===
+function initScrollReveal() {{
+    const observer = new IntersectionObserver((entries) => {{
+        entries.forEach(entry => {{
+            if (entry.isIntersecting) {{
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+                observer.unobserve(entry.target);
+            }}
+        }});
+    }}, {{ threshold: 0.1, rootMargin: '0px 0px -40px 0px' }});
+
+    document.querySelectorAll('.flow-card, .compare-card, .insight-highlight, .cat-card').forEach(el => {{
+        if (el.dataset.revealed) return;
+        el.dataset.revealed = 'true';
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(15px)';
+        el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        observer.observe(el);
+    }});
+}}
+
+// === Sparkline mini charts in flow cards ===
+function drawMiniSparklines() {{
+    document.querySelectorAll('.minibar-row').forEach(row => {{
+        if (row.dataset.drawn) return;
+        row.dataset.drawn = 'true';
+        const bars = row.querySelectorAll('.minibar');
+        bars.forEach((bar, i) => {{
+            const h = bar.dataset.height || '0';
+            setTimeout(() => {{ bar.style.height = h + '%'; }}, i * 50);
+        }});
+    }});
+}}
+
 // === Tooltip for KPI cards ===
 function addKpiTooltips() {{
-    document.querySelectorAll('.kpi').forEach(el => {{
+    document.querySelectorAll('.kpi, .flow-card').forEach(el => {{
         if (el.dataset.tipped) return;
         el.dataset.tipped = 'true';
         el.style.cursor = 'default';
-        el.title = el.querySelector('.kpi-label')?.innerText || '';
+        const label = el.querySelector('.kpi-label, .flow-label');
+        if (label) el.title = label.innerText;
+    }});
+}}
+
+// === Number hover effect ===
+function addNumberHover() {{
+    document.querySelectorAll('.flow-val, .kpi-val').forEach(el => {{
+        if (el.dataset.hovered) return;
+        el.dataset.hovered = 'true';
+        el.addEventListener('mouseenter', () => {{
+            el.style.transform = 'scale(1.05)';
+            el.style.transition = 'transform 0.2s ease';
+        }});
+        el.addEventListener('mouseleave', () => {{
+            el.style.transform = 'scale(1)';
+        }});
     }});
 }}
 
 // === Init ===
-const initAll = () => {{ animateCounters(); initSmoothTabs(); addKpiTooltips(); }};
+const initAll = () => {{
+    animateCounters(); initSmoothTabs(); addKpiTooltips();
+    initScrollReveal(); drawMiniSparklines(); addNumberHover();
+}};
 if (document.readyState === 'complete') setTimeout(initAll, 400);
 else window.addEventListener('load', () => setTimeout(initAll, 400));
 
@@ -678,7 +859,10 @@ else window.addEventListener('load', () => setTimeout(initAll, 400));
 let _animTimeout;
 const observer = new MutationObserver(() => {{
     clearTimeout(_animTimeout);
-    _animTimeout = setTimeout(() => {{ animateCounters(); addKpiTooltips(); }}, 150);
+    _animTimeout = setTimeout(() => {{
+        animateCounters(); addKpiTooltips();
+        initScrollReveal(); drawMiniSparklines(); addNumberHover();
+    }}, 150);
 }});
 observer.observe(document.body, {{ childList: true, subtree: true }});
 </script>
@@ -1118,6 +1302,135 @@ def chart_trend(df):
     fig.update_layout(**plotly_layout(height=300, hovermode='x unified'))
     return fig
 
+def chart_income_vs_expenses(df):
+    """Grouped bar chart comparing income and expenses per month."""
+    months = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    income_vals = []
+    expense_vals = []
+    for m in months:
+        m_df = df[df['חודש'] == m]
+        income_vals.append(m_df[m_df['סכום'] > 0]['סכום'].sum())
+        expense_vals.append(abs(m_df[m_df['סכום'] < 0]['סכום'].sum()))
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=list(months), y=income_vals, name='הכנסות',
+                         marker=dict(color='rgba(52,211,153,0.85)', cornerradius=5),
+                         hovertemplate='<b>%{x}</b><br>הכנסות: ₪%{y:,.0f}<extra></extra>'))
+    fig.add_trace(go.Bar(x=list(months), y=expense_vals, name='הוצאות',
+                         marker=dict(color='rgba(248,113,113,0.85)', cornerradius=5),
+                         hovertemplate='<b>%{x}</b><br>הוצאות: ₪%{y:,.0f}<extra></extra>'))
+    # Add net line
+    net_vals = [i - e for i, e in zip(income_vals, expense_vals)]
+    fig.add_trace(go.Scatter(x=list(months), y=net_vals, name='מאזן נטו', mode='lines+markers',
+                             line=dict(color=T['accent'], width=2.5, dash='dot'),
+                             marker=dict(size=8, color=T['accent']),
+                             hovertemplate='<b>%{x}</b><br>מאזן: ₪%{y:,.0f}<extra></extra>'))
+    fig.add_hline(y=0, line_dash='dot', line_color=T['text3'], opacity=0.3)
+    fig.update_layout(**plotly_layout(height=320, barmode='group', bargap=0.25,
+                      legend=dict(orientation='h', y=-0.18, x=0.5, xanchor='center',
+                                  font=dict(size=11, color=T['text2']))))
+    return fig
+
+def chart_net_savings(df):
+    """Area chart showing cumulative savings over time."""
+    months = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    cum_savings = []
+    running = 0
+    for m in months:
+        m_df = df[df['חודש'] == m]
+        income = m_df[m_df['סכום'] > 0]['סכום'].sum()
+        expense = abs(m_df[m_df['סכום'] < 0]['סכום'].sum())
+        running += (income - expense)
+        cum_savings.append(running)
+    fig = go.Figure()
+    colors_fill = ['rgba(52,211,153,0.12)' if v >= 0 else 'rgba(248,113,113,0.12)' for v in cum_savings]
+    fig.add_trace(go.Scatter(
+        x=list(months), y=cum_savings, mode='lines+markers', fill='tozeroy',
+        line=dict(color=T['green'], width=2.5),
+        fillcolor='rgba(52,211,153,0.08)',
+        marker=dict(size=7, color=[T['green'] if v >= 0 else T['red'] for v in cum_savings]),
+        hovertemplate='<b>%{x}</b><br>חיסכון מצטבר: ₪%{y:,.0f}<extra></extra>'
+    ))
+    fig.add_hline(y=0, line_dash='dot', line_color=T['red'], opacity=0.4)
+    fig.update_layout(**plotly_layout(height=280, hovermode='x unified'))
+    return fig
+
+def render_cashflow_cards(df):
+    """Render premium cash flow summary cards with mini-bars."""
+    init_income_state()
+    exp = df[df['סכום'] < 0]
+    tx_income = df[df['סכום'] > 0]['סכום'].sum()
+    manual_income = get_total_income()
+    total_income = tx_income + manual_income
+    total_expenses = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
+    balance = total_income - total_expenses
+    savings_rate = (balance / total_income * 100) if total_income > 0 else 0
+
+    # Monthly mini-bars data
+    months = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    inc_monthly = []
+    exp_monthly = []
+    for m in months:
+        m_df = df[df['חודש'] == m]
+        inc_monthly.append(m_df[m_df['סכום'] > 0]['סכום'].sum())
+        exp_monthly.append(abs(m_df[m_df['סכום'] < 0]['סכום'].sum()))
+
+    inc_max = max(inc_monthly) if inc_monthly and max(inc_monthly) > 0 else 1
+    exp_max = max(exp_monthly) if exp_monthly and max(exp_monthly) > 0 else 1
+
+    def mini_bars(values, max_val, color):
+        bars = ''
+        for v in values[-6:]:
+            h = max(5, (v / max_val) * 100) if max_val > 0 else 5
+            bars += f'<div class="minibar" data-height="{h:.0f}" style="background:{color};height:0%"></div>'
+        return f'<div class="minibar-row">{bars}</div>'
+
+    # Balance indicator
+    bal_color = T['green'] if balance >= 0 else T['red']
+    bal_icon = '📈' if balance >= 0 else '📉'
+    bal_badge_bg = T['green_bg'] if balance >= 0 else T['red_bg']
+    savings_text = f'חיסכון {savings_rate:.0f}%' if savings_rate > 0 else f'גירעון {abs(savings_rate):.0f}%'
+
+    html = f'''<div class="flow-row">
+        <div class="flow-card income stagger-1">
+            <div class="flow-icon" style="background:linear-gradient(135deg,#34d399,#059669)">📈</div>
+            <div class="flow-val" style="color:{T['green']}">{fmt(total_income)}</div>
+            <div class="flow-label">סה״כ הכנסות</div>
+            {mini_bars(inc_monthly, inc_max, T['green'])}
+            <div class="flow-mini">
+                <span>ממוצע חודשי:</span>
+                <span style="color:{T['text1']};font-weight:600;direction:ltr">{fmt(total_income / max(len(months), 1))}</span>
+            </div>
+        </div>
+        <div class="flow-card expense stagger-2">
+            <div class="flow-icon" style="background:linear-gradient(135deg,#f87171,#dc2626)">📉</div>
+            <div class="flow-val" style="color:{T['red']}">{fmt(total_expenses)}</div>
+            <div class="flow-label">סה״כ הוצאות</div>
+            {mini_bars(exp_monthly, exp_max, T['red'])}
+            <div class="flow-mini">
+                <span>ממוצע חודשי:</span>
+                <span style="color:{T['text1']};font-weight:600;direction:ltr">{fmt(total_expenses / max(len(months), 1))}</span>
+            </div>
+        </div>
+        <div class="flow-card balance stagger-3">
+            <div class="flow-icon" style="background:linear-gradient(135deg,{T['accent']},#6d28d9)">{bal_icon}</div>
+            <div class="flow-val glow-number" style="color:{bal_color}">{fmt(balance)}</div>
+            <div class="flow-label">מאזן נטו</div>
+            <div style="margin-top:0.75rem">
+                <div class="ie-bar-container">
+                    <div class="ie-bar-income" style="width:{min(total_income / max(total_income + total_expenses, 1) * 100, 100):.0f}%"></div>
+                    <div class="ie-bar-expense" style="width:{min(total_expenses / max(total_income + total_expenses, 1) * 100, 100):.0f}%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:{T['text3']};margin-top:4px">
+                    <span>הכנסות</span><span>הוצאות</span>
+                </div>
+            </div>
+            <div class="flow-mini">
+                <span class="flow-mini-badge" style="background:{bal_badge_bg};color:{bal_color}">{savings_text}</span>
+            </div>
+        </div>
+    </div>'''
+    st.markdown(html, unsafe_allow_html=True)
+
 # =============================================================================
 # UI Components
 # =============================================================================
@@ -1544,7 +1857,7 @@ def render_income_tab(df_f):
 # =============================================================================
 def main():
     # Header
-    st.markdown(f'<div class="dash-header"><h1 class="dash-title">מנתח עסקאות</h1><p class="dash-subtitle">ניתוח חכם של הוצאות כרטיס האשראי שלך</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="dash-header"><h1 class="dash-title">מנתח עסקאות</h1><p class="dash-subtitle">ניתוח חכם של הכנסות, הוצאות ותזרים מזומנים</p></div>', unsafe_allow_html=True)
 
     # Sidebar
     with st.sidebar:
@@ -1606,6 +1919,10 @@ def main():
                 <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">דיסקונט</span>
                 <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">כאל</span>
                 <span style="background:{T['surface2']};color:{T['text2']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:500">CSV</span>
+            </div>
+            <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
+                <span style="background:rgba(52,211,153,0.12);color:{T['green']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:600">עו"ש בנק</span>
+                <span style="background:rgba(52,211,153,0.12);color:{T['green']};padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:600">הכנסות</span>
             </div>
         </div>
         ''', unsafe_allow_html=True)
@@ -1776,11 +2093,11 @@ def _render_dashboard(df):
         </div>''', unsafe_allow_html=True)
         return
 
-    # KPIs
-    render_kpis(df_f)
+    # Cash Flow Cards (replaces basic KPIs with premium version)
+    render_cashflow_cards(df_f)
 
     # Tabs
-    tabs = st.tabs(["📊 סקירה","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב","🗄️ ניהול נתונים"])
+    tabs = st.tabs(["📊 סקירה","💹 הכנסות מול הוצאות","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב","🗄️ ניהול נתונים"])
 
     # ══════════════════════════════════════════════
     # TAB 0: Overview
@@ -1836,9 +2153,71 @@ def _render_dashboard(df):
             render_categories(df_f)
 
     # ══════════════════════════════════════════════
-    # TAB 1: Trends - Enhanced
+    # TAB 1: Income vs Expenses (NEW!)
     # ══════════════════════════════════════════════
     with tabs[1]:
+        has_income = len(df_f[df_f['סכום'] > 0]) > 0
+        has_expenses = len(df_f[df_f['סכום'] < 0]) > 0
+        n_months = df_f['חודש'].nunique()
+
+        # Income vs Expenses grouped bar chart
+        st.markdown(f'<div class="section-label">💹 הכנסות מול הוצאות - השוואה חודשית</div>', unsafe_allow_html=True)
+        if has_income or has_expenses:
+            st.plotly_chart(chart_income_vs_expenses(df_f), use_container_width=True, key="ie_chart")
+        else:
+            st.markdown(f'<div style="text-align:center;padding:2rem;color:{T["text3"]}">אין נתוני הכנסות להשוואה. העלה קובץ הכנסות (עו"ש) או הוסף הכנסות ידנית בלשונית "תקציב".</div>', unsafe_allow_html=True)
+
+        # Monthly breakdown table
+        if has_income or has_expenses:
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">📊 פירוט חודשי</div>', unsafe_allow_html=True)
+            months_sorted = df_f.drop_duplicates('חודש').sort_values('תאריך', ascending=False)['חודש'].unique()
+            for m in months_sorted:
+                m_df = df_f[df_f['חודש'] == m]
+                m_income = m_df[m_df['סכום'] > 0]['סכום'].sum()
+                m_expense = abs(m_df[m_df['סכום'] < 0]['סכום'].sum())
+                m_balance = m_income - m_expense
+                m_savings = (m_balance / m_income * 100) if m_income > 0 else 0
+                bal_color = T['green'] if m_balance >= 0 else T['red']
+                inc_pct = (m_income / max(m_income + m_expense, 1)) * 100
+
+                st.markdown(f'''<div class="compare-card" style="margin-bottom:0.5rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+                        <div style="font-weight:800;font-size:1.05rem;color:{T['text1']};min-width:70px">{m}</div>
+                        <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
+                            <div style="text-align:center">
+                                <div style="font-size:0.65rem;color:{T['text3']};text-transform:uppercase;letter-spacing:0.5px">הכנסות</div>
+                                <div style="font-weight:700;color:{T['green']};direction:ltr">{fmt(m_income)}</div>
+                            </div>
+                            <div style="text-align:center">
+                                <div style="font-size:0.65rem;color:{T['text3']};text-transform:uppercase;letter-spacing:0.5px">הוצאות</div>
+                                <div style="font-weight:700;color:{T['red']};direction:ltr">{fmt(m_expense)}</div>
+                            </div>
+                            <div style="text-align:center">
+                                <div style="font-size:0.65rem;color:{T['text3']};text-transform:uppercase;letter-spacing:0.5px">מאזן</div>
+                                <div style="font-weight:700;color:{bal_color};direction:ltr">{fmt(m_balance)}</div>
+                            </div>
+                            <span class="diff-badge {'down' if m_balance >= 0 else 'up'}" style="font-size:0.72rem">
+                                {'↑' if m_savings > 0 else '↓'} {abs(m_savings):.0f}% חיסכון
+                            </span>
+                        </div>
+                    </div>
+                    <div class="ie-bar-container" style="margin-top:0.75rem">
+                        <div class="ie-bar-income" style="width:{inc_pct:.0f}%"></div>
+                        <div class="ie-bar-expense" style="width:{100 - inc_pct:.0f}%"></div>
+                    </div>
+                </div>''', unsafe_allow_html=True)
+
+        # Cumulative savings chart
+        if n_months >= 2 and (has_income or has_expenses):
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">📈 חיסכון מצטבר לאורך זמן</div>', unsafe_allow_html=True)
+            st.plotly_chart(chart_net_savings(df_f), use_container_width=True, key="savings_chart")
+
+    # ══════════════════════════════════════════════
+    # TAB 2: Trends - Enhanced
+    # ══════════════════════════════════════════════
+    with tabs[2]:
         st.markdown(f'<div class="section-label">📈 מאזן מצטבר</div>', unsafe_allow_html=True)
         st.plotly_chart(chart_trend(df_f), use_container_width=True, key="t")
 
@@ -1940,9 +2319,9 @@ def _render_dashboard(df):
             st.markdown(grid_html, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
-    # TAB 2: Merchants - Enhanced
+    # TAB 3: Merchants - Enhanced
     # ══════════════════════════════════════════════
-    with tabs[2]:
+    with tabs[3]:
         st.markdown(f'<div class="section-label">🏆 בתי עסק מובילים</div>', unsafe_allow_html=True)
         if 'merchant_count' not in st.session_state:
             st.session_state.merchant_count = 8
@@ -1975,9 +2354,9 @@ def _render_dashboard(df):
                 </div>''', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
-    # TAB 3: Insights (NEW!)
+    # TAB 4: Insights
     # ══════════════════════════════════════════════
-    with tabs[3]:
+    with tabs[4]:
         if len(exp) > 0:
             total_exp = exp['סכום_מוחלט'].sum()
             num_days = max((df_f['תאריך'].max() - df_f['תאריך'].min()).days, 1)
@@ -2098,9 +2477,9 @@ def _render_dashboard(df):
                     f'</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
-    # TAB 4: Transactions - Side-by-Side Comparison
+    # TAB 5: Transactions - Side-by-Side Comparison
     # ══════════════════════════════════════════════
-    with tabs[4]:
+    with tabs[5]:
         st.markdown(f'<div class="section-label">📋 השוואת עסקאות חודשית</div>', unsafe_allow_html=True)
 
         available_months = df_f.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist()
@@ -2246,12 +2625,12 @@ def _render_dashboard(df):
         st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:1rem;text-align:center">{len(df_f):,} עסקאות בסה״כ (כל החודשים המסוננים)</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
-    # TAB 5: Budget
+    # TAB 6: Budget
     # ══════════════════════════════════════════════
-    with tabs[5]:
+    with tabs[6]:
         render_income_tab(df_f)
 
-    with tabs[6]:
+    with tabs[7]:
         render_data_management_tab(df_f)
 
     # Export
