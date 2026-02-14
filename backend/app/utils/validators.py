@@ -122,13 +122,26 @@ def parse_dates(series: pd.Series) -> pd.Series:
     """פרסור תאריכים בפורמטים שונים עם טיפול בשגיאות"""
     if series.empty:
         return pd.Series(dtype='datetime64[ns]')
-    
-    formats = ['%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d.%m.%Y', '%Y/%m/%d', '%m/%d/%Y']
+
+    # If already datetime dtype, return directly (no string conversion needed)
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return pd.to_datetime(series, errors='coerce')
+
+    # Check if values are native datetime/Timestamp objects (common from Excel)
+    sample = series.dropna().head(5)
+    if len(sample) > 0:
+        from datetime import datetime as _dt
+        if all(isinstance(v, (pd.Timestamp, _dt)) for v in sample):
+            return pd.to_datetime(series, errors='coerce')
+
+    # String-based parsing with explicit formats
+    # %Y-%m-%d %H:%M:%S first — matches stringified Excel datetime objects
+    formats = ['%Y-%m-%d %H:%M:%S', '%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d', '%d.%m.%Y', '%Y/%m/%d', '%m/%d/%Y']
     result = pd.Series([pd.NaT] * len(series), index=series.index)
-    
+
     # ניקוי ערכים לפני פרסור
     cleaned_series = series.astype(str).str.strip()
-    
+
     for fmt in formats:
         mask = result.isna()
         if not mask.any():
@@ -137,7 +150,7 @@ def parse_dates(series: pd.Series) -> pd.Series:
             result[mask] = pd.to_datetime(cleaned_series[mask], format=fmt, errors='coerce')
         except Exception:
             continue
-    
+
     # ניסיון אחרון עם dayfirst
     if result.isna().any():
         try:
@@ -145,5 +158,5 @@ def parse_dates(series: pd.Series) -> pd.Series:
             result[remaining_mask] = pd.to_datetime(cleaned_series[remaining_mask], dayfirst=True, errors='coerce')
         except Exception:
             pass
-    
+
     return result
