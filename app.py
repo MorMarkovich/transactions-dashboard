@@ -971,6 +971,85 @@ def compute_category_mom(df):
         })
     return sorted(results, key=lambda x: abs(x['change_pct']), reverse=True)
 
+
+def chart_category_pct_by_month(df):
+    """100% stacked bar chart: category spending as % of total per month."""
+    exp = df[df['סכום'] < 0].copy()
+    if exp.empty:
+        fig = go.Figure()
+        fig.add_annotation(text="אין נתונים", x=0.5, y=0.5, showarrow=False, font=dict(color=T['text3']))
+        fig.update_layout(**plotly_layout(height=340))
+        return fig, pd.DataFrame()
+
+    # Build pivot: months as columns, categories as rows, values = absolute amounts
+    months_sorted = exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist()
+    pivot = exp.groupby(['חודש', 'קטגוריה'])['סכום_מוחלט'].sum().reset_index()
+    month_totals = exp.groupby('חודש')['סכום_מוחלט'].sum()
+
+    # Compute percentages
+    pivot['אחוז'] = pivot.apply(lambda r: (r['סכום_מוחלט'] / month_totals[r['חודש']] * 100) if month_totals[r['חודש']] > 0 else 0, axis=1)
+
+    # Top categories (by overall total), rest -> "אחר"
+    top_cats = exp.groupby('קטגוריה')['סכום_מוחלט'].sum().nlargest(8).index.tolist()
+
+    fig = go.Figure()
+    for i, cat in enumerate(top_cats):
+        cat_data = pivot[pivot['קטגוריה'] == cat]
+        y_vals = []
+        amounts = []
+        for m in months_sorted:
+            row = cat_data[cat_data['חודש'] == m]
+            y_vals.append(row['אחוז'].values[0] if len(row) > 0 else 0)
+            amounts.append(row['סכום_מוחלט'].values[0] if len(row) > 0 else 0)
+        fig.add_trace(go.Bar(
+            x=months_sorted, y=y_vals, name=cat,
+            marker=dict(color=CHART_COLORS[i % len(CHART_COLORS)], cornerradius=3),
+            customdata=amounts,
+            hovertemplate=f'<b>{cat}</b><br>%{{y:.1f}}% &middot; ₪%{{customdata:,.0f}}<extra></extra>',
+        ))
+
+    # "Other" categories
+    other_cats = [c for c in exp['קטגוריה'].unique() if c not in top_cats]
+    if other_cats:
+        y_vals = []
+        amounts = []
+        for m in months_sorted:
+            m_data = pivot[(pivot['קטגוריה'].isin(other_cats)) & (pivot['חודש'] == m)]
+            y_vals.append(m_data['אחוז'].sum())
+            amounts.append(m_data['סכום_מוחלט'].sum())
+        fig.add_trace(go.Bar(
+            x=months_sorted, y=y_vals, name='אחר',
+            marker=dict(color='#64748b', cornerradius=3),
+            customdata=amounts,
+            hovertemplate='<b>אחר</b><br>%{y:.1f}% &middot; ₪%{customdata:,.0f}<extra></extra>',
+        ))
+
+    fig.update_layout(**plotly_layout(
+        height=380, barmode='stack', bargap=0.25,
+        yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10),
+                   showgrid=True, zeroline=False, ticksuffix='%', range=[0, 100]),
+        legend=dict(orientation='h', y=-0.22, x=0.5, xanchor='center',
+                    font=dict(size=10, color=T['text2'])),
+    ))
+
+    # Build detail table
+    table_data = []
+    all_cats = top_cats + (['אחר'] if other_cats else [])
+    for cat in all_cats:
+        row_data = {'קטגוריה': cat}
+        for m in months_sorted:
+            if cat == 'אחר':
+                m_data = pivot[(pivot['קטגוריה'].isin(other_cats)) & (pivot['חודש'] == m)]
+                row_data[m] = round(m_data['אחוז'].sum(), 1)
+            else:
+                m_data = pivot[(pivot['קטגוריה'] == cat) & (pivot['חודש'] == m)]
+                row_data[m] = round(m_data['אחוז'].values[0], 1) if len(m_data) > 0 else 0
+        table_data.append(row_data)
+    detail_df = pd.DataFrame(table_data)
+
+    return fig, detail_df
+
+
 def compute_spending_pace(df):
     """Compare current month's spending pace to previous month."""
     from datetime import datetime
@@ -2369,6 +2448,41 @@ def _render_dashboard(df):
                         f'</div>'
                         f'<div style="font-weight:700;color:{T["red"]};font-size:0.95rem;direction:ltr">{total_str}</div>'
                         f'</div>', unsafe_allow_html=True)
+
+        # ── Category % by Month ──
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-label">📊 התפלגות קטגוריות לפי חודש (%)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin-bottom:0.5rem">כמה אחוז מסך ההוצאות של כל חודש הלך לכל קטגוריה</div>', unsafe_allow_html=True)
+
+        cat_pct_fig, cat_pct_table = chart_category_pct_by_month(df_f)
+        st.plotly_chart(cat_pct_fig, use_container_width=True, key="cat_pct_chart")
+
+        if not cat_pct_table.empty and len(cat_pct_table.columns) > 1:
+            st.markdown(f'<div class="section-label" style="font-size:0.85rem">📋 טבלת פירוט אחוזים</div>', unsafe_allow_html=True)
+            month_cols = [c for c in cat_pct_table.columns if c != 'קטגוריה']
+
+            # Build styled HTML table
+            tbl = f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem;direction:rtl">'
+            tbl += f'<thead><tr style="border-bottom:2px solid {T["border"]}">'
+            tbl += f'<th style="text-align:right;padding:8px 10px;color:{T["text1"]};font-weight:700">קטגוריה</th>'
+            for m in month_cols:
+                tbl += f'<th style="text-align:center;padding:8px 6px;color:{T["text1"]};font-weight:700">{m}</th>'
+            tbl += '</tr></thead><tbody>'
+
+            for _, row in cat_pct_table.iterrows():
+                cat = row['קטגוריה']
+                tbl += f'<tr style="border-bottom:1px solid {T["border"]}">'
+                tbl += f'<td style="padding:6px 10px;color:{T["text1"]};font-weight:600">{icon_for(cat)} {cat}</td>'
+                vals = [row[m] for m in month_cols]
+                max_val = max(vals) if vals else 0
+                for v in vals:
+                    intensity = v / max_val if max_val > 0 else 0
+                    bg = f'rgba(129,140,248,{intensity * 0.25})' if v > 0 else 'transparent'
+                    tbl += f'<td style="text-align:center;padding:6px;color:{T["text1"]};background:{bg};font-weight:500">{v:.1f}%</td>'
+                tbl += '</tr>'
+
+            tbl += '</tbody></table></div>'
+            st.markdown(tbl, unsafe_allow_html=True)
 
         # ── Category MoM Comparison ──
         mom_data = compute_category_mom(df_f)
