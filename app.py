@@ -1067,9 +1067,20 @@ def find_column(df, kws):
 
 def parse_dates(s):
     if s.empty: return pd.Series(dtype='datetime64[ns]')
+    # If already datetime dtype, return directly (no string conversion needed)
+    if pd.api.types.is_datetime64_any_dtype(s):
+        return pd.to_datetime(s, errors='coerce')
+    # Check if values are native datetime/Timestamp objects (common from Excel)
+    sample = s.dropna().head(5)
+    if len(sample) > 0:
+        from datetime import datetime as _dt
+        if all(isinstance(v, (pd.Timestamp, _dt)) for v in sample):
+            return pd.to_datetime(s, errors='coerce')
+    # String-based parsing with explicit formats
     cleaned = s.astype(str).str.strip()
     result = pd.Series([pd.NaT]*len(s), index=s.index)
-    for f in ['%d-%m-%Y','%d/%m/%Y','%Y-%m-%d','%d.%m.%Y','%Y/%m/%d','%m/%d/%Y']:
+    # %Y-%m-%d %H:%M:%S first — matches stringified Excel datetime objects
+    for f in ['%Y-%m-%d %H:%M:%S','%d-%m-%Y','%d/%m/%Y','%Y-%m-%d','%d.%m.%Y','%Y/%m/%d','%m/%d/%Y']:
         m = result.isna()
         if not m.any(): break
         try: result[m] = pd.to_datetime(cleaned[m], format=f, errors='coerce')
