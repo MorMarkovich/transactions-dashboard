@@ -2454,7 +2454,13 @@ def _render_dashboard(df):
         st.markdown(f'<div class="section-label">📊 התפלגות קטגוריות לפי חודש (%)</div>', unsafe_allow_html=True)
         st.markdown(f'<div style="color:{T["text2"]};font-size:0.8rem;margin-bottom:0.5rem">כמה אחוז מסך ההוצאות של כל חודש הלך לכל קטגוריה</div>', unsafe_allow_html=True)
 
-        cat_pct_fig, cat_pct_table = chart_category_pct_by_month(df_f)
+        # Month selector for this section
+        cat_pct_exp = df_f[df_f['סכום'] < 0]
+        cat_pct_months = cat_pct_exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist() if not cat_pct_exp.empty else []
+        cat_pct_selected = st.multiselect("בחר חודשים להשוואה", options=cat_pct_months, default=cat_pct_months, key="cat_pct_months")
+
+        cat_pct_data = df_f[df_f['חודש'].isin(cat_pct_selected)] if cat_pct_selected else df_f
+        cat_pct_fig, cat_pct_table = chart_category_pct_by_month(cat_pct_data)
         st.plotly_chart(cat_pct_fig, use_container_width=True, key="cat_pct_chart")
 
         if not cat_pct_table.empty and len(cat_pct_table.columns) > 1:
