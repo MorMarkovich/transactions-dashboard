@@ -731,13 +731,30 @@ def chart_weekday(df):
     if exp.empty:
         fig = go.Figure(); fig.add_annotation(text="אין נתונים", x=0.5, y=0.5, showarrow=False, font=dict(color=T['text3']))
         fig.update_layout(**plotly_layout(height=240)); return fig
-    d = exp.groupby('יום_בשבוע')['סכום_מוחלט'].sum().reset_index()
-    d['יום'] = d['יום_בשבוע'].apply(lambda x: days[x] if x < 7 else '')
-    purples = ['#c4b5fd','#a78bfa','#8b5cf6','#7c3aed','#6d28d9','#5b21b6','#4c1d95']
-    fig = go.Figure(go.Bar(x=d['יום'], y=d['סכום_מוחלט'],
-                           marker=dict(color=[purples[int(x)] for x in d['יום_בשבוע']], cornerradius=5),
-                           hovertemplate='<b>יום %{x}</b><br>₪%{y:,.0f}<extra></extra>'))
-    fig.update_layout(**plotly_layout(height=240, bargap=0.25))
+    months = exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    fig = go.Figure()
+    if len(months) > 1:
+        # Grouped bars: one bar per month within each weekday group
+        for i, month in enumerate(months):
+            m_exp = exp[exp['חודש'] == month]
+            d = m_exp.groupby('יום_בשבוע')['סכום_מוחלט'].sum().reindex(range(7), fill_value=0).reset_index()
+            d.columns = ['יום_בשבוע', 'סכום_מוחלט']
+            d['יום'] = d['יום_בשבוע'].apply(lambda x: days[x] if x < 7 else '')
+            fig.add_trace(go.Bar(x=d['יום'], y=d['סכום_מוחלט'], name=month,
+                                 marker=dict(color=CHART_COLORS[i % len(CHART_COLORS)], cornerradius=5),
+                                 hovertemplate=f'<b>{month}</b> · יום %{{x}}<br>₪%{{y:,.0f}}<extra></extra>'))
+        fig.update_layout(**plotly_layout(height=240, bargap=0.25, barmode='group',
+                          legend=dict(orientation='h', y=-0.2, x=0.5, xanchor='center',
+                                      font=dict(size=10, color=T['text2']))))
+    else:
+        # Single month: original style
+        d = exp.groupby('יום_בשבוע')['סכום_מוחלט'].sum().reset_index()
+        d['יום'] = d['יום_בשבוע'].apply(lambda x: days[x] if x < 7 else '')
+        purples = ['#c4b5fd','#a78bfa','#8b5cf6','#7c3aed','#6d28d9','#5b21b6','#4c1d95']
+        fig.add_trace(go.Bar(x=d['יום'], y=d['סכום_מוחלט'],
+                             marker=dict(color=[purples[int(x)] for x in d['יום_בשבוע']], cornerradius=5),
+                             hovertemplate='<b>יום %{x}</b><br>₪%{y:,.0f}<extra></extra>'))
+        fig.update_layout(**plotly_layout(height=240, bargap=0.25))
     return fig
 
 def chart_merchants(df, n=8):
@@ -745,14 +762,38 @@ def chart_merchants(df, n=8):
     if exp.empty:
         fig = go.Figure(); fig.add_annotation(text="אין נתונים", x=0.5, y=0.5, showarrow=False, font=dict(color=T['text3']))
         fig.update_layout(**plotly_layout(height=280)); return fig
-    m = exp.groupby('תיאור')['סכום_מוחלט'].sum().nlargest(n).reset_index().sort_values('סכום_מוחלט', ascending=True)
-    m['short'] = m['תיאור'].apply(lambda x: x[:25]+'...' if len(x) > 28 else x)
-    nb = len(m)
-    colors = [f'rgba(52,211,153,{0.35 + 0.65*i/max(nb-1,1)})' for i in range(nb)]
-    fig = go.Figure(go.Bar(x=m['סכום_מוחלט'], y=m['short'], orientation='h',
-                           marker=dict(color=colors, cornerradius=5),
-                           hovertemplate='<b>%{y}</b><br>₪%{x:,.0f}<extra></extra>'))
-    fig.update_layout(**plotly_layout(height=max(280, n*38), margin=dict(t=10, b=30, l=160, r=15)))
+    # Find top N merchants by total spending across all months
+    top_merchants = exp.groupby('תיאור')['סכום_מוחלט'].sum().nlargest(n).index.tolist()
+    exp_top = exp[exp['תיאור'].isin(top_merchants)]
+    months = exp_top.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    fig = go.Figure()
+    if len(months) > 1:
+        # Grouped horizontal bars: one bar per month within each merchant group
+        # Sort merchants by total ascending for horizontal layout
+        merchant_order = exp_top.groupby('תיאור')['סכום_מוחלט'].sum().sort_values(ascending=True).index.tolist()
+        short_names = {m: (m[:25]+'...' if len(m) > 28 else m) for m in merchant_order}
+        y_labels = [short_names[m] for m in merchant_order]
+        for i, month in enumerate(months):
+            m_exp = exp_top[exp_top['חודש'] == month]
+            m_totals = m_exp.groupby('תיאור')['סכום_מוחלט'].sum()
+            values = [m_totals.get(merchant, 0) for merchant in merchant_order]
+            fig.add_trace(go.Bar(x=values, y=y_labels, orientation='h', name=month,
+                                 marker=dict(color=CHART_COLORS[i % len(CHART_COLORS)], cornerradius=5),
+                                 hovertemplate=f'<b>{month}</b> · %{{y}}<br>₪%{{x:,.0f}}<extra></extra>'))
+        fig.update_layout(**plotly_layout(height=max(280, n*50), barmode='group',
+                          margin=dict(t=10, b=40, l=160, r=15),
+                          legend=dict(orientation='h', y=-0.15, x=0.5, xanchor='center',
+                                      font=dict(size=10, color=T['text2']))))
+    else:
+        # Single month: original style
+        m = exp_top.groupby('תיאור')['סכום_מוחלט'].sum().reset_index().sort_values('סכום_מוחלט', ascending=True)
+        m['short'] = m['תיאור'].apply(lambda x: x[:25]+'...' if len(x) > 28 else x)
+        nb = len(m)
+        colors = [f'rgba(52,211,153,{0.35 + 0.65*i/max(nb-1,1)})' for i in range(nb)]
+        fig.add_trace(go.Bar(x=m['סכום_מוחלט'], y=m['short'], orientation='h',
+                             marker=dict(color=colors, cornerradius=5),
+                             hovertemplate='<b>%{y}</b><br>₪%{x:,.0f}<extra></extra>'))
+        fig.update_layout(**plotly_layout(height=max(280, n*38), margin=dict(t=10, b=30, l=160, r=15)))
     return fig
 
 def chart_trend(df):
@@ -1406,14 +1447,16 @@ def _render_dashboard(df):
     """Render the main dashboard (filters, KPIs, tabs)."""
     # Filters
     st.markdown(f'<div class="section-label">🔍 סינון</div>', unsafe_allow_html=True)
+    # Build chronologically sorted month list from transaction dates
+    month_order = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist()
     c1, c2, c3 = st.columns(3)
-    with c1: dates = st.date_input("טווח תאריכים", [df['תאריך'].min(), df['תאריך'].max()])
+    with c1: selected_months = st.multiselect("בחר חודשים להשוואה", options=month_order, default=month_order)
     with c2: cat_f = st.selectbox("קטגוריה", ['הכל'] + sorted(df['קטגוריה'].unique().tolist()))
     with c3: search = st.text_input("חיפוש בית עסק", placeholder="הקלד...")
 
     df_f = df.copy()
-    if len(dates) == 2:
-        df_f = df_f[(df_f['תאריך'].dt.date >= dates[0]) & (df_f['תאריך'].dt.date <= dates[1])]
+    if selected_months:
+        df_f = df_f[df_f['חודש'].isin(selected_months)]
     if cat_f != 'הכל': df_f = df_f[df_f['קטגוריה'] == cat_f]
     if search: df_f = df_f[df_f['תיאור'].str.contains(search, case=False, na=False)]
 
@@ -1603,29 +1646,6 @@ def _render_dashboard(df):
                 </div>
                 <div class="cat-stats"><div class="cat-amount">{fmt(avg_tx)}</div></div>
             </div>''', unsafe_allow_html=True)
-
-            # Spending heatmap by category & month
-            st.markdown(f'<div class="section-label">🗓️ מפת חום: קטגוריות x חודשים</div>', unsafe_allow_html=True)
-            heatmap_data = exp.groupby(['קטגוריה','חודש'])['סכום_מוחלט'].sum().reset_index()
-            if not heatmap_data.empty:
-                pivot = heatmap_data.pivot_table(index='קטגוריה', columns='חודש', values='סכום_מוחלט', fill_value=0)
-                # Sort by total
-                pivot['_total'] = pivot.sum(axis=1)
-                pivot = pivot.sort_values('_total', ascending=False).drop('_total', axis=1).head(8)
-                fig_heat = go.Figure(go.Heatmap(
-                    z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
-                    colorscale=[[0,'#0c111d'],[0.5,'#818cf8'],[1,'#c084fc']],
-                    hovertemplate='<b>%{y}</b><br>%{x}<br>₪%{z:,.0f}<extra></extra>',
-                    showscale=False,
-                ))
-                fig_heat.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    margin=dict(t=10, b=40, l=120, r=10), height=max(250, len(pivot)*35),
-                    font=dict(family='Heebo', color=T['text2']),
-                    xaxis=dict(tickfont=dict(color=T['text2'], size=10), side='bottom'),
-                    yaxis=dict(tickfont=dict(color=T['text1'], size=11), autorange='reversed'),
-                )
-                st.plotly_chart(fig_heat, use_container_width=True, key="heatmap")
 
             # Large transactions alert
             threshold = exp['סכום_מוחלט'].quantile(0.9)
