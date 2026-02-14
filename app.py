@@ -70,6 +70,7 @@ CHART_COLORS = ['#818cf8', '#34d399', '#f87171', '#38bdf8', '#fbbf24', '#a78bfa'
 # =============================================================================
 # CSS
 # =============================================================================
+st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">', unsafe_allow_html=True)
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
@@ -388,12 +389,165 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 .kpi:hover {{ transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.15); }}
 .cat-card:hover {{ transform: translateX(-3px); }}
 
-/* === Responsive tweaks === */
+/* === Responsive – Tablet (768px) === */
 @media(max-width:768px) {{
     .kpi-row {{ grid-template-columns: repeat(2,1fr) !important; gap: 0.75rem !important; }}
     .kpi-val {{ font-size: 1.3rem !important; }}
+    .kpi {{ padding: 1rem 0.75rem !important; }}
     .feat-row {{ grid-template-columns: 1fr !important; }}
-    section[data-testid="stSidebar"] {{ min-width: 240px !important; max-width: 260px !important; }}
+    .feat {{ padding: 1.25rem 1rem !important; }}
+    .feat-icon {{ font-size: 1.5rem !important; }}
+    .flow-row {{ gap: 0.75rem !important; }}
+    .flow-card {{ padding: 1.1rem 1rem !important; }}
+    .flow-val {{ font-size: 1.5rem !important; }}
+    .flow-icon {{ width: 42px !important; height: 42px !important; font-size: 1.3rem !important; }}
+    .mom-grid {{ grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }}
+    .compare-summary {{ grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; }}
+    .compare-card {{ padding: 1rem !important; border-radius: 14px !important; }}
+    .compare-month {{ font-size: 1rem !important; }}
+    .compare-stat {{ gap: 0.75rem !important; }}
+    .dash-title {{ font-size: 1.35rem !important; }}
+    .section-label {{ font-size: 0.88rem !important; }}
+    .insight-highlight {{ padding: 1rem !important; }}
+    .pace-container {{ padding: 0.75rem 1rem !important; }}
+    .section-divider {{ margin: 1.25rem 0 !important; }}
+    div[data-testid="stPlotlyChart"] {{ padding: 0.6rem !important; border-radius: 12px !important; }}
+
+    /* Sidebar: full-width overlay on tablet */
+    section[data-testid="stSidebar"] {{
+        min-width: 260px !important; max-width: 280px !important;
+    }}
+
+    /* Tabs: scroll horizontally */
+    .stTabs [data-baseweb="tab-list"] {{
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 3px !important;
+    }}
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar {{ display: none; }}
+    .stTabs [data-baseweb="tab"] {{ white-space: nowrap !important; font-size: 0.8rem !important; padding: 0.45rem 0.7rem !important; }}
+}}
+
+/* === Responsive – Phone (480px) === */
+@media(max-width:480px) {{
+    /* Sidebar: full screen overlay on phone */
+    section[data-testid="stSidebar"] {{
+        min-width: 100vw !important; max-width: 100vw !important; width: 100vw !important;
+    }}
+    section[data-testid="stSidebar"] > div {{
+        padding: 1rem 0.75rem 2rem !important;
+    }}
+
+    /* Typography */
+    .dash-title {{ font-size: 1.15rem !important; }}
+    .dash-subtitle {{ font-size: 0.8rem !important; }}
+    .section-label {{ font-size: 0.82rem !important; margin: 0.5rem 0 0.6rem !important; padding-bottom: 0.4rem !important; }}
+
+    /* KPI cards */
+    .kpi-row {{ grid-template-columns: repeat(2,1fr) !important; gap: 0.5rem !important; margin: 0.75rem 0 !important; }}
+    .kpi {{ padding: 0.75rem 0.5rem !important; border-radius: 12px !important; }}
+    .kpi-val {{ font-size: 1.1rem !important; }}
+    .kpi-label {{ font-size: 0.68rem !important; }}
+    .kpi-icon {{ width: 38px !important; height: 38px !important; font-size: 1.2rem !important; margin-bottom: 8px !important; border-radius: 10px !important; }}
+
+    /* Category cards */
+    .cat-card {{ padding: 0.65rem 0.8rem !important; }}
+    .cat-icon {{ width: 34px !important; height: 34px !important; font-size: 1rem !important; }}
+    .cat-name {{ font-size: 0.78rem !important; }}
+    .cat-amount {{ font-size: 0.8rem !important; }}
+
+    /* Feature cards (empty state) */
+    .feat {{ padding: 1rem 0.75rem !important; border-radius: 12px !important; }}
+    .feat-icon {{ font-size: 1.3rem !important; margin-bottom: 0.5rem !important; }}
+    .feat-title {{ font-size: 0.88rem !important; }}
+    .feat-desc {{ font-size: 0.75rem !important; }}
+
+    /* Flow cards */
+    .flow-row {{ gap: 0.5rem !important; margin: 0.75rem 0 !important; }}
+    .flow-card {{ padding: 0.9rem 0.75rem !important; border-radius: 14px !important; }}
+    .flow-val {{ font-size: 1.25rem !important; }}
+    .flow-label {{ font-size: 0.75rem !important; }}
+    .flow-icon {{ width: 38px !important; height: 38px !important; font-size: 1.2rem !important; margin-bottom: 0.6rem !important; }}
+    .flow-mini {{ font-size: 0.7rem !important; margin-top: 0.5rem !important; padding-top: 0.5rem !important; }}
+
+    /* MoM cards */
+    .mom-grid {{ grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)) !important; gap: 0.5rem !important; }}
+    .mom-card {{ padding: 0.7rem 0.5rem !important; border-radius: 10px !important; }}
+    .mom-arrow {{ font-size: 1.2rem !important; }}
+
+    /* Compare cards */
+    .compare-card {{ border-radius: 12px !important; padding: 0.85rem !important; }}
+    .compare-month {{ font-size: 0.95rem !important; }}
+    .compare-stat {{ gap: 0.5rem !important; flex-wrap: wrap !important; }}
+    .compare-stat-val {{ font-size: 0.88rem !important; }}
+    .compare-stat-label {{ font-size: 0.6rem !important; }}
+    .compare-summary {{ grid-template-columns: repeat(2, 1fr) !important; gap: 0.5rem !important; }}
+    .compare-summary-card {{ padding: 0.7rem !important; }}
+
+    /* Diff badges */
+    .diff-badge {{ font-size: 0.7rem !important; padding: 0.2rem 0.5rem !important; }}
+
+    /* Recurring cards */
+    .recurring-card {{ padding: 0.7rem 0.8rem !important; gap: 0.6rem !important; }}
+
+    /* Charts */
+    div[data-testid="stPlotlyChart"] {{ padding: 0.4rem !important; border-radius: 10px !important; margin-bottom: 0.5rem !important; }}
+
+    /* Alerts */
+    .alert {{ padding: 0.7rem 0.9rem !important; gap: 0.6rem !important; border-radius: 10px !important; }}
+    .alert-icon {{ font-size: 1rem !important; }}
+    .alert-text {{ font-size: 0.8rem !important; }}
+    .alert-sub {{ font-size: 0.7rem !important; }}
+
+    /* Insight highlights */
+    .insight-highlight {{ padding: 0.85rem !important; border-radius: 14px !important; }}
+
+    /* Gauge */
+    .gauge-ring {{ width: 110px !important; height: 110px !important; }}
+    .gauge-inner {{ width: 85px !important; height: 85px !important; }}
+    .gauge-container {{ padding: 0.75rem !important; }}
+
+    /* Pace */
+    .pace-container {{ padding: 0.6rem 0.75rem !important; }}
+
+    /* Section divider */
+    .section-divider {{ margin: 1rem 0 !important; }}
+
+    /* Tabs: compact */
+    .stTabs [data-baseweb="tab"] {{ padding: 0.4rem 0.55rem !important; font-size: 0.73rem !important; }}
+    .stTabs [data-baseweb="tab-list"] {{ border-radius: 10px !important; }}
+
+    /* Buttons */
+    .stButton > button {{ padding: 0.45rem 1rem !important; font-size: 0.82rem !important; border-radius: 8px !important; }}
+
+    /* Form controls */
+    [data-baseweb="select"] > div {{ border-radius: 8px !important; }}
+}}
+
+/* === Very small phones (360px) === */
+@media(max-width:360px) {{
+    .kpi-row {{ grid-template-columns: 1fr !important; }}
+    .mom-grid {{ grid-template-columns: repeat(2, 1fr) !important; }}
+    .compare-summary {{ grid-template-columns: 1fr !important; }}
+    .flow-row {{ grid-template-columns: 1fr !important; }}
+    .dash-title {{ font-size: 1rem !important; }}
+}}
+
+/* === Touch-friendly improvements === */
+@media(hover: none) and (pointer: coarse) {{
+    /* Disable hover transforms on touch devices (causes sticky hover) */
+    .kpi:hover, .cat-card:hover, .feat:hover, .flow-card:hover,
+    .mom-card:hover, .compare-card:hover, .recurring-card:hover {{
+        transform: none !important;
+    }}
+    /* Larger tap targets */
+    .stTabs [data-baseweb="tab"] {{ min-height: 44px !important; }}
+    .stButton > button {{ min-height: 44px !important; }}
+    [data-baseweb="select"] > div {{ min-height: 44px !important; }}
+    [data-testid="stTextInput"] input {{ min-height: 44px !important; }}
+    /* Smooth scrolling */
+    html {{ -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }}
 }}
 
 /* === Glassmorphism Compare Cards === */
@@ -891,16 +1045,17 @@ def fmt(v):
 def icon_for(cat): return CATEGORY_ICONS.get(cat, '📋')
 
 def plotly_layout(**kw):
-    """Base layout for all charts -- optimized for speed and dark/light theme."""
+    """Base layout for all charts -- optimized for speed, dark/light theme, and mobile."""
     base = dict(
         paper_bgcolor=T['chart_bg'], plot_bgcolor=T['chart_bg'],
         font=dict(family='Heebo', color=T['text2'], size=12),
-        margin=dict(t=16, b=36, l=48, r=16),
+        margin=dict(t=16, b=36, l=40, r=12),
         hoverlabel=dict(bgcolor=T['surface'], font_size=12, font_family='Heebo', bordercolor=T['border_h']),
         xaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=False, zeroline=False),
         yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=True, zeroline=False, gridwidth=1),
-        dragmode=False,  # Disable drag for faster interaction
+        dragmode=False,
         modebar_remove=['zoom','pan','select','lasso','zoomIn','zoomOut','autoScale','resetScale'],
+        autosize=True,
     )
     base.update(kw)
     return base
@@ -1268,16 +1423,16 @@ def render_donut(df):
     # Render donut circle
     donut_html = (
         '<div style="display:flex;flex-direction:column;align-items:center;padding:0.5rem 0">'
-        '<div style="position:relative;width:200px;height:200px;margin-bottom:1.25rem">'
-        '<div style="width:200px;height:200px;border-radius:50%;'
+        '<div style="position:relative;width:min(200px,50vw);height:min(200px,50vw);margin-bottom:1.25rem">'
+        '<div style="width:min(200px,50vw);height:min(200px,50vw);border-radius:50%;'
         f'background:conic-gradient({gradient});'
         'display:flex;align-items:center;justify-content:center">'
-        f'<div style="width:130px;height:130px;border-radius:50%;background:{T["surface"]};'
+        f'<div style="width:65%;height:65%;border-radius:50%;background:{T["surface"]};'
         'display:flex;flex-direction:column;align-items:center;justify-content:center;'
         'box-shadow:0 0 20px rgba(0,0,0,0.15)">'
-        f'<div style="font-size:1.25rem;font-weight:800;color:{T["text1"]};direction:ltr">'
+        f'<div style="font-size:clamp(0.9rem,3vw,1.25rem);font-weight:800;color:{T["text1"]};direction:ltr">'
         f'₪{total:,.0f}</div>'
-        f'<div style="font-size:0.72rem;color:{T["text3"]};margin-top:2px">סה״כ הוצאות</div>'
+        f'<div style="font-size:clamp(0.6rem,2vw,0.72rem);color:{T["text3"]};margin-top:2px">סה״כ הוצאות</div>'
         '</div></div></div></div>'
     )
     st.markdown(donut_html, unsafe_allow_html=True)
@@ -2357,8 +2512,8 @@ def _render_dashboard(df):
 
                 st.markdown(f'''<div class="compare-card" style="margin-bottom:0.5rem">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
-                        <div style="font-weight:800;font-size:1.05rem;color:{T['text1']};min-width:70px">{m}</div>
-                        <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
+                        <div style="font-weight:800;font-size:clamp(0.88rem,3vw,1.05rem);color:{T['text1']};min-width:60px">{m}</div>
+                        <div style="display:flex;gap:clamp(0.5rem,2vw,1.5rem);align-items:center;flex-wrap:wrap">
                             <div style="text-align:center">
                                 <div style="font-size:0.65rem;color:{T['text3']};text-transform:uppercase;letter-spacing:0.5px">הכנסות</div>
                                 <div style="font-weight:700;color:{T['green']};direction:ltr">{fmt(m_income)}</div>
@@ -2886,6 +3041,9 @@ def render_auth_page():
     button[aria-label="Collapse sidebar"],
     button[aria-label="Expand sidebar"] {{ display: none !important; }}
     [data-testid="stAppViewBlockContainer"] {{ max-width: 900px !important; margin: 0 auto !important; padding-top: 2rem !important; }}
+    @media(max-width:480px) {{
+        [data-testid="stAppViewBlockContainer"] {{ padding: 0.75rem !important; padding-top: 1rem !important; }}
+    }}
     [data-testid="stTextInput"] {{ margin-bottom: 0.2rem; }}
     [data-testid="stTextInput"] input {{
         background: {T['surface2']} !important; border: 1.5px solid {T['border']} !important;
@@ -2910,11 +3068,11 @@ def render_auth_page():
     with col_brand:
         st.markdown(f'''
         <div style="display:flex;flex-direction:column;justify-content:center;height:100%;padding:2rem 1rem">
-            <div style="width:56px;height:56px;background:linear-gradient(135deg,#818cf8,#6d28d9);
+            <div style="width:clamp(42px,12vw,56px);height:clamp(42px,12vw,56px);background:linear-gradient(135deg,#818cf8,#6d28d9);
                 border-radius:16px;display:flex;align-items:center;justify-content:center;
-                font-size:1.6rem;box-shadow:0 6px 24px rgba(129,140,248,0.2);margin-bottom:1.25rem">💳</div>
-            <div style="font-size:1.5rem;font-weight:800;color:{T['text1']};margin-bottom:0.4rem">מנתח עסקאות</div>
-            <div style="color:{T['text2']};font-size:0.88rem;line-height:1.6;margin-bottom:1.5rem">ניתוח חכם של הוצאות כרטיס האשראי שלך. העלה קובץ, קבל תובנות.</div>
+                font-size:clamp(1.2rem,4vw,1.6rem);box-shadow:0 6px 24px rgba(129,140,248,0.2);margin-bottom:1.25rem">💳</div>
+            <div style="font-size:clamp(1.1rem,4vw,1.5rem);font-weight:800;color:{T['text1']};margin-bottom:0.4rem">מנתח עסקאות</div>
+            <div style="color:{T['text2']};font-size:clamp(0.78rem,2.5vw,0.88rem);line-height:1.6;margin-bottom:1.5rem">ניתוח חכם של הוצאות כרטיס האשראי שלך. העלה קובץ, קבל תובנות.</div>
             <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:0.4rem"><span style="font-size:1rem">🔒</span><span style="font-size:0.78rem;color:{T['text3']}">מאובטח</span></div>
                 <div style="display:flex;align-items:center;gap:0.4rem"><span style="font-size:1rem">☁️</span><span style="font-size:0.78rem;color:{T['text3']}">שמירה בענן</span></div>
