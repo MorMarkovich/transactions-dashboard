@@ -395,6 +395,213 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
     section[data-testid="stSidebar"] {{ min-width: 240px !important; max-width: 260px !important; }}
 }}
 
+/* === Glassmorphism Compare Cards === */
+.compare-card {{
+    background: {T['surface']}cc;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid {T['border']};
+    border-radius: 18px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    margin-bottom: 0.75rem;
+}}
+.compare-card::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, {T['accent']}, #a78bfa, {T['accent']});
+    background-size: 200% 100%;
+    animation: gradientShift 3s ease infinite;
+}}
+.compare-card:hover {{
+    border-color: {T['accent']}40;
+    box-shadow: 0 8px 32px rgba(129,140,248,0.12);
+    transform: translateY(-2px);
+}}
+.compare-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0;
+}}
+.compare-month {{
+    font-size: 1.15rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, {T['accent']}, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}}
+.compare-stat {{
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+}}
+.compare-stat-item {{
+    text-align: center;
+}}
+.compare-stat-val {{
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: {T['text1']};
+    direction: ltr;
+}}
+.compare-stat-label {{
+    font-size: 0.68rem;
+    color: {T['text3']};
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}}
+
+/* === Diff Badges === */
+.diff-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.3rem 0.75rem;
+    border-radius: 99px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    direction: ltr;
+}}
+.diff-badge.up {{
+    background: {T['red_bg']};
+    color: {T['red']};
+}}
+.diff-badge.down {{
+    background: {T['green_bg']};
+    color: {T['green']};
+}}
+.diff-badge.neutral {{
+    background: {T['surface2']};
+    color: {T['text3']};
+}}
+
+/* === Recurring Payment Cards === */
+.recurring-card {{
+    background: {T['surface']}cc;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid {T['border']};
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    overflow: hidden;
+}}
+.recurring-card::after {{
+    content: '\U0001f504';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 0.65rem;
+    opacity: 0.4;
+}}
+.recurring-card:hover {{
+    border-color: {T['accent']}40;
+    background: {T['surface2']}cc;
+    transform: translateX(-3px);
+}}
+
+/* === Category MoM Cards === */
+.mom-card {{
+    background: {T['surface']};
+    border: 1px solid {T['border']};
+    border-radius: 14px;
+    padding: 1rem;
+    text-align: center;
+    transition: all 0.2s;
+}}
+.mom-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}}
+.mom-arrow {{
+    font-size: 1.5rem;
+    margin: 0.25rem 0;
+}}
+.mom-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}}
+
+/* === Spending Pace Bar === */
+.pace-container {{
+    background: {T['surface']};
+    border: 1px solid {T['border']};
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}}
+.pace-bar-bg {{
+    height: 12px;
+    background: {T['surface2']};
+    border-radius: 99px;
+    overflow: hidden;
+    position: relative;
+    margin: 0.75rem 0 0.5rem;
+}}
+.pace-bar {{
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}}
+.pace-marker {{
+    position: absolute;
+    top: -6px;
+    width: 3px;
+    height: 24px;
+    background: {T['text1']};
+    border-radius: 2px;
+    opacity: 0.6;
+}}
+
+/* === Comparison Summary === */
+.compare-summary {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}}
+.compare-summary-card {{
+    background: {T['surface']}cc;
+    backdrop-filter: blur(10px);
+    border: 1px solid {T['border']};
+    border-radius: 14px;
+    padding: 1rem;
+    text-align: center;
+}}
+
+/* === Section Dividers Enhanced === */
+.section-divider {{
+    height: 1px;
+    background: linear-gradient(90deg, transparent, {T['border_h']}, transparent);
+    margin: 1.75rem 0;
+}}
+
+/* === Gradient Animated Border Keyframe === */
+@keyframes gradientShift {{
+    0% {{ background-position: 0% 50%; }}
+    50% {{ background-position: 100% 50%; }}
+    100% {{ background-position: 0% 50%; }}
+}}
+
+/* === Enhanced KPI Glow === */
+.kpi:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 20px rgba(129,140,248,0.08);
+}}
+
 /* === Print === */
 @media print {{ section[data-testid="stSidebar"] {{ display: none !important; }} }}
 </style>
@@ -512,6 +719,105 @@ def plotly_layout(**kw):
     )
     base.update(kw)
     return base
+
+# =============================================================================
+# Smart Analysis Functions
+# =============================================================================
+def detect_recurring_payments(df):
+    """Detect merchants that appear across 2+ months with consistent amounts."""
+    exp = df[df['סכום'] < 0].copy()
+    if exp.empty or exp['חודש'].nunique() < 2:
+        return pd.DataFrame()
+    merchant_months = exp.groupby(['תיאור', 'חודש']).agg(
+        monthly_total=('סכום_מוחלט', 'sum'),
+        count=('סכום_מוחלט', 'count')
+    ).reset_index()
+    merchant_month_counts = merchant_months.groupby('תיאור')['חודש'].nunique()
+    recurring_merchants = merchant_month_counts[merchant_month_counts >= 2].index
+    if len(recurring_merchants) == 0:
+        return pd.DataFrame()
+    results = []
+    for merchant in recurring_merchants:
+        m_data = merchant_months[merchant_months['תיאור'] == merchant]
+        amounts = m_data['monthly_total'].values
+        avg = amounts.mean()
+        std = amounts.std() if len(amounts) > 1 else 0
+        if avg > 0 and (std / avg) < 0.20:
+            results.append({
+                'merchant': merchant,
+                'avg_amount': avg,
+                'frequency': len(amounts),
+                'std_pct': (std / avg * 100) if avg > 0 else 0,
+                'months_list': ', '.join(m_data['חודש'].tolist()),
+                'total': amounts.sum(),
+            })
+    if not results:
+        return pd.DataFrame()
+    return pd.DataFrame(results).sort_values('avg_amount', ascending=False)
+
+def compute_category_mom(df):
+    """Compute month-over-month change per category for the 2 most recent months."""
+    exp = df[df['סכום'] < 0].copy()
+    if exp.empty:
+        return []
+    months_sorted = exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    if len(months_sorted) < 2:
+        return []
+    prev_month = months_sorted[-2]
+    curr_month = months_sorted[-1]
+    prev_data = exp[exp['חודש'] == prev_month].groupby('קטגוריה')['סכום_מוחלט'].sum()
+    curr_data = exp[exp['חודש'] == curr_month].groupby('קטגוריה')['סכום_מוחלט'].sum()
+    all_cats = set(prev_data.index) | set(curr_data.index)
+    results = []
+    for cat in all_cats:
+        prev_val = prev_data.get(cat, 0)
+        curr_val = curr_data.get(cat, 0)
+        if prev_val > 0:
+            change_pct = ((curr_val - prev_val) / prev_val) * 100
+        elif curr_val > 0:
+            change_pct = 100.0
+        else:
+            change_pct = 0
+        direction = 'up' if change_pct > 5 else 'down' if change_pct < -5 else 'neutral'
+        results.append({
+            'category': cat, 'prev_amount': prev_val, 'curr_amount': curr_val,
+            'change_pct': change_pct, 'direction': direction,
+            'prev_month': prev_month, 'curr_month': curr_month,
+        })
+    return sorted(results, key=lambda x: abs(x['change_pct']), reverse=True)
+
+def compute_spending_pace(df):
+    """Compare current month's spending pace to previous month."""
+    from datetime import datetime
+    exp = df[df['סכום'] < 0].copy()
+    if exp.empty:
+        return None
+    today = datetime.now()
+    current_month_str = today.strftime('%m/%Y')
+    day_of_month = today.day
+    if current_month_str not in exp['חודש'].values:
+        return None
+    months_sorted = exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    if len(months_sorted) < 2:
+        return None
+    curr_idx = list(months_sorted).index(current_month_str) if current_month_str in months_sorted else -1
+    if curr_idx <= 0:
+        return None
+    prev_month_str = months_sorted[curr_idx - 1]
+    curr_exp = exp[exp['חודש'] == current_month_str]
+    curr_total = curr_exp['סכום_מוחלט'].sum()
+    prev_exp = exp[exp['חודש'] == prev_month_str]
+    prev_total = prev_exp['סכום_מוחלט'].sum()
+    prev_by_today = prev_exp[prev_exp['תאריך'].dt.day <= day_of_month]['סכום_מוחלט'].sum()
+    projected = (curr_total / day_of_month) * 30 if day_of_month > 0 else 0
+    pace_vs_prev = ((curr_total / max(prev_by_today, 1)) - 1) * 100 if prev_by_today > 0 else 0
+    return {
+        'current_total': curr_total, 'prev_total': prev_total,
+        'prev_by_today': prev_by_today, 'projected': projected,
+        'pace_pct': pace_vs_prev, 'day_of_month': day_of_month,
+        'current_month': current_month_str, 'prev_month': prev_month_str,
+        'progress_pct': min((day_of_month / 30) * 100, 100),
+    }
 
 # =============================================================================
 # Data Functions
@@ -1478,6 +1784,43 @@ def _render_dashboard(df):
     # TAB 0: Overview
     # ══════════════════════════════════════════════
     with tabs[0]:
+        # ── Spending Pace Indicator ──
+        pace = compute_spending_pace(df_f)
+        if pace:
+            pace_color = T['red'] if pace['pace_pct'] > 10 else T['green'] if pace['pace_pct'] < -10 else T['amber']
+            pace_arrow = '↑' if pace['pace_pct'] > 0 else '↓' if pace['pace_pct'] < 0 else '―'
+            pace_word = 'מהיר מ' if pace['pace_pct'] > 0 else 'איטי מ' if pace['pace_pct'] < 0 else 'זהה ל'
+            projected_color = T['red'] if pace['projected'] > pace['prev_total'] else T['green']
+
+            st.markdown(f'''<div class="pace-container">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-weight:700;color:{T['text1']};font-size:0.95rem">⏱️ קצב הוצאות - {pace['current_month']}</div>
+                        <div style="color:{T['text2']};font-size:0.8rem;margin-top:2px">
+                            יום {pace['day_of_month']} בחודש &bull;
+                            {pace_word}חודש קודם ({pace['prev_month']})
+                        </div>
+                    </div>
+                    <div style="text-align:left">
+                        <span class="diff-badge {'up' if pace['pace_pct'] > 10 else 'down' if pace['pace_pct'] < -10 else 'neutral'}">
+                            {pace_arrow} {abs(pace['pace_pct']):.0f}%
+                        </span>
+                    </div>
+                </div>
+                <div class="pace-bar-bg">
+                    <div class="pace-bar" style="width:{min(pace['progress_pct'], 100):.0f}%;background:{pace_color}"></div>
+                    <div class="pace-marker" style="left:{min((pace['prev_by_today'] / max(pace['prev_total'], 1)) * 100, 100):.0f}%"
+                         title="חודש קודם בנקודה זו"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:{T['text3']}">
+                    <div>הוצאות עד כה: <span style="color:{T['text1']};font-weight:600;direction:ltr">₪{pace['current_total']:,.0f}</span></div>
+                    <div>צפי חודשי: <span style="color:{projected_color};font-weight:600;direction:ltr">₪{pace['projected']:,.0f}</span></div>
+                </div>
+                <div style="font-size:0.72rem;color:{T['text3']};margin-top:4px;text-align:center">
+                    חודש קודם סה״כ: ₪{pace['prev_total']:,.0f} &bull; בנקודה זו: ₪{pace['prev_by_today']:,.0f}
+                </div>
+            </div>''', unsafe_allow_html=True)
+
         c1, c2 = st.columns([3, 2])
         with c1:
             st.markdown(f'<div class="section-label">📅 הוצאות חודשיות</div>', unsafe_allow_html=True)
@@ -1552,6 +1895,47 @@ def _render_dashboard(df):
                         f'</div>'
                         f'<div style="font-weight:700;color:{T["red"]};font-size:0.95rem;direction:ltr">{total_str}</div>'
                         f'</div>', unsafe_allow_html=True)
+
+        # ── Category MoM Comparison ──
+        mom_data = compute_category_mom(df_f)
+        if mom_data:
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">🏷️ שינוי בקטגוריות חודש-על-חודש</div>', unsafe_allow_html=True)
+
+            prev_m = mom_data[0]['prev_month']
+            curr_m = mom_data[0]['curr_month']
+            st.markdown(
+                f'<div style="color:{T["text2"]};font-size:0.82rem;margin-bottom:0.75rem">'
+                f'השוואה: {prev_m} ← {curr_m}'
+                f'</div>', unsafe_allow_html=True)
+
+            grid_html = '<div class="mom-grid">'
+            for item in mom_data:
+                cat = item['category']
+                icon = icon_for(cat)
+                prev_val = item['prev_amount']
+                curr_val = item['curr_amount']
+                change = item['change_pct']
+                direction = item['direction']
+
+                if direction == 'up':
+                    arrow = '↑'; color = T['red']; bg_tint = T['red'] + '11'
+                elif direction == 'down':
+                    arrow = '↓'; color = T['green']; bg_tint = T['green'] + '11'
+                else:
+                    arrow = '―'; color = T['text3']; bg_tint = T['surface2']
+
+                grid_html += f'''<div class="mom-card" style="border-color:{color}33">
+                    <div style="font-size:1.3rem">{icon}</div>
+                    <div style="font-size:0.78rem;font-weight:600;color:{T['text1']}">{cat}</div>
+                    <div class="mom-arrow" style="color:{color}">{arrow}</div>
+                    <div style="font-size:0.85rem;font-weight:700;color:{color};direction:ltr">{abs(change):.0f}%</div>
+                    <div style="display:flex;justify-content:space-around;margin-top:6px;font-size:0.7rem;color:{T['text3']};direction:ltr">
+                        <span>₪{prev_val:,.0f}</span><span>→</span><span>₪{curr_val:,.0f}</span>
+                    </div>
+                </div>'''
+            grid_html += '</div>'
+            st.markdown(grid_html, unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
     # TAB 2: Merchants - Enhanced
@@ -1663,32 +2047,201 @@ def _render_dashboard(df):
                         f'<div style="font-weight:700;color:{T["red"]};font-size:0.9rem;direction:ltr;min-width:70px;text-align:left">{amount_str}</div>'
                         f'</div>', unsafe_allow_html=True)
 
+            # ── Recurring Payments Detection ──
+            st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">🔄 תשלומים חוזרים (מנויים)</div>', unsafe_allow_html=True)
+
+            recurring = detect_recurring_payments(df_f)
+            if not recurring.empty:
+                st.markdown(
+                    f'<div style="color:{T["text2"]};font-size:0.82rem;margin-bottom:0.75rem">'
+                    f'זוהו {len(recurring)} תשלומים חוזרים עם סכום עקבי לאורך חודשים'
+                    f'</div>', unsafe_allow_html=True)
+
+                for _, rrow in recurring.iterrows():
+                    merchant_name = str(rrow['merchant'])[:35]
+                    avg_str = fmt(rrow['avg_amount'])
+                    freq = int(rrow['frequency'])
+                    consistency = 100 - rrow['std_pct']
+                    total_str = fmt(rrow['total'])
+                    months_str = rrow['months_list']
+
+                    st.markdown(f'''<div class="recurring-card">
+                        <div class="cat-icon" style="background:{T['accent']}22;color:{T['accent']}">💳</div>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:600;color:{T['text1']};font-size:0.88rem">{merchant_name}</div>
+                            <div style="color:{T['text3']};font-size:0.75rem;margin-top:2px">
+                                {freq} חודשים &bull; עקביות {consistency:.0f}%
+                            </div>
+                            <div style="color:{T['text3']};font-size:0.7rem;margin-top:2px;direction:ltr">{months_str}</div>
+                        </div>
+                        <div style="text-align:left;flex-shrink:0">
+                            <div style="font-weight:700;color:{T['accent']};font-size:1rem;direction:ltr">{avg_str}</div>
+                            <div style="font-size:0.7rem;color:{T['text3']}">ממוצע/חודש</div>
+                        </div>
+                    </div>''', unsafe_allow_html=True)
+
+                total_recurring = recurring['avg_amount'].sum()
+                st.markdown(f'''
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;
+                    background:{T['accent']}11;border:1px solid {T['accent']}33;border-radius:10px;margin-top:0.5rem">
+                    <div style="color:{T['text1']};font-weight:600;font-size:0.9rem">סה״כ תשלומים חוזרים (חודשי)</div>
+                    <div style="color:{T['accent']};font-weight:700;font-size:1.1rem;direction:ltr">₪{total_recurring:,.0f}</div>
+                </div>''', unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    f'<div style="text-align:center;padding:1.5rem;color:{T["text3"]}">'
+                    f'<div style="font-size:1.5rem;margin-bottom:0.5rem">🔍</div>'
+                    f'<div>לא זוהו תשלומים חוזרים. נדרשים לפחות 2 חודשי נתונים.</div>'
+                    f'</div>', unsafe_allow_html=True)
+
     # ══════════════════════════════════════════════
-    # TAB 4: Transactions
+    # TAB 4: Transactions - Side-by-Side Comparison
     # ══════════════════════════════════════════════
     with tabs[4]:
-        st.markdown(f'<div class="section-label">📋 עסקאות</div>', unsafe_allow_html=True)
-        col1, _ = st.columns([2, 3])
-        with col1:
-            sort = st.selectbox("מיון", ['תאריך ↓','תאריך ↑','סכום ↓','סכום ↑'])
+        st.markdown(f'<div class="section-label">📋 השוואת עסקאות חודשית</div>', unsafe_allow_html=True)
+
+        available_months = df_f.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist()
+
+        sel_c1, sel_c2, sel_c3 = st.columns([2, 2, 2])
+        with sel_c1:
+            left_month = st.selectbox("📅 חודש ראשון", options=available_months,
+                index=0 if len(available_months) > 0 else 0, key="compare_left_month")
+        with sel_c2:
+            right_month = st.selectbox("📅 חודש שני", options=available_months,
+                index=min(1, len(available_months) - 1) if len(available_months) > 1 else 0, key="compare_right_month")
+        with sel_c3:
+            cmp_sort = st.selectbox("מיון", ['תאריך ↓','תאריך ↑','סכום ↓','סכום ↑'], key="compare_sort")
+
         smap = {'תאריך ↓':('תאריך',False),'תאריך ↑':('תאריך',True),'סכום ↓':('סכום_מוחלט',False),'סכום ↑':('סכום_מוחלט',True)}
-        sc, sa = smap[sort]
-        # Include source file column if multiple files were uploaded
-        cols_to_show = ['תאריך','תיאור','קטגוריה','סכום']
+        sc, sa = smap[cmp_sort]
+
         col_config = {
             "תאריך": st.column_config.DateColumn("תאריך", format="DD/MM/YYYY", width="small"),
             "תיאור": st.column_config.TextColumn("בית עסק", width="large"),
             "קטגוריה": st.column_config.TextColumn("קטגוריה", width="medium"),
             "סכום": st.column_config.NumberColumn("סכום (₪)", format="₪%.2f", width="small"),
         }
-        if '_מקור' in df_f.columns and df_f['_מקור'].nunique() > 1:
-            cols_to_show = ['תאריך','תיאור','קטגוריה','סכום','_מקור']
-            col_config["_מקור"] = st.column_config.TextColumn("מקור (קובץ)", width="medium")
-        
-        view = df_f.sort_values(sc, ascending=sa)[cols_to_show].copy()
-        st.dataframe(view, column_config=col_config,
-            hide_index=True, use_container_width=True, height=500)
-        st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:0.5rem;text-align:center">{len(view):,} עסקאות</div>', unsafe_allow_html=True)
+
+        # --- Side by Side Tables ---
+        left_col, right_col = st.columns(2)
+
+        left_df = df_f[df_f['חודש'] == left_month].sort_values(sc, ascending=sa)
+        left_exp = left_df[left_df['סכום'] < 0]
+        left_total = abs(left_exp['סכום'].sum()) if len(left_exp) > 0 else 0
+        left_count = len(left_df)
+
+        with left_col:
+            st.markdown(f'''<div class="compare-card">
+                <div class="compare-header">
+                    <div class="compare-month">{left_month}</div>
+                    <div class="compare-stat">
+                        <div class="compare-stat-item">
+                            <div class="compare-stat-val">₪{left_total:,.0f}</div>
+                            <div class="compare-stat-label">הוצאות</div>
+                        </div>
+                        <div class="compare-stat-item">
+                            <div class="compare-stat-val">{left_count}</div>
+                            <div class="compare-stat-label">עסקאות</div>
+                        </div>
+                    </div>
+                </div>
+            </div>''', unsafe_allow_html=True)
+            st.dataframe(left_df[['תאריך','תיאור','קטגוריה','סכום']], column_config=col_config,
+                hide_index=True, use_container_width=True, height=400)
+
+        right_df = df_f[df_f['חודש'] == right_month].sort_values(sc, ascending=sa)
+        right_exp = right_df[right_df['סכום'] < 0]
+        right_total = abs(right_exp['סכום'].sum()) if len(right_exp) > 0 else 0
+        right_count = len(right_df)
+
+        with right_col:
+            st.markdown(f'''<div class="compare-card">
+                <div class="compare-header">
+                    <div class="compare-month">{right_month}</div>
+                    <div class="compare-stat">
+                        <div class="compare-stat-item">
+                            <div class="compare-stat-val">₪{right_total:,.0f}</div>
+                            <div class="compare-stat-label">הוצאות</div>
+                        </div>
+                        <div class="compare-stat-item">
+                            <div class="compare-stat-val">{right_count}</div>
+                            <div class="compare-stat-label">עסקאות</div>
+                        </div>
+                    </div>
+                </div>
+            </div>''', unsafe_allow_html=True)
+            st.dataframe(right_df[['תאריך','תיאור','קטגוריה','סכום']], column_config=col_config,
+                hide_index=True, use_container_width=True, height=400)
+
+        # --- Comparison Summary ---
+        st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-label">📊 סיכום השוואה</div>', unsafe_allow_html=True)
+
+        if left_month != right_month:
+            diff_total = right_total - left_total
+            diff_pct = ((diff_total / left_total) * 100) if left_total > 0 else 0
+            diff_class = 'up' if diff_total > 0 else 'down' if diff_total < 0 else 'neutral'
+            diff_arrow = '↑' if diff_total > 0 else '↓' if diff_total < 0 else '―'
+            diff_word = 'עלייה' if diff_total > 0 else 'ירידה' if diff_total < 0 else 'ללא שינוי'
+
+            s1, s2, s3 = st.columns(3)
+            with s1:
+                st.markdown(f'''<div class="compare-summary-card">
+                    <div style="color:{T['text3']};font-size:0.75rem;margin-bottom:4px">הפרש הוצאות</div>
+                    <div style="font-size:1.2rem;font-weight:700;color:{T['red'] if diff_total > 0 else T['green']};direction:ltr">
+                        {diff_arrow} ₪{abs(diff_total):,.0f}
+                    </div>
+                    <span class="diff-badge {diff_class}">{diff_word} {abs(diff_pct):.0f}%</span>
+                </div>''', unsafe_allow_html=True)
+            with s2:
+                diff_count = right_count - left_count
+                st.markdown(f'''<div class="compare-summary-card">
+                    <div style="color:{T['text3']};font-size:0.75rem;margin-bottom:4px">הפרש עסקאות</div>
+                    <div style="font-size:1.2rem;font-weight:700;color:{T['text1']};direction:ltr">
+                        {'↑' if diff_count > 0 else '↓' if diff_count < 0 else '―'} {abs(diff_count)}
+                    </div>
+                </div>''', unsafe_allow_html=True)
+            with s3:
+                left_avg = (left_total / left_count) if left_count > 0 else 0
+                right_avg = (right_total / right_count) if right_count > 0 else 0
+                st.markdown(f'''<div class="compare-summary-card">
+                    <div style="color:{T['text3']};font-size:0.75rem;margin-bottom:4px">ממוצע לעסקה</div>
+                    <div style="font-size:1.2rem;font-weight:700;color:{T['text1']};direction:ltr">
+                        ₪{right_avg:,.0f} vs ₪{left_avg:,.0f}
+                    </div>
+                </div>''', unsafe_allow_html=True)
+
+            # --- Category Comparison ---
+            st.markdown(f'<div class="section-label">🏷️ השוואת קטגוריות</div>', unsafe_allow_html=True)
+            left_cats = left_exp.groupby('קטגוריה')['סכום_מוחלט'].sum() if len(left_exp) > 0 else pd.Series(dtype=float)
+            right_cats = right_exp.groupby('קטגוריה')['סכום_מוחלט'].sum() if len(right_exp) > 0 else pd.Series(dtype=float)
+            all_categories = sorted(set(left_cats.index) | set(right_cats.index))
+
+            cat_html = '<div class="mom-grid">'
+            for cat in all_categories:
+                lv = left_cats.get(cat, 0)
+                rv = right_cats.get(cat, 0)
+                cat_diff = rv - lv
+                cat_diff_pct = ((cat_diff / lv) * 100) if lv > 0 else (100 if rv > 0 else 0)
+                cat_color = T['red'] if cat_diff > 0 else T['green'] if cat_diff < 0 else T['text3']
+                cat_arrow = '↑' if cat_diff > 0 else '↓' if cat_diff < 0 else '―'
+
+                cat_html += f'''<div class="mom-card" style="border-color:{cat_color}33">
+                    <div style="font-size:1.25rem;margin-bottom:4px">{icon_for(cat)}</div>
+                    <div style="font-size:0.78rem;font-weight:600;color:{T['text1']}">{cat}</div>
+                    <div class="mom-arrow" style="color:{cat_color}">{cat_arrow}</div>
+                    <div style="font-size:0.85rem;font-weight:700;color:{cat_color};direction:ltr">{abs(cat_diff_pct):.0f}%</div>
+                    <div style="display:flex;justify-content:space-around;margin-top:6px;font-size:0.7rem;color:{T['text3']};direction:ltr">
+                        <span>₪{lv:,.0f}</span><span>→</span><span>₪{rv:,.0f}</span>
+                    </div>
+                </div>'''
+            cat_html += '</div>'
+            st.markdown(cat_html, unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="text-align:center;padding:1.5rem;color:{T["text3"]}">בחר שני חודשים שונים להשוואה</div>', unsafe_allow_html=True)
+
+        st.markdown(f'<div style="color:{T["text3"]};font-size:0.82rem;margin-top:1rem;text-align:center">{len(df_f):,} עסקאות בסה״כ (כל החודשים המסוננים)</div>', unsafe_allow_html=True)
 
     # ══════════════════════════════════════════════
     # TAB 5: Budget
