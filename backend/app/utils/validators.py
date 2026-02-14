@@ -86,7 +86,7 @@ def has_valid_amounts(df: pd.DataFrame, col: str) -> bool:
 
 
 def detect_amount_column(df: pd.DataFrame) -> Optional[str]:
-    preferred = ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', 'אם זכות/חובה']
+    preferred = ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', '₪ זכות/חובה', 'אם זכות/חובה']
     for name in preferred:
         matches = [c for c in df.columns if str(c).strip() == name]
         for col in matches:
