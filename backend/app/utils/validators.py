@@ -9,7 +9,7 @@ from typing import Optional
 def detect_header_row(df: pd.DataFrame) -> int:
     """זיהוי חכם של שורת הכותרת"""
     # מילות מפתח לזיהוי כותרות
-    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'Date', 'Amount']
+    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'Date', 'Amount', 'זכות', 'חובה', 'תנועה', 'ערך']
     
     # סריקה של 20 השורות הראשונות
     for idx in range(min(20, len(df))):
@@ -86,14 +86,14 @@ def has_valid_amounts(df: pd.DataFrame, col: str) -> bool:
 
 
 def detect_amount_column(df: pd.DataFrame) -> Optional[str]:
-    preferred = ['סכום חיוב', 'סכום עסקה מקורי', 'סכום']
+    preferred = ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', 'אם זכות/חובה']
     for name in preferred:
         matches = [c for c in df.columns if str(c).strip() == name]
         for col in matches:
             if has_valid_amounts(df, col):
                 return col
 
-    keywords = ['amount', 'sum', 'סכום', 'total', 'חיוב']
+    keywords = ['amount', 'sum', 'סכום', 'total', 'חיוב', 'זכות/חובה']
     for col in df.columns:
         col_lower = str(col).lower()
         if any(k in col_lower for k in keywords) and has_valid_amounts(df, col):
