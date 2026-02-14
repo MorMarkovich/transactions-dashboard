@@ -940,7 +940,7 @@ def detect_recurring_payments(df):
         return pd.DataFrame()
     return pd.DataFrame(results).sort_values('avg_amount', ascending=False)
 
-def compute_category_mom(df):
+def compute_category_mom(df, prev_month=None, curr_month=None):
     """Compute month-over-month change per category for the 2 most recent months."""
     exp = df[df['סכום'] < 0].copy()
     if exp.empty:
@@ -948,8 +948,10 @@ def compute_category_mom(df):
     months_sorted = exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
     if len(months_sorted) < 2:
         return []
-    prev_month = months_sorted[-2]
-    curr_month = months_sorted[-1]
+    if prev_month is None:
+        prev_month = months_sorted[-2]
+    if curr_month is None:
+        curr_month = months_sorted[-1]
     prev_data = exp[exp['חודש'] == prev_month].groupby('קטגוריה')['סכום_מוחלט'].sum()
     curr_data = exp[exp['חודש'] == curr_month].groupby('קטגוריה')['סכום_מוחלט'].sum()
     all_cats = set(prev_data.index) | set(curr_data.index)
@@ -2491,11 +2493,22 @@ def _render_dashboard(df):
             st.markdown(tbl, unsafe_allow_html=True)
 
         # ── Category MoM Comparison ──
-        mom_data = compute_category_mom(df_f)
-        if mom_data:
+        mom_exp = df_f[df_f['סכום'] < 0]
+        mom_months_sorted = mom_exp.drop_duplicates('חודש').sort_values('תאריך')['חודש'].tolist() if not mom_exp.empty else []
+        if len(mom_months_sorted) >= 2:
             st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
             st.markdown(f'<div class="section-label">🏷️ שינוי בקטגוריות חודש-על-חודש</div>', unsafe_allow_html=True)
 
+            mom_c1, mom_c2 = st.columns(2)
+            with mom_c1:
+                mom_prev = st.selectbox("חודש קודם", options=mom_months_sorted, index=len(mom_months_sorted) - 2, key="mom_prev_month")
+            with mom_c2:
+                mom_curr = st.selectbox("חודש נוכחי", options=mom_months_sorted, index=len(mom_months_sorted) - 1, key="mom_curr_month")
+
+            mom_data = compute_category_mom(df_f, prev_month=mom_prev, curr_month=mom_curr)
+        else:
+            mom_data = []
+        if mom_data:
             prev_m = mom_data[0]['prev_month']
             curr_m = mom_data[0]['curr_month']
             st.markdown(
