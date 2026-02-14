@@ -193,6 +193,8 @@ def load_transactions():
         df['סכום_מוחלט'] = pd.to_numeric(df['סכום_מוחלט'], errors='coerce').fillna(0)
         df['חודש'] = df['תאריך'].dt.strftime('%m/%Y')
         df['יום_בשבוע'] = df['תאריך'].dt.dayofweek
+        if '_מקור' not in df.columns:
+            df['_מקור'] = 'לא ידוע'
         return df if not df.empty else None
     except:
         return None
@@ -218,6 +220,110 @@ def delete_all_user_data() -> bool:
         sb.table("user_settings").delete().eq("user_id", uid).execute()
         return True
     except: return False
+
+
+# =============================================================================
+# Per-File Transaction Storage (Smart File Management)
+# =============================================================================
+def save_file_transactions(files_dict):
+    """Save transactions for specific files, preserving other files' data.
+    files_dict: {file_name: DataFrame}
+    """
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user or user.get('id') == 'guest':
+        return False
+    try:
+        new_file_names = set(files_dict.keys())
+
+        # Load existing and keep only non-replaced files
+        res = sb.table("saved_transactions").select("data").eq("user_id", user["id"]).execute()
+        keep_records = []
+        if res.data:
+            for r in res.data:
+                d = json.loads(r['data'])
+                if d.get('_מקור') not in new_file_names:
+                    keep_records.append(r['data'])
+
+        # Prepare new records from uploaded files
+        new_records = []
+        for file_name, df in files_dict.items():
+            cols = ['תאריך', 'תיאור', 'קטגוריה', 'סכום', 'סכום_מוחלט']
+            data = df[cols].copy()
+            data['תאריך'] = data['תאריך'].dt.strftime('%Y-%m-%d')
+            data['_מקור'] = file_name
+            new_records.extend(
+                [json.dumps(r, ensure_ascii=False) for r in data.to_dict('records')]
+            )
+
+        # Atomic: delete all then insert all (keep + new)
+        sb.table("saved_transactions").delete().eq("user_id", user["id"]).execute()
+        all_records = keep_records + new_records
+        for i in range(0, len(all_records), 500):
+            batch = all_records[i:i + 500]
+            rows = [{"user_id": user["id"], "data": d} for d in batch]
+            sb.table("saved_transactions").insert(rows).execute()
+        return True
+    except:
+        return False
+
+
+def delete_file_transactions(file_name):
+    """Delete transactions from a specific file only, keeping all other files."""
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user:
+        return False
+    try:
+        res = sb.table("saved_transactions").select("data").eq("user_id", user["id"]).execute()
+        if not res.data:
+            return True
+
+        keep = [r['data'] for r in res.data
+                if json.loads(r['data']).get('_מקור') != file_name]
+
+        sb.table("saved_transactions").delete().eq("user_id", user["id"]).execute()
+
+        for i in range(0, len(keep), 500):
+            batch = keep[i:i + 500]
+            rows = [{"user_id": user["id"], "data": d} for d in batch]
+            sb.table("saved_transactions").insert(rows).execute()
+        return True
+    except:
+        return False
+
+
+def list_saved_files():
+    """List all saved files with metadata (count, total amount, date range)."""
+    sb = get_supabase()
+    user = get_current_user()
+    if not sb or not user or user.get('id') == 'guest':
+        return []
+    try:
+        res = sb.table("saved_transactions").select("data").eq("user_id", user["id"]).execute()
+        if not res.data:
+            return []
+
+        files = {}
+        for r in res.data:
+            d = json.loads(r['data'])
+            fname = d.get('_מקור', 'לא ידוע')
+            if fname not in files:
+                files[fname] = {'name': fname, 'count': 0, 'total': 0, 'dates': []}
+            files[fname]['count'] += 1
+            files[fname]['total'] += abs(float(d.get('סכום', 0)))
+            if d.get('תאריך'):
+                files[fname]['dates'].append(d['תאריך'])
+
+        result = []
+        for f in files.values():
+            dates = sorted(f['dates'])
+            f['date_range'] = f"{dates[0]} — {dates[-1]}" if dates else ""
+            del f['dates']
+            result.append(f)
+        return result
+    except:
+        return []
 
 
 # =============================================================================
