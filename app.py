@@ -823,7 +823,7 @@ def compute_spending_pace(df):
 # Data Functions
 # =============================================================================
 def detect_header_row(df):
-    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'רכישה', 'פרטי', 'Date', 'Amount']
+    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'רכישה', 'פרטי', 'Date', 'Amount', 'זכות', 'חובה', 'תנועה', 'ערך']
     for idx in range(min(20, len(df))):
         vals = [str(v).strip() for v in df.iloc[idx].tolist() if pd.notna(v)]
         hits = sum(1 for k in keywords if any(k in v for v in vals))
@@ -864,11 +864,11 @@ def has_valid_amounts(df, col):
     except: return False
 
 def detect_amount_column(df):
-    for n in ['סכום חיוב', 'סכום עסקה מקורי', 'סכום']:
+    for n in ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', 'אם זכות/חובה']:
         for c in df.columns:
             if str(c).strip() == n and has_valid_amounts(df, c): return c
     for c in df.columns:
-        if any(k in str(c).lower() for k in ['סכום','חיוב','amount']) and has_valid_amounts(df, c): return c
+        if any(k in str(c).lower() for k in ['סכום','חיוב','amount','זכות/חובה']) and has_valid_amounts(df, c): return c
     for c in df.columns:
         if has_valid_amounts(df, c): return c
     return None
@@ -1640,7 +1640,7 @@ def main():
     file_results = []
     
     date_kws = ['תאריך עסקה','תאריך','תאריך רכישה','תאריך חיוב','Date']
-    desc_kws = ['שם בית העסק','תיאור','שם בית עסק','פרטי העסקה','Description']
+    desc_kws = ['שם בית העסק','תיאור','תיאור התנועה','שם בית עסק','פרטי העסקה','Description']
     cat_kws = ['קטגוריה','סוג עסקה','Category']
     
     with st.spinner('טוען ומעבד קבצים...'):

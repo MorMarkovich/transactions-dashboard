@@ -54,7 +54,7 @@ async def upload_file(file: UploadFile = File(...)):
         # Detect columns
         date_col = find_column(df_clean, ['תאריך עסקה', 'תאריך', 'date', 'Date'])
         amount_col = detect_amount_column(df_clean)
-        desc_col = find_column(df_clean, ['שם בית העסק', 'תיאור', 'description', 'merchant'])
+        desc_col = find_column(df_clean, ['שם בית העסק', 'תיאור', 'תיאור התנועה', 'description', 'merchant'])
         cat_col = find_column(df_clean, ['קטגוריה', 'category', 'Category'])
         
         if not date_col or not amount_col or not desc_col:
