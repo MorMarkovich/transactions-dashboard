@@ -79,8 +79,10 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             pass
     
     # המרת סכומים חיוביים לשליליים (הוצאות) - רק אם רוב הערכים חיוביים
+    # לא מבצעים המרה בדוחות עו"ש (זכות/חובה) כי הסימן כבר נכון
+    is_bank_statement = 'זכות/חובה' in str(amount_col)
     non_zero = result['סכום'][result['סכום'] != 0]
-    if len(non_zero) > 0:
+    if not is_bank_statement and len(non_zero) > 0:
         positive_ratio = (non_zero > 0).sum() / len(non_zero)
         if positive_ratio > 0.8:  # אם יותר מ-80% חיוביים - אלה הוצאות
             result['סכום'] = -result['סכום'].abs()
