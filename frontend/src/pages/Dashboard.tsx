@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw, TrendingUp, Zap } from 'lucide-react'
+import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw, TrendingUp, Zap, Bell } from 'lucide-react'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
@@ -9,6 +9,7 @@ import DonutChart from '../components/charts/DonutChart'
 import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
 import CategoryList from '../components/category/CategoryList'
+import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -24,6 +25,8 @@ import type {
   WeeklySummaryData,
   ForecastData,
   SpendingVelocityData,
+  AnomalyItem,
+  RecurringTransaction,
 } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -41,10 +44,17 @@ export default function Dashboard() {
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummaryData | null>(null)
   const [forecast, setForecast] = useState<ForecastData | null>(null)
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
+  const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
+  const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
 
   // UI state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+
+  const handleDismissAlert = useCallback((id: string) => {
+    setDismissedAlerts((prev) => new Set(prev).add(id))
+  }, [])
 
   // ---- Fetch data with AbortController ------------------------------------
   useEffect(() => {
@@ -66,6 +76,8 @@ export default function Dashboard() {
           transactionsApi.getWeeklySummary(sessionId, signal).catch(() => null),
           transactionsApi.getForecast(sessionId, signal).catch(() => null),
           transactionsApi.getSpendingVelocity(sessionId, signal).catch(() => null),
+          transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
+          transactionsApi.getRecurring(sessionId, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -75,6 +87,8 @@ export default function Dashboard() {
         if (results[4]) setWeeklySummary(results[4] as WeeklySummaryData)
         if (results[5]) setForecast(results[5] as ForecastData)
         if (results[6]) setVelocity(results[6] as SpendingVelocityData)
+        if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
+        if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message =
@@ -260,6 +274,33 @@ export default function Dashboard() {
       />
 
       <MetricsGrid metrics={metrics} />
+
+      {/* ── Spending Alerts ──────────────────────────────────────────── */}
+      {(anomalies.length > 0 || recurring.length > 0 || forecast) && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          style={{
+            marginTop: 'var(--space-lg)',
+            position: 'relative',
+            zIndex: 1,
+          }}
+        >
+          <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+            <Bell size={18} />
+            <span>התראות והמלצות</span>
+          </div>
+          <SpendingAlerts
+            metrics={metrics}
+            anomalies={anomalies}
+            recurring={recurring}
+            forecast={forecast}
+            dismissedAlerts={dismissedAlerts}
+            onDismiss={handleDismissAlert}
+          />
+        </motion.div>
+      )}
 
       {weeklySummary && (
         <motion.div
@@ -482,6 +523,74 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* ── Month-over-Month Comparison ──────────────────────────────── */}
+      {monthlyData && monthlyData.months.length >= 2 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <div className="section-title">
+            <BarChart3 size={20} />
+            <span>השוואה חודשית</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.min(monthlyData.months.length, 6)}, 1fr)`,
+                gap: 'var(--space-sm)',
+              }}
+              className="dashboard-monthly-comparison"
+            >
+              {monthlyData.months.slice(-6).map((month, idx, arr) => {
+                const prev = idx > 0 ? arr[idx - 1].amount : null
+                const changePct = prev ? ((month.amount - prev) / Math.abs(prev)) * 100 : null
+                return (
+                  <div
+                    key={month.month}
+                    style={{
+                      textAlign: 'center',
+                      padding: 'var(--space-sm)',
+                      borderRadius: 'var(--radius-md, 8px)',
+                      background: 'var(--bg-tertiary, rgba(255,255,255,0.03))',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      {month.month}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        color: 'var(--text-primary)',
+                        fontFamily: 'var(--font-mono)',
+                        direction: 'ltr',
+                      }}
+                    >
+                      {formatCurrency(month.amount)}
+                    </div>
+                    {changePct !== null && (
+                      <div
+                        style={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 600,
+                          marginTop: '4px',
+                          color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
+                        }}
+                      >
+                        {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Responsive: single column on mobile */}
       <style>{`
         @media (max-width: 768px) {
@@ -490,6 +599,9 @@ export default function Dashboard() {
           }
           .dashboard-premium-row {
             grid-template-columns: 1fr !important;
+          }
+          .dashboard-monthly-comparison {
+            grid-template-columns: repeat(3, 1fr) !important;
           }
         }
       `}</style>

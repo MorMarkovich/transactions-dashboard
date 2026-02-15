@@ -7,6 +7,7 @@ import {
   Lightbulb,
   Store,
   Wallet,
+  Target,
   Database,
   Upload,
   Loader2,
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { to: '/trends', label: 'מגמות', icon: TrendingUp },
   { to: '/insights', label: 'תובנות', icon: Lightbulb },
   { to: '/merchants', label: 'בתי עסק', icon: Store },
+  { to: '/budget', label: 'תקציב', icon: Target },
   { to: '/income', label: 'הכנסות', icon: Wallet },
   { to: '/data-management', label: 'ניהול מידע', icon: Database },
 ] as const
