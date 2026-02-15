@@ -17,12 +17,16 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'es2022',
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           charts: ['recharts'],
           motion: ['framer-motion'],
+          supabase: ['@supabase/supabase-js'],
+          icons: ['lucide-react'],
         },
       },
     },

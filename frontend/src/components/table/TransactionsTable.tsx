@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
-import { ChevronRight, ChevronLeft, Inbox } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo, useState, useRef, useEffect, useCallback, memo } from 'react'
+import { ChevronRight, ChevronLeft, Inbox, ArrowUpDown } from 'lucide-react'
 import type { Transaction } from '../../services/types'
 import { formatDate, formatCurrency } from '../../utils/formatting'
 import { get_icon } from '../../utils/constants'
@@ -14,6 +13,87 @@ interface TransactionsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   onRowClick?: (transaction: Transaction) => void
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────
+const ROW_HEIGHT = 48
+const OVERSCAN = 5
+
+// ─── Memoized table row ───────────────────────────────────────────────
+const TableRow = memo(function TableRow({
+  tx,
+  onClick,
+  style,
+}: {
+  tx: Transaction
+  onClick?: (tx: Transaction) => void
+  style?: React.CSSProperties
+}) {
+  const amount = tx.סכום
+  const isPositive = amount > 0
+
+  return (
+    <tr
+      onClick={() => onClick?.(tx)}
+      style={{ cursor: onClick ? 'pointer' : undefined, ...style }}
+    >
+      <td className="col-date">{formatDate(tx.תאריך)}</td>
+      <td>{tx.תיאור}</td>
+      <td className="col-category">
+        <span style={{ marginLeft: '6px' }}>
+          {get_icon(tx.קטגוריה)}
+        </span>
+        {tx.קטגוריה}
+      </td>
+      <td
+        className="col-amount"
+        style={{
+          color: isPositive ? 'var(--success)' : 'var(--danger)',
+        }}
+      >
+        {formatCurrency(amount)}
+      </td>
+    </tr>
+  )
+})
+
+// ─── Sortable column header ───────────────────────────────────────────
+type SortField = 'תאריך' | 'סכום' | 'קטגוריה' | 'תיאור'
+type SortDir = 'asc' | 'desc'
+
+// ─── Sort header component ────────────────────────────────────────────
+function SortHeader({
+  field,
+  label,
+  sortField,
+  sortDir,
+  onSort,
+}: {
+  field: SortField
+  label: string
+  sortField: SortField | null
+  sortDir: SortDir
+  onSort: (field: SortField) => void
+}) {
+  return (
+    <th
+      scope="col"
+      onClick={() => onSort(field)}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        {label}
+        <ArrowUpDown
+          size={12}
+          style={{
+            opacity: sortField === field ? 1 : 0.3,
+            transform: sortField === field && sortDir === 'desc' ? 'scaleY(-1)' : undefined,
+            transition: 'opacity 0.15s, transform 0.15s',
+          }}
+        />
+      </span>
+    </th>
+  )
 }
 
 export default function TransactionsTable({
@@ -31,6 +111,67 @@ export default function TransactionsTable({
 
   const canGoPrev = page > 1
   const canGoNext = page < totalPages
+
+  // Local sort state
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  // Virtual scroll state
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [containerHeight, setContainerHeight] = useState(500)
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerHeight(entry.contentRect.height)
+      }
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop)
+  }, [])
+
+  // Client-side sort
+  const sortedTransactions = useMemo(() => {
+    if (!sortField) return transactions
+    const sorted = [...transactions].sort((a, b) => {
+      const valA = a[sortField]
+      const valB = b[sortField]
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return sortDir === 'asc' ? valA - valB : valB - valA
+      }
+      const strA = String(valA ?? '')
+      const strB = String(valB ?? '')
+      return sortDir === 'asc' ? strA.localeCompare(strB, 'he') : strB.localeCompare(strA, 'he')
+    })
+    return sorted
+  }, [transactions, sortField, sortDir])
+
+  // Virtual scroll calculations
+  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
+  const endIndex = Math.min(
+    sortedTransactions.length,
+    Math.ceil((scrollTop + containerHeight) / ROW_HEIGHT) + OVERSCAN,
+  )
+  const visibleTransactions = sortedTransactions.slice(startIndex, endIndex)
+  const useVirtualScroll = sortedTransactions.length > 100
+
+  const handleSort = useCallback((field: SortField) => {
+    setSortField((prev) => {
+      if (prev === field) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return field
+      }
+      setSortDir('asc')
+      return field
+    })
+  }, [])
 
   if (transactions.length === 0 && total === 0) {
     return (
@@ -65,7 +206,12 @@ export default function TransactionsTable({
 
   return (
     <div>
-      <div className="table-scroll">
+      <div
+        ref={scrollContainerRef}
+        className="table-scroll"
+        onScroll={useVirtualScroll ? handleScroll : undefined}
+        style={useVirtualScroll ? { maxHeight: '600px', overflow: 'auto' } : undefined}
+      >
         <table
           className="transactions-table"
           role="table"
@@ -73,55 +219,48 @@ export default function TransactionsTable({
         >
           <thead>
             <tr>
-              <th scope="col">תאריך</th>
-              <th scope="col">תיאור</th>
-              <th scope="col">קטגוריה</th>
-              <th scope="col">סכום</th>
+              <SortHeader field="תאריך" label="תאריך" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader field="תיאור" label="תיאור" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader field="קטגוריה" label="קטגוריה" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader field="סכום" label="סכום" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
 
-          <AnimatePresence mode="popLayout">
-            <tbody>
-              {transactions.map((tx, index) => {
-                const amount = tx.סכום
-                const isPositive = amount > 0
-
-                return (
-                  <motion.tr
-                    key={`${tx.תאריך}-${tx.תיאור}-${index}`}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{
-                      duration: 0.2,
-                      delay: index * 0.02,
-                    }}
-                    onClick={() => onRowClick?.(tx)}
-                    style={{ cursor: onRowClick ? 'pointer' : undefined }}
+          <tbody>
+            {useVirtualScroll ? (
+              <>
+                {startIndex > 0 && (
+                  <tr style={{ height: startIndex * ROW_HEIGHT }} aria-hidden="true">
+                    <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )}
+                {visibleTransactions.map((tx, i) => (
+                  <TableRow
+                    key={`${tx.תאריך}-${tx.תיאור}-${startIndex + i}`}
+                    tx={tx}
+                    onClick={onRowClick}
+                    style={{ height: ROW_HEIGHT }}
+                  />
+                ))}
+                {endIndex < sortedTransactions.length && (
+                  <tr
+                    style={{ height: (sortedTransactions.length - endIndex) * ROW_HEIGHT }}
+                    aria-hidden="true"
                   >
-                    <td className="col-date">{formatDate(tx.תאריך)}</td>
-                    <td>{tx.תיאור}</td>
-                    <td className="col-category">
-                      <span style={{ marginLeft: '6px' }}>
-                        {get_icon(tx.קטגוריה)}
-                      </span>
-                      {tx.קטגוריה}
-                    </td>
-                    <td
-                      className="col-amount"
-                      style={{
-                        color: isPositive
-                          ? 'var(--success)'
-                          : 'var(--danger)',
-                      }}
-                    >
-                      {formatCurrency(amount)}
-                    </td>
-                  </motion.tr>
-                )
-              })}
-            </tbody>
-          </AnimatePresence>
+                    <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )}
+              </>
+            ) : (
+              sortedTransactions.map((tx, index) => (
+                <TableRow
+                  key={`${tx.תאריך}-${tx.תיאור}-${index}`}
+                  tx={tx}
+                  onClick={onRowClick}
+                />
+              ))
+            )}
+          </tbody>
         </table>
       </div>
 
