@@ -39,6 +39,7 @@ yarn-error.log
 # Build
 dist/
 build/
+.vite/
 
 # Backend uploads
 backend/uploads/
