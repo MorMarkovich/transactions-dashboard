@@ -1,6 +1,5 @@
-import { Sun, Moon, LogOut, Menu, X, CreditCard, Command } from 'lucide-react'
+import { Sun, Moon, Menu, X, CreditCard, Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
-import { useAuth } from '../../lib/AuthContext'
 import NotificationCenter from './NotificationCenter'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -12,13 +11,6 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
-  const { user, signOut } = useAuth()
-
-  // Derive display name from user metadata or email
-  const displayName =
-    user?.user_metadata?.full_name ||
-    user?.email?.split('@')[0] ||
-    'משתמש'
 
   return (
     <header
@@ -55,7 +47,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
           aria-label={sidebarOpen ? 'סגור תפריט' : 'פתח תפריט'}
           className="header-hamburger"
           style={{
-            display: 'none', // shown via CSS media query
+            display: 'none',
             alignItems: 'center',
             justifyContent: 'center',
             width: '36px',
@@ -103,38 +95,55 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
                 fontWeight: 400,
                 lineHeight: 1.2,
                 whiteSpace: 'nowrap',
-                display: 'block', // hidden on mobile via CSS
+                display: 'block',
               }}
             >
               ניתוח חכם של הוצאות כרטיס אשראי
             </p>
           </div>
         </div>
-
-        {/* Ctrl+K command palette hint */}
-        <div
-          onClick={() => onCommandPalette?.()}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '4px 10px',
-            fontSize: '0.6875rem',
-            color: 'var(--text-muted)',
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--glass-border)',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            transition: 'all 150ms ease',
-            fontFamily: 'var(--font-mono, monospace)',
-          }}
-        >
-          <Command size={12} />
-          <span>K</span>
-        </div>
       </div>
 
-      {/* ─── Left side: theme toggle + user menu ─── */}
+      {/* ─── Center: search bar ─── */}
+      <div
+        onClick={() => onCommandPalette?.()}
+        className="header-search-bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 16px',
+          fontSize: 'var(--text-sm)',
+          color: 'var(--text-muted)',
+          background: 'var(--bg-input)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          cursor: 'pointer',
+          transition: 'all 150ms ease',
+          maxWidth: '320px',
+          flex: 1,
+          minWidth: '120px',
+        }}
+      >
+        <Search size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
+        <span style={{ flex: 1 }}>חיפוש...</span>
+        <kbd
+          style={{
+            fontSize: '0.65rem',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono, monospace)',
+            flexShrink: 0,
+          }}
+        >
+          ⌘K
+        </kbd>
+      </div>
+
+      {/* ─── Left side: notifications + theme toggle ─── */}
       <div
         style={{
           display: 'flex',
@@ -167,59 +176,10 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
         >
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
-
-        {/* User info + sign out */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-sm)',
-            paddingRight: 'var(--space-sm)',
-            borderRight: '1px solid var(--border)',
-            marginRight: 'var(--space-xs)',
-          }}
-        >
-          <span
-            className="header-username"
-            style={{
-              fontSize: 'var(--text-sm)',
-              fontWeight: 500,
-              color: 'var(--text-primary)',
-              whiteSpace: 'nowrap',
-              maxWidth: '120px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {displayName}
-          </span>
-
-          <button
-            onClick={() => signOut()}
-            aria-label="התנתק"
-            className="header-icon-btn"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '36px',
-              height: '36px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              transition: 'all 150ms ease',
-            }}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
       </div>
 
       {/* ─── Responsive styles ─── */}
       <style>{`
-        /* Show hamburger on mobile only */
         @media (max-width: 1023px) {
           .header-hamburger {
             display: flex !important;
@@ -227,7 +187,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
           .header-subtitle {
             display: none !important;
           }
-          .header-username {
+          .header-search-bar {
             display: none !important;
           }
         }
@@ -242,6 +202,11 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
           background: var(--bg-card-hover) !important;
           color: var(--text-primary) !important;
           border-color: var(--border-hover) !important;
+        }
+
+        .header-search-bar:hover {
+          border-color: var(--border-accent) !important;
+          background: var(--bg-card-hover) !important;
         }
       `}</style>
     </header>

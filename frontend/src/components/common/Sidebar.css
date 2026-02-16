@@ -1,8 +1,8 @@
 /* ========== Sidebar ========== */
 .sidebar {
-  width: 280px;
-  min-width: 280px;
-  max-width: 280px;
+  width: var(--sidebar-width, 260px);
+  min-width: var(--sidebar-width, 260px);
+  max-width: var(--sidebar-width, 260px);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur, 16px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
@@ -15,16 +15,34 @@
   top: var(--header-height, 64px);
   overflow-y: auto;
   overflow-x: hidden;
-  transition: transform var(--transition-normal);
+  transition: width var(--transition-normal), min-width var(--transition-normal), max-width var(--transition-normal);
   z-index: var(--z-fixed, 30);
+}
+
+/* ========== Collapsed State ========== */
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width, 72px);
+  min-width: var(--sidebar-collapsed-width, 72px);
+  max-width: var(--sidebar-collapsed-width, 72px);
 }
 
 /* ========== Navigation ========== */
 .sidebar-nav {
-  padding: var(--space-md) var(--space-sm);
+  padding: var(--space-2) var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--space-0-5, 2px);
+  gap: 0;
+  flex: 1;
+}
+
+.sidebar-section {
+  margin-bottom: var(--space-1);
+}
+
+.sidebar-section-divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-2) var(--space-3);
 }
 
 .sidebar-nav-link {
@@ -42,18 +60,26 @@
   overflow: hidden;
 }
 
+.sidebar.collapsed .sidebar-nav-link {
+  justify-content: center;
+  padding: var(--space-2, 0.5rem) var(--space-2);
+}
+
 .sidebar-nav-link:hover {
   color: var(--text-primary);
   background: var(--bg-card-hover);
 }
 
 .sidebar-nav-link.active {
-  background: var(--gradient-primary);
-  color: #ffffff;
+  background: var(--accent-muted);
+  color: var(--accent);
   font-weight: 600;
-  box-shadow: var(--shadow-glow-sm);
-  border-right: 3px solid var(--accent-primary, #818cf8);
-  box-shadow: var(--shadow-glow-sm), inset 4px 0 12px -4px rgba(129, 140, 248, 0.3);
+  border-right: 3px solid var(--accent);
+}
+
+.sidebar.collapsed .sidebar-nav-link.active {
+  border-right: none;
+  border-bottom: 2px solid var(--accent);
 }
 
 .sidebar-nav-link .nav-icon {
@@ -72,31 +98,74 @@
   text-overflow: ellipsis;
 }
 
+/* ========== Collapse Toggle ========== */
+.sidebar-collapse-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin: var(--space-2) auto;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
 /* ========== Divider ========== */
 .sidebar-divider {
   height: 1px;
   background: var(--border);
-  margin: var(--space-sm) var(--space-md);
+  margin: var(--space-1) var(--space-3);
 }
 
 /* ========== Upload Section ========== */
 .sidebar-upload-section {
-  padding: var(--space-md);
-  margin-top: auto;
+  padding: var(--space-3) var(--space-3);
 }
 
 .sidebar-upload-title {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-2);
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
 }
 
+.sidebar-info-btn {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.sidebar-info-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
 .file-upload-area {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-2);
 }
 
 .file-upload-label {
@@ -104,8 +173,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2, 0.5rem);
-  padding: var(--space-lg) var(--space-md);
+  gap: var(--space-1, 0.25rem);
+  padding: var(--space-3) var(--space-2);
   background: var(--glass-bg, var(--bg-card));
   backdrop-filter: blur(var(--glass-blur, 16px));
   -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
@@ -114,9 +183,9 @@
   cursor: pointer;
   text-align: center;
   color: var(--text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   transition: all var(--transition-fast);
-  min-height: 80px;
+  min-height: 64px;
 }
 
 .file-upload-label:hover {
@@ -131,11 +200,6 @@
   border-color: var(--accent);
 }
 
-.file-upload-icon {
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
 .file-upload-hint {
   font-size: var(--text-xs);
   color: var(--text-muted);
@@ -145,22 +209,22 @@
 .sidebar-error {
   background: var(--danger-muted);
   color: var(--danger);
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-2);
 }
 
 /* ========== Formats Section ========== */
 .sidebar-formats {
-  padding: var(--space-sm) var(--space-md);
+  padding: var(--space-2) 0;
 }
 
 .sidebar-formats-title {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-muted);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -171,12 +235,91 @@
   gap: var(--space-1, 0.25rem);
 }
 
+/* ========== User Profile Area ========== */
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-profile.collapsed {
+  justify-content: center;
+  padding: var(--space-3) var(--space-2);
+}
+
+.sidebar-profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-profile-name {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-profile-email {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: ltr;
+  text-align: right;
+}
+
+.sidebar-signout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.sidebar-signout-btn:hover {
+  background: var(--danger-muted);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 /* ========== Close Button (mobile) ========== */
 .sidebar-close-btn {
   display: none;
   position: absolute;
-  top: var(--space-md);
-  left: var(--space-md);
+  top: var(--space-3);
+  left: var(--space-3);
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
@@ -205,14 +348,27 @@
     z-index: var(--z-modal, 50);
     box-shadow: var(--shadow-xl);
     transform: translateX(100%);
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
+  .sidebar.collapsed {
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+  }
+
   .sidebar-close-btn {
     display: flex;
+  }
+
+  .sidebar-collapse-btn {
+    display: none !important;
   }
 }
 
@@ -220,5 +376,9 @@
 @media (min-width: 1024px) {
   .sidebar {
     transform: translateX(0) !important;
+  }
+
+  .sidebar-collapse-btn {
+    display: flex;
   }
 }

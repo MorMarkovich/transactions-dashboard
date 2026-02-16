@@ -1,16 +1,29 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Calendar, BarChart3, PieChart, CalendarDays, RefreshCw, TrendingUp, Zap, Bell } from 'lucide-react'
+import {
+  Calendar,
+  BarChart3,
+  PieChart,
+  CalendarDays,
+  RefreshCw,
+  TrendingUp,
+  Zap,
+  Bell,
+  LayoutDashboard,
+  Grid3X3,
+} from 'lucide-react'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import DonutChart from '../components/charts/DonutChart'
 import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
+import HeatmapChart from '../components/charts/HeatmapChart'
 import CategoryList from '../components/category/CategoryList'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
+import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
@@ -27,6 +40,7 @@ import type {
   SpendingVelocityData,
   AnomalyItem,
   RecurringTransaction,
+  HeatmapData,
 } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -46,6 +60,7 @@ export default function Dashboard() {
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
+  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -78,6 +93,7 @@ export default function Dashboard() {
           transactionsApi.getSpendingVelocity(sessionId, signal).catch(() => null),
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
+          transactionsApi.getHeatmap(sessionId, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -89,10 +105,11 @@ export default function Dashboard() {
         if (results[6]) setVelocity(results[6] as SpendingVelocityData)
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
+        if (results[9]) setHeatmapData(results[9] as HeatmapData)
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message =
-          err instanceof Error ? err.message : '\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05D4\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD'
+          err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
         setError(message)
       } finally {
         setLoading(false)
@@ -108,8 +125,8 @@ export default function Dashboard() {
   const categories = useMemo<CategoryData[]>(() => {
     if (!donutData?.categories) return []
     return donutData.categories.map((cat) => ({
-      '\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4': cat.name,
-      '\u05E1\u05DB\u05D5\u05DD_\u05DE\u05D5\u05D7\u05DC\u05D8': cat.value,
+      'קטגוריה': cat.name,
+      'סכום_מוחלט': cat.value,
     }))
   }, [donutData])
 
@@ -120,6 +137,12 @@ export default function Dashboard() {
       label: m.month,
       value: m.amount,
     }))
+  }, [monthlyData])
+
+  // ---- Monthly amounts for sparklines ------------------------------------
+  const monthlyAmounts = useMemo(() => {
+    if (!monthlyData?.months) return undefined
+    return monthlyData.months.map((m) => m.amount)
   }, [monthlyData])
 
   // ---- Transform weekday data for WeekdayChart ----------------------------
@@ -145,9 +168,9 @@ export default function Dashboard() {
     return (
       <>
         <EmptyState
-          icon="\u{1F4CA}"
-          title={'\u05D1\u05E8\u05D5\u05DB\u05D9\u05DD \u05D4\u05D1\u05D0\u05D9\u05DD \u05DC\u05D3\u05D0\u05E9\u05D1\u05D5\u05E8\u05D3!'}
-          text={'\u05D4\u05E2\u05DC\u05D4 \u05E7\u05D5\u05D1\u05E5 \u05D0\u05E7\u05E1\u05DC \u05D0\u05D5 CSV \u05DE\u05D7\u05D1\u05E8\u05EA \u05D4\u05D0\u05E9\u05E8\u05D0\u05D9 \u05E9\u05DC\u05DA \u05DB\u05D3\u05D9 \u05DC\u05D4\u05EA\u05D7\u05D9\u05DC \u05D1\u05E0\u05D9\u05EA\u05D5\u05D7'}
+          icon="📊"
+          title={'ברוכים הבאים לדאשבורד!'}
+          text={'העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח'}
         />
         <div
           style={{
@@ -158,24 +181,24 @@ export default function Dashboard() {
           }}
         >
           <div className="feature-card">
-            <div className="feature-icon">{'\u{1F4CA}'}</div>
-            <div className="feature-title">{'\u05E0\u05D9\u05EA\u05D5\u05D7 \u05D5\u05D9\u05D6\u05D5\u05D0\u05DC\u05D9'}</div>
+            <div className="feature-icon">📊</div>
+            <div className="feature-title">ניתוח ויזואלי</div>
             <div className="feature-desc">
-              {'\u05D2\u05E8\u05E4\u05D9\u05DD \u05D0\u05D9\u05E0\u05D8\u05E8\u05D0\u05E7\u05D8\u05D9\u05D1\u05D9\u05D9\u05DD \u05D5\u05D7\u05DB\u05DE\u05D9\u05DD \u05DC\u05EA\u05D5\u05D1\u05E0\u05D5\u05EA \u05DE\u05D9\u05D9\u05D3\u05D9\u05D5\u05EA'}
+              גרפים אינטראקטיביים וחכמים לתובנות מיידיות
             </div>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">{'\u{1F3F7}\uFE0F'}</div>
-            <div className="feature-title">{'\u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9\u05D5\u05EA'}</div>
+            <div className="feature-icon">🏷️</div>
+            <div className="feature-title">קטגוריות אוטומטיות</div>
             <div className="feature-desc">
-              {'\u05D6\u05D9\u05D4\u05D5\u05D9 \u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9 \u05E9\u05DC \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA \u05DE\u05D4\u05E7\u05D5\u05D1\u05E5 \u05D4\u05DE\u05E7\u05D5\u05E8\u05D9'}
+              זיהוי אוטומטי של קטגוריות מהקובץ המקורי
             </div>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">{'\u{1F4D1}'}</div>
-            <div className="feature-title">{'\u05EA\u05DE\u05D9\u05DB\u05D4 \u05DE\u05DC\u05D0\u05D4'}</div>
+            <div className="feature-icon">📑</div>
+            <div className="feature-title">תמיכה מלאה</div>
             <div className="feature-desc">
-              {'Excel \u05E2\u05DD \u05DE\u05E1\u05E4\u05E8 \u05D2\u05DC\u05D9\u05D5\u05E0\u05D5\u05EA, CSV \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05DE\u05DC\u05D0\u05D4'}
+              Excel עם מספר גליונות, CSV בעברית מלאה
             </div>
           </div>
         </div>
@@ -187,31 +210,18 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div>
-        {/* 4 metric card skeletons */}
-        <div className="metrics-grid">
+        <div className="card-grid-responsive">
           <Skeleton variant="card" count={4} />
         </div>
-
-        {/* 2-column chart skeleton */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '3fr 2fr',
-            gap: 'var(--space-lg)',
-            marginTop: 'var(--space-xl)',
-          }}
-        >
-          <div>
-            <Skeleton variant="rectangular" height={260} />
-            <div style={{ marginTop: 'var(--space-lg)' }}>
-              <Skeleton variant="rectangular" height={230} />
-            </div>
+        <div className="bento-grid" style={{ marginTop: 'var(--space-xl)' }}>
+          <div className="bento-full">
+            <Skeleton variant="rectangular" height={100} />
           </div>
-          <div>
-            <Skeleton variant="rectangular" height={340} />
-            <div style={{ marginTop: 'var(--space-lg)' }}>
-              <Skeleton variant="rectangular" height={200} />
-            </div>
+          <div className="bento-2-3">
+            <Skeleton variant="rectangular" height={260} />
+          </div>
+          <div className="bento-1-3">
+            <Skeleton variant="rectangular" height={260} />
           </div>
         </div>
       </div>
@@ -246,7 +256,7 @@ export default function Dashboard() {
           icon={<RefreshCw size={16} />}
           onClick={() => window.location.reload()}
         >
-          {'\u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1'}
+          נסה שוב
         </Button>
       </div>
     )
@@ -273,7 +283,13 @@ export default function Dashboard() {
         }}
       />
 
-      <MetricsGrid metrics={metrics} />
+      <PageHeader
+        title="דשבורד"
+        subtitle="סקירה כללית של ההוצאות וההכנסות שלך"
+        icon={LayoutDashboard}
+      />
+
+      <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
 
       {/* ── Spending Alerts ──────────────────────────────────────────── */}
       {(anomalies.length > 0 || recurring.length > 0 || forecast) && (
@@ -287,7 +303,7 @@ export default function Dashboard() {
             zIndex: 1,
           }}
         >
-          <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+          <div className="section-header-v2">
             <Bell size={18} />
             <span>התראות והמלצות</span>
           </div>
@@ -302,6 +318,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* ── Weekly Summary ──────────────────────────────────────────── */}
       {weeklySummary && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -330,7 +347,7 @@ export default function Dashboard() {
                   background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)',
                   color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
                 }}>
-                  {weeklySummary.change_pct > 0 ? '\u2191' : '\u2193'} {Math.abs(weeklySummary.change_pct)}%
+                  {weeklySummary.change_pct > 0 ? '↑' : '↓'} {Math.abs(weeklySummary.change_pct)}%
                 </span>
               )}
             </div>
@@ -338,56 +355,41 @@ export default function Dashboard() {
               {formatCurrency(weeklySummary.this_week.total)}
             </p>
             <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {weeklySummary.this_week.count} \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u00B7 {weeklySummary.this_week.top_category}
+              {weeklySummary.this_week.count} עסקאות · {weeklySummary.this_week.top_category}
             </p>
           </div>
 
           {/* Last week */}
           <div className="glass-card" style={{ padding: '16px 20px' }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>\u05E9\u05D1\u05D5\u05E2 \u05E9\u05E2\u05D1\u05E8</span>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>שבוע שעבר</span>
             <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>
               {formatCurrency(weeklySummary.last_week.total)}
             </p>
             <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {weeklySummary.last_week.count} \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u00B7 {weeklySummary.last_week.top_category}
+              {weeklySummary.last_week.count} עסקאות · {weeklySummary.last_week.top_category}
             </p>
           </div>
         </motion.div>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '3fr 2fr',
-          gap: 'var(--space-lg)',
-          marginTop: 'var(--space-xl)',
-        }}
-        className="dashboard-grid"
-      >
-        {/* Left column: Monthly + Weekday charts */}
-        <div>
-          <div className="section-title">
-            <Calendar size={20} />
-            <span>{'\u05D4\u05D5\u05E6\u05D0\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D7\u05D5\u05D3\u05E9'}</span>
+      {/* ── Main Charts: Bento Grid ─────────────────────────────────── */}
+      <div className="bento-grid" style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
+        {/* Monthly bar chart (2/3 width) */}
+        <div className="bento-2-3">
+          <div className="section-header-v2">
+            <Calendar size={18} />
+            <span>הוצאות לפי חודש</span>
           </div>
           <Card className="glass-card" padding="md">
             <BarChart data={monthlyChartData} />
           </Card>
-
-          <div className="section-title" style={{ marginTop: 'var(--space-lg)' }}>
-            <CalendarDays size={20} />
-            <span>{'\u05D4\u05EA\u05E4\u05DC\u05D2\u05D5\u05EA \u05DC\u05E4\u05D9 \u05D9\u05D5\u05DD \u05D1\u05E9\u05D1\u05D5\u05E2'}</span>
-          </div>
-          <Card className="glass-card" padding="md">
-            <WeekdayChart data={weekdayChartData} />
-          </Card>
         </div>
 
-        {/* Right column: Donut + Category list */}
-        <div>
-          <div className="section-title">
-            <PieChart size={20} />
-            <span>{'\u05D7\u05DC\u05D5\u05E7\u05D4 \u05DC\u05E4\u05D9 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D4'}</span>
+        {/* Donut chart (1/3 width) */}
+        <div className="bento-1-3">
+          <div className="section-header-v2">
+            <PieChart size={18} />
+            <span>חלוקה לפי קטגוריה</span>
           </div>
           <Card className="glass-card" padding="md">
             {donutChartData.data.length > 0 && (
@@ -396,10 +398,24 @@ export default function Dashboard() {
               </div>
             )}
           </Card>
+        </div>
 
-          <div className="section-title" style={{ marginTop: 'var(--space-lg)' }}>
-            <BarChart3 size={20} />
-            <span>{'\u05E4\u05D9\u05E8\u05D5\u05D8 \u05E7\u05D8\u05D2\u05D5\u05E8\u05D9\u05D5\u05EA'}</span>
+        {/* Weekday chart (1/3 width) */}
+        <div className="bento-1-3">
+          <div className="section-header-v2">
+            <CalendarDays size={18} />
+            <span>התפלגות לפי יום בשבוע</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <WeekdayChart data={weekdayChartData} />
+          </Card>
+        </div>
+
+        {/* Category list (2/3 width) */}
+        <div className="bento-2-3">
+          <div className="section-header-v2">
+            <BarChart3 size={18} />
+            <span>פירוט קטגוריות</span>
           </div>
           {categories.length > 0 && <CategoryList categories={categories} />}
         </div>
@@ -422,7 +438,7 @@ export default function Dashboard() {
           {/* Forecast card */}
           {forecast && (
             <Card variant="glass" padding="md">
-              <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+              <div className="section-header-v2" style={{ marginTop: 0 }}>
                 <TrendingUp size={18} />
                 <span>תחזית חודש הבא</span>
               </div>
@@ -450,7 +466,7 @@ export default function Dashboard() {
                         ? 'var(--accent-secondary, #10b981)'
                         : 'var(--text-muted)',
                 }}>
-                  {forecast.trend_direction === 'up' ? '↑' : forecast.trend_direction === 'down' ? '↓' : '→'} {forecast.trend_direction === 'up' ? 'עלייה' : forecast.trend_direction === 'down' ? 'ירידה' : 'יציב'}
+                  {forecast.trend_direction === 'up' ? '↑ עלייה' : forecast.trend_direction === 'down' ? '↓ ירידה' : '→ יציב'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
@@ -478,7 +494,7 @@ export default function Dashboard() {
           {/* Spending velocity card */}
           {velocity && (
             <Card variant="glass" padding="md">
-              <div className="section-title" style={{ marginBottom: 'var(--space-sm)' }}>
+              <div className="section-header-v2" style={{ marginTop: 0 }}>
                 <Zap size={18} />
                 <span>קצב הוצאות</span>
               </div>
@@ -523,16 +539,38 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Month-over-Month Comparison ──────────────────────────────── */}
-      {monthlyData && monthlyData.months.length >= 2 && (
+      {/* ── Heatmap ──────────────────────────────────────────────────── */}
+      {heatmapData && heatmapData.categories.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-title">
-            <BarChart3 size={20} />
+          <div className="section-header-v2">
+            <Grid3X3 size={18} />
+            <span>מפת חום לפי קטגוריה</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <HeatmapChart
+              categories={heatmapData.categories}
+              months={heatmapData.months}
+              data={heatmapData.data}
+            />
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ── Month-over-Month Comparison ──────────────────────────────── */}
+      {monthlyData && monthlyData.months.length >= 2 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <div className="section-header-v2">
+            <BarChart3 size={18} />
             <span>השוואה חודשית</span>
           </div>
           <Card className="glass-card" padding="md">
@@ -594,9 +632,6 @@ export default function Dashboard() {
       {/* Responsive: single column on mobile */}
       <style>{`
         @media (max-width: 768px) {
-          .dashboard-grid {
-            grid-template-columns: 1fr !important;
-          }
           .dashboard-premium-row {
             grid-template-columns: 1fr !important;
           }

@@ -13,6 +13,7 @@ import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
 import { transactionsApi } from '../services/api'
 import type { Income as IncomeType, MetricsData } from '../services/types'
+import PageHeader from '../components/common/PageHeader'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -324,10 +325,8 @@ export default function Income() {
     <div style={{ direction: 'rtl' }}>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {/* ─── Section title ──────────────────────────────────────────── */}
-      <div className="section-title">
-        <span>💰</span> ניהול הכנסות ותקציב
-      </div>
+      {/* ─── Page Header ────────────────────────────────────────────── */}
+      <PageHeader title="הכנסות" subtitle="ניהול ומעקב אחר ההכנסות שלך" icon={Wallet} />
 
       {/* ─── 2-column layout ────────────────────────────────────────── */}
       <div

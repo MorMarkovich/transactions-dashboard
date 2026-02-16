@@ -218,3 +218,14 @@ export interface SearchResult {
   results: Transaction[];
   total: number;
 }
+
+export interface SavingsGoal {
+  id: string
+  name: string
+  target_amount: number
+  current_amount: number
+  deadline?: string
+  category: string
+  color: string
+  created_at: string
+}

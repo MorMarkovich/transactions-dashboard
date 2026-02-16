@@ -6,18 +6,19 @@ interface CardProps {
   hover?: boolean
   onClick?: () => void
   padding?: 'none' | 'sm' | 'md' | 'lg'
-  variant?: 'default' | 'glass' | 'elevated'
+  variant?: 'default' | 'glass' | 'elevated' | 'stat'
   glowOnHover?: boolean
+  borderAccent?: string
 }
 
-const paddingMap: Record<NonNullable<CardProps['padding']>, string> = {
+const paddingMap: Record<string, string> = {
   none: 'p-0',
   sm: 'p-3',
   md: 'p-5',
   lg: 'p-7',
 }
 
-const variantStyles: Record<NonNullable<CardProps['variant']>, React.CSSProperties> = {
+const variantStyles: Record<string, React.CSSProperties> = {
   default: {
     background: 'var(--bg-card)',
     border: '1px solid var(--border-color)',
@@ -33,6 +34,12 @@ const variantStyles: Record<NonNullable<CardProps['variant']>, React.CSSProperti
     border: '1px solid var(--border-color)',
     boxShadow: 'var(--elevation-2, var(--shadow-lg))',
   },
+  stat: {
+    background: 'var(--glass-bg, rgba(255,255,255,0.05))',
+    backdropFilter: 'blur(var(--glass-blur, 12px))',
+    WebkitBackdropFilter: 'blur(var(--glass-blur, 12px))',
+    border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
+  },
 }
 
 export default function Card({
@@ -43,8 +50,20 @@ export default function Card({
   padding = 'md',
   variant = 'default',
   glowOnHover = false,
+  borderAccent,
 }: CardProps) {
   const isInteractive = hover || !!onClick
+  const isStat = variant === 'stat'
+
+  const style: React.CSSProperties = {
+    ...variantStyles[variant],
+    borderRadius: 'var(--radius-lg, 12px)',
+    transition: 'all 0.25s ease',
+  }
+
+  if (borderAccent) {
+    style.borderRight = `3px solid ${borderAccent}`
+  }
 
   return (
     <div
@@ -61,12 +80,8 @@ export default function Card({
             }
           : undefined
       }
-      className={`${paddingMap[padding]} ${isInteractive ? 'card-interactive' : ''} ${glowOnHover ? 'card-glow-hover' : ''} ${onClick ? 'cursor-pointer' : ''} ${className}`}
-      style={{
-        ...variantStyles[variant],
-        borderRadius: 'var(--radius-lg, 12px)',
-        transition: 'all 0.25s ease',
-      }}
+      className={`${isStat ? 'stat-card-compact' : paddingMap[padding]} ${isInteractive ? 'card-interactive' : ''} ${glowOnHover ? 'card-glow-hover' : ''} ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      style={style}
     >
       {children}
 
