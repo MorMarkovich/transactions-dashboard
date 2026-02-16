@@ -3,8 +3,13 @@ Authentication & Database module using Supabase
 Session persistence via st.query_params (survives refresh, no external deps)
 """
 import streamlit as st
-from supabase import create_client, Client
 from typing import Optional
+
+try:
+    from supabase import create_client, Client
+except ImportError:
+    create_client = None  # type: ignore
+    Client = None  # type: ignore
 import re
 import json
 
@@ -14,6 +19,8 @@ import json
 # =============================================================================
 @st.cache_resource
 def _get_client():
+    if create_client is None:
+        return None
     try:
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["key"]
