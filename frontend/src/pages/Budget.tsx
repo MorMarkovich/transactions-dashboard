@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/common/PageHeader'
+import RadialProgress from '../components/ui/RadialProgress'
 import EmptyState from '../components/common/EmptyState'
 import Skeleton from '../components/ui/Skeleton'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
@@ -139,6 +141,16 @@ export default function Budget() {
     }
   }, [goals, categorySpending])
 
+  // Overall budget health: average of all individual goal percentages
+  const overallBudgetHealth = useMemo(() => {
+    if (goals.length === 0) return 0
+    const totalPct = goals.reduce((sum, goal) => {
+      const spent = categorySpending.get(goal.category) ?? 0
+      return sum + Math.min(100, (spent / goal.limit) * 100)
+    }, 0)
+    return totalPct / goals.length
+  }, [goals, categorySpending])
+
   // Handlers
   const addGoal = useCallback(() => {
     if (!newCategory || !newLimit || Number(newLimit) <= 0) return
@@ -191,10 +203,34 @@ export default function Budget() {
   return (
     <div style={{ direction: 'rtl' }}>
       {/* ─── Header ─────────────────────────────────────────────────── */}
-      <div className="section-title">
-        <Target size={20} />
-        <span>ניהול תקציב</span>
-      </div>
+      <PageHeader title="תקציב" subtitle="הגדרת יעדי תקציב ומעקב" icon={Target} />
+
+      {/* ─── Overall Budget Health ────────────────────────────────── */}
+      {goals.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+          style={{ marginBottom: 'var(--space-xl)' }}
+        >
+          <Card className="glass-card" padding="md">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-md) 0' }}>
+              <RadialProgress
+                value={overallBudgetHealth}
+                size={140}
+                label="בריאות תקציב"
+                color={
+                  overallBudgetHealth > 90
+                    ? 'var(--danger)'
+                    : overallBudgetHealth > 70
+                    ? 'var(--warning)'
+                    : 'var(--success)'
+                }
+              />
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* ─── Summary Cards ─────────────────────────────────────────── */}
       {goals.length > 0 && (
@@ -300,7 +336,7 @@ export default function Budget() {
 
       {/* ─── Budget Goals List ─────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
-        <div className="section-title" style={{ marginBottom: 0 }}>
+        <div className="section-header-v2" style={{ marginBottom: 0 }}>
           <span>📊</span>
           <span>יעדי תקציב ({goals.length})</span>
         </div>
@@ -449,51 +485,38 @@ export default function Budget() {
                     </button>
                   </div>
 
-                  {/* Progress bar */}
-                  <div
-                    style={{
-                      height: '8px',
-                      borderRadius: '4px',
-                      background: 'var(--bg-tertiary, rgba(255,255,255,0.06))',
-                      overflow: 'hidden',
-                      marginBottom: '12px',
-                    }}
-                  >
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(pct, 100)}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                      style={{
-                        height: '100%',
-                        borderRadius: '4px',
-                        background: isOver
-                          ? 'linear-gradient(90deg, #ef4444, #f87171)'
-                          : isWarning
-                            ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-                            : 'linear-gradient(90deg, #10b981, #34d399)',
-                      }}
+                  {/* Radial Progress + Stats */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                    <RadialProgress
+                      value={Math.min(100, (spent / goal.limit) * 100)}
+                      size={80}
+                      color={
+                        pct > 90
+                          ? 'var(--danger)'
+                          : pct > 70
+                          ? 'var(--warning)'
+                          : 'var(--success)'
+                      }
                     />
-                  </div>
-
-                  {/* Stats */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הוצאה</div>
-                      <span
-                        style={{
-                          fontSize: '1.125rem',
-                          fontWeight: 700,
-                          color: isOver ? 'var(--accent-danger, #ef4444)' : 'var(--text-primary)',
-                        }}
-                      >
-                        {formatCurrency(spent)}
-                      </span>
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>תקציב</div>
-                      <span style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {formatCurrency(goal.limit)}
-                      </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ marginBottom: '6px' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הוצאה</div>
+                        <span
+                          style={{
+                            fontSize: '1.125rem',
+                            fontWeight: 700,
+                            color: isOver ? 'var(--accent-danger, #ef4444)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {formatCurrency(spent)}
+                        </span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>תקציב</div>
+                        <span style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {formatCurrency(goal.limit)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -537,7 +560,7 @@ export default function Budget() {
           transition={{ delay: 0.3, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-title">
+          <div className="section-header-v2">
             <span>💰</span>
             <span>סיכום כללי</span>
           </div>

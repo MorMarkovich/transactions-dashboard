@@ -22,6 +22,7 @@
   overflow-y: auto;
   min-height: calc(100vh - var(--header-height, 64px));
   max-width: 100%;
+  transition: max-width var(--transition-normal);
 }
 
 /* ========== Sidebar Overlay (mobile) ========== */
@@ -62,6 +63,10 @@
 /* ========== Desktop >= 1024px ========== */
 @media (min-width: 1024px) {
   .main-content {
-    max-width: calc(100vw - 280px);
+    max-width: calc(100vw - var(--sidebar-width, 260px));
+  }
+
+  .sidebar-is-collapsed .main-content {
+    max-width: calc(100vw - var(--sidebar-collapsed-width, 72px));
   }
 }
