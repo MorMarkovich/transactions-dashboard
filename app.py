@@ -107,7 +107,7 @@ html, body, .stApp {{
                 radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.05) 0%, transparent 60%);
     animation: meshDrift 20s ease-in-out infinite;
     pointer-events: none;
-    z-index: 0;
+    z-index: -1;
     {'opacity: 1;' if IS_DARK else 'opacity: 0.3;'}
 }}
 /* Smooth rendering */
@@ -3645,7 +3645,7 @@ def render_auth_page():
                     radial-gradient(ellipse at 70% 70%, rgba(167,139,250,0.1) 0%, transparent 50%),
                     radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.06) 0%, transparent 60%);
         animation: meshDrift 20s ease-in-out infinite;
-        pointer-events: none; z-index: 0;
+        pointer-events: none; z-index: -1;
     }}
     </style>
     """, unsafe_allow_html=True)
