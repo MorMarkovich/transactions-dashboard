@@ -1,13 +1,73 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { List } from 'lucide-react'
+import { Receipt, Hash, DollarSign, Calculator } from 'lucide-react'
 import TransactionsTable from '../components/table/TransactionsTable'
 import TransactionDrawer from '../components/table/TransactionDrawer'
 import AdvancedFilters from '../components/table/AdvancedFilters'
 import EmptyState from '../components/common/EmptyState'
+import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
+import { formatCurrency } from '../utils/formatting'
 import type { Transaction, TransactionFilters } from '../services/types'
+
+// ---------------------------------------------------------------------------
+// Date chip configuration
+// ---------------------------------------------------------------------------
+interface DateChip {
+  label: string
+  key: string
+  getRange: () => { startDate?: string; endDate?: string }
+}
+
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
+const DATE_CHIPS: DateChip[] = [
+  {
+    label: 'הכל',
+    key: 'all',
+    getRange: () => ({}),
+  },
+  {
+    label: 'היום',
+    key: 'today',
+    getRange: () => {
+      const today = toISODate(new Date())
+      return { startDate: today, endDate: today }
+    },
+  },
+  {
+    label: 'השבוע',
+    key: 'week',
+    getRange: () => {
+      const now = new Date()
+      const dayOfWeek = now.getDay()
+      const start = new Date(now)
+      start.setDate(now.getDate() - dayOfWeek)
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+  {
+    label: 'החודש',
+    key: 'month',
+    getRange: () => {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+  {
+    label: '3 חודשים',
+    key: '3months',
+    getRange: () => {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+]
 
 // ---------------------------------------------------------------------------
 // Component
@@ -24,7 +84,17 @@ export default function Transactions() {
   // Filter / pagination state
   const [page, setPage] = useState(1)
   const [pageSize] = useState(50)
-  const [filters, setFilters] = useState<{ search?: string; category?: string }>({})
+  const [filters, setFilters] = useState<{
+    search?: string
+    category?: string
+    startDate?: string
+    endDate?: string
+    minAmount?: number
+    maxAmount?: number
+  }>({})
+
+  // Date chip state
+  const [activeDateChip, setActiveDateChip] = useState('all')
 
   // Drawer state
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
@@ -64,6 +134,8 @@ export default function Transactions() {
         page_size: pageSize,
         search: filters.search,
         category: filters.category,
+        start_date: filters.startDate,
+        end_date: filters.endDate,
       }
 
       try {
@@ -87,12 +159,36 @@ export default function Transactions() {
     return () => controller.abort()
   }, [sessionId, filters, page, pageSize])
 
+  // ---- Computed stats -------------------------------------------------------
+  const stats = useMemo(() => {
+    const totalAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx['סכום'] ?? 0), 0)
+    const count = total
+    const avg = count > 0 ? totalAmount / Math.min(count, transactions.length) : 0
+    return { count, totalAmount, avg }
+  }, [transactions, total])
+
   // ---- Handlers -----------------------------------------------------------
 
   const handleFilterChange = useCallback(
     (newFilters: { search?: string; category?: string; startDate?: string; endDate?: string; minAmount?: number; maxAmount?: number }) => {
       setFilters(newFilters)
       setPage(1) // reset to first page on filter change
+      // If user manually changes date in advanced filters, reset the chip
+      setActiveDateChip('all')
+    },
+    [],
+  )
+
+  const handleDateChipClick = useCallback(
+    (chip: DateChip) => {
+      setActiveDateChip(chip.key)
+      const range = chip.getRange()
+      setFilters((prev) => ({
+        ...prev,
+        startDate: range.startDate,
+        endDate: range.endDate,
+      }))
+      setPage(1)
     },
     [],
   )
@@ -134,9 +230,41 @@ export default function Transactions() {
   // ---- Render -------------------------------------------------------------
   return (
     <div>
-      <div className="section-title">
-        <List size={20} />
-        <span>{'\u05E8\u05E9\u05D9\u05DE\u05EA \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA'}</span>
+      <PageHeader
+        title="עסקאות"
+        subtitle="צפייה וניהול העסקאות שלך"
+        icon={Receipt}
+      />
+
+      {/* ── Compact Stats Row ─────────────────────────────────────────── */}
+      <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-md)' }}>
+        <div className="stat-card-compact glass-card">
+          <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
+            <Hash size={18} color="#fff" />
+          </div>
+          <div className="stat-content">
+            <div className="stat-value">{stats.count.toLocaleString('he-IL')}</div>
+            <div className="stat-label">סה"כ עסקאות</div>
+          </div>
+        </div>
+        <div className="stat-card-compact glass-card">
+          <div className="stat-icon" style={{ background: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b, #38f9d7))' }}>
+            <DollarSign size={18} color="#fff" />
+          </div>
+          <div className="stat-content">
+            <div className="stat-value">{formatCurrency(stats.totalAmount)}</div>
+            <div className="stat-label">סכום כולל</div>
+          </div>
+        </div>
+        <div className="stat-card-compact glass-card">
+          <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
+            <Calculator size={18} color="#fff" />
+          </div>
+          <div className="stat-content">
+            <div className="stat-value">{formatCurrency(stats.avg)}</div>
+            <div className="stat-label">ממוצע לעסקה</div>
+          </div>
+        </div>
       </div>
 
       <AdvancedFilters
@@ -145,6 +273,23 @@ export default function Transactions() {
         categories={categories}
         loading={loading}
       />
+
+      {/* ── Quick Date Filter Chips ───────────────────────────────────── */}
+      <div className="filter-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+        {DATE_CHIPS.map((chip) => (
+          <button
+            key={chip.key}
+            className={`filter-chip${activeDateChip === chip.key ? ' active' : ''}`}
+            onClick={() => handleDateChipClick(chip)}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="section-header-v2">
+        <span>רשימת עסקאות</span>
+      </div>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'var(--space-md)' }}>

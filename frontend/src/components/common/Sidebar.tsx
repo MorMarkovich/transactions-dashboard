@@ -13,29 +13,58 @@ import {
   Loader2,
   X,
   FolderOpen,
+  PiggyBank,
+  LogOut,
+  ChevronsLeft,
+  ChevronsRight,
+  Info,
 } from 'lucide-react'
 import Badge from '../ui/Badge'
+import { useAuth } from '../../lib/AuthContext'
 import { transactionsApi } from '../../services/api'
 import './Sidebar.css'
 
 // ─── Types ────────────────────────────────────────────────────────────
 interface SidebarProps {
   isOpen: boolean
+  collapsed?: boolean
   onClose?: () => void
   onFileUploaded?: (sessionId: string) => void
+  onToggleCollapse?: () => void
 }
 
-// ─── Navigation Items ─────────────────────────────────────────────────
-const NAV_ITEMS = [
-  { to: '/', label: 'דשבורד', icon: LayoutDashboard },
-  { to: '/transactions', label: 'עסקאות', icon: Receipt },
-  { to: '/trends', label: 'מגמות', icon: TrendingUp },
-  { to: '/insights', label: 'תובנות', icon: Lightbulb },
-  { to: '/merchants', label: 'בתי עסק', icon: Store },
-  { to: '/budget', label: 'תקציב', icon: Target },
-  { to: '/income', label: 'הכנסות', icon: Wallet },
-  { to: '/data-management', label: 'ניהול מידע', icon: Database },
-] as const
+// ─── Navigation Sections ─────────────────────────────────────────────
+const NAV_SECTIONS = [
+  {
+    label: 'ראשי',
+    items: [
+      { to: '/', label: 'דשבורד', icon: LayoutDashboard },
+      { to: '/transactions', label: 'עסקאות', icon: Receipt },
+    ],
+  },
+  {
+    label: 'ניתוח',
+    items: [
+      { to: '/trends', label: 'מגמות', icon: TrendingUp },
+      { to: '/insights', label: 'תובנות', icon: Lightbulb },
+      { to: '/merchants', label: 'בתי עסק', icon: Store },
+    ],
+  },
+  {
+    label: 'תקציב',
+    items: [
+      { to: '/budget', label: 'תקציב', icon: Target },
+      { to: '/income', label: 'הכנסות', icon: Wallet },
+      { to: '/savings', label: 'חיסכון', icon: PiggyBank },
+    ],
+  },
+  {
+    label: 'ניהול',
+    items: [
+      { to: '/data-management', label: 'ניהול מידע', icon: Database },
+    ],
+  },
+]
 
 // ─── Supported Formats ────────────────────────────────────────────────
 const SUPPORTED_FORMATS = [
@@ -46,18 +75,33 @@ const SUPPORTED_FORMATS = [
   { label: 'CSV', variant: 'default' as const },
 ]
 
-export default function Sidebar({ isOpen, onClose, onFileUploaded }: SidebarProps) {
+export default function Sidebar({
+  isOpen,
+  collapsed = false,
+  onClose,
+  onFileUploaded,
+  onToggleCollapse,
+}: SidebarProps) {
   const [searchParams] = useSearchParams()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showFormats, setShowFormats] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user, signOut } = useAuth()
 
-  // Preserve session_id across navigation
   const sessionId = searchParams.get('session_id')
 
-  /**
-   * Build target URL preserving the current session_id query param.
-   */
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.email?.split('@')[0] ||
+    'משתמש'
+
+  const initials = displayName
+    .split(' ')
+    .map((w: string) => w[0])
+    .join('')
+    .slice(0, 2)
+
   function buildNavHref(basePath: string): string {
     if (sessionId) {
       return `${basePath}?session_id=${sessionId}`
@@ -65,9 +109,6 @@ export default function Sidebar({ isOpen, onClose, onFileUploaded }: SidebarProp
     return basePath
   }
 
-  /**
-   * Handle file selection and upload.
-   */
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -87,7 +128,6 @@ export default function Sidebar({ isOpen, onClose, onFileUploaded }: SidebarProp
       setError(typeof detail === 'string' ? detail : 'שגיאה בהעלאת הקובץ')
     } finally {
       setUploading(false)
-      // Reset file input so the same file can be re-uploaded
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -95,7 +135,7 @@ export default function Sidebar({ isOpen, onClose, onFileUploaded }: SidebarProp
   }
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       {/* ─── Close button (mobile only) ─── */}
       <button
         className="sidebar-close-btn"
@@ -107,89 +147,141 @@ export default function Sidebar({ isOpen, onClose, onFileUploaded }: SidebarProp
 
       {/* ─── Navigation ─── */}
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={buildNavHref(to)}
-            end={to === '/'}
-            className={({ isActive }) =>
-              `sidebar-nav-link ${isActive ? 'active' : ''}`
-            }
-            onClick={() => {
-              // Close sidebar on mobile after navigation
-              if (window.innerWidth < 1024) {
-                onClose?.()
-              }
-            }}
-          >
-            <span className="nav-icon">
-              <Icon size={18} />
-            </span>
-            <span className="nav-label">{label}</span>
-          </NavLink>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label} className="sidebar-section">
+            {!collapsed && (
+              <div className="nav-section-label">{section.label}</div>
+            )}
+            {collapsed && <div className="sidebar-section-divider" />}
+            {section.items.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={buildNavHref(to)}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `sidebar-nav-link ${isActive ? 'active' : ''}`
+                }
+                onClick={() => {
+                  if (window.innerWidth < 1024) {
+                    onClose?.()
+                  }
+                }}
+                title={collapsed ? label : undefined}
+              >
+                <span className="nav-icon">
+                  <Icon size={18} />
+                </span>
+                {!collapsed && <span className="nav-label">{label}</span>}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 
-      {/* ─── Divider ─── */}
-      <div className="sidebar-divider" />
+      {/* ─── Collapse Toggle (desktop only) ─── */}
+      <button
+        className="sidebar-collapse-btn"
+        onClick={onToggleCollapse}
+        aria-label={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+        title={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+      >
+        {collapsed ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
+      </button>
 
       {/* ─── File Upload Section ─── */}
-      <div className="sidebar-upload-section">
-        <div className="sidebar-upload-title">
-          <FolderOpen size={16} />
-          <span>העלאת קובץ</span>
-        </div>
+      {!collapsed && (
+        <>
+          <div className="sidebar-divider" />
+          <div className="sidebar-upload-section">
+            <div className="sidebar-upload-title">
+              <FolderOpen size={16} />
+              <span>העלאת קובץ</span>
+              <button
+                className="sidebar-info-btn"
+                onClick={() => setShowFormats(!showFormats)}
+                aria-label="פורמטים נתמכים"
+                title="פורמטים נתמכים"
+              >
+                <Info size={14} />
+              </button>
+            </div>
 
-        <div className="file-upload-area">
-          <input
-            ref={fileInputRef}
-            type="file"
-            id="sidebar-file-upload"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileUpload}
-            disabled={uploading}
-            style={{ display: 'none' }}
-          />
-          <label
-            htmlFor="sidebar-file-upload"
-            className={`file-upload-label ${uploading ? 'uploading' : ''}`}
-          >
-            {uploading ? (
-              <>
-                <Loader2
-                  size={24}
-                  style={{
-                    color: 'var(--accent)',
-                    animation: 'spin 1s linear infinite',
-                  }}
-                />
-                <span>מעלה קובץ...</span>
-              </>
-            ) : (
-              <>
-                <Upload size={24} style={{ color: 'var(--accent)' }} />
-                <span>גרור קובץ או לחץ לבחירה</span>
-                <span className="file-upload-hint">.xlsx, .xls, .csv</span>
-              </>
+            <div className="file-upload-area">
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="sidebar-file-upload"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                style={{ display: 'none' }}
+              />
+              <label
+                htmlFor="sidebar-file-upload"
+                className={`file-upload-label ${uploading ? 'uploading' : ''}`}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2
+                      size={20}
+                      style={{
+                        color: 'var(--accent)',
+                        animation: 'spin 1s linear infinite',
+                      }}
+                    />
+                    <span>מעלה קובץ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={20} style={{ color: 'var(--accent)' }} />
+                    <span>גרור קובץ או לחץ לבחירה</span>
+                    <span className="file-upload-hint">.xlsx, .xls, .csv</span>
+                  </>
+                )}
+              </label>
+            </div>
+
+            {error && <div className="sidebar-error">{error}</div>}
+
+            {showFormats && (
+              <div className="sidebar-formats">
+                <div className="sidebar-formats-title">פורמטים נתמכים</div>
+                <div className="sidebar-formats-list">
+                  {SUPPORTED_FORMATS.map(({ label, variant }) => (
+                    <Badge key={label} variant={variant} size="sm">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             )}
-          </label>
-        </div>
+          </div>
+        </>
+      )}
 
-        {error && (
-          <div className="sidebar-error">{error}</div>
+      {/* ─── User Profile Area ─── */}
+      <div className={`sidebar-profile ${collapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar-profile-avatar">
+          {initials}
+        </div>
+        {!collapsed && (
+          <>
+            <div className="sidebar-profile-info">
+              <span className="sidebar-profile-name">{displayName}</span>
+              <span className="sidebar-profile-email">
+                {user?.email || ''}
+              </span>
+            </div>
+            <button
+              onClick={() => signOut()}
+              className="sidebar-signout-btn"
+              aria-label="התנתק"
+              title="התנתק"
+            >
+              <LogOut size={16} />
+            </button>
+          </>
         )}
-      </div>
-
-      {/* ─── Supported Formats ─── */}
-      <div className="sidebar-formats">
-        <div className="sidebar-formats-title">פורמטים נתמכים</div>
-        <div className="sidebar-formats-list">
-          {SUPPORTED_FORMATS.map(({ label, variant }) => (
-            <Badge key={label} variant={variant} size="sm">
-              {label}
-            </Badge>
-          ))}
-        </div>
       </div>
 
       {/* ─── Spinner keyframes ─── */}

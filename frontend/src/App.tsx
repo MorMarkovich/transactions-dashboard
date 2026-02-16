@@ -16,6 +16,7 @@ const Merchants = lazy(() => import('./pages/Merchants'))
 const Income = lazy(() => import('./pages/Income'))
 const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Budget = lazy(() => import('./pages/Budget'))
+const SavingsGoals = lazy(() => import('./pages/SavingsGoals'))
 
 function PageLoader() {
   return (
@@ -124,6 +125,16 @@ function AppRoutes() {
             <ProtectedRoute>
               <Layout>
                 <Budget />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/savings"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SavingsGoals />
               </Layout>
             </ProtectedRoute>
           }

@@ -108,6 +108,13 @@
   /* Card hover glow */
   --card-glow: 0 0 0 1px var(--glass-border), 0 0 20px rgba(129, 140, 248, 0.08);
   --card-glow-hover: 0 0 0 1px var(--glass-border-hover), 0 0 30px rgba(129, 140, 248, 0.15);
+
+  /* Stat Card Gradients */
+  --gradient-stat-purple: linear-gradient(135deg, rgba(129, 140, 248, 0.1) 0%, rgba(167, 139, 250, 0.04) 100%);
+  --gradient-stat-green: linear-gradient(135deg, rgba(52, 211, 153, 0.1) 0%, rgba(110, 231, 183, 0.04) 100%);
+  --gradient-stat-red: linear-gradient(135deg, rgba(248, 113, 113, 0.1) 0%, rgba(251, 146, 60, 0.04) 100%);
+  --gradient-stat-blue: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(59, 130, 246, 0.04) 100%);
+  --gradient-stat-yellow: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(252, 211, 77, 0.04) 100%);
 }
 
 /* ========== Light Theme ========== */
@@ -217,6 +224,13 @@
   /* Card hover glow */
   --card-glow: 0 0 0 1px var(--glass-border), 0 0 15px rgba(99, 102, 241, 0.05);
   --card-glow-hover: 0 0 0 1px var(--glass-border-hover), 0 0 25px rgba(99, 102, 241, 0.1);
+
+  /* Stat Card Gradients */
+  --gradient-stat-purple: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.03) 100%);
+  --gradient-stat-green: linear-gradient(135deg, rgba(5, 150, 105, 0.08) 0%, rgba(52, 211, 153, 0.03) 100%);
+  --gradient-stat-red: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, rgba(248, 113, 113, 0.03) 100%);
+  --gradient-stat-blue: linear-gradient(135deg, rgba(2, 132, 199, 0.08) 0%, rgba(56, 189, 248, 0.03) 100%);
+  --gradient-stat-yellow: linear-gradient(135deg, rgba(217, 119, 6, 0.08) 0%, rgba(251, 191, 36, 0.03) 100%);
 }
 
 /* ========== Shared Properties (Theme-Independent) ========== */
@@ -299,6 +313,11 @@
   --z-popover: 60;
   --z-tooltip: 70;
   --z-toast: 80;
+
+  /* Typography Scale (Display) */
+  --text-display: 2.5rem;
+  --text-heading: 1.25rem;
+  --text-subheading: 1rem;
 
   /* Layout */
   --sidebar-width: 260px;
