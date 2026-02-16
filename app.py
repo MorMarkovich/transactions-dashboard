@@ -43,26 +43,43 @@ IS_DARK = st.session_state.theme == 'dark'
 
 # Color tokens
 T = {
-    'bg':        '#0c111d' if IS_DARK else '#f8fafc',
-    'surface':   '#161d2f' if IS_DARK else '#ffffff',
-    'surface2':  '#1e2740' if IS_DARK else '#f1f5f9',
-    'border':    'rgba(255,255,255,0.07)' if IS_DARK else 'rgba(0,0,0,0.08)',
-    'border_h':  'rgba(255,255,255,0.14)' if IS_DARK else 'rgba(0,0,0,0.14)',
+    'bg':        '#0b1120' if IS_DARK else '#f8fafc',
+    'surface':   '#1a2235' if IS_DARK else '#ffffff',
+    'surface2':  '#253046' if IS_DARK else '#f1f5f9',
+    'border':    'rgba(255,255,255,0.08)' if IS_DARK else 'rgba(0,0,0,0.08)',
+    'border_h':  'rgba(255,255,255,0.15)' if IS_DARK else 'rgba(0,0,0,0.15)',
     'text1':     '#f1f5f9' if IS_DARK else '#0f172a',
     'text2':     '#94a3b8' if IS_DARK else '#64748b',
     'text3':     '#64748b' if IS_DARK else '#94a3b8',
     'accent':    '#818cf8',
+    'accent2':   '#a78bfa',
     'accent_bg': 'rgba(129,140,248,0.12)' if IS_DARK else 'rgba(99,102,241,0.08)',
     'green':     '#34d399',
     'green_bg':  'rgba(52,211,153,0.12)',
     'red':       '#f87171',
     'red_bg':    'rgba(248,113,113,0.12)',
     'amber':     '#fbbf24',
-    'chart_bg':  'rgba(0,0,0,0)' ,
+    'amber_bg':  'rgba(251,191,36,0.15)',
+    'info':      '#38bdf8',
+    'info_bg':   'rgba(56,189,248,0.15)',
+    'chart_bg':  'rgba(0,0,0,0)',
     'grid':      'rgba(255,255,255,0.04)' if IS_DARK else 'rgba(0,0,0,0.04)',
     'sidebar':   '#0f1525' if IS_DARK else '#ffffff',
     'input':     '#1e2740' if IS_DARK else '#f1f5f9',
+    'glass_bg':  'rgba(15,23,42,0.65)' if IS_DARK else 'rgba(255,255,255,0.7)',
+    'glass_border': 'rgba(255,255,255,0.08)' if IS_DARK else 'rgba(0,0,0,0.06)',
+    'glass_blur': '16px',
+    'elevated':  '#253046' if IS_DARK else '#ffffff',
+    'card_hover':'#212d42' if IS_DARK else '#f1f5f9',
+    'neon_glow': 'rgba(129,140,248,0.2)',
+    'font_mono': "'JetBrains Mono', 'Fira Code', monospace",
 }
+
+# Session state for new features
+if 'savings_goals' not in st.session_state:
+    st.session_state.savings_goals = []
+if 'dismissed_alerts' not in st.session_state:
+    st.session_state.dismissed_alerts = set()
 
 # Unified chart palette
 CHART_COLORS = ['#818cf8', '#34d399', '#f87171', '#38bdf8', '#fbbf24', '#a78bfa', '#fb923c', '#94a3b8']
@@ -74,12 +91,24 @@ st.markdown('<meta name="viewport" content="width=device-width, initial-scale=1.
 st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* === Reset & Base === */
 *, *::before, *::after {{ font-family: 'Heebo', sans-serif !important; box-sizing: border-box; }}
 html, body, .stApp {{
     background: {T['bg']} !important; color: {T['text1']}; direction: rtl; text-align: right;
-    {'background-image: radial-gradient(ellipse at 70% 10%, rgba(129,140,248,0.04) 0%, transparent 50%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.03) 0%, transparent 50%) !important;' if IS_DARK else ''}
+    position: relative;
+}}
+.stApp::before {{
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(129,140,248,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(167,139,250,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.05) 0%, transparent 60%);
+    animation: meshDrift 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 0;
+    {'opacity: 1;' if IS_DARK else 'opacity: 0.3;'}
 }}
 /* Smooth rendering */
 * {{ -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }}
@@ -106,10 +135,12 @@ button[aria-label="Expand sidebar"],
 
 /* === Sidebar === */
 section[data-testid="stSidebar"] {{
-    background: {'linear-gradient(180deg, #0f1525 0%, #0c111d 100%)' if IS_DARK else '#ffffff'} !important;
-    border-left: 1px solid {T['border']};
+    background: {T['glass_bg']} !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-left: 1px solid {T['glass_border']};
     min-width: 280px !important; max-width: 310px !important; width: 295px !important;
-    box-shadow: {'-4px 0 20px rgba(0,0,0,0.15)' if IS_DARK else '-2px 0 10px rgba(0,0,0,0.04)'};
+    box-shadow: {'-4px 0 30px rgba(0,0,0,0.2)' if IS_DARK else '-2px 0 10px rgba(0,0,0,0.04)'};
 }}
 section[data-testid="stSidebar"] > div {{
     direction: rtl; text-align: right;
@@ -201,9 +232,14 @@ section[data-testid="stSidebar"] > div {{
 .section-label {{
     display: flex; align-items: center; gap: 8px;
     color: {T['text1']}; font-weight: 700; font-size: 0.95rem;
-    margin: 0.75rem 0 0.85rem; padding-bottom: 0.6rem;
-    border-bottom: 2px solid {T['border']};
-    letter-spacing: 0.2px;
+    margin: 1.25rem 0 1rem; padding-right: 0.85rem;
+    position: relative; letter-spacing: 0.2px;
+}}
+.section-label::before {{
+    content: '';
+    position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 70%; border-radius: 99px;
+    background: linear-gradient(135deg, {T['accent']}, #a78bfa);
 }}
 
 /* === KPI Cards === */
@@ -211,15 +247,18 @@ section[data-testid="stSidebar"] > div {{
 @media(max-width:900px) {{ .kpi-row {{ grid-template-columns: repeat(2,1fr); }} }}
 @media(max-width:500px) {{ .kpi-row {{ grid-template-columns: 1fr; }} }}
 .kpi {{
-    background: {T['surface']};
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']});
+    -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 16px; padding: 1.25rem 1rem; text-align: center;
     position: relative; overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }}
 .kpi::before {{
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     background: linear-gradient(90deg, {T['accent']}, #a78bfa);
-    opacity: 0; transition: opacity 0.2s;
+    opacity: 0; transition: opacity 0.25s;
 }}
 .kpi:hover::before {{ opacity: 1; }}
 .kpi-icon {{
@@ -227,19 +266,21 @@ section[data-testid="stSidebar"] > div {{
     display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }}
-.kpi-val {{ font-size: 1.65rem; font-weight: 800; color: {T['text1']}; direction: ltr; letter-spacing: -0.5px; }}
+.kpi-val {{ font-size: 1.65rem; font-weight: 800; color: {T['text1']}; direction: ltr; letter-spacing: -0.5px; font-family: {T['font_mono']} !important; font-variant-numeric: tabular-nums; }}
 .kpi-label {{ font-size: 0.78rem; color: {T['text2']}; margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }}
 
 /* === Category Cards === */
 .cat-card {{
-    background: {T['surface']};
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']});
+    -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 14px; padding: 0.9rem 1.1rem;
     margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.9rem;
-    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
     cursor: default;
 }}
-.cat-card:hover {{ border-color: {T['accent']}40; background: {T['surface2']}; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
+.cat-card:hover {{ border-color: {T['accent']}40; background: {T['card_hover']}; box-shadow: 0 4px 20px rgba(0,0,0,0.1), 0 0 15px {T['neon_glow']}; transform: translateX(-3px); }}
 .cat-icon {{
     width: 40px; height: 40px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0;
@@ -249,18 +290,19 @@ section[data-testid="stSidebar"] > div {{
 .cat-bar-bg {{ height: 5px; background: {T['surface2']}; border-radius: 99px; overflow: hidden; }}
 .cat-bar {{ height: 100%; border-radius: 99px; }}
 .cat-stats {{ text-align: left; direction: ltr; flex-shrink: 0; }}
-.cat-amount {{ font-weight: 700; font-size: 0.9rem; color: {T['text1']}; }}
+.cat-amount {{ font-weight: 700; font-size: 0.9rem; color: {T['text1']}; font-family: {T['font_mono']} !important; font-variant-numeric: tabular-nums; }}
 .cat-pct {{ font-size: 0.7rem; color: {T['text2']}; }}
 
 /* === Feature Cards (empty state) === */
 .feat-row {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-top: 1.5rem; }}
 @media(max-width:700px) {{ .feat-row {{ grid-template-columns: 1fr; }} }}
 .feat {{
-    background: {T['surface']}; border: 1px solid {T['border']};
+    background: {T['glass_bg']}; border: 1px solid {T['glass_border']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
     border-radius: 14px; padding: 2rem 1.5rem; text-align: center;
-    transition: border-color 0.2s, transform 0.2s;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }}
-.feat:hover {{ border-color: {T['accent']}; transform: translateY(-3px); }}
+.feat:hover {{ border-color: {T['accent']}; transform: translateY(-3px); box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px {T['neon_glow']}; }}
 .feat-icon {{ font-size: 2rem; margin-bottom: 0.75rem; }}
 .feat-title {{ font-weight: 600; color: {T['text1']}; font-size: 1rem; }}
 .feat-desc {{ color: {T['text2']}; font-size: 0.82rem; margin-top: 4px; }}
@@ -305,16 +347,17 @@ ul[role="listbox"] li[aria-selected="true"] {{ background: {T['accent']} !import
 
 /* === Tabs === */
 .stTabs [data-baseweb="tab-list"] {{
-    gap: 2px; background: {T['surface']}; border-radius: 12px; padding: 4px;
-    direction: rtl; border: 1px solid {T['border']};
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    gap: 3px; background: {T['glass_bg']}; border-radius: 99px; padding: 4px;
+    direction: rtl; border: 1px solid {T['glass_border']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }}
 .stTabs [data-baseweb="tab"] {{
-    background: transparent; border-radius: 10px; color: {T['text3']};
+    background: transparent; border-radius: 99px; color: {T['text3']};
     padding: 0.55rem 0.9rem; font-weight: 500; font-size: 0.85rem;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
 }}
-.stTabs [data-baseweb="tab"]:hover {{ color: {T['text1']}; background: {T['surface2']}; }}
+.stTabs [data-baseweb="tab"]:hover {{ color: {T['text1']}; background: {T['surface2']}80; }}
 .stTabs [aria-selected="true"] {{
     background: linear-gradient(135deg, {T['accent']}, #a78bfa) !important;
     color: #fff !important;
@@ -324,9 +367,15 @@ ul[role="listbox"] li[aria-selected="true"] {{ background: {T['accent']} !import
 
 /* === Chart containers === */
 div[data-testid="stPlotlyChart"] {{
-    background: {T['surface']}; border: 1px solid {T['border']};
+    background: {T['glass_bg']}; border: 1px solid {T['glass_border']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
     border-radius: 16px; padding: 1rem; margin-bottom: 0.85rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}}
+div[data-testid="stPlotlyChart"]:hover {{
+    border-color: {T['border_h']};
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 0 20px rgba(129,140,248,0.06);
 }}
 
 /* === Buttons === */
@@ -378,7 +427,7 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 .stSpinner > div {{ border-color: {T['accent']} transparent transparent transparent !important; }}
 
 /* === Expander === */
-[data-testid="stExpander"] {{ background: {T['surface']} !important; border: 1px solid {T['border']} !important; border-radius: 12px !important; }}
+[data-testid="stExpander"] {{ background: {T['glass_bg']} !important; backdrop-filter: blur({T['glass_blur']}) !important; border: 1px solid {T['glass_border']} !important; border-radius: 12px !important; }}
 [data-testid="stExpander"] summary {{ color: {T['text1']} !important; }}
 
 /* === Tab panel smooth entrance === */
@@ -604,6 +653,7 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
     font-weight: 700;
     color: {T['text1']};
     direction: ltr;
+    font-family: {T['font_mono']} !important; font-variant-numeric: tabular-nums;
 }}
 .compare-stat-label {{
     font-size: 0.68rem;
@@ -668,16 +718,18 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 
 /* === Category MoM Cards === */
 .mom-card {{
-    background: {T['surface']};
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 14px;
     padding: 1rem;
     text-align: center;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }}
 .mom-card:hover {{
     transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 0 15px {T['neon_glow']};
+    border-color: {T['border_h']};
 }}
 .mom-arrow {{
     font-size: 1.5rem;
@@ -692,8 +744,9 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 
 /* === Spending Pace Bar === */
 .pace-container {{
-    background: {T['surface']};
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 14px;
     padding: 1rem 1.25rem;
     margin-bottom: 1rem;
@@ -729,12 +782,17 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
     margin-top: 1.25rem;
 }}
 .compare-summary-card {{
-    background: {T['surface']}cc;
-    backdrop-filter: blur(10px);
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 14px;
     padding: 1rem;
     text-align: center;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}}
+.compare-summary-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }}
 
 /* === Section Dividers Enhanced === */
@@ -754,7 +812,8 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 /* === Enhanced KPI Glow === */
 .kpi:hover {{
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 20px rgba(129,140,248,0.08);
+    border-color: {T['border_h']};
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 0 25px {T['neon_glow']};
 }}
 
 /* === Print === */
@@ -764,8 +823,10 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 .flow-row {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin: 1.25rem 0; }}
 @media(max-width:768px) {{ .flow-row {{ grid-template-columns: 1fr; }} }}
 .flow-card {{
-    background: {T['surface']};
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']});
+    -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 18px;
     padding: 1.5rem 1.25rem;
     position: relative;
@@ -798,6 +859,7 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 .flow-val {{
     font-size: 2rem; font-weight: 800; direction: ltr;
     letter-spacing: -1px; line-height: 1.2;
+    font-family: {T['font_mono']} !important; font-variant-numeric: tabular-nums;
 }}
 .flow-label {{
     font-size: 0.82rem; color: {T['text2']}; margin-top: 4px;
@@ -835,10 +897,10 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 }}
 .gauge-inner {{
     width: 110px; height: 110px; border-radius: 50%;
-    background: {T['surface']};
+    background: {T['bg']};
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
 }}
 
 /* === Staggered card entrance === */
@@ -846,20 +908,67 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
     from {{ opacity: 0; transform: translateY(20px); }}
     to {{ opacity: 1; transform: translateY(0); }}
 }}
-.stagger-1 {{ animation: slideInUp 0.4s ease-out 0.05s both; }}
-.stagger-2 {{ animation: slideInUp 0.4s ease-out 0.12s both; }}
-.stagger-3 {{ animation: slideInUp 0.4s ease-out 0.19s both; }}
-.stagger-4 {{ animation: slideInUp 0.4s ease-out 0.26s both; }}
+@keyframes fadeInUp {{
+    from {{ opacity: 0; transform: translateY(20px); }}
+    to {{ opacity: 1; transform: translateY(0); }}
+}}
+@keyframes slideInRight {{
+    from {{ opacity: 0; transform: translateX(-30px); }}
+    to {{ opacity: 1; transform: translateX(0); }}
+}}
+@keyframes scaleIn {{
+    from {{ opacity: 0; transform: scale(0.9); }}
+    to {{ opacity: 1; transform: scale(1); }}
+}}
+@keyframes shimmer {{
+    0% {{ background-position: -200% 0; }}
+    100% {{ background-position: 200% 0; }}
+}}
+@keyframes glowPulse {{
+    0%, 100% {{ box-shadow: 0 0 20px {T['neon_glow']}; }}
+    50% {{ box-shadow: 0 0 30px rgba(129,140,248,0.3); }}
+}}
+@keyframes numberReveal {{
+    from {{ opacity: 0; transform: translateY(6px); filter: blur(4px); }}
+    to {{ opacity: 1; transform: translateY(0); filter: blur(0); }}
+}}
+@keyframes progressFill {{
+    from {{ width: 0; }}
+}}
+@keyframes radialFill {{
+    from {{ stroke-dashoffset: var(--circumference, 283); }}
+}}
+@keyframes meshDrift {{
+    0% {{ transform: translate(0, 0) scale(1); }}
+    33% {{ transform: translate(15px, -10px) scale(1.02); }}
+    66% {{ transform: translate(-10px, 8px) scale(0.98); }}
+    100% {{ transform: translate(0, 0) scale(1); }}
+}}
+.stagger-1 {{ animation: fadeInUp 0.4s ease-out 0.05s both; }}
+.stagger-2 {{ animation: fadeInUp 0.4s ease-out 0.12s both; }}
+.stagger-3 {{ animation: fadeInUp 0.4s ease-out 0.19s both; }}
+.stagger-4 {{ animation: fadeInUp 0.4s ease-out 0.26s both; }}
+.stagger-5 {{ animation: fadeInUp 0.4s ease-out 0.33s both; }}
+.stagger-6 {{ animation: fadeInUp 0.4s ease-out 0.40s both; }}
+.stagger-7 {{ animation: fadeInUp 0.4s ease-out 0.47s both; }}
+.stagger-8 {{ animation: fadeInUp 0.4s ease-out 0.54s both; }}
 
 /* === Insight Highlight Cards === */
 .insight-highlight {{
-    background: linear-gradient(135deg, {T['surface']}, {T['surface2']});
-    border: 1px solid {T['border']};
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
     border-radius: 18px;
     padding: 1.5rem;
     text-align: center;
     position: relative;
     overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}}
+.insight-highlight:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px {T['neon_glow']};
+    border-color: {T['border_h']};
 }}
 .insight-highlight::after {{
     content: '';
@@ -886,6 +995,102 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
     flex: 1; border-radius: 3px 3px 0 0;
     min-width: 4px; transition: height 0.4s ease;
 }}
+
+/* === Neon Glow Utilities === */
+.neon-accent {{ text-shadow: 0 0 10px rgba(129,140,248,0.2); }}
+.neon-green {{ text-shadow: 0 0 10px rgba(52,211,153,0.2); }}
+.neon-red {{ text-shadow: 0 0 10px rgba(248,113,113,0.2); }}
+
+/* === Trend Badge === */
+.trend-badge {{
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 0.2rem 0.6rem; border-radius: 99px;
+    font-size: 0.72rem; font-weight: 700; direction: ltr;
+    font-family: {T['font_mono']} !important;
+}}
+.trend-badge.up {{ background: {T['green_bg']}; color: {T['green']}; }}
+.trend-badge.down {{ background: {T['red_bg']}; color: {T['red']}; }}
+.trend-badge.neutral {{ background: {T['surface2']}; color: {T['text3']}; }}
+
+/* === Health Score Card === */
+.health-score-card {{
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
+    border-radius: 18px; padding: 1.5rem;
+    display: flex; gap: 2rem; align-items: center;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    animation: fadeInUp 0.5s ease-out both;
+}}
+.health-score-card:hover {{
+    border-color: {T['border_h']};
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 0 20px {T['neon_glow']};
+    transform: translateY(-2px);
+}}
+.health-radial {{ flex-shrink: 0; text-align: center; }}
+.health-details {{ flex: 1; }}
+.health-grade {{
+    font-size: 2.5rem; font-weight: 800;
+    font-family: {T['font_mono']} !important;
+    line-height: 1;
+}}
+.health-factor {{
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.5rem 0; border-bottom: 1px solid {T['border']};
+}}
+.health-factor:last-child {{ border-bottom: none; }}
+.health-factor-bar {{
+    flex: 1; height: 6px; background: {T['surface2']};
+    border-radius: 99px; overflow: hidden;
+}}
+.health-factor-fill {{
+    height: 100%; border-radius: 99px;
+    animation: progressFill 0.8s ease-out both;
+}}
+
+/* === Spending Alert Card === */
+.spending-alert {{
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border-radius: 14px; padding: 0.85rem 1.1rem;
+    display: flex; align-items: center; gap: 0.85rem;
+    margin-bottom: 0.5rem; direction: rtl;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    animation: slideInRight 0.4s ease-out both;
+}}
+.spending-alert.danger {{ border: 1px solid rgba(248,113,113,0.25); border-right: 3px solid {T['red']}; }}
+.spending-alert.warning {{ border: 1px solid rgba(251,191,36,0.25); border-right: 3px solid {T['amber']}; }}
+.spending-alert.info {{ border: 1px solid rgba(56,189,248,0.25); border-right: 3px solid {T['info']}; }}
+.spending-alert .alert-icon {{ font-size: 1.3rem; flex-shrink: 0; }}
+.spending-alert .alert-content {{ flex: 1; }}
+.spending-alert .alert-title {{ font-weight: 600; font-size: 0.85rem; color: {T['text1']}; }}
+.spending-alert .alert-msg {{ font-size: 0.78rem; color: {T['text2']}; margin-top: 2px; }}
+
+/* === Savings Goal Card === */
+.savings-card {{
+    background: {T['glass_bg']};
+    backdrop-filter: blur({T['glass_blur']}); -webkit-backdrop-filter: blur({T['glass_blur']});
+    border: 1px solid {T['glass_border']};
+    border-radius: 16px; padding: 1.25rem;
+    text-align: center;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}}
+.savings-card:hover {{
+    transform: translateY(-2px);
+    border-color: {T['border_h']};
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12), 0 0 20px {T['neon_glow']};
+}}
+.savings-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }}
+
+/* === Reduced motion === */
+@media (prefers-reduced-motion: reduce) {{
+    *, *::before, *::after {{
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }}
+    .stApp::before {{ animation: none !important; }}
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -894,11 +1099,12 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 # =============================================================================
 st.markdown(f"""
 <script>
-// === Animated counter for KPI values with easing ===
+// === Animated counter for KPI values with blur-to-clear reveal ===
 function animateCounters() {{
     document.querySelectorAll('.kpi-val, .flow-val').forEach(el => {{
         if (el.dataset.animated) return;
         el.dataset.animated = 'true';
+        el.style.animation = 'numberReveal 0.5s ease-out both';
         const text = el.innerText;
         const match = text.match(/[\\d,]+/);
         if (!match) return;
@@ -910,7 +1116,6 @@ function animateCounters() {{
         const start = performance.now();
         function step(now) {{
             const progress = Math.min((now - start) / duration, 1);
-            // Exponential ease-out for professional feel
             const ease = 1 - Math.pow(1 - progress, 4);
             const current = Math.round(target * ease);
             el.innerText = prefix + current.toLocaleString() + suffix;
@@ -1002,10 +1207,42 @@ function addNumberHover() {{
     }});
 }}
 
+// === Radial gauge animation ===
+function animateRadialGauges() {{
+    document.querySelectorAll('.radial-progress-circle').forEach(el => {{
+        if (el.dataset.gaugeAnimated) return;
+        el.dataset.gaugeAnimated = 'true';
+        const target = parseFloat(el.dataset.target || 0);
+        const circumference = parseFloat(el.dataset.circumference || 283);
+        const offset = circumference - (target / 100) * circumference;
+        el.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)';
+        el.style.strokeDashoffset = circumference;
+        requestAnimationFrame(() => {{
+            requestAnimationFrame(() => {{
+                el.style.strokeDashoffset = offset;
+            }});
+        }});
+    }});
+}}
+
+// === Stagger scroll reveal with index-based delays ===
+function initStaggeredReveal() {{
+    const containers = document.querySelectorAll('.kpi-row, .flow-row, .savings-grid');
+    containers.forEach(container => {{
+        if (container.dataset.staggered) return;
+        container.dataset.staggered = 'true';
+        const children = container.children;
+        Array.from(children).forEach((child, i) => {{
+            child.style.animationDelay = (i * 0.08) + 's';
+        }});
+    }});
+}}
+
 // === Init ===
 const initAll = () => {{
     animateCounters(); initSmoothTabs(); addKpiTooltips();
     initScrollReveal(); drawMiniSparklines(); addNumberHover();
+    animateRadialGauges(); initStaggeredReveal();
 }};
 if (document.readyState === 'complete') setTimeout(initAll, 400);
 else window.addEventListener('load', () => setTimeout(initAll, 400));
@@ -1017,6 +1254,7 @@ const observer = new MutationObserver(() => {{
     _animTimeout = setTimeout(() => {{
         animateCounters(); addKpiTooltips();
         initScrollReveal(); drawMiniSparklines(); addNumberHover();
+        animateRadialGauges(); initStaggeredReveal();
     }}, 150);
 }});
 observer.observe(document.body, {{ childList: true, subtree: true }});
@@ -1050,9 +1288,9 @@ def plotly_layout(**kw):
         paper_bgcolor=T['chart_bg'], plot_bgcolor=T['chart_bg'],
         font=dict(family='Heebo', color=T['text2'], size=12),
         margin=dict(t=16, b=36, l=40, r=12),
-        hoverlabel=dict(bgcolor=T['surface'], font_size=12, font_family='Heebo', bordercolor=T['border_h']),
-        xaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=False, zeroline=False),
-        yaxis=dict(gridcolor=T['grid'], tickfont=dict(color=T['text2'], size=10), showgrid=True, zeroline=False, gridwidth=1),
+        hoverlabel=dict(bgcolor=T['surface'], font_size=12, font_family='Heebo', bordercolor=T['border_h'], font_color=T['text1']),
+        xaxis=dict(gridcolor=T['grid'], tickfont=dict(family='JetBrains Mono, Heebo', color=T['text2'], size=10), showgrid=False, zeroline=False),
+        yaxis=dict(gridcolor=T['grid'], tickfont=dict(family='JetBrains Mono, Heebo', color=T['text2'], size=10), showgrid=True, zeroline=False, gridwidth=1),
         dragmode=False,
         modebar_remove=['zoom','pan','select','lasso','zoomIn','zoomOut','autoScale','resetScale'],
         autosize=True,
@@ -1427,7 +1665,7 @@ def render_donut(df):
         '<div style="width:min(200px,50vw);height:min(200px,50vw);border-radius:50%;'
         f'background:conic-gradient({gradient});'
         'display:flex;align-items:center;justify-content:center">'
-        f'<div style="width:65%;height:65%;border-radius:50%;background:{T["surface"]};'
+        f'<div style="width:65%;height:65%;border-radius:50%;background:{T["bg"]};'
         'display:flex;flex-direction:column;align-items:center;justify-content:center;'
         'box-shadow:0 0 20px rgba(0,0,0,0.15)">'
         f'<div style="font-size:clamp(0.9rem,3vw,1.25rem);font-weight:800;color:{T["text1"]};direction:ltr">'
@@ -1687,13 +1925,39 @@ def render_kpis(df):
     total = len(df)
     exp = df[df['סכום'] < 0]
     spent = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
-    # Income = transactions income + manually entered incomes
     tx_income = df[df['סכום'] > 0]['סכום'].sum()
     manual_income = get_total_income()
     income = tx_income + manual_income
     avg = df['סכום_מוחלט'].mean() if not df.empty else 0
     balance = income - spent
     bal_color = T['green'] if balance >= 0 else T['red']
+
+    # MoM trend calculation
+    months_sorted = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+    trends = {}
+    if len(months_sorted) >= 2:
+        last_m, prev_m = months_sorted[-1], months_sorted[-2]
+        last_df, prev_df = df[df['חודש'] == last_m], df[df['חודש'] == prev_m]
+        last_exp = abs(last_df[last_df['סכום'] < 0]['סכום'].sum())
+        prev_exp = abs(prev_df[prev_df['סכום'] < 0]['סכום'].sum())
+        last_inc = last_df[last_df['סכום'] > 0]['סכום'].sum()
+        prev_inc = prev_df[prev_df['סכום'] > 0]['סכום'].sum()
+        if prev_exp > 0: trends['הוצאות'] = ((last_exp - prev_exp) / prev_exp * 100)
+        if prev_inc > 0: trends['הכנסות'] = ((last_inc - prev_inc) / prev_inc * 100)
+        trends['עסקאות'] = ((len(last_df) - len(prev_df)) / max(len(prev_df), 1) * 100)
+
+    def trend_badge(label):
+        if label not in trends: return ''
+        pct = trends[label]
+        if abs(pct) < 1: return '<span class="trend-badge neutral">—</span>'
+        arrow = '↑' if pct > 0 else '↓'
+        if label == 'הוצאות':
+            # For expenses: decrease=good(green/up), increase=bad(red/down)
+            badge_cls = 'up' if pct < 0 else 'down'
+        else:
+            badge_cls = 'up' if pct > 0 else 'down'
+        return f'<span class="trend-badge {badge_cls}">{arrow} {abs(pct):.0f}%</span>'
+
     cards = [
         ('💳', f'linear-gradient(135deg,{T["accent"]},#6d28d9)', f'{total:,}', 'עסקאות'),
         ('📉', f'linear-gradient(135deg,#f87171,#dc2626)', fmt(spent), 'הוצאות'),
@@ -1702,10 +1966,13 @@ def render_kpis(df):
     ]
     html = '<div class="kpi-row">'
     for ic, bg, val, label in cards:
+        badge = trend_badge(label)
+        color_style = f'color:{bal_color}' if label == 'מאזן' else ''
         html += f'''<div class="kpi">
             <div class="kpi-icon" style="background:{bg}">{ic}</div>
-            <div class="kpi-val">{val}</div>
+            <div class="kpi-val" style="{color_style}">{val}</div>
             <div class="kpi-label">{label}</div>
+            {f'<div style="margin-top:6px">{badge}</div>' if badge else ''}
         </div>'''
     html += '</div>'
     st.markdown(html, unsafe_allow_html=True)
@@ -1728,7 +1995,7 @@ def render_categories(df):
             <div class="cat-icon" style="background:{c}22;color:{c}">{icon_for(r['קטגוריה'])}</div>
             <div class="cat-info">
                 <div class="cat-name">{r['קטגוריה']}</div>
-                <div class="cat-bar-bg"><div class="cat-bar" style="width:{r['pct']}%;background:{c}"></div></div>
+                <div class="cat-bar-bg"><div class="cat-bar" style="width:{r['pct']}%;background:{c};animation:progressFill 0.8s ease-out {0.1*i:.1f}s both"></div></div>
             </div>
             <div class="cat-stats">
                 <div class="cat-amount">{fmt(r['סכום'])}</div>
@@ -1742,6 +2009,307 @@ def export_excel(df):
     with pd.ExcelWriter(out, engine='xlsxwriter') as w:
         df.to_excel(w, sheet_name='עסקאות', index=False)
     return out.getvalue()
+
+
+# =============================================================================
+# Financial Health Score Widget
+# =============================================================================
+def render_financial_health_score(df):
+    """Compute and render a financial health score (0-100) with radial gauge."""
+    exp = df[df['סכום'] < 0].copy()
+    months_sorted = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+
+    # Factor 1: Spending Trend (30 pts) - are expenses going down?
+    trend_pts = 15  # default
+    if len(months_sorted) >= 2:
+        last_exp = abs(exp[exp['חודש'] == months_sorted[-1]]['סכום'].sum())
+        prev_exp = abs(exp[exp['חודש'] == months_sorted[-2]]['סכום'].sum())
+        if prev_exp > 0:
+            change = (last_exp - prev_exp) / prev_exp
+            if change < -0.05: trend_pts = 30
+            elif change < 0.05: trend_pts = 20
+            else: trend_pts = 5
+
+    # Factor 2: Anomalies (25 pts) - fewer outliers is better
+    anomaly_count = 0
+    if len(exp) > 10:
+        threshold = exp['סכום_מוחלט'].quantile(0.9)
+        anomaly_count = len(exp[exp['סכום_מוחלט'] > threshold * 1.5])
+    anomaly_pts = max(0, 25 - anomaly_count * 5)
+
+    # Factor 3: Recurring Burden (25 pts)
+    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else []
+    rec_count = len(recurring)
+    if rec_count < 3: rec_pts = 25
+    elif rec_count < 5: rec_pts = 18
+    elif rec_count < 8: rec_pts = 10
+    else: rec_pts = 5
+
+    # Factor 4: Income Ratio (20 pts)
+    init_income_state()
+    total_income = df[df['סכום'] > 0]['סכום'].sum() + get_total_income()
+    total_expenses = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
+    if total_income > 0 and total_expenses > 0:
+        ratio = total_income / total_expenses
+        if ratio > 1.3: ratio_pts = 20
+        elif ratio > 1.1: ratio_pts = 15
+        elif ratio > 0.9: ratio_pts = 8
+        else: ratio_pts = 3
+    else:
+        ratio_pts = 10
+
+    score = trend_pts + anomaly_pts + rec_pts + ratio_pts
+    score = max(0, min(100, score))
+
+    # Grade & color
+    if score >= 80: grade, grade_color = 'A', T['green']
+    elif score >= 65: grade, grade_color = 'B', '#34d399'
+    elif score >= 50: grade, grade_color = 'C', T['amber']
+    elif score >= 35: grade, grade_color = 'D', '#fb923c'
+    else: grade, grade_color = 'F', T['red']
+
+    # SVG radial gauge
+    size, stroke = 130, 10
+    radius = (size - stroke) / 2
+    circumference = 2 * 3.14159 * radius
+    offset = circumference - (score / 100) * circumference
+
+    factors = [
+        ('מגמת הוצאות', trend_pts, 30, T['accent']),
+        ('חריגות', anomaly_pts, 25, T['amber']),
+        ('מנויים קבועים', rec_pts, 25, T['info']),
+        ('יחס הכנסות/הוצאות', ratio_pts, 20, T['green']),
+    ]
+
+    factors_html = ''
+    for name, pts, max_pts, color in factors:
+        pct = (pts / max_pts * 100) if max_pts > 0 else 0
+        factors_html += f'''<div class="health-factor">
+            <div style="min-width:120px;font-size:0.8rem;color:{T['text2']}">{name}</div>
+            <div class="health-factor-bar">
+                <div class="health-factor-fill" style="width:{pct:.0f}%;background:{color}"></div>
+            </div>
+            <div style="font-size:0.78rem;font-weight:600;color:{T['text1']};min-width:45px;text-align:left;direction:ltr;font-family:{T['font_mono']}">{pts}/{max_pts}</div>
+        </div>'''
+
+    html = f'''<div class="health-score-card">
+        <div class="health-radial">
+            <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" style="transform:rotate(-90deg)">
+                <circle cx="{size/2}" cy="{size/2}" r="{radius}" fill="none" stroke="{T['surface2']}" stroke-width="{stroke}"/>
+                <circle class="radial-progress-circle" cx="{size/2}" cy="{size/2}" r="{radius}" fill="none"
+                    stroke="{grade_color}" stroke-width="{stroke}" stroke-linecap="round"
+                    stroke-dasharray="{circumference}" stroke-dashoffset="{circumference}"
+                    data-target="{score}" data-circumference="{circumference}"
+                    style="filter:drop-shadow(0 0 6px {grade_color}40)"/>
+            </svg>
+            <div style="position:relative;top:-{size/2 + 20}px;text-align:center">
+                <div class="health-grade" style="color:{grade_color}">{grade}</div>
+                <div style="font-size:0.72rem;color:{T['text2']};margin-top:2px">{score}/100</div>
+            </div>
+        </div>
+        <div class="health-details">
+            <div style="font-weight:700;font-size:1rem;color:{T['text1']};margin-bottom:0.75rem">❤️ ציון בריאות פיננסית</div>
+            {factors_html}
+        </div>
+    </div>'''
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# =============================================================================
+# Spending Alerts Widget
+# =============================================================================
+def render_spending_alerts(df):
+    """Show smart spending alerts based on data analysis."""
+    alerts = []
+    exp = df[df['סכום'] < 0].copy()
+    months_sorted = df.drop_duplicates('חודש').sort_values('תאריך')['חודש'].unique()
+
+    init_income_state()
+    total_income = df[df['סכום'] > 0]['סכום'].sum() + get_total_income()
+    total_expenses = abs(exp['סכום'].sum()) if len(exp) > 0 else 0
+
+    # Alert: Overspending
+    if total_expenses > total_income and total_income > 0:
+        diff = total_expenses - total_income
+        alerts.append(('danger', '⚠️', 'הוצאות עולות על הכנסות', f'ההוצאות גבוהות ב-₪{diff:,.0f} מההכנסות'))
+
+    # Alert: Spending trend up
+    if len(months_sorted) >= 2:
+        last_exp = abs(exp[exp['חודש'] == months_sorted[-1]]['סכום'].sum())
+        prev_exp = abs(exp[exp['חודש'] == months_sorted[-2]]['סכום'].sum())
+        if prev_exp > 0 and (last_exp - prev_exp) / prev_exp > 0.15:
+            pct = ((last_exp - prev_exp) / prev_exp * 100)
+            alerts.append(('warning', '📈', 'עלייה בהוצאות', f'עלייה של {pct:.0f}% לעומת חודש קודם'))
+
+    # Alert: Anomaly transactions
+    if len(exp) > 10:
+        threshold = exp['סכום_מוחלט'].quantile(0.9) * 1.5
+        anomalies = exp[exp['סכום_מוחלט'] > threshold]
+        if len(anomalies) > 0:
+            alerts.append(('warning', '🔍', f'{len(anomalies)} עסקאות חריגות', f'עסקאות מעל ₪{threshold:,.0f}'))
+
+    # Alert: Many recurring payments
+    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else []
+    if len(recurring) > 5:
+        total_rec = sum(r['avg_amount'] for r in recurring)
+        alerts.append(('info', '🔄', f'{len(recurring)} תשלומים קבועים', f'סה״כ ~₪{total_rec:,.0f} לחודש'))
+
+    # Alert: High average transaction
+    if len(exp) > 0:
+        avg_tx = exp['סכום_מוחלט'].mean()
+        if avg_tx > 500:
+            alerts.append(('info', '💡', 'ממוצע עסקה גבוה', f'₪{avg_tx:,.0f} לעסקה בממוצע'))
+
+    # Filter dismissed
+    dismissed = st.session_state.get('dismissed_alerts', set())
+    alerts = [(s, ic, t, m) for s, ic, t, m in alerts if f'{t}' not in dismissed]
+
+    if not alerts:
+        return
+
+    html = '<div style="margin-bottom:1rem">'
+    for i, (severity, icon, title, msg) in enumerate(alerts):
+        html += f'''<div class="spending-alert {severity}" style="animation-delay:{i*0.08}s">
+            <div class="alert-icon">{icon}</div>
+            <div class="alert-content">
+                <div class="alert-title">{title}</div>
+                <div class="alert-msg">{msg}</div>
+            </div>
+        </div>'''
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# =============================================================================
+# Savings Goals Tab
+# =============================================================================
+def render_savings_goals_tab():
+    """Render savings goals management page."""
+    st.markdown(f'''<div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem">
+        <div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,{T['accent']},#a78bfa);
+             display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 4px 12px rgba(129,140,248,0.3)">🎯</div>
+        <div>
+            <div style="font-weight:700;font-size:1.15rem;color:{T['text1']}">יעדי חיסכון</div>
+            <div style="font-size:0.82rem;color:{T['text2']}">הגדירו יעדים ועקבו אחר ההתקדמות</div>
+        </div>
+    </div>''', unsafe_allow_html=True)
+
+    goals = st.session_state.get('savings_goals', [])
+
+    # Summary cards
+    total_saved = sum(g.get('current', 0) for g in goals)
+    total_target = sum(g.get('target', 0) for g in goals)
+    overall_pct = (total_saved / total_target * 100) if total_target > 0 else 0
+
+    st.markdown(f'''<div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi">
+            <div class="kpi-icon" style="background:linear-gradient(135deg,{T['green']},#059669)">💰</div>
+            <div class="kpi-val" style="color:{T['green']}">₪{total_saved:,.0f}</div>
+            <div class="kpi-label">נחסך עד כה</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-icon" style="background:linear-gradient(135deg,{T['accent']},#6d28d9)">🎯</div>
+            <div class="kpi-val">₪{total_target:,.0f}</div>
+            <div class="kpi-label">יעד כולל</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-icon" style="background:linear-gradient(135deg,#38bdf8,#0284c7)">📊</div>
+            <div class="kpi-val">{overall_pct:.0f}%</div>
+            <div class="kpi-label">התקדמות כוללת</div>
+        </div>
+    </div>''', unsafe_allow_html=True)
+
+    # Add new goal form
+    with st.expander("➕ הוסף יעד חדש", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            goal_name = st.text_input("שם היעד", key="sg_name", placeholder="למשל: חופשה")
+        with c2:
+            goal_target = st.number_input("סכום יעד (₪)", min_value=100, value=5000, step=500, key="sg_target")
+        c3, c4 = st.columns(2)
+        with c3:
+            categories = ["חופשה", "רכב", "חירום", "השקעה", "ריהוט", "אלקטרוניקה", "אחר"]
+            goal_cat = st.selectbox("קטגוריה", categories, key="sg_cat")
+        with c4:
+            icons = ["🏖️", "🚗", "🆘", "📈", "🛋️", "💻", "🎯"]
+            goal_icon = icons[categories.index(goal_cat)]
+            colors = ['#818cf8', '#34d399', '#f87171', '#fbbf24', '#38bdf8', '#a78bfa']
+            goal_color = st.selectbox("צבע", colors, format_func=lambda c: f"● {c}", key="sg_color")
+
+        if st.button("💾 שמור יעד", key="sg_save"):
+            if goal_name:
+                import uuid
+                new_goal = {
+                    'id': str(uuid.uuid4()),
+                    'name': goal_name,
+                    'target': goal_target,
+                    'current': 0,
+                    'category': goal_cat,
+                    'icon': goal_icon,
+                    'color': goal_color,
+                }
+                st.session_state.savings_goals.append(new_goal)
+                st.rerun()
+            else:
+                st.warning("נא למלא שם ליעד")
+
+    # Goal cards
+    if not goals:
+        st.markdown(f'''<div style="text-align:center;padding:3rem;color:{T['text3']}">
+            <div style="font-size:3rem;margin-bottom:1rem">🎯</div>
+            <div style="font-weight:600;font-size:1.1rem;color:{T['text1']}">אין יעדי חיסכון עדיין</div>
+            <div style="margin-top:0.5rem">הוסיפו יעד חדש כדי להתחיל לעקוב</div>
+        </div>''', unsafe_allow_html=True)
+        return
+
+    html = '<div class="savings-grid">'
+    for goal in goals:
+        pct = (goal['current'] / goal['target'] * 100) if goal['target'] > 0 else 0
+        pct = min(pct, 100)
+        color = goal.get('color', T['accent'])
+        icon = goal.get('icon', '🎯')
+        size, stroke = 100, 8
+        radius = (size - stroke) / 2
+        circumference = 2 * 3.14159 * radius
+
+        done_label = f'<div style="margin-top:8px;padding:4px 12px;border-radius:99px;background:{T["green_bg"]};color:{T["green"]};font-size:0.75rem;font-weight:600">✅ הושלם!</div>' if pct >= 100 else ''
+
+        html += f'''<div class="savings-card">
+            <div style="font-size:1.5rem;margin-bottom:0.5rem">{icon}</div>
+            <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}" style="transform:rotate(-90deg);margin:0 auto">
+                <circle cx="{size/2}" cy="{size/2}" r="{radius}" fill="none" stroke="{T['surface2']}" stroke-width="{stroke}"/>
+                <circle class="radial-progress-circle" cx="{size/2}" cy="{size/2}" r="{radius}" fill="none"
+                    stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"
+                    stroke-dasharray="{circumference}" stroke-dashoffset="{circumference}"
+                    data-target="{pct}" data-circumference="{circumference}"
+                    style="filter:drop-shadow(0 0 4px {color}40)"/>
+            </svg>
+            <div style="margin-top:-{size/2+12}px;position:relative;font-size:1.1rem;font-weight:700;color:{T['text1']};font-family:{T['font_mono']}">{pct:.0f}%</div>
+            <div style="margin-top:1rem;font-weight:600;color:{T['text1']}">{goal['name']}</div>
+            <div style="font-size:0.8rem;color:{T['text2']};margin-top:4px;direction:ltr">
+                ₪{goal['current']:,.0f} / ₪{goal['target']:,.0f}
+            </div>
+            <div style="margin-top:6px;padding:3px 10px;border-radius:99px;background:{color}20;color:{color};font-size:0.72rem;font-weight:600;display:inline-block">{goal.get('category','')}</div>
+            {done_label}
+        </div>'''
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+    # Per-goal actions
+    st.markdown(f'<div class="section-label" style="margin-top:1.5rem">⚡ ניהול יעדים</div>', unsafe_allow_html=True)
+    for i, goal in enumerate(goals):
+        c1, c2, c3 = st.columns([3, 2, 1])
+        with c1:
+            st.markdown(f"**{goal.get('icon','')} {goal['name']}** — ₪{goal['current']:,.0f} / ₪{goal['target']:,.0f}")
+        with c2:
+            amount = st.number_input("הוסף ₪", min_value=0, value=0, step=100, key=f"sg_add_{goal['id']}")
+            if amount > 0 and st.button("💰 הוסף", key=f"sg_btn_{goal['id']}"):
+                st.session_state.savings_goals[i]['current'] += amount
+                st.rerun()
+        with c3:
+            if st.button("🗑️", key=f"sg_del_{goal['id']}"):
+                st.session_state.savings_goals.pop(i)
+                st.rerun()
 
 
 def render_data_management_tab(df_f):
@@ -2426,7 +2994,7 @@ def _render_dashboard(df):
     render_cashflow_cards(df_f)
 
     # Tabs
-    tabs = st.tabs(["📊 סקירה","💹 הכנסות מול הוצאות","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב","🗄️ ניהול נתונים"])
+    tabs = st.tabs(["📊 סקירה","💹 הכנסות מול הוצאות","📈 מגמות","🏪 בתי עסק","🔍 תובנות","📋 עסקאות","💰 תקציב","🎯 חיסכון","🗄️ ניהול נתונים"])
 
     # ══════════════════════════════════════════════
     # TAB 0: Overview
@@ -2468,6 +3036,12 @@ def _render_dashboard(df):
                     חודש קודם סה״כ: ₪{pace['prev_total']:,.0f} &bull; בנקודה זו: ₪{pace['prev_by_today']:,.0f}
                 </div>
             </div>''', unsafe_allow_html=True)
+
+        # ── Financial Health Score ──
+        render_financial_health_score(df_f)
+
+        # ── Spending Alerts ──
+        render_spending_alerts(df_f)
 
         c1, c2 = st.columns([3, 2])
         with c1:
@@ -3011,7 +3585,12 @@ def _render_dashboard(df):
     with tabs[6]:
         render_income_tab(df_f)
 
+    # TAB 7: Savings Goals
     with tabs[7]:
+        render_savings_goals_tab()
+
+    # TAB 8: Data Management
+    with tabs[8]:
         render_data_management_tab(df_f)
 
     # Export
@@ -3050,7 +3629,7 @@ def render_auth_page():
         border-radius: 10px !important; padding: 0.7rem 0.9rem !important;
         font-size: 0.92rem !important; color: {T['text1']} !important;
     }}
-    [data-testid="stTextInput"] input:focus {{ border-color: {T['accent']} !important; box-shadow: 0 0 0 3px rgba(129,140,248,0.1) !important; }}
+    [data-testid="stTextInput"] input:focus {{ border-color: {T['accent']} !important; box-shadow: 0 0 0 3px rgba(129,140,248,0.15) !important; }}
     [data-testid="stTextInput"] input::placeholder {{ color: {T['text3']} !important; }}
     .stButton > button {{
         background: linear-gradient(135deg, #818cf8, #6d28d9) !important; color: #fff !important;
@@ -3059,6 +3638,15 @@ def render_auth_page():
         box-shadow: 0 4px 16px rgba(129,140,248,0.25) !important;
     }}
     .stButton > button:hover {{ transform: translateY(-1px) !important; box-shadow: 0 6px 24px rgba(129,140,248,0.35) !important; }}
+    .stApp::before {{
+        content: '';
+        position: fixed; inset: 0;
+        background: radial-gradient(ellipse at 30% 30%, rgba(129,140,248,0.15) 0%, transparent 50%),
+                    radial-gradient(ellipse at 70% 70%, rgba(167,139,250,0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 50% 50%, rgba(52,211,153,0.06) 0%, transparent 60%);
+        animation: meshDrift 20s ease-in-out infinite;
+        pointer-events: none; z-index: 0;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
