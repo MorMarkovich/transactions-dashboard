@@ -9,6 +9,7 @@ import './Layout.css'
 
 // ─── Constants ────────────────────────────────────────────────────────
 const MOBILE_BREAKPOINT = 1024
+const COLLAPSED_KEY = 'sidebar-collapsed'
 
 interface LayoutProps {
   children: ReactNode
@@ -23,6 +24,12 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true
     return window.innerWidth >= MOBILE_BREAKPOINT
+  })
+
+  // Collapsed state persisted in localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(COLLAPSED_KEY) === 'true'
   })
 
   // Track window resize to auto-show/hide sidebar
@@ -61,17 +68,23 @@ export default function Layout({ children }: LayoutProps) {
   }, [])
 
   const closeSidebar = useCallback(() => {
-    // Only close on mobile
     if (window.innerWidth < MOBILE_BREAKPOINT) {
       setSidebarOpen(false)
     }
+  }, [])
+
+  const toggleCollapse = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem(COLLAPSED_KEY, String(next))
+      return next
+    })
   }, [])
 
   // File upload handler: navigate to dashboard with the new session_id
   const handleFileUploaded = useCallback(
     (sessionId: string) => {
       navigate(`/?session_id=${sessionId}`)
-      // Close sidebar on mobile after upload
       if (window.innerWidth < MOBILE_BREAKPOINT) {
         setSidebarOpen(false)
       }
@@ -80,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
   )
 
   return (
-    <div className="layout">
+    <div className={`layout ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
       <Header
         onToggleSidebar={toggleSidebar}
         sidebarOpen={sidebarOpen}
@@ -91,8 +104,10 @@ export default function Layout({ children }: LayoutProps) {
         {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
+          collapsed={sidebarCollapsed}
           onClose={closeSidebar}
           onFileUploaded={handleFileUploaded}
+          onToggleCollapse={toggleCollapse}
         />
 
         {/* Mobile overlay backdrop */}

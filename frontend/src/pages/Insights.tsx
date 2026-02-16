@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Minus,
   Percent,
+  Lightbulb,
 } from 'lucide-react'
 import { transactionsApi } from '../services/api'
 import type { InsightData, TrendStats } from '../services/types'
@@ -17,6 +18,7 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/common/EmptyState'
+import PageHeader from '../components/common/PageHeader'
 import { formatCurrency, formatDate } from '../utils/formatting'
 
 /* ------------------------------------------------------------------ */
@@ -33,6 +35,21 @@ const cardVariants = {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Background gradients for insight cards                             */
+/* ------------------------------------------------------------------ */
+
+const CARD_GRADIENTS = [
+  'var(--gradient-stat-purple)',
+  'var(--gradient-stat-green)',
+  'var(--gradient-stat-blue)',
+  'var(--gradient-stat-red)',
+  'var(--gradient-stat-yellow)',
+  'var(--gradient-stat-purple)',
+  'var(--gradient-stat-green)',
+  'var(--gradient-stat-blue)',
+]
+
+/* ------------------------------------------------------------------ */
 /*  Insight Card sub-component                                         */
 /* ------------------------------------------------------------------ */
 
@@ -44,12 +61,22 @@ interface InsightCardProps {
   subtitle: string
   extra?: string
   index: number
+  backgroundGradient?: string
 }
 
-function InsightCard({ icon, iconBg, title, value, subtitle, extra, index }: InsightCardProps) {
+function InsightCard({ icon, iconBg, title, value, subtitle, extra, index, backgroundGradient }: InsightCardProps) {
   return (
-    <motion.div custom={index} initial="hidden" animate="visible" variants={cardVariants}>
-      <Card className="insight-card glass-card" hover>
+    <motion.div
+      custom={index}
+      initial="hidden"
+      animate="visible"
+      variants={cardVariants}
+      style={backgroundGradient ? { background: backgroundGradient, borderRadius: 'var(--radius-lg, 12px)' } : undefined}
+    >
+      <Card
+        className="insight-card glass-card"
+        hover
+      >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
           <div
             style={{
@@ -121,11 +148,16 @@ function InsightCard({ icon, iconBg, title, value, subtitle, extra, index }: Ins
 function InsightsSkeleton() {
   return (
     <div style={{ direction: 'rtl' }}>
+      <PageHeader
+        title="תובנות"
+        subtitle="תובנות חכמות על דפוסי ההוצאות שלך"
+        icon={Lightbulb}
+      />
       {/* Skeleton cards grid */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 'var(--space-md)',
         }}
       >
@@ -221,16 +253,22 @@ export default function Insights() {
 
   return (
     <div style={{ direction: 'rtl' }}>
+      <PageHeader
+        title="תובנות"
+        subtitle="תובנות חכמות על דפוסי ההוצאות שלך"
+        icon={Lightbulb}
+      />
+
       {/* ─── Section title ──────────────────────────────────────────── */}
-      <div className="section-title">
-        <span>💡</span> תובנות חכמות
+      <div className="section-header-v2">
+        <span>תובנות חכמות</span>
       </div>
 
-      {/* ─── Insight cards 2x2 grid ─────────────────────────────────── */}
+      {/* ─── Insight cards 3-column grid ──────────────────────────────── */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 'var(--space-md)',
         }}
       >
@@ -243,6 +281,7 @@ export default function Insights() {
           value={formatCurrency(biggest_expense.amount)}
           subtitle={biggest_expense.description}
           extra={`${formatDate(biggest_expense.date)} · ${biggest_expense.category}`}
+          backgroundGradient={CARD_GRADIENTS[0]}
         />
 
         {/* 2. Top merchant */}
@@ -254,6 +293,7 @@ export default function Insights() {
           value={top_merchant.name}
           subtitle={`${top_merchant.count} ביקורים`}
           extra={`סה"כ ${formatCurrency(top_merchant.total)}`}
+          backgroundGradient={CARD_GRADIENTS[1]}
         />
 
         {/* 3. Most expensive day */}
@@ -264,6 +304,7 @@ export default function Insights() {
           title="היום היקר ביותר"
           value={expensive_day.day}
           subtitle={`ממוצע ${formatCurrency(expensive_day.average)}`}
+          backgroundGradient={CARD_GRADIENTS[2]}
         />
 
         {/* 4. Average per transaction */}
@@ -274,6 +315,7 @@ export default function Insights() {
           title="ממוצע לעסקה"
           value={formatCurrency(avg_transaction)}
           subtitle="ממוצע לכל העסקאות"
+          backgroundGradient={CARD_GRADIENTS[3]}
         />
       </div>
 
@@ -285,13 +327,13 @@ export default function Insights() {
           transition={{ delay: 0.35, duration: 0.4 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-title">
-            <span>📊</span> תובנות נוספות
+          <div className="section-header-v2">
+            <span>תובנות נוספות</span>
           </div>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
+              gridTemplateColumns: 'repeat(3, 1fr)',
               gap: 'var(--space-md)',
             }}
           >
@@ -302,6 +344,7 @@ export default function Insights() {
               title="ממוצע יומי"
               value={formatCurrency(trendStats.daily_avg)}
               subtitle="הוצאה ממוצעת ליום עם עסקאות"
+              backgroundGradient={CARD_GRADIENTS[4]}
             />
             <InsightCard
               index={5}
@@ -310,6 +353,7 @@ export default function Insights() {
               title="חציון לעסקה"
               value={formatCurrency(trendStats.median)}
               subtitle="ערך חציון לכל עסקה"
+              backgroundGradient={CARD_GRADIENTS[5]}
             />
             {(() => {
               const lastMonth = trendStats.monthly?.length
@@ -324,6 +368,7 @@ export default function Insights() {
                   title="שינוי חודשי"
                   value={changePct >= 0 ? `+${changePct}%` : `${changePct}%`}
                   subtitle="השוואה לחודש הקודם"
+                  backgroundGradient={CARD_GRADIENTS[6]}
                 />
               ) : (
                 <InsightCard
@@ -333,6 +378,7 @@ export default function Insights() {
                   title="הוצאה מקסימלית"
                   value={formatCurrency(trendStats.max_expense)}
                   subtitle="העסקה היקרה ביותר"
+                  backgroundGradient={CARD_GRADIENTS[6]}
                 />
               )
             })()}
@@ -343,6 +389,7 @@ export default function Insights() {
               title="סה״כ עסקאות"
               value={String(trendStats.transaction_count)}
               subtitle="מספר עסקאות הוצאה"
+              backgroundGradient={CARD_GRADIENTS[7]}
             />
           </div>
         </motion.div>
@@ -356,8 +403,8 @@ export default function Insights() {
           transition={{ delay: 0.45, duration: 0.4 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-title">
-            <span>⚡</span> התראות עסקאות גדולות
+          <div className="section-header-v2">
+            <span>התראות עסקאות גדולות</span>
           </div>
 
           <div

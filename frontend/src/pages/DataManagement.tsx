@@ -17,6 +17,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/common/EmptyState'
+import PageHeader from '../components/common/PageHeader'
 import { ToastContainer, useToast } from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatNumber } from '../utils/formatting'
 
@@ -228,10 +229,11 @@ export default function DataManagement() {
     <div style={{ direction: 'rtl' }}>
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      {/* ─── Section title ──────────────────────────────────────────── */}
-      <div className="section-title">
-        <span>🗄️</span> ניהול נתונים
-      </div>
+      <PageHeader
+        title="ניהול נתונים"
+        subtitle="צפייה, ניהול ומחיקה של הנתונים השמורים שלך"
+        icon={Database}
+      />
 
       {/* ─── Storage overview cards ─────────────────────────────────── */}
       <div
@@ -272,8 +274,9 @@ export default function DataManagement() {
           transition={{ delay: 0.3, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-title">
-            <span>📜</span> היסטוריית העלאות
+          <div className="section-header-v2">
+            <FileSpreadsheet size={18} />
+            <span>היסטוריית העלאות</span>
           </div>
 
           <Card className="glass-card" padding="none">
@@ -395,8 +398,9 @@ export default function DataManagement() {
         transition={{ delay: 0.4, duration: 0.35 }}
         style={{ marginTop: 'var(--space-xl)' }}
       >
-        <div className="section-title">
-          <span>⚠️</span> אזור מסוכן
+        <div className="section-header-v2">
+          <AlertTriangle size={18} />
+          <span>אזור מסוכן</span>
         </div>
 
         <Card

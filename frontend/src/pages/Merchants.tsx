@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Store, ShoppingBag, Hash, TrendingUp } from 'lucide-react'
+import { Store, ShoppingBag, Hash, TrendingUp, DollarSign, Users, Crown } from 'lucide-react'
 import { transactionsApi } from '../services/api'
 import type { MerchantData } from '../services/types'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
@@ -10,6 +10,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import MerchantChart from '../components/charts/MerchantChart'
 import EmptyState from '../components/common/EmptyState'
+import PageHeader from '../components/common/PageHeader'
 import { formatCurrency, formatNumber } from '../utils/formatting'
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +35,17 @@ const cardVariants = {
 function MerchantsSkeleton() {
   return (
     <div style={{ direction: 'rtl' }}>
+      <PageHeader
+        title="בתי עסק"
+        subtitle="ניתוח הוצאות לפי בתי עסק"
+        icon={Store}
+      />
+      {/* Stats skeleton */}
+      <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-lg)' }}>
+        <Skeleton variant="card" />
+        <Skeleton variant="card" />
+        <Skeleton variant="card" />
+      </div>
       {/* Chart skeleton */}
       <Skeleton variant="rectangular" height={300} />
 
@@ -110,6 +122,17 @@ export default function Merchants() {
     return () => controller.abort()
   }, [sessionId, merchantCount])
 
+  // ── Computed summary stats ──────────────────────────────────────────
+  const summaryStats = useMemo(() => {
+    if (!merchantData?.merchants.length) return null
+    const { merchants } = merchantData
+    const uniqueCount = merchants.length
+    const totalSpending = merchants.reduce((sum, m) => sum + Math.abs(m.total), 0)
+    const mostFrequent = merchants.reduce((prev, curr) =>
+      curr.count > prev.count ? curr : prev, merchants[0])
+    return { uniqueCount, totalSpending, mostFrequent }
+  }, [merchantData])
+
   // ── No session ────────────────────────────────────────────────────────
   if (!sessionId) {
     return (
@@ -146,9 +169,48 @@ export default function Merchants() {
 
   return (
     <div style={{ direction: 'rtl' }}>
+      <PageHeader
+        title="בתי עסק"
+        subtitle="ניתוח הוצאות לפי בתי עסק"
+        icon={Store}
+      />
+
+      {/* ─── Summary Stats Row ───────────────────────────────────────── */}
+      {summaryStats && (
+        <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-lg)' }}>
+          <div className="stat-card-compact glass-card">
+            <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
+              <Users size={18} color="#fff" />
+            </div>
+            <div className="stat-content">
+              <div className="stat-value">{summaryStats.uniqueCount}</div>
+              <div className="stat-label">בתי עסק</div>
+            </div>
+          </div>
+          <div className="stat-card-compact glass-card">
+            <div className="stat-icon" style={{ background: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b, #38f9d7))' }}>
+              <DollarSign size={18} color="#fff" />
+            </div>
+            <div className="stat-content">
+              <div className="stat-value">{formatCurrency(summaryStats.totalSpending)}</div>
+              <div className="stat-label">סה"כ הוצאות</div>
+            </div>
+          </div>
+          <div className="stat-card-compact glass-card">
+            <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
+              <Crown size={18} color="#fff" />
+            </div>
+            <div className="stat-content">
+              <div className="stat-value">{summaryStats.mostFrequent.name}</div>
+              <div className="stat-label">הכי תדיר ({summaryStats.mostFrequent.count} ביקורים)</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Section title ──────────────────────────────────────────── */}
-      <div className="section-title">
-        <span>🏪</span> בתי עסק מובילים
+      <div className="section-header-v2">
+        <span>בתי עסק מובילים</span>
       </div>
 
       {/* ─── Count selector ─────────────────────────────────────────── */}
@@ -196,10 +258,10 @@ export default function Merchants() {
 
       {/* ─── Merchant detail cards ──────────────────────────────────── */}
       <div
-        className="section-title"
+        className="section-header-v2"
         style={{ marginTop: 'var(--space-xl)' }}
       >
-        <span>📋</span> פירוט בתי עסק
+        <span>פירוט בתי עסק</span>
       </div>
 
       <div
