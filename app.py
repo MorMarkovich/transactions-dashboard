@@ -3,6 +3,7 @@
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
@@ -1097,7 +1098,7 @@ hr {{ border: none; height: 1px; background: {T['border']}; margin: 1.25rem 0; }
 # =============================================================================
 # JavaScript enhancements
 # =============================================================================
-st.markdown(f"""
+components.html(f"""
 <script>
 // === Animated counter for KPI values with blur-to-clear reveal ===
 function animateCounters() {{
@@ -1259,7 +1260,7 @@ const observer = new MutationObserver(() => {{
 }});
 observer.observe(document.body, {{ childList: true, subtree: true }});
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # =============================================================================
 # Constants
@@ -2038,7 +2039,7 @@ def render_financial_health_score(df):
     anomaly_pts = max(0, 25 - anomaly_count * 5)
 
     # Factor 3: Recurring Burden (25 pts)
-    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else []
+    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else pd.DataFrame()
     rec_count = len(recurring)
     if rec_count < 3: rec_pts = 25
     elif rec_count < 5: rec_pts = 18
@@ -2149,9 +2150,9 @@ def render_spending_alerts(df):
             alerts.append(('warning', '🔍', f'{len(anomalies)} עסקאות חריגות', f'עסקאות מעל ₪{threshold:,.0f}'))
 
     # Alert: Many recurring payments
-    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else []
+    recurring = detect_recurring_payments(df) if len(months_sorted) >= 2 else pd.DataFrame()
     if len(recurring) > 5:
-        total_rec = sum(r['avg_amount'] for r in recurring)
+        total_rec = recurring['avg_amount'].sum()
         alerts.append(('info', '🔄', f'{len(recurring)} תשלומים קבועים', f'סה״כ ~₪{total_rec:,.0f} לחודש'))
 
     # Alert: High average transaction
@@ -2585,7 +2586,7 @@ def init_income_state():
             st.session_state.incomes = []
 
 def get_total_income():
-    return sum(item['amount'] for item in st.session_state.incomes)
+    return sum(item['amount'] for item in st.session_state.get('incomes', []))
 
 def render_income_tab(df_f):
     """Tab for managing income entries and showing budget overview."""
