@@ -72,20 +72,37 @@ export default function Layout({ children }: LayoutProps) {
   // Auto-restore last session from Supabase when user logs in with no active session
   useEffect(() => {
     const sessionId = searchParams.get('session_id')
-    if (!user || sessionId || hasTriedRestore.current) return
+    if (!user || hasTriedRestore.current) return
     hasTriedRestore.current = true
 
-    supabaseApi.getLatestTransactions(user.id)
-      .then(transactions => {
-        if (!transactions || transactions.length === 0) return
-        return transactionsApi.restoreSession(transactions)
-      })
-      .then(response => {
-        if (response?.success && response.session_id) {
-          navigate(`/?session_id=${response.session_id}`, { replace: true })
+    const doRestore = () => {
+      supabaseApi.getLatestTransactions(user.id)
+        .then(transactions => {
+          if (!transactions || transactions.length === 0) return
+          return transactionsApi.restoreSession(transactions)
+        })
+        .then(response => {
+          if (response?.success && response.session_id) {
+            navigate(`/?session_id=${response.session_id}`, { replace: true })
+          }
+        })
+        .catch(() => {}) // Silent fail — user can upload a new file
+    }
+
+    if (!sessionId) {
+      doRestore()
+      return
+    }
+
+    // Session ID is in URL — verify it still exists in the backend.
+    // After a backend restart all in-memory sessions are wiped, so a stale
+    // session_id causes 404s across the whole app.
+    transactionsApi.getMetrics(sessionId)
+      .catch(err => {
+        if ((err as { response?: { status?: number } }).response?.status === 404) {
+          doRestore()
         }
       })
-      .catch(() => {}) // Silent fail — user can upload a new file
   }, [user, searchParams, navigate])
 
   const toggleSidebar = useCallback(() => {
