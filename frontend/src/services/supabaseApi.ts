@@ -72,11 +72,24 @@ export const supabaseApi = {
       .from('saved_transactions')
       .select('data')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    if (error) return null;
-    return (data?.data as unknown[]) ?? null;
+      .order('created_at', { ascending: false });
+    if (error || !data || data.length === 0) return null;
+
+    // New format: single row whose data is already a full array
+    if (Array.isArray(data[0].data)) {
+      return data[0].data as unknown[];
+    }
+
+    // Old format: one row per transaction, data may be a JSON string or plain object
+    const transactions = data.map(row => {
+      const d = row.data;
+      if (typeof d === 'string') {
+        try { return JSON.parse(d); } catch { return null; }
+      }
+      return d;
+    }).filter(Boolean);
+
+    return transactions.length > 0 ? transactions : null;
   },
 
   // ─── Data Management ──────────────────────────────────────────────────
