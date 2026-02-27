@@ -61,6 +61,8 @@ if not os.path.isdir(STATIC_DIR):
     STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "..", "static"))
 
 if os.path.isdir(STATIC_DIR):
+    logger.info("Serving SPA from STATIC_DIR=%s", STATIC_DIR)
+
     # Serve hashed asset files (JS/CSS bundles) with long-lived cache
     assets_dir = os.path.join(STATIC_DIR, "assets")
     if os.path.isdir(assets_dir):
@@ -74,6 +76,8 @@ if os.path.isdir(STATIC_DIR):
             return FileResponse(file_path)
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 else:
+    logger.warning("STATIC_DIR=%s not found — SPA catch-all disabled", STATIC_DIR)
+
     @app.get("/")
     async def root():
         return {"message": "Transactions Dashboard API", "version": "1.0.0"}
