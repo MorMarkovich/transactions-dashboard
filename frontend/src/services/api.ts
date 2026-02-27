@@ -187,7 +187,7 @@ export const transactionsApi = {
    * Get donut chart data (v2 - raw Recharts format)
    */
   getDonutChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawDonutData> => {
-    const response = await api.get<RawDonutData>('/api/v2/charts/donut', {
+    const response = await api.get<RawDonutData>('/api/charts/v2/donut', {
       params: { sessionId },
       signal,
     });
@@ -198,7 +198,7 @@ export const transactionsApi = {
    * Get monthly chart data (v2 - raw Recharts format)
    */
   getMonthlyChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawMonthlyData> => {
-    const response = await api.get<RawMonthlyData>('/api/v2/charts/monthly', {
+    const response = await api.get<RawMonthlyData>('/api/charts/v2/monthly', {
       params: { sessionId },
       signal,
     });
@@ -209,7 +209,7 @@ export const transactionsApi = {
    * Get weekday chart data (v2 - raw Recharts format)
    */
   getWeekdayChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawWeekdayData> => {
-    const response = await api.get<RawWeekdayData>('/api/v2/charts/weekday', {
+    const response = await api.get<RawWeekdayData>('/api/charts/v2/weekday', {
       params: { sessionId },
       signal,
     });
@@ -220,7 +220,7 @@ export const transactionsApi = {
    * Get trend chart data (v2 - raw Recharts format)
    */
   getTrendChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawTrendData> => {
-    const response = await api.get<RawTrendData>('/api/v2/charts/trend', {
+    const response = await api.get<RawTrendData>('/api/charts/v2/trend', {
       params: { sessionId },
       signal,
     });
@@ -266,7 +266,7 @@ export const transactionsApi = {
    * Get heatmap data (categories x months matrix)
    */
   getHeatmap: async (sessionId: string, signal?: AbortSignal): Promise<HeatmapData> => {
-    const response = await api.get<HeatmapData>('/api/charts/heatmap', {
+    const response = await api.get<HeatmapData>('/api/charts/v2/heatmap', {
       params: { sessionId },
       signal,
     });
