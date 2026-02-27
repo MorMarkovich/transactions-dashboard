@@ -6,7 +6,8 @@ import os
 import math
 from typing import Optional, Any
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException
-from pydantic import BaseModel
+import json as _json
+from pydantic import BaseModel, field_validator
 from fastapi.responses import FileResponse, StreamingResponse
 import pandas as pd
 import numpy as np
@@ -128,6 +129,13 @@ async def upload_file(file: UploadFile = File(...)):
 
 class RestoreSessionRequest(BaseModel):
     transactions: list[Any]
+
+    @field_validator('transactions', mode='before')
+    @classmethod
+    def parse_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v
 
 
 @router.post("/restore-session")
