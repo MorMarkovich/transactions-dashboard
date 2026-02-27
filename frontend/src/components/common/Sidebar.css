@@ -33,6 +33,8 @@
   flex-direction: column;
   gap: 0;
   flex: 1;
+  justify-content: flex-start;
+  overflow-y: auto;
 }
 
 .sidebar-section {
@@ -103,8 +105,8 @@
   display: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-card);
@@ -113,6 +115,8 @@
   transition: all var(--transition-fast);
   margin: var(--space-2) auto;
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .sidebar-collapse-btn:hover {
@@ -353,12 +357,14 @@
     top: 0;
     right: 0;
     height: 100vh;
+    height: 100dvh;
     z-index: var(--z-modal, 50);
     box-shadow: var(--shadow-xl);
     transform: translateX(100%);
-    width: 280px;
-    min-width: 280px;
-    max-width: 280px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: min(280px, 85vw);
+    min-width: min(280px, 85vw);
+    max-width: min(280px, 85vw);
   }
 
   .sidebar.open {
@@ -366,9 +372,9 @@
   }
 
   .sidebar.collapsed {
-    width: 280px;
-    min-width: 280px;
-    max-width: 280px;
+    width: min(280px, 85vw);
+    min-width: min(280px, 85vw);
+    max-width: min(280px, 85vw);
   }
 
   .sidebar-close-btn {
