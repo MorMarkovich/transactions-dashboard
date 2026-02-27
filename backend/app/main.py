@@ -1,12 +1,15 @@
 """
 FastAPI main application
 """
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import router
+import os
 import traceback
 import logging
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from .api.routes import router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,13 +40,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# API routes (registered first so /api/* always takes priority)
 app.include_router(router, prefix="/api")
-
-@app.get("/")
-async def root():
-    return {"message": "Transactions Dashboard API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+# ── Production: serve the compiled React SPA ─────────────────────────────────
+# The Dockerfile copies frontend/dist → ./static
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "static")
+STATIC_DIR = os.path.normpath(STATIC_DIR)
+
+if os.path.isdir(STATIC_DIR):
+    # Serve hashed asset files (JS/CSS bundles) with long-lived cache
+    assets_dir = os.path.join(STATIC_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all: return index.html so React Router handles client-side routing."""
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "Transactions Dashboard API", "version": "1.0.0"}

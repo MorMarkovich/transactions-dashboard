@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: transactions-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Supabase – set these in the Render dashboard (Settings → Environment)
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

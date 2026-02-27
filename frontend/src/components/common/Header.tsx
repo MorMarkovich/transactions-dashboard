@@ -9,6 +9,11 @@ interface HeaderProps {
   onCommandPalette?: () => void
 }
 
+// Detect Mac so we show the correct keyboard shortcut label
+const isMac =
+  typeof navigator !== 'undefined' &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+
 export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
 
@@ -66,10 +71,12 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
 
         {/* App title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', minWidth: 0 }}>
-          <CreditCard
-            size={24}
-            style={{ color: 'var(--accent)', flexShrink: 0 }}
-          />
+          <span title="מנתח עסקאות — ניתוח חכם של הוצאות כרטיס אשראי" style={{ flexShrink: 0, display: 'inline-flex' }}>
+            <CreditCard
+              size={24}
+              style={{ color: 'var(--accent)' }}
+            />
+          </span>
           <div style={{ minWidth: 0 }}>
             <h1
               style={{
@@ -139,7 +146,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
             flexShrink: 0,
           }}
         >
-          ⌘K
+          {isMac ? '⌘K' : 'Ctrl+K'}
         </kbd>
       </div>
 
