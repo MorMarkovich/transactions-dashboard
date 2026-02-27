@@ -22,6 +22,8 @@ import type {
   SpendingVelocityData,
   AnomalyData,
   SearchResult,
+  MonthOverviewData,
+  IndustryMonthlyData,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -207,9 +209,9 @@ export const transactionsApi = {
   /**
    * Get monthly chart data (v2 - raw Recharts format)
    */
-  getMonthlyChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawMonthlyData> => {
+  getMonthlyChartV2: async (sessionId: string, dateType?: string, signal?: AbortSignal): Promise<RawMonthlyData> => {
     const response = await api.get<RawMonthlyData>('/api/charts/v2/monthly', {
-      params: { sessionId },
+      params: { sessionId, ...(dateType && { date_type: dateType }) },
       signal,
     });
     return response.data;
@@ -345,6 +347,28 @@ export const transactionsApi = {
   searchTransactions: async (sessionId: string, query: string, limit?: number, signal?: AbortSignal): Promise<SearchResult> => {
     const response = await api.get<SearchResult>('/api/search', {
       params: { sessionId, q: query, ...(limit !== undefined && { limit }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get income vs expenses breakdown by category for a specific month
+   */
+  getMonthOverview: async (sessionId: string, month: string, dateType?: string, signal?: AbortSignal): Promise<MonthOverviewData> => {
+    const response = await api.get<MonthOverviewData>('/api/charts/v2/month-overview', {
+      params: { sessionId, month, ...(dateType && { date_type: dateType }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get expenses per category per month for stacked bar chart comparison
+   */
+  getIndustryMonthly: async (sessionId: string, dateType?: string, signal?: AbortSignal): Promise<IndustryMonthlyData> => {
+    const response = await api.get<IndustryMonthlyData>('/api/charts/v2/industry-monthly', {
+      params: { sessionId, ...(dateType && { date_type: dateType }) },
       signal,
     });
     return response.data;

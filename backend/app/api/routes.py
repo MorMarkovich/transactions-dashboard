@@ -59,7 +59,8 @@ async def upload_file(file: UploadFile = File(...)):
         amount_col = detect_amount_column(df_clean)
         desc_col = find_column(df_clean, ['שם בית העסק', 'שם בית עסק', 'תיאור', 'תיאור התנועה', 'description', 'merchant'])
         cat_col = find_column(df_clean, ['קטגוריה', 'category', 'Category'])
-        
+        billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:'])
+
         if not date_col or not amount_col or not desc_col:
             # Clean up before raising error
             if file_path and os.path.exists(file_path):
@@ -70,12 +71,12 @@ async def upload_file(file: UploadFile = File(...)):
                 except:
                     pass
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Required columns not found. Found columns: {list(df_clean.columns)}"
             )
-        
+
         # Process data
-        df = process_data(df_clean, date_col, amount_col, desc_col, cat_col)
+        df = process_data(df_clean, date_col, amount_col, desc_col, cat_col, billing_date_col)
         
         if df.empty:
             # Clean up before raising error
@@ -152,6 +153,10 @@ async def restore_session(body: RestoreSessionRequest):
         if 'תאריך' in df.columns:
             df['תאריך'] = pd.to_datetime(df['תאריך'], errors='coerce')
 
+        # Parse billing date column if present
+        if 'תאריך_חיוב' in df.columns:
+            df['תאריך_חיוב'] = pd.to_datetime(df['תאריך_חיוב'], errors='coerce')
+
         # Ensure numeric columns
         if 'סכום' in df.columns:
             df['סכום'] = pd.to_numeric(df['סכום'], errors='coerce')
@@ -164,6 +169,9 @@ async def restore_session(body: RestoreSessionRequest):
 
         if 'יום_בשבוע' not in df.columns and 'תאריך' in df.columns:
             df['יום_בשבוע'] = df['תאריך'].dt.dayofweek
+
+        if 'חודש_חיוב' not in df.columns and 'תאריך_חיוב' in df.columns:
+            df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
 
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
@@ -260,12 +268,15 @@ async def get_metrics(sessionId: str = Query(...)):
             trend_pct = ((second_half_avg - first_half_avg) / first_half_avg) * 100
             trend = 'up' if trend_pct > 0 else 'down'
     
+    has_billing_date = 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any()
+
     return {
         "total_transactions": total_transactions,
         "total_expenses": total_expenses,
         "total_income": total_income,
         "average_transaction": average_transaction,
-        "trend": trend
+        "trend": trend,
+        "has_billing_date": bool(has_billing_date),
     }
 
 
@@ -427,7 +438,7 @@ async def get_donut_v2(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/monthly")
-async def get_monthly_v2(sessionId: str = Query(...)):
+async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
     """Return raw monthly expense totals."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -438,7 +449,10 @@ async def get_monthly_v2(sessionId: str = Query(...)):
     if expenses.empty:
         return {"months": []}
 
-    expenses['month_period'] = expenses['תאריך'].dt.to_period('M')
+    # Choose date column based on date_type
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in expenses.columns) else 'תאריך'
+    expenses['month_period'] = expenses[date_col].dt.to_period('M')
+    expenses = expenses.dropna(subset=['month_period'])
     monthly = (
         expenses
         .groupby('month_period')['סכום_מוחלט']
@@ -720,6 +734,109 @@ async def get_heatmap_v2(sessionId: str = Query(...)):
     ]
 
     return {"categories": categories, "months": months, "data": data}
+
+
+@router.get("/charts/v2/month-overview")
+async def get_month_overview(
+    sessionId: str = Query(...),
+    month: str = Query(...),
+    date_type: str = Query("transaction"),
+):
+    """Return income vs expenses breakdown by category for a specific month (MM/YYYY)."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId].copy()
+    if df.empty:
+        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
+
+    # Choose date column
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    month_df = df[df['_month'] == month].copy()
+
+    if month_df.empty:
+        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
+
+    expenses = month_df[month_df['סכום'] < 0]
+    income = month_df[month_df['סכום'] > 0]
+
+    exp_by_cat = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum()
+    inc_by_cat = income.groupby('קטגוריה')['סכום'].sum()
+
+    all_cats = set(exp_by_cat.index) | set(inc_by_cat.index)
+    categories = []
+    for cat in sorted(all_cats):
+        exp_val = float(exp_by_cat.get(cat, 0))
+        inc_val = float(inc_by_cat.get(cat, 0))
+        categories.append({
+            "name": str(cat),
+            "expenses": round(_sanitize(exp_val), 2),
+            "income": round(_sanitize(inc_val), 2),
+        })
+
+    # Sort by expenses descending
+    categories.sort(key=lambda x: x["expenses"], reverse=True)
+
+    total_expenses = round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2) if not expenses.empty else 0
+    total_income = round(_sanitize(float(income['סכום'].sum())), 2) if not income.empty else 0
+
+    return {
+        "month": month,
+        "categories": categories,
+        "total_expenses": total_expenses,
+        "total_income": total_income,
+        "transaction_count": int(len(month_df)),
+    }
+
+
+@router.get("/charts/v2/industry-monthly")
+async def get_industry_monthly(
+    sessionId: str = Query(...),
+    date_type: str = Query("transaction"),
+    top_n: int = Query(default=8, ge=1, le=20),
+):
+    """Return expenses per category per month for stacked bar chart comparison."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    expenses = df[df['סכום'] < 0].copy()
+
+    if expenses.empty:
+        return {"months": [], "series": []}
+
+    # Choose date column
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in expenses.columns) else 'תאריך'
+    expenses['_month_period'] = expenses[date_col].dt.to_period('M')
+    expenses = expenses.dropna(subset=['_month_period'])
+
+    # Get top N categories by total spend
+    cat_totals = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().sort_values(ascending=False)
+    top_cats = [str(c) for c in cat_totals.head(top_n).index]
+
+    # Build pivot: rows=months, cols=categories
+    pivot = pd.pivot_table(
+        expenses,
+        values='סכום_מוחלט',
+        index='_month_period',
+        columns='קטגוריה',
+        aggfunc='sum',
+        fill_value=0,
+    )
+    pivot = pivot.sort_index()
+
+    months = [period.strftime('%m/%Y') for period in pivot.index]
+
+    series = []
+    for cat in top_cats:
+        if cat in pivot.columns:
+            data = [round(_sanitize(float(v)), 2) for v in pivot[cat].values]
+        else:
+            data = [0.0] * len(months)
+        series.append({"name": cat, "data": data})
+
+    return {"months": months, "series": series}
 
 
 # ---------------------------------------------------------------------------
