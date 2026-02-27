@@ -211,7 +211,8 @@ async def get_transactions(
     end = start + page_size
     df_page = df.iloc[start:end]
     
-    # Convert to dict
+    # Convert to dict, replacing NaN/Inf with None for JSON safety
+    df_page = df_page.where(pd.notna(df_page), None)
     transactions = df_page.to_dict('records')
     
     return {
