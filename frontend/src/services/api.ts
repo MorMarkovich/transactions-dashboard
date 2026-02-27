@@ -35,6 +35,16 @@ const api = axios.create({
 
 export const transactionsApi = {
   /**
+   * Restore a backend session from saved transaction JSON data
+   */
+  restoreSession: async (transactions: unknown[]): Promise<FileUploadResponse> => {
+    const response = await api.post<FileUploadResponse>('/api/restore-session', {
+      transactions,
+    });
+    return response.data;
+  },
+
+  /**
    * Upload transaction file
    */
   uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {

@@ -22,6 +22,7 @@ import {
 import Badge from '../ui/Badge'
 import { useAuth } from '../../lib/AuthContext'
 import { transactionsApi } from '../../services/api'
+import { supabaseApi } from '../../services/supabaseApi'
 import './Sidebar.css'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const [searchParams] = useSearchParams()
   const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('מעלה קובץ...')
   const [error, setError] = useState<string | null>(null)
   const [showFormats, setShowFormats] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -110,28 +112,76 @@ export default function Sidebar({
     return basePath
   }
 
-  const handleUploadFile = async (file: File) => {
+  // Save transactions to Supabase (fire and forget)
+  const saveToSupabase = (transactions: unknown[]) => {
+    if (!user || !transactions.length) return
+    supabaseApi.deleteAllTransactions(user.id)
+      .then(() => supabaseApi.saveTransactions(user.id, transactions))
+      .catch(e => console.error('Failed to save to Supabase:', e))
+  }
+
+  const handleUploadFiles = async (files: File[]) => {
     setUploading(true)
     setError(null)
+
     try {
-      const response = await transactionsApi.uploadFile(file)
-      if (response.success && response.session_id) {
-        onFileUploaded?.(response.session_id)
+      if (files.length === 1) {
+        setUploadStatus('מעלה קובץ...')
+        const response = await transactionsApi.uploadFile(files[0])
+        if (response.success && response.session_id) {
+          // Fetch all transactions in background and save to Supabase
+          transactionsApi.getTransactions(response.session_id, { page: 1, page_size: 50000 })
+            .then(data => saveToSupabase(data.transactions as unknown[]))
+            .catch(() => {})
+          onFileUploaded?.(response.session_id)
+        } else {
+          setError('שגיאה בהעלאת הקובץ')
+        }
       } else {
-        setError('שגיאה בהעלאת הקובץ')
+        // Multiple files: upload each, merge, create combined session
+        const allTransactions: unknown[] = []
+
+        for (let i = 0; i < files.length; i++) {
+          setUploadStatus(`מעלה קובץ ${i + 1} מ-${files.length}...`)
+          const response = await transactionsApi.uploadFile(files[i])
+          if (response.success && response.session_id) {
+            const data = await transactionsApi.getTransactions(
+              response.session_id,
+              { page: 1, page_size: 50000 }
+            )
+            allTransactions.push(...(data.transactions as unknown[]))
+          }
+        }
+
+        if (allTransactions.length > 0) {
+          setUploadStatus('ממזג נתונים...')
+          const merged = await transactionsApi.restoreSession(allTransactions)
+          if (merged.success && merged.session_id) {
+            saveToSupabase(allTransactions)
+            onFileUploaded?.(merged.session_id)
+          } else {
+            setError('שגיאה במיזוג הקבצים')
+          }
+        } else {
+          setError('לא נמצאו עסקאות בקבצים')
+        }
       }
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: unknown } } }
+      const detail = axiosErr?.response?.data?.detail
       setError(typeof detail === 'string' ? detail : 'שגיאה בהעלאת הקובץ')
     } finally {
       setUploading(false)
+      setUploadStatus('מעלה קובץ...')
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleUploadFile(file)
+    const files = e.target.files
+    if (files && files.length > 0) {
+      handleUploadFiles(Array.from(files))
+    }
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -149,8 +199,10 @@ export default function Sidebar({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleUploadFile(file)
+    const files = Array.from(e.dataTransfer.files).filter(
+      f => /\.(xlsx|xls|csv)$/i.test(f.name)
+    )
+    if (files.length > 0) handleUploadFiles(files)
   }
 
   return (
@@ -233,6 +285,7 @@ export default function Sidebar({
                 accept=".xlsx,.xls,.csv"
                 onChange={handleFileUpload}
                 disabled={uploading}
+                multiple
                 style={{ display: 'none' }}
               />
               <label
@@ -251,7 +304,7 @@ export default function Sidebar({
                         animation: 'spin 1s linear infinite',
                       }}
                     />
-                    <span>מעלה קובץ...</span>
+                    <span>{uploadStatus}</span>
                   </>
                 ) : isDragging ? (
                   <>
@@ -261,7 +314,7 @@ export default function Sidebar({
                 ) : (
                   <>
                     <Upload size={20} style={{ color: 'var(--accent)' }} />
-                    <span>גרור קובץ או לחץ לבחירה</span>
+                    <span>גרור קובץ/ים או לחץ לבחירה</span>
                     <span className="file-upload-hint" style={{ color: 'var(--text-secondary)' }}>.xlsx, .xls, .csv</span>
                   </>
                 )}

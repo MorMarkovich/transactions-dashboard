@@ -4,8 +4,9 @@ API routes for transactions dashboard
 import uuid
 import os
 import math
-from typing import Optional
+from typing import Optional, Any
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import FileResponse, StreamingResponse
 import pandas as pd
 import numpy as np
@@ -123,6 +124,50 @@ async def upload_file(file: UploadFile = File(...)):
             except:
                 pass
         raise HTTPException(status_code=500, detail=error_detail)
+
+
+class RestoreSessionRequest(BaseModel):
+    transactions: list[dict[str, Any]]
+
+
+@router.post("/restore-session")
+async def restore_session(body: RestoreSessionRequest):
+    """Restore a backend session from saved transaction JSON data."""
+    if not body.transactions:
+        raise HTTPException(status_code=400, detail="No transactions provided")
+
+    try:
+        df = pd.DataFrame(body.transactions)
+
+        # Parse date column
+        if 'תאריך' in df.columns:
+            df['תאריך'] = pd.to_datetime(df['תאריך'], errors='coerce')
+
+        # Ensure numeric columns
+        if 'סכום' in df.columns:
+            df['סכום'] = pd.to_numeric(df['סכום'], errors='coerce')
+
+        # Compute derived columns if missing
+        if 'סכום_מוחלט' not in df.columns and 'סכום' in df.columns:
+            df['סכום_מוחלט'] = df['סכום'].abs()
+        elif 'סכום_מוחלט' in df.columns:
+            df['סכום_מוחלט'] = pd.to_numeric(df['סכום_מוחלט'], errors='coerce')
+
+        if 'יום_בשבוע' not in df.columns and 'תאריך' in df.columns:
+            df['יום_בשבוע'] = df['תאריך'].dt.dayofweek
+
+        session_id = str(uuid.uuid4())
+        sessions[session_id] = df
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "transaction_count": len(df),
+            "message": f"Restored {len(df)} transactions",
+        }
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"{str(e)}\n{traceback.format_exc()}")
 
 
 @router.get("/transactions")
