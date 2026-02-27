@@ -18,6 +18,7 @@ const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Budget = lazy(() => import('./pages/Budget'))
 const SavingsGoals = lazy(() => import('./pages/SavingsGoals'))
 
+// Full-screen loader — used only for auth state and the Login page
 function PageLoader() {
   return (
     <div
@@ -33,6 +34,26 @@ function PageLoader() {
           ...טוען
         </p>
       </div>
+    </div>
+  )
+}
+
+// Inline content loader — renders inside the Layout so the header/sidebar stay visible
+function ContentLoader() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '280px',
+      }}
+    >
+      <Loader2
+        size={28}
+        className="animate-spin"
+        style={{ color: 'var(--accent-primary)' }}
+      />
     </div>
   )
 }
@@ -54,101 +75,35 @@ function LoginRoute() {
   return <Login />
 }
 
+// Wraps every protected page: auth guard + shared Layout + per-route Suspense
+// so the header and sidebar are never unmounted during page transitions.
+function ProtectedPage({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <Layout>
+        <Suspense fallback={<ContentLoader />}>
+          {children}
+        </Suspense>
+      </Layout>
+    </ProtectedRoute>
+  )
+}
+
 function AppRoutes() {
   return (
+    // Outer Suspense handles the lazy Login page (no Layout needed there)
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/transactions"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Transactions />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/trends"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Trends />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/insights"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Insights />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/merchants"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Merchants />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/income"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Income />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/budget"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Budget />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/savings"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <SavingsGoals />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/data-management"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <DataManagement />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
+        <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
+        <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
+        <Route path="/insights" element={<ProtectedPage><Insights /></ProtectedPage>} />
+        <Route path="/merchants" element={<ProtectedPage><Merchants /></ProtectedPage>} />
+        <Route path="/income" element={<ProtectedPage><Income /></ProtectedPage>} />
+        <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
+        <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />
+        <Route path="/data-management" element={<ProtectedPage><DataManagement /></ProtectedPage>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
