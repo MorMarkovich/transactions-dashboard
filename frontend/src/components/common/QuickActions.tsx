@@ -63,7 +63,7 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
               background: 'rgba(0, 0, 0, 0.3)',
               backdropFilter: 'blur(2px)',
               WebkitBackdropFilter: 'blur(2px)',
-              zIndex: 9989,
+              zIndex: 29,
             }}
           />
         )}
@@ -74,7 +74,7 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
           position: 'fixed',
           bottom: '24px',
           left: '24px',
-          zIndex: 9990,
+          zIndex: 35,
           display: 'flex',
           flexDirection: 'column-reverse',
           alignItems: 'center',
