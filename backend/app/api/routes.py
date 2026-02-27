@@ -7,6 +7,7 @@ import math
 from typing import Optional, Any
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException
 import json as _json
+import datetime as _dt
 from pydantic import BaseModel, field_validator
 from fastapi.responses import FileResponse, StreamingResponse
 import pandas as pd
@@ -219,9 +220,11 @@ async def get_transactions(
     end = start + page_size
     df_page = df.iloc[start:end]
     
-    # Convert to dict, replacing NaN/Inf with None for JSON safety
-    df_page = df_page.where(pd.notna(df_page), None)
-    transactions = df_page.to_dict('records')
+    # Convert to dict with full JSON safety (NaT, Timestamp, numpy scalars, NaN/Inf)
+    transactions = [
+        {k: _to_json_safe(v) for k, v in record.items()}
+        for record in df_page.to_dict('records')
+    ]
     
     return {
         "transactions": transactions,
@@ -365,6 +368,28 @@ def _sanitize(val):
         return None
     if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
         return 0
+    return val
+
+
+def _to_json_safe(val):
+    """Convert any pandas/numpy value to a JSON-serializable Python type.
+
+    Handles: pd.NaT, pd.Timestamp, np.int64/float64, NaN, Inf.
+    """
+    try:
+        if pd.isnull(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(val, (_dt.datetime, _dt.date)):
+        return val.isoformat()
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return None
+    if hasattr(val, 'item'):   # numpy int64, float64, bool_, etc.
+        v = val.item()
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return None
+        return v
     return val
 
 
