@@ -53,8 +53,12 @@ async def health():
 
 # ── Production: serve the compiled React SPA ─────────────────────────────────
 # The Dockerfile copies frontend/dist → ./static
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "static")
-STATIC_DIR = os.path.normpath(STATIC_DIR)
+# Try one level up first (Docker: /app/app/main.py → /app/static),
+# then two levels up (dev: backend/app/main.py → ../../static).
+_base = os.path.dirname(__file__)
+STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "static"))
+if not os.path.isdir(STATIC_DIR):
+    STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "..", "static"))
 
 if os.path.isdir(STATIC_DIR):
     # Serve hashed asset files (JS/CSS bundles) with long-lived cache
