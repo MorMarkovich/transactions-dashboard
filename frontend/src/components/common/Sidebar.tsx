@@ -86,6 +86,7 @@ export default function Sidebar({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showFormats, setShowFormats] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { user, signOut } = useAuth()
 
@@ -109,13 +110,9 @@ export default function Sidebar({
     return basePath
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  const handleUploadFile = async (file: File) => {
     setUploading(true)
     setError(null)
-
     try {
       const response = await transactionsApi.uploadFile(file)
       if (response.success && response.session_id) {
@@ -128,10 +125,32 @@ export default function Sidebar({
       setError(typeof detail === 'string' ? detail : 'שגיאה בהעלאת הקובץ')
     } finally {
       setUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleUploadFile(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (!isDragging) setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear when leaving the label itself, not a child element
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleUploadFile(file)
   }
 
   return (
@@ -218,7 +237,10 @@ export default function Sidebar({
               />
               <label
                 htmlFor="sidebar-file-upload"
-                className={`file-upload-label ${uploading ? 'uploading' : ''}`}
+                className={`file-upload-label ${uploading ? 'uploading' : ''} ${isDragging ? 'dragging' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 {uploading ? (
                   <>
@@ -231,11 +253,16 @@ export default function Sidebar({
                     />
                     <span>מעלה קובץ...</span>
                   </>
+                ) : isDragging ? (
+                  <>
+                    <Upload size={20} style={{ color: 'var(--accent)' }} />
+                    <span style={{ fontWeight: 600 }}>שחרר כאן להעלאה</span>
+                  </>
                 ) : (
                   <>
                     <Upload size={20} style={{ color: 'var(--accent)' }} />
                     <span>גרור קובץ או לחץ לבחירה</span>
-                    <span className="file-upload-hint">.xlsx, .xls, .csv</span>
+                    <span className="file-upload-hint" style={{ color: 'var(--text-secondary)' }}>.xlsx, .xls, .csv</span>
                   </>
                 )}
               </label>

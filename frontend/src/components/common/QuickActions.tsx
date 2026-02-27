@@ -61,6 +61,7 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
         animate={{ rotate: isOpen ? 45 : 0 }}
         transition={{ duration: 0.2 }}
         aria-label={isOpen ? 'סגור פעולות' : 'פעולות מהירות'}
+        title={isOpen ? 'סגור פעולות' : 'פעולות מהירות'}
         style={{
           width: 52,
           height: 52,
