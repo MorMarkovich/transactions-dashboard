@@ -11,7 +11,6 @@ import {
   Zap,
   Bell,
   LayoutDashboard,
-  Grid3X3,
   ChevronRight,
   ChevronLeft,
   CreditCard,
@@ -24,7 +23,6 @@ import MetricsGrid from '../components/metrics/MetricsGrid'
 import DonutChart from '../components/charts/DonutChart'
 import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
-import HeatmapChart from '../components/charts/HeatmapChart'
 import CategoryList from '../components/category/CategoryList'
 import MonthOverviewChart from '../components/charts/MonthOverviewChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
@@ -47,7 +45,6 @@ import type {
   SpendingVelocityData,
   AnomalyItem,
   RecurringTransaction,
-  HeatmapData,
   MonthOverviewData,
   IndustryMonthlyData,
 } from '../services/types'
@@ -84,7 +81,6 @@ export default function Dashboard() {
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
-  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
   const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
 
@@ -95,6 +91,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
+  const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
@@ -121,7 +118,6 @@ export default function Dashboard() {
           transactionsApi.getSpendingVelocity(sessionId, signal).catch(() => null),
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
-          transactionsApi.getHeatmap(sessionId, signal).catch(() => null),
           transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
         ])
 
@@ -134,8 +130,7 @@ export default function Dashboard() {
         if (results[6]) setVelocity(results[6] as SpendingVelocityData)
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
-        if (results[9]) setHeatmapData(results[9] as HeatmapData)
-        if (results[10]) setIndustryMonthly(results[10] as IndustryMonthlyData)
+        if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
 
         // Auto-select most recent month
         const monthly = results[2] as RawMonthlyData
@@ -214,6 +209,30 @@ export default function Dashboard() {
     if (!monthlyData?.months) return []
     return [...monthlyData.months].reverse().slice(0, 12)
   }, [monthlyData])
+
+  // Sync comparison month selection when industry data loads
+  useEffect(() => {
+    if (industryMonthly?.months.length) {
+      setSelectedComparisonMonths(new Set(industryMonthly.months))
+    }
+  }, [industryMonthly])
+
+  const filteredIndustryMonthly = useMemo<IndustryMonthlyData | null>(() => {
+    if (!industryMonthly) return null
+    if (!selectedComparisonMonths.size || selectedComparisonMonths.size === industryMonthly.months.length) {
+      return industryMonthly
+    }
+    const monthIndices = industryMonthly.months
+      .map((m, i) => (selectedComparisonMonths.has(m) ? i : -1))
+      .filter((i): i is number => i >= 0)
+    return {
+      months: monthIndices.map(i => industryMonthly.months[i]),
+      series: industryMonthly.series.map(s => ({
+        ...s,
+        data: monthIndices.map(i => s.data[i]),
+      })),
+    }
+  }, [industryMonthly, selectedComparisonMonths])
 
   const hasBillingDate = metrics?.has_billing_date ?? false
 
@@ -336,12 +355,17 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-xl)', position: 'relative', zIndex: 1 }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
           {/* Section header */}
           <div className="section-header-v2">
             <Calendar size={18} />
             <span>סקירת חודש</span>
+            {hasBillingDate && (
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
+                {dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'}
+              </span>
+            )}
           </div>
 
           {/* Month selector bar */}
@@ -524,14 +548,54 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-xl)', position: 'relative', zIndex: 1 }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
           <div className="section-header-v2">
             <Layers size={18} />
-            <span>השוואת הוצאות לפי קטגוריה — כל החודשים</span>
+            <span>השוואת הוצאות לפי קטגוריה</span>
+            {hasBillingDate && (
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
+                {dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'}
+              </span>
+            )}
+          </div>
+          {/* Month selector pills */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
+            {industryMonthly.months.map((m) => {
+              const isSelected = selectedComparisonMonths.has(m)
+              return (
+                <button
+                  key={m}
+                  onClick={() => setSelectedComparisonMonths(prev => {
+                    const next = new Set(prev)
+                    if (next.has(m)) {
+                      if (next.size > 1) next.delete(m)
+                    } else {
+                      next.add(m)
+                    }
+                    return next
+                  })}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid',
+                    borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
+                    background: isSelected ? 'var(--accent-muted)' : 'transparent',
+                    color: isSelected ? 'var(--accent)' : 'var(--text-muted)',
+                    fontSize: '0.75rem',
+                    fontWeight: isSelected ? 600 : 400,
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-family)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {m}
+                </button>
+              )
+            })}
           </div>
           <Card className="glass-card" padding="md">
-            <IndustryMonthlyChart data={industryMonthly} height={320} />
+            <IndustryMonthlyChart data={filteredIndustryMonthly!} height={320} />
           </Card>
         </motion.div>
       )}
@@ -594,6 +658,11 @@ export default function Dashboard() {
           <div className="section-header-v2">
             <Calendar size={18} />
             <span>הוצאות לפי חודש</span>
+            {hasBillingDate && (
+              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
+                {dateType === 'billing' ? 'חיוב' : 'עסקה'}
+              </span>
+            )}
           </div>
           <Card className="glass-card" padding="md">
             <BarChart data={monthlyChartData} />
@@ -642,7 +711,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.35 }}
-          style={{ display: 'grid', gridTemplateColumns: forecast && velocity ? '1fr 1fr' : '1fr', gap: 'var(--space-md)', marginTop: 'var(--space-xl)' }}
+          style={{ display: 'grid', gridTemplateColumns: forecast && velocity ? '1fr 1fr' : '1fr', gap: 'var(--space-md)', marginTop: 'var(--space-lg)' }}
           className="dashboard-premium-row"
         >
           {forecast && (
@@ -704,35 +773,13 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Heatmap ────────────────────────────────────────────────── */}
-      {heatmapData && heatmapData.categories.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-xl)' }}
-        >
-          <div className="section-header-v2">
-            <Grid3X3 size={18} />
-            <span>מפת חום לפי קטגוריה</span>
-          </div>
-          <Card className="glass-card" padding="md">
-            <HeatmapChart
-              categories={heatmapData.categories}
-              months={heatmapData.months}
-              data={heatmapData.data}
-            />
-          </Card>
-        </motion.div>
-      )}
-
       {/* ── Month-over-Month ───────────────────────────────────────── */}
       {monthlyData && monthlyData.months.length >= 2 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-xl)' }}
+          style={{ marginTop: 'var(--space-lg)' }}
         >
           <div className="section-header-v2">
             <BarChart3 size={18} />
