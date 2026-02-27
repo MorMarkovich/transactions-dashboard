@@ -46,18 +46,25 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str, cat_col: Optional[str]) -> pd.DataFrame:
+def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str, cat_col: Optional[str], billing_date_col: Optional[str] = None) -> pd.DataFrame:
     """עיבוד הנתונים עם טיפול מקיף ב-edge cases"""
     if df.empty:
         return pd.DataFrame()
-    
+
     result = df.copy()
-    
+
     # פרסור תאריכים
     try:
         result['תאריך'] = parse_dates(result[date_col])
     except Exception:
         result['תאריך'] = pd.NaT
+
+    # פרסור תאריך חיוב (אם קיים)
+    if billing_date_col and billing_date_col in result.columns:
+        try:
+            result['תאריך_חיוב'] = parse_dates(result[billing_date_col])
+        except Exception:
+            result['תאריך_חיוב'] = pd.NaT
     
     # ניקוי סכומים
     try:
@@ -113,6 +120,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         result['סכום_מוחלט'] = result['סכום'].abs()
         result['חודש'] = result['תאריך'].dt.strftime('%m/%Y')
         result['יום_בשבוע'] = result['תאריך'].dt.dayofweek
+        if 'תאריך_חיוב' in result.columns:
+            result['חודש_חיוב'] = result['תאריך_חיוב'].dt.strftime('%m/%Y')
     else:
         # יצירת DataFrame ריק עם העמודות הנדרשות
         result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])

@@ -305,6 +305,7 @@ export default function Transactions() {
           pageSize={pageSize}
           onPageChange={handlePageChange}
           onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}
+          showBillingDate={transactions.some((tx) => !!tx.תאריך_חיוב)}
         />
       )}
 

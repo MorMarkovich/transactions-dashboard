@@ -12,6 +12,11 @@ import {
   Bell,
   LayoutDashboard,
   Grid3X3,
+  ChevronRight,
+  ChevronLeft,
+  CreditCard,
+  ArrowUpDown,
+  Layers,
 } from 'lucide-react'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
@@ -21,6 +26,8 @@ import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
 import HeatmapChart from '../components/charts/HeatmapChart'
 import CategoryList from '../components/category/CategoryList'
+import MonthOverviewChart from '../components/charts/MonthOverviewChart'
+import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
@@ -41,7 +48,24 @@ import type {
   AnomalyItem,
   RecurringTransaction,
   HeatmapData,
+  MonthOverviewData,
+  IndustryMonthlyData,
 } from '../services/types'
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Format MM/YYYY → Hebrew-friendly label, e.g. "01/2024" → "ינואר 2024" */
+const HEBREW_MONTHS: Record<string, string> = {
+  '01': 'ינואר', '02': 'פברואר', '03': 'מרץ', '04': 'אפריל',
+  '05': 'מאי', '06': 'יוני', '07': 'יולי', '08': 'אוגוסט',
+  '09': 'ספטמבר', '10': 'אוקטובר', '11': 'נובמבר', '12': 'דצמבר',
+}
+function formatMonthLabel(mmYYYY: string): string {
+  const [mm, yyyy] = mmYYYY.split('/')
+  return `${HEBREW_MONTHS[mm] ?? mm} ${yyyy}`
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -50,7 +74,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
 
-  // Data state
+  // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [donutData, setDonutData] = useState<RawDonutData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
@@ -61,20 +85,24 @@ export default function Dashboard() {
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
+  const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
+  const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
 
-  // UI state
+  // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
+  const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
   }, [])
 
-  // ---- Fetch data with AbortController ------------------------------------
+  // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionId) return
-
     const controller = new AbortController()
     const { signal } = controller
 
@@ -86,7 +114,7 @@ export default function Dashboard() {
         const results = await Promise.all([
           transactionsApi.getMetrics(sessionId, signal),
           transactionsApi.getDonutChartV2(sessionId, signal),
-          transactionsApi.getMonthlyChartV2(sessionId, signal),
+          transactionsApi.getMonthlyChartV2(sessionId, dateType, signal),
           transactionsApi.getWeekdayChartV2(sessionId, signal),
           transactionsApi.getWeeklySummary(sessionId, signal).catch(() => null),
           transactionsApi.getForecast(sessionId, signal).catch(() => null),
@@ -94,6 +122,7 @@ export default function Dashboard() {
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
           transactionsApi.getHeatmap(sessionId, signal).catch(() => null),
+          transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -106,10 +135,17 @@ export default function Dashboard() {
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
         if (results[9]) setHeatmapData(results[9] as HeatmapData)
+        if (results[10]) setIndustryMonthly(results[10] as IndustryMonthlyData)
+
+        // Auto-select most recent month
+        const monthly = results[2] as RawMonthlyData
+        if (monthly?.months?.length) {
+          const latest = monthly.months[monthly.months.length - 1].month
+          setSelectedMonth(latest)
+        }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
-        const message =
-          err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
+        const message = err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
         setError(message)
       } finally {
         setLoading(false)
@@ -117,11 +153,31 @@ export default function Dashboard() {
     }
 
     fetchData()
-
     return () => controller.abort()
-  }, [sessionId])
+  }, [sessionId, dateType])
 
-  // ---- Derive CategoryData[] from donut data via useMemo ------------------
+  // ── Fetch month overview when selectedMonth changes ────────────────
+  useEffect(() => {
+    if (!sessionId || !selectedMonth) return
+    const controller = new AbortController()
+
+    const fetchOverview = async () => {
+      setMonthOverviewLoading(true)
+      try {
+        const data = await transactionsApi.getMonthOverview(sessionId, selectedMonth, dateType, controller.signal)
+        setMonthOverview(data)
+      } catch {
+        // non-critical
+      } finally {
+        setMonthOverviewLoading(false)
+      }
+    }
+
+    fetchOverview()
+    return () => controller.abort()
+  }, [sessionId, selectedMonth, dateType])
+
+  // ── Derived data ───────────────────────────────────────────────────
   const categories = useMemo<CategoryData[]>(() => {
     if (!donutData?.categories) return []
     return donutData.categories.map((cat) => ({
@@ -130,31 +186,21 @@ export default function Dashboard() {
     }))
   }, [donutData])
 
-  // ---- Transform monthly data for BarChart --------------------------------
   const monthlyChartData = useMemo(() => {
     if (!monthlyData?.months) return []
-    return monthlyData.months.map((m) => ({
-      label: m.month,
-      value: m.amount,
-    }))
+    return monthlyData.months.map((m) => ({ label: m.month, value: m.amount }))
   }, [monthlyData])
 
-  // ---- Monthly amounts for sparklines ------------------------------------
   const monthlyAmounts = useMemo(() => {
     if (!monthlyData?.months) return undefined
     return monthlyData.months.map((m) => m.amount)
   }, [monthlyData])
 
-  // ---- Transform weekday data for WeekdayChart ----------------------------
   const weekdayChartData = useMemo(() => {
     if (!weekdayData?.days) return []
-    return weekdayData.days.map((d) => ({
-      day: d.day,
-      amount: d.amount,
-    }))
+    return weekdayData.days.map((d) => ({ day: d.day, amount: d.amount }))
   }, [weekdayData])
 
-  // ---- Transform donut data for DonutChart --------------------------------
   const donutChartData = useMemo(() => {
     if (!donutData?.categories) return { data: [], total: 0 }
     return {
@@ -163,7 +209,33 @@ export default function Dashboard() {
     }
   }, [donutData])
 
-  // ---- No session: show welcome screen ------------------------------------
+  // List of months to show in selector (last 12 months)
+  const availableMonths = useMemo(() => {
+    if (!monthlyData?.months) return []
+    return [...monthlyData.months].reverse().slice(0, 12)
+  }, [monthlyData])
+
+  const hasBillingDate = metrics?.has_billing_date ?? false
+
+  // ── Month selector navigation ──────────────────────────────────────
+  const selectedMonthIdx = useMemo(() => {
+    if (!selectedMonth || !availableMonths.length) return 0
+    return availableMonths.findIndex((m) => m.month === selectedMonth)
+  }, [selectedMonth, availableMonths])
+
+  const goToPrevMonth = useCallback(() => {
+    if (selectedMonthIdx < availableMonths.length - 1) {
+      setSelectedMonth(availableMonths[selectedMonthIdx + 1].month)
+    }
+  }, [selectedMonthIdx, availableMonths])
+
+  const goToNextMonth = useCallback(() => {
+    if (selectedMonthIdx > 0) {
+      setSelectedMonth(availableMonths[selectedMonthIdx - 1].month)
+    }
+  }, [selectedMonthIdx, availableMonths])
+
+  // ── No session ────────────────────────────────────────────────────
   if (!sessionId) {
     return (
       <>
@@ -172,41 +244,16 @@ export default function Dashboard() {
           title={'ברוכים הבאים לדאשבורד!'}
           text={'העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח'}
         />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'var(--space-lg)',
-            marginTop: 'var(--space-xl)',
-          }}
-        >
-          <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <div className="feature-title">ניתוח ויזואלי</div>
-            <div className="feature-desc">
-              גרפים אינטראקטיביים וחכמים לתובנות מיידיות
-            </div>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">🏷️</div>
-            <div className="feature-title">קטגוריות אוטומטיות</div>
-            <div className="feature-desc">
-              זיהוי אוטומטי של קטגוריות מהקובץ המקורי
-            </div>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">📑</div>
-            <div className="feature-title">תמיכה מלאה</div>
-            <div className="feature-desc">
-              Excel עם מספר גליונות, CSV בעברית מלאה
-            </div>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
+          <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים וחכמים לתובנות מיידיות</div></div>
+          <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי אוטומטי של קטגוריות מהקובץ המקורי</div></div>
+          <div className="feature-card"><div className="feature-icon">📑</div><div className="feature-title">תמיכה מלאה</div><div className="feature-desc">Excel עם מספר גליונות, CSV בעברית מלאה</div></div>
         </div>
       </>
     )
   }
 
-  // ---- Loading skeleton ---------------------------------------------------
+  // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <div>
@@ -214,74 +261,32 @@ export default function Dashboard() {
           <Skeleton variant="card" count={4} />
         </div>
         <div className="bento-grid" style={{ marginTop: 'var(--space-xl)' }}>
-          <div className="bento-full">
-            <Skeleton variant="rectangular" height={100} />
-          </div>
-          <div className="bento-2-3">
-            <Skeleton variant="rectangular" height={260} />
-          </div>
-          <div className="bento-1-3">
-            <Skeleton variant="rectangular" height={260} />
-          </div>
+          <div className="bento-full"><Skeleton variant="rectangular" height={100} /></div>
+          <div className="bento-2-3"><Skeleton variant="rectangular" height={300} /></div>
+          <div className="bento-1-3"><Skeleton variant="rectangular" height={300} /></div>
+          <div className="bento-full"><Skeleton variant="rectangular" height={320} /></div>
         </div>
       </div>
     )
   }
 
-  // ---- Error state --------------------------------------------------------
+  // ── Error ─────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--space-2xl)',
-          textAlign: 'center',
-        }}
-      >
-        <p
-          style={{
-            color: 'var(--accent-danger)',
-            fontSize: '1rem',
-            fontWeight: 600,
-            marginBottom: 'var(--space-md)',
-          }}
-        >
-          {error}
-        </p>
-        <Button
-          variant="secondary"
-          icon={<RefreshCw size={16} />}
-          onClick={() => window.location.reload()}
-        >
-          נסה שוב
-        </Button>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-2xl)', textAlign: 'center' }}>
+        <p style={{ color: 'var(--accent-danger)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-md)' }}>{error}</p>
+        <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => window.location.reload()}>נסה שוב</Button>
       </div>
     )
   }
 
-  // ---- No data loaded yet -------------------------------------------------
   if (!metrics) return null
 
-  // ---- Main dashboard view ------------------------------------------------
+  // ── Main view ──────────────────────────────────────────────────────
   return (
     <div style={{ direction: 'rtl', position: 'relative' }}>
       {/* Mesh gradient background */}
-      <div
-        className="mesh-gradient-bg"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '300px',
-          pointerEvents: 'none',
-          zIndex: 0,
-          opacity: 0.6,
-        }}
-      />
+      <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
       <PageHeader
         title="דשבורד"
@@ -289,19 +294,255 @@ export default function Dashboard() {
         icon={LayoutDashboard}
       />
 
+      {/* ── Date type toggle (billing / transaction) ───────────────── */}
+      {hasBillingDate && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{ marginBottom: 'var(--space-md)', position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}
+        >
+          <CreditCard size={15} style={{ color: 'var(--text-muted)' }} />
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>קיבוץ לפי:</span>
+          <div style={{ display: 'flex', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            {(['transaction', 'billing'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setDateType(type)}
+                style={{
+                  padding: '5px 14px',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-family)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  background: dateType === type ? 'var(--accent)' : 'transparent',
+                  color: dateType === type ? '#fff' : 'var(--text-secondary)',
+                }}
+              >
+                {type === 'transaction' ? 'תאריך עסקה' : 'תאריך חיוב'}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
 
-      {/* ── Spending Alerts ──────────────────────────────────────────── */}
+      {/* ── Month selector + overview ──────────────────────────────── */}
+      {availableMonths.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)', position: 'relative', zIndex: 1 }}
+        >
+          {/* Section header */}
+          <div className="section-header-v2">
+            <Calendar size={18} />
+            <span>סקירת חודש</span>
+          </div>
+
+          {/* Month selector bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-sm)',
+            marginBottom: 'var(--space-md)',
+            flexWrap: 'wrap',
+          }}>
+            <button
+              onClick={goToPrevMonth}
+              disabled={selectedMonthIdx >= availableMonths.length - 1}
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)',
+                cursor: selectedMonthIdx >= availableMonths.length - 1 ? 'not-allowed' : 'pointer',
+                opacity: selectedMonthIdx >= availableMonths.length - 1 ? 0.4 : 1,
+                padding: '6px 10px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              aria-label="חודש קודם"
+            >
+              <ChevronRight size={16} />
+            </button>
+
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
+              {availableMonths.slice(0, 8).map((m) => (
+                <button
+                  key={m.month}
+                  onClick={() => setSelectedMonth(m.month)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    border: '1px solid',
+                    borderColor: selectedMonth === m.month ? 'var(--accent)' : 'var(--border)',
+                    background: selectedMonth === m.month ? 'var(--accent-muted)' : 'transparent',
+                    color: selectedMonth === m.month ? 'var(--accent)' : 'var(--text-secondary)',
+                    fontWeight: selectedMonth === m.month ? 700 : 500,
+                    fontSize: '0.8125rem',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-family)',
+                    transition: 'all 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {formatMonthLabel(m.month)}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={goToNextMonth}
+              disabled={selectedMonthIdx <= 0}
+              style={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)',
+                cursor: selectedMonthIdx <= 0 ? 'not-allowed' : 'pointer',
+                opacity: selectedMonthIdx <= 0 ? 0.4 : 1,
+                padding: '6px 10px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              aria-label="חודש הבא"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          </div>
+
+          {/* Month overview content */}
+          {monthOverviewLoading ? (
+            <Skeleton variant="rectangular" height={320} />
+          ) : monthOverview && (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 2fr',
+              gap: 'var(--space-md)',
+            }}
+              className="month-overview-grid"
+            >
+              {/* Summary cards */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                <Card variant="glass" padding="md">
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }} />
+                    הוצאות — {formatMonthLabel(monthOverview.month)}
+                  </div>
+                  <AnimatedNumber
+                    value={monthOverview.total_expenses}
+                    formatter={formatCurrency}
+                    style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
+                  />
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {monthOverview.transaction_count} עסקאות
+                  </div>
+                </Card>
+
+                {monthOverview.total_income > 0 && (
+                  <Card variant="glass" padding="md">
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
+                      הכנסות — {formatMonthLabel(monthOverview.month)}
+                    </div>
+                    <AnimatedNumber
+                      value={monthOverview.total_income}
+                      formatter={formatCurrency}
+                      style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
+                    />
+                  </Card>
+                )}
+
+                {monthOverview.total_income > 0 && (
+                  <Card variant="glass" padding="md">
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px' }}>יתרה נטו</div>
+                    {(() => {
+                      const balance = monthOverview.total_income - monthOverview.total_expenses
+                      return (
+                        <AnimatedNumber
+                          value={Math.abs(balance)}
+                          formatter={(v) => `${balance >= 0 ? '+' : '-'}${formatCurrency(v)}`}
+                          style={{
+                            fontSize: '1.625rem', fontWeight: 700,
+                            color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
+                            fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block'
+                          }}
+                        />
+                      )
+                    })()}
+                  </Card>
+                )}
+
+                {/* Top category */}
+                {monthOverview.categories.length > 0 && (
+                  <Card variant="glass" padding="md">
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>חלוקה לפי קטגוריה</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {monthOverview.categories.filter((c) => c.expenses > 0).slice(0, 5).map((cat) => {
+                        const pct = monthOverview.total_expenses > 0 ? (cat.expenses / monthOverview.total_expenses) * 100 : 0
+                        return (
+                          <div key={cat.name}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{cat.name}</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(0)}%</span>
+                            </div>
+                            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Card>
+                )}
+              </div>
+
+              {/* Grouped bar chart */}
+              <Card variant="glass" padding="md">
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ArrowUpDown size={14} />
+                  הוצאות לעומת הכנסות לפי קטגוריה
+                </div>
+                <MonthOverviewChart
+                  categories={monthOverview.categories}
+                  height={280}
+                />
+              </Card>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* ── Industry monthly comparison ────────────────────────────── */}
+      {industryMonthly && industryMonthly.months.length >= 2 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)', position: 'relative', zIndex: 1 }}
+        >
+          <div className="section-header-v2">
+            <Layers size={18} />
+            <span>השוואת הוצאות לפי קטגוריה — כל החודשים</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <IndustryMonthlyChart data={industryMonthly} height={320} />
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ── Spending Alerts ────────────────────────────────────────── */}
       {(anomalies.length > 0 || recurring.length > 0 || forecast) && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.35 }}
-          style={{
-            marginTop: 'var(--space-lg)',
-            position: 'relative',
-            zIndex: 1,
-          }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
           <div className="section-header-v2">
             <Bell size={18} />
@@ -318,61 +559,35 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Weekly Summary ──────────────────────────────────────────── */}
+      {/* ── Weekly Summary ─────────────────────────────────────────── */}
       {weeklySummary && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 'var(--space-md)',
-            marginTop: 'var(--space-lg)',
-            marginBottom: 'var(--space-lg)',
-            position: 'relative',
-            zIndex: 1,
-          }}
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginTop: 'var(--space-lg)', marginBottom: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
-          {/* This week */}
-          <div className="glass-card" style={{ padding: '16px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div className="glass-card" style={{ padding: '18px 22px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)' }}>השבוע</span>
               {weeklySummary.change_pct !== 0 && (
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)',
-                  color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
-                }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)', color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
                   {weeklySummary.change_pct > 0 ? '↑' : '↓'} {Math.abs(weeklySummary.change_pct)}%
                 </span>
               )}
             </div>
-            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>
-              {formatCurrency(weeklySummary.this_week.total)}
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {weeklySummary.this_week.count} עסקאות · {weeklySummary.this_week.top_category}
-            </p>
+            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.this_week.total)}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.this_week.count} עסקאות · {weeklySummary.this_week.top_category}</p>
           </div>
-
-          {/* Last week */}
-          <div className="glass-card" style={{ padding: '16px 20px' }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>שבוע שעבר</span>
-            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>
-              {formatCurrency(weeklySummary.last_week.total)}
-            </p>
-            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {weeklySummary.last_week.count} עסקאות · {weeklySummary.last_week.top_category}
-            </p>
+          <div className="glass-card" style={{ padding: '18px 22px' }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '10px' }}>שבוע שעבר</span>
+            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.last_week.total)}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.last_week.count} עסקאות · {weeklySummary.last_week.top_category}</p>
           </div>
         </motion.div>
       )}
 
-      {/* ── Main Charts: Bento Grid ─────────────────────────────────── */}
+      {/* ── Main Charts: Bento Grid ────────────────────────────────── */}
       <div className="bento-grid" style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
         {/* Monthly bar chart (2/3 width) */}
         <div className="bento-2-3">
@@ -421,21 +636,15 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Forecast & Velocity premium row ──────────────────────────── */}
+      {/* ── Forecast & Velocity ────────────────────────────────────── */}
       {(forecast || velocity) && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.35 }}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: forecast && velocity ? '1fr 1fr' : '1fr',
-            gap: 'var(--space-md)',
-            marginTop: 'var(--space-xl)',
-          }}
+          style={{ display: 'grid', gridTemplateColumns: forecast && velocity ? '1fr 1fr' : '1fr', gap: 'var(--space-md)', marginTop: 'var(--space-xl)' }}
           className="dashboard-premium-row"
         >
-          {/* Forecast card */}
           {forecast && (
             <Card variant="glass" padding="md">
               <div className="section-header-v2" style={{ marginTop: 0 }}>
@@ -448,50 +657,23 @@ export default function Dashboard() {
                   formatter={formatCurrency}
                   style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)' }}
                 />
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background:
-                    forecast.trend_direction === 'up'
-                      ? 'rgba(239, 68, 68, 0.12)'
-                      : forecast.trend_direction === 'down'
-                        ? 'rgba(52, 211, 153, 0.12)'
-                        : 'rgba(148, 163, 184, 0.12)',
-                  color:
-                    forecast.trend_direction === 'up'
-                      ? 'var(--accent-danger, #ef4444)'
-                      : forecast.trend_direction === 'down'
-                        ? 'var(--accent-secondary, #10b981)'
-                        : 'var(--text-muted)',
-                }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: forecast.trend_direction === 'up' ? 'rgba(239, 68, 68, 0.12)' : forecast.trend_direction === 'down' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(148, 163, 184, 0.12)', color: forecast.trend_direction === 'up' ? 'var(--accent-danger, #ef4444)' : forecast.trend_direction === 'down' ? 'var(--accent-secondary, #10b981)' : 'var(--text-muted)' }}>
                   {forecast.trend_direction === 'up' ? '↑ עלייה' : forecast.trend_direction === 'down' ? '↓ ירידה' : '→ יציב'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  ביטחון: {forecast.confidence === 'high' ? 'גבוה' : forecast.confidence === 'medium' ? 'בינוני' : 'נמוך'}
-                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ביטחון: {forecast.confidence === 'high' ? 'גבוה' : forecast.confidence === 'medium' ? 'בינוני' : 'נמוך'}</span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  ממוצע חודשי: {formatCurrency(forecast.avg_monthly)}
-                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ממוצע חודשי: {formatCurrency(forecast.avg_monthly)}</span>
               </div>
               {forecast.monthly_data.length > 1 && (
                 <div style={{ marginTop: '12px' }}>
-                  <SparklineChart
-                    data={forecast.monthly_data.map(m => m.amount)}
-                    color="var(--neon-cyan, var(--accent-primary))"
-                    width={280}
-                    height={40}
-                  />
+                  <SparklineChart data={forecast.monthly_data.map((m) => m.amount)} color="var(--neon-cyan, var(--accent-primary))" width={280} height={40} />
                 </div>
               )}
             </Card>
           )}
 
-          {/* Spending velocity card */}
           {velocity && (
             <Card variant="glass" padding="md">
               <div className="section-header-v2" style={{ marginTop: 0 }}>
@@ -501,37 +683,20 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יומי</div>
-                  <AnimatedNumber
-                    value={velocity.daily_avg}
-                    formatter={formatCurrency}
-                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
-                  />
+                  <AnimatedNumber value={velocity.daily_avg} formatter={formatCurrency} style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }} />
                 </div>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>7 ימים</div>
-                  <AnimatedNumber
-                    value={velocity.rolling_7day}
-                    formatter={formatCurrency}
-                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
-                  />
+                  <AnimatedNumber value={velocity.rolling_7day} formatter={formatCurrency} style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }} />
                 </div>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>30 יום</div>
-                  <AnimatedNumber
-                    value={velocity.rolling_30day}
-                    formatter={formatCurrency}
-                    style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}
-                  />
+                  <AnimatedNumber value={velocity.rolling_30day} formatter={formatCurrency} style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }} />
                 </div>
               </div>
               {velocity.daily_data.length > 1 && (
                 <div style={{ marginTop: '12px' }}>
-                  <SparklineChart
-                    data={velocity.daily_data.map(d => d.amount)}
-                    color="var(--neon-purple, var(--accent-primary))"
-                    width={280}
-                    height={40}
-                  />
+                  <SparklineChart data={velocity.daily_data.map((d) => d.amount)} color="var(--neon-purple, var(--accent-primary))" width={280} height={40} />
                 </div>
               )}
             </Card>
@@ -539,7 +704,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Heatmap ──────────────────────────────────────────────────── */}
+      {/* ── Heatmap ────────────────────────────────────────────────── */}
       {heatmapData && heatmapData.categories.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -561,7 +726,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Month-over-Month Comparison ──────────────────────────────── */}
+      {/* ── Month-over-Month ───────────────────────────────────────── */}
       {monthlyData && monthlyData.months.length >= 2 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -575,49 +740,35 @@ export default function Dashboard() {
           </div>
           <Card className="glass-card" padding="md">
             <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${Math.min(monthlyData.months.length, 6)}, 1fr)`,
-                gap: 'var(--space-sm)',
-              }}
+              style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(monthlyData.months.length, 6)}, 1fr)`, gap: 'var(--space-sm)' }}
               className="dashboard-monthly-comparison"
             >
               {monthlyData.months.slice(-6).map((month, idx, arr) => {
                 const prev = idx > 0 ? arr[idx - 1].amount : null
                 const changePct = prev ? ((month.amount - prev) / Math.abs(prev)) * 100 : null
+                const isSelected = month.month === selectedMonth
                 return (
                   <div
                     key={month.month}
+                    onClick={() => setSelectedMonth(month.month)}
                     style={{
                       textAlign: 'center',
-                      padding: 'var(--space-sm)',
-                      borderRadius: 'var(--radius-md, 8px)',
-                      background: 'var(--bg-tertiary, rgba(255,255,255,0.03))',
+                      padding: 'var(--space-md)',
+                      borderRadius: 'var(--radius-md)',
+                      background: isSelected ? 'var(--accent-muted)' : 'var(--bg-tertiary, rgba(255,255,255,0.03))',
+                      border: isSelected ? '1px solid var(--border-accent)' : '1px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
                     }}
                   >
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '0.75rem', color: isSelected ? 'var(--accent)' : 'var(--text-muted)', marginBottom: '6px', fontWeight: isSelected ? 600 : 400 }}>
                       {month.month}
                     </div>
-                    <div
-                      style={{
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                        fontFamily: 'var(--font-mono)',
-                        direction: 'ltr',
-                      }}
-                    >
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
                       {formatCurrency(month.amount)}
                     </div>
                     {changePct !== null && (
-                      <div
-                        style={{
-                          fontSize: '0.6875rem',
-                          fontWeight: 600,
-                          marginTop: '4px',
-                          color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
-                        }}
-                      >
+                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
                         {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
                       </div>
                     )}
@@ -629,15 +780,11 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Responsive: single column on mobile */}
       <style>{`
         @media (max-width: 768px) {
-          .dashboard-premium-row {
-            grid-template-columns: 1fr !important;
-          }
-          .dashboard-monthly-comparison {
-            grid-template-columns: repeat(3, 1fr) !important;
-          }
+          .dashboard-premium-row { grid-template-columns: 1fr !important; }
+          .dashboard-monthly-comparison { grid-template-columns: repeat(3, 1fr) !important; }
+          .month-overview-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>

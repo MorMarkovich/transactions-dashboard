@@ -10,6 +10,8 @@ export interface Transaction {
   סכום_מוחלט?: number;
   חודש?: string;
   יום_בשבוע?: number;
+  תאריך_חיוב?: string;
+  חודש_חיוב?: string;
 }
 
 export interface TransactionResponse {
@@ -25,6 +27,7 @@ export interface MetricsData {
   total_income: number;
   average_transaction: number;
   trend?: 'up' | 'down' | null;
+  has_billing_date?: boolean;
 }
 
 export interface FileUploadResponse {
@@ -228,4 +231,30 @@ export interface SavingsGoal {
   category: string
   color: string
   created_at: string
+}
+
+// Month overview: income vs expenses by category for a specific month
+export interface MonthOverviewCategory {
+  name: string
+  expenses: number
+  income: number
+}
+
+export interface MonthOverviewData {
+  month: string
+  categories: MonthOverviewCategory[]
+  total_expenses: number
+  total_income: number
+  transaction_count: number
+}
+
+// Industry monthly: expenses per category per month for comparison
+export interface IndustryMonthlySeries {
+  name: string
+  data: number[]
+}
+
+export interface IndustryMonthlyData {
+  months: string[]
+  series: IndustryMonthlySeries[]
 }

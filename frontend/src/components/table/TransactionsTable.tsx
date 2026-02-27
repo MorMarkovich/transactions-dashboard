@@ -13,6 +13,7 @@ interface TransactionsTableProps {
   pageSize: number
   onPageChange: (page: number) => void
   onRowClick?: (transaction: Transaction) => void
+  showBillingDate?: boolean
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────
@@ -24,10 +25,12 @@ const TableRow = memo(function TableRow({
   tx,
   onClick,
   style,
+  showBillingDate,
 }: {
   tx: Transaction
   onClick?: (tx: Transaction) => void
   style?: React.CSSProperties
+  showBillingDate?: boolean
 }) {
   const amount = tx.סכום
   const isPositive = amount > 0
@@ -38,6 +41,9 @@ const TableRow = memo(function TableRow({
       style={{ cursor: onClick ? 'pointer' : undefined, ...style }}
     >
       <td className="col-date">{formatDate(tx.תאריך)}</td>
+      {showBillingDate && (
+        <td className="col-date">{tx.תאריך_חיוב ? formatDate(tx.תאריך_חיוב) : '—'}</td>
+      )}
       <td>{tx.תיאור}</td>
       <td className="col-category">
         <span style={{ marginLeft: '6px' }}>
@@ -103,6 +109,7 @@ export default function TransactionsTable({
   pageSize,
   onPageChange,
   onRowClick,
+  showBillingDate,
 }: TransactionsTableProps) {
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / pageSize)),
@@ -219,7 +226,10 @@ export default function TransactionsTable({
         >
           <thead>
             <tr>
-              <SortHeader field="תאריך" label="תאריך" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              <SortHeader field="תאריך" label="תאריך עסקה" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              {showBillingDate && (
+                <th scope="col" style={{ cursor: 'default', userSelect: 'none' }}>תאריך חיוב</th>
+              )}
               <SortHeader field="תיאור" label="תיאור" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
               <SortHeader field="קטגוריה" label="קטגוריה" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
               <SortHeader field="סכום" label="סכום" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
@@ -231,7 +241,7 @@ export default function TransactionsTable({
               <>
                 {startIndex > 0 && (
                   <tr style={{ height: startIndex * ROW_HEIGHT }} aria-hidden="true">
-                    <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                    <td colSpan={showBillingDate ? 5 : 4} style={{ padding: 0, border: 'none' }} />
                   </tr>
                 )}
                 {visibleTransactions.map((tx, i) => (
@@ -239,6 +249,7 @@ export default function TransactionsTable({
                     key={`${tx.תאריך}-${tx.תיאור}-${startIndex + i}`}
                     tx={tx}
                     onClick={onRowClick}
+                    showBillingDate={showBillingDate}
                     style={{ height: ROW_HEIGHT }}
                   />
                 ))}
@@ -247,7 +258,7 @@ export default function TransactionsTable({
                     style={{ height: (sortedTransactions.length - endIndex) * ROW_HEIGHT }}
                     aria-hidden="true"
                   >
-                    <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                    <td colSpan={showBillingDate ? 5 : 4} style={{ padding: 0, border: 'none' }} />
                   </tr>
                 )}
               </>
@@ -257,6 +268,7 @@ export default function TransactionsTable({
                   key={`${tx.תאריך}-${tx.תיאור}-${index}`}
                   tx={tx}
                   onClick={onRowClick}
+                  showBillingDate={showBillingDate}
                 />
               ))
             )}
