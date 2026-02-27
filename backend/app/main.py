@@ -26,10 +26,14 @@ app = FastAPI(
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global exception: {str(exc)}")
     logger.error(traceback.format_exc())
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error", "error": str(exc), "traceback": traceback.format_exc()},
     )
+    # Ensure CORS header is present so the browser can read the error response
+    origin = request.headers.get("origin", "*")
+    response.headers["Access-Control-Allow-Origin"] = origin
+    return response
 
 # CORS middleware
 app.add_middleware(
