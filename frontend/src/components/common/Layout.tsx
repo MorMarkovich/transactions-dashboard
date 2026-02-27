@@ -1,10 +1,13 @@
-import { type ReactNode, useState, useEffect, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { type ReactNode, useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import QuickActions from './QuickActions'
+import { useAuth } from '../../lib/AuthContext'
+import { supabaseApi } from '../../services/supabaseApi'
+import { transactionsApi } from '../../services/api'
 import './Layout.css'
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -18,7 +21,10 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const hasTriedRestore = useRef(false)
 
   // Sidebar defaults: open on desktop, closed on mobile
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -62,6 +68,25 @@ export default function Layout({ children }: LayoutProps) {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Auto-restore last session from Supabase when user logs in with no active session
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id')
+    if (!user || sessionId || hasTriedRestore.current) return
+    hasTriedRestore.current = true
+
+    supabaseApi.getLatestTransactions(user.id)
+      .then(transactions => {
+        if (!transactions || transactions.length === 0) return
+        return transactionsApi.restoreSession(transactions)
+      })
+      .then(response => {
+        if (response?.success && response.session_id) {
+          navigate(`/?session_id=${response.session_id}`, { replace: true })
+        }
+      })
+      .catch(() => {}) // Silent fail — user can upload a new file
+  }, [user, searchParams, navigate])
 
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => !prev)

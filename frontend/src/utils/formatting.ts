@@ -2,22 +2,21 @@
  * Shared formatting utilities for the Hebrew RTL transactions dashboard.
  */
 
-const currencyFormatter = new Intl.NumberFormat('he-IL', {
-  style: 'currency',
-  currency: 'ILS',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-
 const numberFormatter = new Intl.NumberFormat('he-IL')
 
 /**
  * Format a number as Israeli Shekel currency (e.g. ₪1,234.56).
- * Handles negative numbers, zero, and positive values.
+ * Always places ₪ before the number (LTR-safe, no RTL-marks) so the symbol
+ * renders correctly in both RTL and LTR containers.
  */
 export function formatCurrency(amount: number): string {
   if (amount === 0) return '₪0'
-  return currencyFormatter.format(amount)
+  const abs = Math.abs(amount)
+  const formatted = abs.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return amount < 0 ? `-₪${formatted}` : `₪${formatted}`
 }
 
 /**

@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { CreditCard, Mail, Lock, User, ArrowLeft, LogIn } from 'lucide-react'
+import { CreditCard, Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -130,12 +130,18 @@ export default function Login() {
     navigate('/')
   }
 
+  // Set browser tab title
+  useEffect(() => {
+    document.title = 'התחברות | מנתח עסקאות'
+    return () => { document.title = 'מנתח עסקאות' }
+  }, [])
+
   // ---- Render -------------------------------------------------------------
 
   return (
     <div
       className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: 'var(--bg-primary)' }}
+      style={{ background: 'var(--bg-primary)', direction: 'rtl' }}
     >
       {/* Background gradient orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
@@ -418,7 +424,7 @@ export default function Login() {
                     className="w-full mt-3 py-2 text-sm flex items-center justify-center gap-1 transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                   >
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     {'\u05D7\u05D6\u05D5\u05E8 \u05DC\u05D4\u05EA\u05D7\u05D1\u05E8\u05D5\u05EA'}
                   </button>
                 </form>
@@ -472,7 +478,7 @@ export default function Login() {
                     className="w-full mt-3 py-2 text-sm flex items-center justify-center gap-1 transition-colors"
                     style={{ color: 'var(--text-muted)' }}
                   >
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     {'\u05D7\u05D6\u05D5\u05E8'}
                   </button>
                 </form>
