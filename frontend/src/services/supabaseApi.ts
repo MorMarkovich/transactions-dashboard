@@ -58,6 +58,27 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  // ─── Transaction Persistence ──────────────────────────────────────────
+
+  saveTransactions: async (userId: string, transactions: unknown[]): Promise<void> => {
+    const { error } = await supabase
+      .from('saved_transactions')
+      .insert({ user_id: userId, data: transactions });
+    if (error) throw error;
+  },
+
+  getLatestTransactions: async (userId: string): Promise<unknown[] | null> => {
+    const { data, error } = await supabase
+      .from('saved_transactions')
+      .select('data')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error) return null;
+    return (data?.data as unknown[]) ?? null;
+  },
+
   // ─── Data Management ──────────────────────────────────────────────────
 
   deleteAllTransactions: async (userId: string): Promise<void> => {
