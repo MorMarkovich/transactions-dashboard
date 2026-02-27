@@ -1258,7 +1258,7 @@ const observer = new MutationObserver(() => {{
         animateRadialGauges(); initStaggeredReveal();
     }}, 150);
 }});
-observer.observe(document.body, {{ childList: true, subtree: true }});
+observer.observe(document.body || document.documentElement, {{ childList: true, subtree: true }});
 </script>
 """, height=0)
 
