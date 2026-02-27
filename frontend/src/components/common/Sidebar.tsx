@@ -251,8 +251,13 @@ export default function Sidebar({
 
       {/* ─── Collapse Toggle (desktop only) ─── */}
       <button
+        type="button"
         className="sidebar-collapse-btn"
-        onClick={onToggleCollapse}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onToggleCollapse?.()
+        }}
         aria-label={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
         title={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
       >

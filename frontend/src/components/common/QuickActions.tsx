@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, X, Upload, Download, Wallet } from 'lucide-react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 
 interface QuickActionsProps {
   onUploadClick?: () => void
@@ -17,8 +17,14 @@ const actions = [
 export default function QuickActions({ onUploadClick, onExportClick }: QuickActionsProps) {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
+
+  // Close the FAB menu on route change
+  useEffect(() => {
+    setIsOpen(false)
+  }, [location.pathname])
 
   const toggle = useCallback(() => setIsOpen((prev) => !prev), [])
 
@@ -41,18 +47,40 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
   )
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '24px',
-        left: '24px',
-        zIndex: 9990,
-        display: 'flex',
-        flexDirection: 'column-reverse',
-        alignItems: 'center',
-        gap: '12px',
-      }}
-    >
+    <>
+      {/* Backdrop overlay when FAB menu is open */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.3)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
+              zIndex: 9989,
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '24px',
+          zIndex: 9990,
+          display: 'flex',
+          flexDirection: 'column-reverse',
+          alignItems: 'center',
+          gap: '12px',
+        }}
+      >
       {/* Main FAB button */}
       <motion.button
         onClick={toggle}
@@ -144,5 +172,6 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
           ))}
       </AnimatePresence>
     </div>
+    </>
   )
 }
