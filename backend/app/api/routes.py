@@ -127,7 +127,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 class RestoreSessionRequest(BaseModel):
-    transactions: list[dict[str, Any]]
+    transactions: list[Any]
 
 
 @router.post("/restore-session")
