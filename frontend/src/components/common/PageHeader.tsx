@@ -1,4 +1,4 @@
-import { type ReactNode, type ElementType } from 'react'
+import { type ReactNode, type ElementType, useEffect } from 'react'
 
 interface PageHeaderProps {
   title: string
@@ -8,6 +8,13 @@ interface PageHeaderProps {
 }
 
 export default function PageHeader({ title, subtitle, icon: Icon, actions }: PageHeaderProps) {
+  useEffect(() => {
+    document.title = `${title} | מנתח עסקאות`
+    return () => {
+      document.title = 'מנתח עסקאות'
+    }
+  }, [title])
+
   return (
     <div className="page-header">
       <div className="page-header-info">
