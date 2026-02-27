@@ -170,7 +170,9 @@ export default function Income() {
   const [recurring, setRecurring] = useState('חד-פעמי')
 
   // ── Computed values ───────────────────────────────────────────────────
-  const totalIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0)
+  const manualIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0)
+  const transactionIncome = metrics?.total_income ?? 0
+  const totalIncome = manualIncome + transactionIncome
   const totalExpenses = metrics?.total_expenses ?? 0
   const balance = totalIncome - totalExpenses
   const utilization = totalIncome > 0 ? Math.min((totalExpenses / totalIncome) * 100, 100) : 0
@@ -557,7 +559,11 @@ export default function Income() {
             <SummaryCard
               icon={<Wallet size={20} style={{ color: '#34d399' }} />}
               iconBg="rgba(16, 185, 129, 0.12)"
-              label="סה״כ הכנסות"
+              label={transactionIncome > 0 && manualIncome > 0
+                ? `סה״כ הכנסות (${formatCurrency(transactionIncome)} מעסקאות + ${formatCurrency(manualIncome)} ידני)`
+                : transactionIncome > 0
+                ? 'סה״כ הכנסות (מעסקאות)'
+                : 'סה״כ הכנסות'}
               value={formatCurrency(totalIncome)}
               numericValue={totalIncome}
               formatter={formatCurrency}
@@ -613,7 +619,7 @@ export default function Income() {
                     color: 'var(--text-primary)',
                   }}
                 >
-                  ניצול תקציב
+                  יחס הוצאות להכנסות
                 </h4>
                 <span
                   style={{
@@ -652,7 +658,7 @@ export default function Income() {
               >
                 {totalIncome > 0
                   ? `${formatCurrency(totalExpenses)} מתוך ${formatCurrency(totalIncome)}`
-                  : 'הוסף הכנסות כדי לראות ניצול תקציב'}
+                  : 'הוסף הכנסות כדי לראות יחס הוצאות להכנסות'}
               </p>
             </Card>
           </motion.div>

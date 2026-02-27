@@ -64,7 +64,10 @@ if os.path.isdir(STATIC_DIR):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        """Catch-all: return index.html so React Router handles client-side routing."""
+        """Serve static file if it exists, otherwise return index.html for SPA routing."""
+        file_path = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 else:
     @app.get("/")
