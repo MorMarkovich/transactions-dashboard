@@ -359,15 +359,17 @@ async def get_monthly_v2(sessionId: str = Query(...)):
     if expenses.empty:
         return {"months": []}
 
+    expenses['month_period'] = expenses['תאריך'].dt.to_period('M')
     monthly = (
         expenses
-        .groupby('חודש')['סכום_מוחלט']
+        .groupby('month_period')['סכום_מוחלט']
         .sum()
+        .sort_index()
     )
 
     months = [
-        {"month": str(m), "amount": round(_sanitize(v), 2)}
-        for m, v in monthly.items()
+        {"month": period.strftime('%m/%Y'), "amount": round(_sanitize(v), 2)}
+        for period, v in monthly.items()
     ]
     return {"months": months}
 
@@ -379,13 +381,13 @@ async def get_weekday_v2(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     day_names = {
-        0: 'ראשון',
-        1: 'שני',
-        2: 'שלישי',
-        3: 'רביעי',
-        4: 'חמישי',
-        5: 'שישי',
-        6: 'שבת',
+        0: 'שני',
+        1: 'שלישי',
+        2: 'רביעי',
+        3: 'חמישי',
+        4: 'שישי',
+        5: 'שבת',
+        6: 'ראשון',
     }
 
     df = sessions[sessionId]
@@ -476,8 +478,8 @@ async def get_insights(sessionId: str = Query(...)):
 
     # Most expensive day of week (by average daily spend)
     day_names = {
-        0: 'ראשון', 1: 'שני', 2: 'שלישי', 3: 'רביעי',
-        4: 'חמישי', 5: 'שישי', 6: 'שבת',
+        0: 'שני', 1: 'שלישי', 2: 'רביעי', 3: 'חמישי',
+        4: 'שישי', 5: 'שבת', 6: 'ראשון',
     }
     day_avg = expenses.groupby('יום_בשבוע')['סכום_מוחלט'].mean()
     exp_day_num = day_avg.idxmax()
@@ -494,10 +496,11 @@ async def get_insights(sessionId: str = Query(...)):
     large = expenses[expenses['סכום_מוחלט'] >= p90].nlargest(10, 'סכום_מוחלט')
     large_transactions = [
         {
-            "description": str(row['תיאור']),
-            "amount": round(_sanitize(row['סכום_מוחלט']), 2),
-            "date": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
-            "category": str(row['קטגוריה']),
+            "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
+            "תיאור": str(row['תיאור']),
+            "קטגוריה": str(row['קטגוריה']),
+            "סכום": round(_sanitize(float(row['סכום'])), 2),
+            "סכום_מוחלט": round(_sanitize(float(row['סכום_מוחלט'])), 2),
         }
         for _, row in large.iterrows()
     ]
@@ -576,22 +579,24 @@ async def get_trend_stats(sessionId: str = Query(...)):
     unique_days = expenses['תאריך'].dt.date.nunique()
     daily_avg = round(_sanitize(expenses['סכום_מוחלט'].sum() / max(unique_days, 1)), 2)
 
-    # Monthly totals with month-over-month change
+    # Monthly totals with month-over-month change (sorted chronologically)
+    expenses['month_period'] = expenses['תאריך'].dt.to_period('M')
     monthly_totals = (
         expenses
-        .groupby('חודש')['סכום_מוחלט']
+        .groupby('month_period')['סכום_מוחלט']
         .sum()
+        .sort_index()
     )
 
     monthly_list = []
     prev_amount = None
-    for month, amount in monthly_totals.items():
+    for month_period, amount in monthly_totals.items():
         amt = round(_sanitize(amount), 2)
         change_pct = None
         if prev_amount is not None and prev_amount != 0:
             change_pct = round(((amt - prev_amount) / prev_amount) * 100, 2)
         monthly_list.append({
-            "month": str(month),
+            "month": month_period.strftime('%m/%Y'),
             "amount": amt,
             "change_pct": _sanitize(change_pct),
         })
@@ -618,17 +623,18 @@ async def get_heatmap_v2(sessionId: str = Query(...)):
     if expenses.empty:
         return {"categories": [], "months": [], "data": []}
 
+    expenses['month_period'] = expenses['תאריך'].dt.to_period('M')
     pivot = pd.pivot_table(
         expenses,
         values='סכום_מוחלט',
         index='קטגוריה',
-        columns='חודש',
+        columns='month_period',
         aggfunc='sum',
         fill_value=0,
     )
 
     categories = [str(c) for c in pivot.index.tolist()]
-    months = [str(m) for m in pivot.columns.tolist()]
+    months = [period.strftime('%m/%Y') for period in pivot.columns.tolist()]
     data = [
         [round(_sanitize(val), 2) for val in row]
         for row in pivot.values.tolist()

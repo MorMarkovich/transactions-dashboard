@@ -493,7 +493,7 @@ export default function Insights() {
                           fontVariantNumeric: 'tabular-nums',
                         }}
                       >
-                        {formatCurrency(tx.סכום)}
+                        {formatCurrency(tx.סכום_מוחלט ?? Math.abs(tx.סכום ?? 0))}
                       </span>
                     </div>
                   </div>
