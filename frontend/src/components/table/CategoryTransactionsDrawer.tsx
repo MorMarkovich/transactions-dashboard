@@ -113,7 +113,7 @@ export default function CategoryTransactionsDrawer({
                     {category}
                   </h3>
                   <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {month} · {transactions.length} עסקאות
+                    {month} · {transactions.length === 1 ? 'עסקה אחת' : `${transactions.length} עסקאות`}
                   </p>
                 </div>
               </div>

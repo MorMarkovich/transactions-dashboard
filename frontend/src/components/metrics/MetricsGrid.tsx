@@ -113,7 +113,7 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
         >
           <div
             className="stat-card-compact"
-            style={{ background: card.gradientBg }}
+            style={{ background: card.gradientBg, '--stat-accent-gradient': card.iconBg } as React.CSSProperties}
           >
             <div
               className="stat-icon"
@@ -128,7 +128,7 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
               <div className="stat-label">{card.label}</div>
               {card.key === 'total_expenses' && metrics.trend && (
                 <div className={`stat-trend ${metrics.trend === 'up' ? 'up' : 'down'}`}>
-                  {metrics.trend === 'up' ? '↑ עלייה' : '↓ ירידה'}
+                  {metrics.trend === 'up' ? '↑ עלייה בהוצאות' : '↓ ירידה בהוצאות'}
                 </div>
               )}
             </div>

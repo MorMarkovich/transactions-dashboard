@@ -18,6 +18,9 @@ import {
   Layers,
   Grid3X3,
   Tag,
+  Activity,
+  Clock,
+  Lightbulb,
 } from 'lucide-react'
 import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
@@ -98,6 +101,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
+  const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
 
   // ── Category drill-down drawer state ────────────────────────────────
@@ -126,6 +130,23 @@ export default function Dashboard() {
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
+  }, [])
+
+  // ── Inject responsive CSS once (prevent duplicate <style> elements) ──
+  useEffect(() => {
+    const STYLE_ID = 'dashboard-responsive-css'
+    if (document.getElementById(STYLE_ID)) return
+    const style = document.createElement('style')
+    style.id = STYLE_ID
+    style.textContent = `
+      @media (max-width: 768px) {
+        .dashboard-premium-row { grid-template-columns: 1fr !important; }
+        .dashboard-monthly-comparison { grid-template-columns: repeat(3, 1fr) !important; }
+        .month-overview-grid { grid-template-columns: 1fr !important; }
+      }
+    `
+    document.head.appendChild(style)
+    return () => { document.getElementById(STYLE_ID)?.remove() }
   }, [])
 
   // ── Fetch all data ─────────────────────────────────────────────────
@@ -164,6 +185,8 @@ export default function Dashboard() {
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
         if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
         if (results[10]) setCategorySnapshot(results[10] as CategorySnapshotData)
+
+        setDataLoadedAt(new Date())
 
         // Auto-select most recent month
         const monthly = results[2] as RawMonthlyData
@@ -346,6 +369,76 @@ export default function Dashboard() {
         icon={LayoutDashboard}
       />
 
+      {/* ── Financial Health Banner ──────────────────────────────────── */}
+      {metrics && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          style={{
+            position: 'relative', zIndex: 1,
+            marginBottom: 'var(--space-md)',
+            padding: '16px 20px',
+            borderRadius: 'var(--radius-lg)',
+            background: 'var(--glass-bg)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid var(--glass-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-md)',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Activity size={18} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>בריאות פיננסית</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הוצאות</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+                {formatCurrency(Math.abs(metrics.total_expenses))}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הכנסות</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+                {formatCurrency(metrics.total_income)}
+              </div>
+            </div>
+            {metrics.total_income > 0 && (() => {
+              const balance = metrics.total_income - Math.abs(metrics.total_expenses)
+              const savingsRate = ((metrics.total_income - Math.abs(metrics.total_expenses)) / metrics.total_income * 100)
+              return (
+                <>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: balance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+                      {balance >= 0 ? '+' : ''}{formatCurrency(balance)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: savingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                      {savingsRate.toFixed(1)}%
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+          {/* Last Updated Timestamp */}
+          {dataLoadedAt && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block', flexShrink: 0 }} />
+              <Clock size={11} />
+              <span>עודכן {dataLoadedAt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          )}
+        </motion.div>
+      )}
+
       {/* ── Date type toggle (billing / transaction) ───────────────── */}
       {hasBillingDate && (
         <motion.div
@@ -495,7 +588,7 @@ export default function Dashboard() {
                     style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
                   />
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {monthOverview.transaction_count} עסקאות
+                    {monthOverview.transaction_count === 1 ? 'עסקה אחת' : `${monthOverview.transaction_count} עסקאות`}
                   </div>
                 </Card>
 
@@ -589,8 +682,11 @@ export default function Dashboard() {
           <div className="section-header-v2">
             <Grid3X3 size={18} />
             <span>סיכום הוצאות לפי קטגוריה</span>
+            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              📅 כל התקופה
+            </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-              ({categorySnapshot.categories.length} קטגוריות · {categorySnapshot.total_count} עסקאות)
+              ({categorySnapshot.categories.length} קטגוריות · {categorySnapshot.total_count === 1 ? 'עסקה אחת' : `${categorySnapshot.total_count} עסקאות`})
             </span>
             {selectedMonth && (
               <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
@@ -632,7 +728,7 @@ export default function Dashboard() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Tag size={11} style={{ color: 'var(--text-muted)' }} />
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {cat.count} עסקאות
+                          {cat.count === 1 ? 'עסקה אחת' : `${cat.count} עסקאות`}
                         </span>
                       </div>
                       <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)' }}>
@@ -881,6 +977,34 @@ export default function Dashboard() {
                   <SparklineChart data={velocity.daily_data.map((d) => d.amount)} color="var(--neon-purple, var(--accent-primary))" width={280} height={40} />
                 </div>
               )}
+              {/* Monthly burn-down progress bar */}
+              {forecast && forecast.avg_monthly > 0 && (() => {
+                const burnPct = Math.min((velocity.rolling_30day / forecast.avg_monthly) * 100, 100)
+                const isOver = velocity.rolling_30day > forecast.avg_monthly
+                return (
+                  <div style={{ marginTop: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>שריפת תקציב חודשי</span>
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: isOver ? 'var(--danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {burnPct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div style={{ height: '6px', borderRadius: '3px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${burnPct}%`,
+                        borderRadius: '3px',
+                        background: isOver
+                          ? 'linear-gradient(90deg, var(--danger), #fb923c)'
+                          : burnPct > 75
+                            ? 'linear-gradient(90deg, var(--warning), #fbbf24)'
+                            : 'linear-gradient(90deg, var(--success), #6ee7b7)',
+                        transition: 'width 0.5s ease',
+                      }} />
+                    </div>
+                  </div>
+                )
+              })()}
             </Card>
           )}
         </motion.div>
@@ -897,6 +1021,9 @@ export default function Dashboard() {
           <div className="section-header-v2">
             <BarChart3 size={18} />
             <span>השוואה חודשית</span>
+            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
+              {monthlyData.months.length} חודשים
+            </span>
           </div>
           <Card className="glass-card" padding="md">
             <div
@@ -939,14 +1066,6 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .dashboard-premium-row { grid-template-columns: 1fr !important; }
-          .dashboard-monthly-comparison { grid-template-columns: repeat(3, 1fr) !important; }
-          .month-overview-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
 
       {/* ── Category Transactions Drawer ────────────────────────────── */}
       <CategoryTransactionsDrawer
