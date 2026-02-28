@@ -28,15 +28,15 @@ def create_donut_chart(df: pd.DataFrame) -> dict:
             }
         }
 
-    # הצגת 6 קטגוריות מובילות + "אחר"
-    if len(cat_data) > 6:
-        top = cat_data.head(6).copy()
-        other_sum = cat_data.iloc[6:]['סכום_מוחלט'].sum()
+    # הצגת 10 קטגוריות מובילות + "אחר"
+    if len(cat_data) > 10:
+        top = cat_data.head(10).copy()
+        other_sum = cat_data.iloc[10:]['סכום_מוחלט'].sum()
         other = pd.DataFrame([{'קטגוריה': 'אחר', 'סכום_מוחלט': other_sum}])
         cat_data = pd.concat([top, other], ignore_index=True)
     
     # צבעי gradient מקצועיים
-    premium_colors = ['#667eea', '#38ef7d', '#f5576c', '#4facfe', '#fa709a', '#b794f4', '#a0aec0']
+    premium_colors = ['#667eea', '#38ef7d', '#f5576c', '#4facfe', '#fa709a', '#b794f4', '#f6ad55', '#68d391', '#fc8181', '#63b3ed', '#a0aec0']
     
     total = cat_data['סכום_מוחלט'].sum()
     

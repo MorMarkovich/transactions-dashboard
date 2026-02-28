@@ -36,11 +36,15 @@ const COLORS = [
   '#fbbf24',
   '#38bdf8',
   '#a78bfa',
+  '#f6ad55',
+  '#68d391',
+  '#fc8181',
+  '#63b3ed',
   '#94a3b8',
 ]
 
 const formatShekel = (v: number): string =>
-  `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /* ------------------------------------------------------------------ */
 /*  Custom tooltip                                                     */
