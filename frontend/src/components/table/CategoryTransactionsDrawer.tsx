@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Tag } from 'lucide-react'
+import { X, ArrowUpDown, Calendar } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
