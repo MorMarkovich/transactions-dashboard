@@ -381,10 +381,11 @@ export const transactionsApi = {
    * Get full category snapshot (all categories with count + total).
    * Optional month range filter (MM/YYYY format).
    */
-  getCategorySnapshot: async (sessionId: string, signal?: AbortSignal, monthFrom?: string, monthTo?: string): Promise<CategorySnapshotData> => {
+  getCategorySnapshot: async (sessionId: string, signal?: AbortSignal, monthFrom?: string, monthTo?: string, dateType?: string): Promise<CategorySnapshotData> => {
     const params: Record<string, string> = { sessionId }
     if (monthFrom) params.month_from = monthFrom
     if (monthTo) params.month_to = monthTo
+    if (dateType) params.date_type = dateType
     const response = await api.get<CategorySnapshotData>('/api/charts/v2/category-snapshot', {
       params,
       signal,
