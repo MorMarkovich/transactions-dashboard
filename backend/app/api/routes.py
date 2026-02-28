@@ -598,11 +598,13 @@ async def get_category_snapshot(
 async def get_category_transactions(
     sessionId: str = Query(...),
     month: str = Query(""),
+    month_from: str = Query(""),
+    month_to: str = Query(""),
     category: str = Query(...),
     date_type: str = Query("transaction"),
     sort_order: str = Query("asc"),
 ):
-    """Return all transactions for a given category, optionally filtered by month."""
+    """Return all transactions for a given category, optionally filtered by month or date range."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -613,12 +615,26 @@ async def get_category_transactions(
     # Filter by category + expenses
     filtered = df[(df['קטגוריה'] == category) & (df['סכום'] < 0)]
 
-    # Optionally filter by month
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+
+    # Filter by single month or date range
     if month:
-        date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
         filtered = filtered.copy()
         filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
         filtered = filtered[filtered['_month'] == month]
+    elif month_from or month_to:
+        filtered = filtered.copy()
+        filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
+        # Parse MM/YYYY into sortable YYYY-MM for comparison
+        def month_sort_key(m: str) -> str:
+            parts = m.split('/')
+            return f"{parts[1]}-{parts[0]}" if len(parts) == 2 else m
+        if month_from:
+            from_key = month_sort_key(month_from)
+            filtered = filtered[filtered['_month'].apply(month_sort_key) >= from_key]
+        if month_to:
+            to_key = month_sort_key(month_to)
+            filtered = filtered[filtered['_month'].apply(month_sort_key) <= to_key]
 
     if filtered.empty:
         return {"transactions": [], "total": 0, "count": 0}
