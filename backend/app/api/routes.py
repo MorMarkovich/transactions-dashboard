@@ -406,7 +406,7 @@ def _to_json_safe(val):
 
 @router.get("/charts/v2/donut")
 async def get_donut_v2(sessionId: str = Query(...)):
-    """Return raw category breakdown (top 6 + 'אחר')."""
+    """Return raw category breakdown (top 10 + 'אחר')."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -423,28 +423,44 @@ async def get_donut_v2(sessionId: str = Query(...)):
         .sort_values(ascending=False)
     )
 
-    top6 = cat_totals.head(6)
-    other = cat_totals.iloc[6:].sum() if len(cat_totals) > 6 else 0
+    top = cat_totals.head(10)
+    other = cat_totals.iloc[10:].sum() if len(cat_totals) > 10 else 0
 
     categories = [
         {"name": str(name), "value": round(_sanitize(val), 2)}
-        for name, val in top6.items()
+        for name, val in top.items()
     ]
     if other > 0:
         categories.append({"name": "אחר", "value": round(float(other), 2)})
 
-    total = round(_sanitize(cat_totals.sum()), 2)
+    total = round(_sanitize(float(cat_totals.sum())), 2)
     return {"categories": categories, "total": total}
 
 
 @router.get("/charts/v2/category-snapshot")
-async def get_category_snapshot(sessionId: str = Query(...)):
-    """Return ALL categories with enriched analytical data."""
+async def get_category_snapshot(
+    sessionId: str = Query(...),
+    month_from: str = Query(default=None),
+    month_to: str = Query(default=None),
+):
+    """Return ALL categories with enriched analytical data. Optional month range filter (MM/YYYY)."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
     expenses = df[df['סכום'] < 0].copy()
+
+    # Optional month range filtering
+    if (month_from or month_to) and not expenses.empty:
+        def _month_key(m: str) -> tuple:
+            parts = m.split('/')
+            return (int(parts[1]), int(parts[0]))
+        if month_from:
+            from_key = _month_key(month_from)
+            expenses = expenses[expenses['חודש'].apply(lambda m: _month_key(m) >= from_key)]
+        if month_to:
+            to_key = _month_key(month_to)
+            expenses = expenses[expenses['חודש'].apply(lambda m: _month_key(m) <= to_key)]
 
     if expenses.empty:
         return {"categories": [], "total": 0, "total_count": 0, "month_count": 0}
@@ -465,7 +481,11 @@ async def get_category_snapshot(sessionId: str = Query(...)):
     total_count = int(cat_agg['count'].sum())
 
     # -- Per-category monthly breakdown for trends --
-    all_months = sorted(expenses['חודש'].unique())
+    # Sort months chronologically (MM/YYYY string sort is wrong: 01/2026 < 09/2025)
+    all_months = sorted(
+        expenses['חודש'].unique(),
+        key=lambda m: (int(m.split('/')[1]), int(m.split('/')[0])),
+    )
     month_count = len(all_months)
 
     cat_month = (
@@ -1070,9 +1090,10 @@ async def get_industry_monthly(
     expenses['_month_period'] = expenses[date_col].dt.to_period('M')
     expenses = expenses.dropna(subset=['_month_period'])
 
-    # Get top N categories by total spend
+    # Get top N categories by total spend, group the rest into "אחר"
     cat_totals = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().sort_values(ascending=False)
     top_cats = [str(c) for c in cat_totals.head(top_n).index]
+    other_cats = [str(c) for c in cat_totals.iloc[top_n:].index] if len(cat_totals) > top_n else []
 
     # Build pivot: rows=months, cols=categories
     pivot = pd.pivot_table(
@@ -1094,6 +1115,15 @@ async def get_industry_monthly(
         else:
             data = [0.0] * len(months)
         series.append({"name": cat, "data": data})
+
+    # Add "אחר" series for remaining categories so chart totals are complete
+    if other_cats:
+        other_data = [0.0] * len(months)
+        for cat in other_cats:
+            if cat in pivot.columns:
+                for i, v in enumerate(pivot[cat].values):
+                    other_data[i] += float(v)
+        series.append({"name": "אחר", "data": [round(_sanitize(v), 2) for v in other_data]})
 
     return {"months": months, "series": series}
 
