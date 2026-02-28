@@ -25,6 +25,8 @@ import type {
   MonthOverviewData,
   IndustryMonthlyData,
   CategorySnapshotData,
+  CategoryTransactionsData,
+  CategoryMerchantsData,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -381,6 +383,59 @@ export const transactionsApi = {
   getCategorySnapshot: async (sessionId: string, signal?: AbortSignal): Promise<CategorySnapshotData> => {
     const response = await api.get<CategorySnapshotData>('/api/charts/v2/category-snapshot', {
       params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get transactions for a specific month + category (drill-down)
+   */
+  getCategoryTransactions: async (
+    sessionId: string,
+    month: string,
+    category: string,
+    dateType?: string,
+    sortOrder?: string,
+    signal?: AbortSignal,
+  ): Promise<CategoryTransactionsData> => {
+    const response = await api.get<CategoryTransactionsData>('/api/charts/v2/category-transactions', {
+      params: { sessionId, month, category, ...(dateType && { date_type: dateType }), ...(sortOrder && { sort_order: sortOrder }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get merchant breakdown within a category for a month (drill-down)
+   */
+  getCategoryMerchants: async (
+    sessionId: string,
+    month: string,
+    category: string,
+    dateType?: string,
+    signal?: AbortSignal,
+  ): Promise<CategoryMerchantsData> => {
+    const response = await api.get<CategoryMerchantsData>('/api/charts/v2/category-merchants', {
+      params: { sessionId, month, category, ...(dateType && { date_type: dateType }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get transactions for a specific merchant within a category/month (drill-down)
+   */
+  getMerchantTransactions: async (
+    sessionId: string,
+    month: string,
+    category: string,
+    merchant: string,
+    dateType?: string,
+    signal?: AbortSignal,
+  ): Promise<CategoryTransactionsData> => {
+    const response = await api.get<CategoryTransactionsData>('/api/charts/v2/merchant-transactions', {
+      params: { sessionId, month, category, merchant, ...(dateType && { date_type: dateType }) },
       signal,
     });
     return response.data;
