@@ -125,12 +125,12 @@ export default function Dashboard() {
   const [drawerLoading, setDrawerLoading] = useState(false)
 
   const handleCategoryCardClick = useCallback(async (categoryName: string) => {
-    if (!sessionId || !selectedMonth) return
+    if (!sessionId) return
     setDrawerCategory(categoryName)
     setDrawerOpen(true)
     setDrawerLoading(true)
     try {
-      const data = await transactionsApi.getCategoryTransactions(sessionId, selectedMonth, categoryName, dateType)
+      const data = await transactionsApi.getCategoryTransactions(sessionId, selectedMonth ?? '', categoryName, dateType)
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
     } catch {
@@ -756,11 +756,9 @@ export default function Dashboard() {
                 ? `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`
                 : `כל התקופה · ${categorySnapshot.month_count} חודשים`}
             </span>
-            {selectedMonth && (
-              <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
-                לחצו לפירוט עסקאות
-              </span>
-            )}
+            <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
+              לחצו על קטגוריה לפירוט עסקאות
+            </span>
           </div>
 
           {/* ─── Toolbar: Search + Sort + Actions (always visible) ─── */}
@@ -992,16 +990,15 @@ export default function Dashboard() {
             gap: 'var(--space-sm)',
           }}>
             {(snapshotExpanded ? sortedSnapshotCategories : sortedSnapshotCategories.slice(0, 8)).map((cat) => {
-              const hasMonth = !!selectedMonth
               const changeColor = cat.month_change > 5 ? 'var(--danger)' : cat.month_change < -5 ? 'var(--success)' : 'var(--text-muted)'
               const changeBg = cat.month_change > 5 ? 'var(--danger-muted)' : cat.month_change < -5 ? 'var(--success-muted)' : 'rgba(148, 163, 184, 0.1)'
               return (
-                <div key={cat.name} style={{ cursor: hasMonth ? 'pointer' : 'default' }}>
+                <div key={cat.name} style={{ cursor: 'pointer' }}>
                 <Card
                   variant="glass"
                   padding="sm"
-                  hover={hasMonth}
-                  onClick={hasMonth ? () => handleCategoryCardClick(cat.name) : undefined}
+                  hover
+                  onClick={() => handleCategoryCardClick(cat.name)}
                 >
                   <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
                     {/* Exclude button */}
