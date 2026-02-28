@@ -551,8 +551,8 @@ async def get_category_snapshot(
         pm_val = prev_month_totals.get(cat_name, 0)
         if pm_val > 0:
             month_change = round((lm_val - pm_val) / pm_val * 100, 1)
-        elif lm_val > 0:
-            month_change = 100.0  # new category this month
+        elif lm_val > 0 and prev_month is not None:
+            month_change = 100.0  # new category this month (wasn't in prev month)
         else:
             month_change = 0.0
 
