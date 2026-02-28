@@ -70,7 +70,9 @@ export default function AnimatedNumber({
         ...style,
       }}
     >
-      {prefersReducedMotion || !isInView ? formatter(value) : formatter(displayValue)}
+      {prefersReducedMotion || !isInView
+        ? formatter(value)
+        : formatter(Number.isInteger(value) ? Math.round(displayValue) : displayValue)}
     </span>
   )
 }

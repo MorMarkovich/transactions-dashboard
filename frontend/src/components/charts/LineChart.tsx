@@ -37,6 +37,16 @@ const formatAxisShekel = (v: number): string => {
   return `₪${v}`
 }
 
+/** Format a date label to DD/MM/YYYY for Hebrew locale display. */
+const formatDateLabel = (label: string): string => {
+  // Handle ISO dates like "2025-09-20"
+  if (/^\d{4}-\d{2}-\d{2}/.test(label)) {
+    const [y, m, d] = label.split('-')
+    return `${d}/${m}/${y}`
+  }
+  return label
+}
+
 /* ------------------------------------------------------------------ */
 /*  Gradient definition                                                */
 /* ------------------------------------------------------------------ */
@@ -80,7 +90,7 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
       }}
     >
       <p style={{ color: 'var(--text-primary)', margin: 0, fontWeight: 600, fontSize: 'var(--text-sm)' }}>
-        {label}
+        {label ? formatDateLabel(label) : label}
       </p>
       <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: 'var(--text-sm)' }}>
         {formatShekel(payload[0].value)}
@@ -141,6 +151,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
 
         <XAxis
           dataKey="label"
+          tickFormatter={formatDateLabel}
           tick={{
             fill: 'var(--text-secondary)',
             fontSize: 12,

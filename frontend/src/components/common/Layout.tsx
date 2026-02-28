@@ -25,6 +25,11 @@ export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const hasTriedRestore = useRef(false)
+  // Block rendering children until a stale session_id is verified/restored
+  const [sessionValidating, setSessionValidating] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return !!params.get('session_id')
+  })
 
   // Sidebar defaults: open on desktop, closed on mobile
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -87,9 +92,11 @@ export default function Layout({ children }: LayoutProps) {
           }
         })
         .catch(() => {}) // Silent fail — user can upload a new file
+        .finally(() => setSessionValidating(false))
     }
 
     if (!sessionId) {
+      setSessionValidating(false)
       doRestore()
       return
     }
@@ -97,10 +104,17 @@ export default function Layout({ children }: LayoutProps) {
     // Session ID is in URL — verify it still exists in the backend.
     // After a backend restart all in-memory sessions are wiped, so a stale
     // session_id causes 404s across the whole app.
+    setSessionValidating(true)
     transactionsApi.getMetrics(sessionId)
+      .then(() => {
+        // Session is valid — allow children to render
+        setSessionValidating(false)
+      })
       .catch(err => {
         if ((err as { response?: { status?: number } }).response?.status === 404) {
           doRestore()
+        } else {
+          setSessionValidating(false)
         }
       })
   }, [user, searchParams, navigate])
@@ -161,17 +175,26 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main content area */}
         <main className="main-content">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {sessionValidating ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', direction: 'rtl' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>...מאמת סשן</p>
+              </div>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </main>
       </div>
 
