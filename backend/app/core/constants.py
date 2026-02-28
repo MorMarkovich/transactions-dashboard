@@ -18,7 +18,20 @@ CATEGORY_ICONS = {
     'חיות מחמד': '🐕',
     'שונות': '📦',
     'משיכת מזומן': '🏧',
+    'שכר דירה': '🔑',
+    'הוראות קבע': '🔄',
 }
+
+# Keywords in transaction descriptions that indicate check withdrawals (rent)
+CHECK_WITHDRAWAL_KEYWORDS = [
+    'משיכת שיקים', 'משיכת שיק', 'שיק', 'שיקים', 'צ\'ק', 'צק',
+    'המחאה', 'cheque', 'check withdrawal',
+]
+
+# Keywords in transaction descriptions that indicate standing orders
+STANDING_ORDER_KEYWORDS = [
+    'הוראת קבע', 'הו"ק', 'הוק', 'standing order', 'הוראות קבע',
+]
 
 def get_icon(category: str) -> str:
     return CATEGORY_ICONS.get(category, '📋')
