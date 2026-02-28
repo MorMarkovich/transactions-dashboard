@@ -262,6 +262,25 @@ export interface MonthOverviewData {
   transaction_count: number
 }
 
+// Drill-down: category transactions
+export interface CategoryTransactionsData {
+  transactions: Transaction[]
+  total: number
+  count: number
+}
+
+// Drill-down: merchant breakdown within a category
+export interface CategoryMerchantItem {
+  name: string
+  total: number
+  count: number
+}
+
+export interface CategoryMerchantsData {
+  merchants: CategoryMerchantItem[]
+  total: number
+}
+
 // Industry monthly: expenses per category per month for comparison
 export interface IndustryMonthlySeries {
   name: string
