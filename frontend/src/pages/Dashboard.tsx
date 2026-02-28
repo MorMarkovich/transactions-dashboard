@@ -130,7 +130,11 @@ export default function Dashboard() {
     setDrawerOpen(true)
     setDrawerLoading(true)
     try {
-      const data = await transactionsApi.getCategoryTransactions(sessionId, selectedMonth ?? '', categoryName, dateType)
+      // Use snapshot date range filters to match what the card displays
+      const data = await transactionsApi.getCategoryTransactions(
+        sessionId, '', categoryName, dateType, undefined, undefined,
+        snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
+      )
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
     } catch {
@@ -139,7 +143,7 @@ export default function Dashboard() {
     } finally {
       setDrawerLoading(false)
     }
-  }, [sessionId, selectedMonth, dateType])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
@@ -1477,7 +1481,11 @@ export default function Dashboard() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         category={drawerCategory}
-        month={selectedMonth ?? ''}
+        month={
+          snapshotMonthFrom || snapshotMonthTo
+            ? `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`
+            : ''
+        }
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}

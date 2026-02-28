@@ -393,7 +393,7 @@ export const transactionsApi = {
   },
 
   /**
-   * Get transactions for a category, optionally filtered by month (drill-down)
+   * Get transactions for a category, optionally filtered by month or date range (drill-down)
    */
   getCategoryTransactions: async (
     sessionId: string,
@@ -402,9 +402,19 @@ export const transactionsApi = {
     dateType?: string,
     sortOrder?: string,
     signal?: AbortSignal,
+    monthFrom?: string,
+    monthTo?: string,
   ): Promise<CategoryTransactionsData> => {
     const response = await api.get<CategoryTransactionsData>('/api/charts/v2/category-transactions', {
-      params: { sessionId, category, ...(month && { month }), ...(dateType && { date_type: dateType }), ...(sortOrder && { sort_order: sortOrder }) },
+      params: {
+        sessionId,
+        category,
+        ...(month && { month }),
+        ...(monthFrom && { month_from: monthFrom }),
+        ...(monthTo && { month_to: monthTo }),
+        ...(dateType && { date_type: dateType }),
+        ...(sortOrder && { sort_order: sortOrder }),
+      },
       signal,
     });
     return response.data;
