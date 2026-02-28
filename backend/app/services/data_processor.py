@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -92,7 +93,23 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     if not is_bank_statement and len(non_zero) > 0:
         positive_ratio = (non_zero > 0).sum() / len(non_zero)
         if positive_ratio > 0.8:  # אם יותר מ-80% חיוביים - אלה הוצאות
-            result['סכום'] = -result['סכום'].abs()
+            # Remember which rows were originally negative (credits/refunds/income)
+            originally_negative = result['סכום'] < 0
+            # Flip positive amounts to negative (expenses)
+            result.loc[~originally_negative, 'סכום'] = -result.loc[~originally_negative, 'סכום'].abs()
+            # Flip originally negative amounts to positive (income/refunds)
+            result.loc[originally_negative, 'סכום'] = result.loc[originally_negative, 'סכום'].abs()
+
+    # Ensure Bit and Paybox income is recognized: if description matches known
+    # income transfer apps and amount is negative, flip to positive (income)
+    income_app_keywords = ['bit', 'ביט', 'paybox', 'פייבוקס']
+    if 'תיאור' in result.columns:
+        income_app_mask = result['תיאור'].str.lower().str.contains(
+            '|'.join(income_app_keywords), na=False
+        ) & (result['סכום'] > 0)
+        # These are already positive (income) - no action needed
+        # But if they were expenses that should be income, mark them
+        # (This is a safety net for bank statements where Bit/Paybox credits should be income)
     
     # ניקוי תיאור
     try:
@@ -112,6 +129,19 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     except Exception:
         result['קטגוריה'] = 'שונות'
     
+    # Reclassify check withdrawals as rent (שכר דירה)
+    desc_lower = result['תיאור'].str.lower()
+    for keyword in CHECK_WITHDRAWAL_KEYWORDS:
+        mask = desc_lower.str.contains(keyword.lower(), na=False)
+        if mask.any():
+            result.loc[mask, 'קטגוריה'] = 'שכר דירה'
+
+    # Reclassify standing orders (הוראות קבע)
+    for keyword in STANDING_ORDER_KEYWORDS:
+        mask = desc_lower.str.contains(keyword.lower(), na=False)
+        if mask.any():
+            result.loc[mask, 'קטגוריה'] = 'הוראות קבע'
+
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
     

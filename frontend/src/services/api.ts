@@ -24,6 +24,7 @@ import type {
   SearchResult,
   MonthOverviewData,
   IndustryMonthlyData,
+  CategorySnapshotData,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -369,6 +370,17 @@ export const transactionsApi = {
   getIndustryMonthly: async (sessionId: string, dateType?: string, signal?: AbortSignal): Promise<IndustryMonthlyData> => {
     const response = await api.get<IndustryMonthlyData>('/api/charts/v2/industry-monthly', {
       params: { sessionId, ...(dateType && { date_type: dateType }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get full category snapshot (all categories with count + total)
+   */
+  getCategorySnapshot: async (sessionId: string, signal?: AbortSignal): Promise<CategorySnapshotData> => {
+    const response = await api.get<CategorySnapshotData>('/api/charts/v2/category-snapshot', {
+      params: { sessionId },
       signal,
     });
     return response.data;

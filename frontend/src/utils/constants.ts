@@ -15,6 +15,8 @@ export const CATEGORY_ICONS: Record<string, string> = {
   'חיות מחמד': '🐕',
   'שונות': '📦',
   'משיכת מזומן': '🏧',
+  'שכר דירה': '🔑',
+  'הוראות קבע': '🔄',
 }
 
 export function get_icon(category: string): string {
