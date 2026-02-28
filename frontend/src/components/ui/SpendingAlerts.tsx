@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, TrendingUp, Repeat, DollarSign, X } from 'lucide-react'
+import { AlertTriangle, TrendingUp, Repeat, DollarSign, X, Lightbulb } from 'lucide-react'
 import type { MetricsData, AnomalyItem, RecurringTransaction, ForecastData } from '../../services/types'
 import { formatCurrency } from '../../utils/formatting'
 
@@ -99,6 +99,20 @@ export default function SpendingAlerts({
       })
     }
 
+    // Savings potential: sum of anomaly amounts above category mean
+    if (anomalies.length > 0) {
+      const savingsTotal = anomalies.reduce((sum, a) => sum + Math.max(0, a.amount - a.category_mean), 0)
+      if (savingsTotal > 100) {
+        result.push({
+          id: 'savings-potential',
+          type: 'info',
+          icon: <Lightbulb size={18} />,
+          title: 'פוטנציאל חיסכון',
+          description: `זוהו ${anomalies.length} עסקאות חריגות — חיסכון אפשרי של ${formatCurrency(savingsTotal)}`,
+        })
+      }
+    }
+
     return result.filter((a) => !dismissedAlerts.has(a.id))
   }, [metrics, anomalies, recurring, forecast, dismissedAlerts])
 
@@ -124,6 +138,7 @@ export default function SpendingAlerts({
                 borderRadius: '12px',
                 background: colors.bg,
                 border: `1px solid ${colors.border}`,
+                borderRight: `3px solid ${colors.icon}`,
                 direction: 'rtl',
               }}
             >

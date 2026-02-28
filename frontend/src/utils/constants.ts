@@ -17,8 +17,10 @@ export const CATEGORY_ICONS: Record<string, string> = {
   'משיכת מזומן': '🏧',
   'שכר דירה': '🔑',
   'הוראות קבע': '🔄',
+  'טיסות ותיירות': '✈️',
+  'אחר': '📊',
 }
 
 export function get_icon(category: string): string {
-  return CATEGORY_ICONS[category] || '📋'
+  return CATEGORY_ICONS[category] || '📊'
 }
