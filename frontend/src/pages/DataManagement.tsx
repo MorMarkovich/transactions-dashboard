@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   Calendar,
+  ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
@@ -147,6 +148,7 @@ export default function DataManagement() {
   const [deletingTransactions, setDeletingTransactions] = useState(false)
   const [showDeleteIncomesModal, setShowDeleteIncomesModal] = useState(false)
   const [showDeleteTransactionsModal, setShowDeleteTransactionsModal] = useState(false)
+  const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false)
 
   // ── Fetch storage info ────────────────────────────────────────────────
   const fetchStorageInfo = useCallback(async () => {
@@ -398,82 +400,109 @@ export default function DataManagement() {
         transition={{ delay: 0.4, duration: 0.35 }}
         style={{ marginTop: 'var(--space-xl)' }}
       >
-        <div className="section-header-v2">
-          <AlertTriangle size={18} />
-          <span>אזור מסוכן</span>
-        </div>
-
         <Card
-          padding="lg"
+          padding="md"
           className="glass-card"
         >
-          <div
+          <button
+            onClick={() => setDangerZoneExpanded(!dangerZoneExpanded)}
             style={{
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '10px',
-              padding: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              width: '100%',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 0',
+              fontFamily: 'var(--font-family)',
             }}
           >
+            <AlertTriangle size={18} style={{ color: '#f87171', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--accent-danger, #ef4444)' }}>
+              אזור מסוכן
+            </span>
+            <ChevronDown
+              size={16}
+              style={{
+                color: 'var(--text-muted)',
+                marginRight: 'auto',
+                transition: 'transform 0.2s',
+                transform: dangerZoneExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
+            />
+          </button>
+
+          {dangerZoneExpanded && (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '16px',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '10px',
+                padding: '20px',
+                marginTop: '16px',
               }}
             >
-              <AlertTriangle size={20} style={{ color: '#f87171' }} />
-              <h3
+              <div
                 style={{
-                  margin: 0,
-                  fontSize: '1rem',
-                  fontWeight: 700,
-                  color: 'var(--accent-danger, #ef4444)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  marginBottom: '16px',
                 }}
               >
-                פעולות בלתי הפיכות
-              </h3>
-            </div>
+                <AlertTriangle size={20} style={{ color: '#f87171' }} />
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    color: 'var(--accent-danger, #ef4444)',
+                  }}
+                >
+                  פעולות בלתי הפיכות
+                </h3>
+              </div>
 
-            <p
-              style={{
-                margin: '0 0 20px',
-                fontSize: '0.8125rem',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.6,
-              }}
-            >
-              פעולות אלו ימחקו נתונים לצמיתות ולא ניתן יהיה לשחזר אותם.
-            </p>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                flexWrap: 'wrap',
-              }}
-            >
-              {/* Delete all incomes */}
-              <Button
-                variant="danger"
-                icon={<Trash2 size={16} />}
-                onClick={() => setShowDeleteIncomesModal(true)}
-                disabled={(storageInfo?.incomeCount ?? 0) === 0}
+              <p
+                style={{
+                  margin: '0 0 20px',
+                  fontSize: '0.8125rem',
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.6,
+                }}
               >
-                מחק את כל ההכנסות
-              </Button>
+                פעולות אלו ימחקו נתונים לצמיתות ולא ניתן יהיה לשחזר אותם.
+              </p>
 
-              {/* Delete all transactions */}
-              <Button
-                variant="danger"
-                icon={<Trash2 size={16} />}
-                onClick={() => setShowDeleteTransactionsModal(true)}
-                disabled={(storageInfo?.transactionSets ?? 0) === 0}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                }}
               >
-                מחק את כל העסקאות
-              </Button>
+                {/* Delete all incomes */}
+                <Button
+                  variant="danger"
+                  icon={<Trash2 size={16} />}
+                  onClick={() => setShowDeleteIncomesModal(true)}
+                  disabled={(storageInfo?.incomeCount ?? 0) === 0}
+                >
+                  מחק את כל ההכנסות
+                </Button>
+
+                {/* Delete all transactions */}
+                <Button
+                  variant="danger"
+                  icon={<Trash2 size={16} />}
+                  onClick={() => setShowDeleteTransactionsModal(true)}
+                  disabled={(storageInfo?.transactionSets ?? 0) === 0}
+                >
+                  מחק את כל העסקאות
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </Card>
       </motion.div>
 
