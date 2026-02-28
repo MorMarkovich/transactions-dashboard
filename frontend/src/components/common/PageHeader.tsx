@@ -10,9 +10,6 @@ interface PageHeaderProps {
 export default function PageHeader({ title, subtitle, icon: Icon, actions }: PageHeaderProps) {
   useEffect(() => {
     document.title = `${title} | מנתח עסקאות`
-    return () => {
-      document.title = 'מנתח עסקאות'
-    }
   }, [title])
 
   return (
