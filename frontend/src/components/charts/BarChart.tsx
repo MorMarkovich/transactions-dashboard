@@ -128,14 +128,15 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           dataKey="label"
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: needsRotation ? 11 : 12,
             fontFamily: 'var(--font-family)',
           }}
+          tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 12) + '…' : v}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
-          angle={needsRotation ? -45 : 0}
+          angle={needsRotation ? -35 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
-          height={needsRotation ? 60 : 30}
+          height={needsRotation ? 70 : 30}
           interval={0}
         />
 

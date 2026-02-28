@@ -17,6 +17,10 @@ export interface Transaction {
 export interface TransactionResponse {
   transactions: Transaction[];
   total: number;
+  total_amount?: number;
+  avg_transaction?: number;
+  expense_count?: number;
+  income_count?: number;
   page?: number;
   page_size?: number;
 }
