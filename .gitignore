@@ -45,6 +45,7 @@ build/
 backend/uploads/
 backend/debug_log.txt
 
-# Temp scripts
+# Temp scripts (not in backend/tests/)
 test_*.py
+!backend/tests/test_*.py
 reproduce_*.py
