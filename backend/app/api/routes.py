@@ -249,25 +249,25 @@ async def get_metrics(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
-    
-    total_transactions = len(df)
+
     expenses = df[df['סכום'] < 0]
     income = df[df['סכום'] > 0]
-    
+
+    total_transactions = len(expenses)
     total_expenses = abs(expenses['סכום'].sum()) if len(expenses) > 0 else 0
     total_income = income['סכום'].sum() if len(income) > 0 else 0
-    average_transaction = df['סכום_מוחלט'].mean() if not df.empty else 0
-    
-    # Calculate trend
+    average_transaction = expenses['סכום_מוחלט'].mean() if not expenses.empty else 0
+
+    # Calculate trend (based on expenses only)
     trend = None
-    if len(df) > 10:
-        mid = len(df) // 2
-        first_half_avg = df.iloc[:mid]['סכום_מוחלט'].mean()
-        second_half_avg = df.iloc[mid:]['סכום_מוחלט'].mean()
+    if len(expenses) > 10:
+        mid = len(expenses) // 2
+        first_half_avg = expenses.iloc[:mid]['סכום_מוחלט'].mean()
+        second_half_avg = expenses.iloc[mid:]['סכום_מוחלט'].mean()
         if first_half_avg > 0:
             trend_pct = ((second_half_avg - first_half_avg) / first_half_avg) * 100
             trend = 'up' if trend_pct > 0 else 'down'
-    
+
     has_billing_date = 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any()
 
     return {
@@ -435,6 +435,44 @@ async def get_donut_v2(sessionId: str = Query(...)):
 
     total = round(_sanitize(cat_totals.sum()), 2)
     return {"categories": categories, "total": total}
+
+
+@router.get("/charts/v2/category-snapshot")
+async def get_category_snapshot(sessionId: str = Query(...)):
+    """Return ALL categories with expense count and total amount (no filter/limit)."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    expenses = df[df['סכום'] < 0].copy()
+
+    if expenses.empty:
+        return {"categories": [], "total": 0, "total_count": 0}
+
+    cat_agg = (
+        expenses
+        .groupby('קטגוריה')
+        .agg(
+            total=('סכום_מוחלט', 'sum'),
+            count=('סכום_מוחלט', 'size'),
+        )
+        .sort_values('total', ascending=False)
+    )
+
+    total = round(_sanitize(float(cat_agg['total'].sum())), 2)
+    total_count = int(cat_agg['count'].sum())
+
+    categories = [
+        {
+            "name": str(name),
+            "total": round(_sanitize(float(row['total'])), 2),
+            "count": int(row['count']),
+            "percent": round(float(row['total']) / float(cat_agg['total'].sum()) * 100, 1) if cat_agg['total'].sum() > 0 else 0,
+        }
+        for name, row in cat_agg.iterrows()
+    ]
+
+    return {"categories": categories, "total": total, "total_count": total_count}
 
 
 @router.get("/charts/v2/monthly")
