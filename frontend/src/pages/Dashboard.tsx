@@ -474,25 +474,28 @@ export default function Dashboard() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הכנסות</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: displayIncome > 0 ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
                 {formatCurrency(displayIncome)}
+              </div>
+              {hasMonthData && displayIncome === 0 && metrics.total_income > 0 && (
+                <div style={{ fontSize: '0.5625rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                  אין הכנסות בחודש זה
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: displayBalance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+                {displayBalance >= 0 ? '+' : ''}{formatCurrency(displayBalance)}
               </div>
             </div>
             {displayIncome > 0 && (
-              <>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: displayBalance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                    {displayBalance >= 0 ? '+' : ''}{formatCurrency(displayBalance)}
-                  </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {displaySavingsRate.toFixed(1)}%
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {displaySavingsRate.toFixed(1)}%
-                  </div>
-                </div>
-              </>
+              </div>
             )}
           </div>
           {/* Last Updated Timestamp */}
@@ -1327,10 +1330,24 @@ export default function Dashboard() {
                   {forecast.trend_direction === 'up' ? '↑ עלייה' : forecast.trend_direction === 'down' ? '↓ ירידה' : '→ יציב'}
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ביטחון: {forecast.confidence === 'high' ? 'גבוה' : forecast.confidence === 'medium' ? 'בינוני' : 'נמוך'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                <span
+                  style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
+                  title={forecast.confidence === 'high'
+                    ? 'רמת ביטחון גבוהה: 6+ חודשי נתונים עם מגמה עקבית (R² > 0.7)'
+                    : forecast.confidence === 'medium'
+                      ? 'רמת ביטחון בינונית: 3+ חודשי נתונים עם מגמה מתונה (R² > 0.4)'
+                      : `רמת ביטחון נמוכה: ${(forecast.monthly_data?.length ?? 0) < 3 ? 'פחות מ-3 חודשי נתונים' : 'תנודתיות גבוהה בין חודשים'} — ככל שיצטברו נתונים התחזית תשתפר`}
+                >
+                  ביטחון: {forecast.confidence === 'high' ? 'גבוה' : forecast.confidence === 'medium' ? 'בינוני' : 'נמוך'} ⓘ
+                </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ממוצע חודשי: {formatCurrency(forecast.avg_monthly)}</span>
+                <span
+                  style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
+                  title="ממוצע ההוצאות החודשי על פני כל התקופה — התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד"
+                >
+                  ממוצע בפועל: {formatCurrency(forecast.avg_monthly)}
+                </span>
               </div>
               {forecast.monthly_data.length > 1 && (
                 <div style={{ marginTop: '12px' }}>
