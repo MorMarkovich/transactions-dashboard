@@ -188,7 +188,7 @@ export default function Dashboard() {
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
           transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
-          transactionsApi.getCategorySnapshot(sessionId, signal).catch(() => null),
+          transactionsApi.getCategorySnapshot(sessionId, signal, undefined, undefined, dateType).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -210,6 +210,9 @@ export default function Dashboard() {
         if (monthly?.months?.length) {
           const latest = monthly.months[monthly.months.length - 1].month
           setSelectedMonth(latest)
+          // Default snapshot to last month so user sees recent monthly breakdown
+          setSnapshotMonthFrom(latest)
+          setSnapshotMonthTo(latest)
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
@@ -309,16 +312,19 @@ export default function Dashboard() {
 
   const hasBillingDate = metrics?.has_billing_date ?? false
 
-  // ── Refetch category snapshot when month range changes ───────────────
+  // ── Refetch category snapshot when month range or date type changes ──
   useEffect(() => {
     if (!sessionId) return
     if (!snapshotMonthFrom && !snapshotMonthTo) return // initial load already covered
     const controller = new AbortController()
-    transactionsApi.getCategorySnapshot(sessionId, controller.signal, snapshotMonthFrom || undefined, snapshotMonthTo || undefined)
+    transactionsApi.getCategorySnapshot(
+      sessionId, controller.signal,
+      snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
+    )
       .then((data) => setCategorySnapshot(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
 
   // ── Filtered + sorted snapshot categories (uses extracted pure fn) ────
   const snapshotFilterOpts = useMemo(() => ({
@@ -760,7 +766,9 @@ export default function Dashboard() {
             <span>סיכום הוצאות לפי קטגוריה</span>
             <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               {snapshotMonthFrom || snapshotMonthTo
-                ? `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`
+                ? (snapshotMonthFrom && snapshotMonthTo && snapshotMonthFrom === snapshotMonthTo
+                    ? snapshotMonthFrom
+                    : `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`)
                 : `כל התקופה · ${categorySnapshot.month_count} חודשים`}
             </span>
             <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
@@ -1483,7 +1491,9 @@ export default function Dashboard() {
         category={drawerCategory}
         month={
           snapshotMonthFrom || snapshotMonthTo
-            ? `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`
+            ? (snapshotMonthFrom && snapshotMonthTo && snapshotMonthFrom === snapshotMonthTo
+                ? snapshotMonthFrom
+                : `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`)
             : ''
         }
         transactions={drawerTransactions}
