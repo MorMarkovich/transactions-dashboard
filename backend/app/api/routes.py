@@ -439,7 +439,7 @@ async def get_donut_v2(sessionId: str = Query(...)):
 
 @router.get("/charts/v2/category-snapshot")
 async def get_category_snapshot(sessionId: str = Query(...)):
-    """Return ALL categories with expense count and total amount (no filter/limit)."""
+    """Return ALL categories with enriched analytical data."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -447,8 +447,9 @@ async def get_category_snapshot(sessionId: str = Query(...)):
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
-        return {"categories": [], "total": 0, "total_count": 0}
+        return {"categories": [], "total": 0, "total_count": 0, "month_count": 0}
 
+    # -- Overall aggregation --
     cat_agg = (
         expenses
         .groupby('קטגוריה')
@@ -459,20 +460,108 @@ async def get_category_snapshot(sessionId: str = Query(...)):
         .sort_values('total', ascending=False)
     )
 
-    total = round(_sanitize(float(cat_agg['total'].sum())), 2)
+    grand_total = float(cat_agg['total'].sum())
+    total = round(_sanitize(grand_total), 2)
     total_count = int(cat_agg['count'].sum())
 
-    categories = [
-        {
-            "name": str(name),
-            "total": round(_sanitize(float(row['total'])), 2),
-            "count": int(row['count']),
-            "percent": round(float(row['total']) / float(cat_agg['total'].sum()) * 100, 1) if cat_agg['total'].sum() > 0 else 0,
-        }
-        for name, row in cat_agg.iterrows()
-    ]
+    # -- Per-category monthly breakdown for trends --
+    all_months = sorted(expenses['חודש'].unique())
+    month_count = len(all_months)
 
-    return {"categories": categories, "total": total, "total_count": total_count}
+    cat_month = (
+        expenses
+        .groupby(['קטגוריה', 'חודש'])
+        .agg(month_total=('סכום_מוחלט', 'sum'))
+        .reset_index()
+    )
+
+    # -- Top merchant per category --
+    cat_merchant = (
+        expenses
+        .groupby(['קטגוריה', 'תיאור'])
+        .agg(merchant_total=('סכום_מוחלט', 'sum'))
+        .reset_index()
+    )
+    top_merchants = (
+        cat_merchant
+        .sort_values('merchant_total', ascending=False)
+        .drop_duplicates(subset='קטגוריה', keep='first')
+        .set_index('קטגוריה')
+    )
+
+    # -- Last two months for trend calculation --
+    last_month = all_months[-1] if all_months else None
+    prev_month = all_months[-2] if len(all_months) >= 2 else None
+
+    last_month_totals = {}
+    prev_month_totals = {}
+    if last_month:
+        lm = cat_month[cat_month['חודש'] == last_month].set_index('קטגוריה')
+        last_month_totals = lm['month_total'].to_dict()
+    if prev_month:
+        pm = cat_month[cat_month['חודש'] == prev_month].set_index('קטגוריה')
+        prev_month_totals = pm['month_total'].to_dict()
+
+    # -- Months active per category --
+    months_active = cat_month.groupby('קטגוריה')['חודש'].nunique().to_dict()
+
+    # -- Build enriched response --
+    categories = []
+    for name, row in cat_agg.iterrows():
+        cat_name = str(name)
+        cat_total = round(_sanitize(float(row['total'])), 2)
+        cat_count = int(row['count'])
+        cat_avg = round(_sanitize(cat_total / cat_count), 2) if cat_count > 0 else 0
+        cat_percent = round(cat_total / grand_total * 100, 1) if grand_total > 0 else 0
+        cat_months_active = months_active.get(cat_name, 1)
+        cat_monthly_avg = round(_sanitize(cat_total / cat_months_active), 2) if cat_months_active > 0 else 0
+
+        # Month-over-month trend
+        lm_val = last_month_totals.get(cat_name, 0)
+        pm_val = prev_month_totals.get(cat_name, 0)
+        if pm_val > 0:
+            month_change = round((lm_val - pm_val) / pm_val * 100, 1)
+        elif lm_val > 0:
+            month_change = 100.0  # new category this month
+        else:
+            month_change = 0.0
+
+        # Top merchant
+        merchant_name = None
+        merchant_total_val = 0
+        if cat_name in top_merchants.index:
+            merchant_name = str(top_merchants.loc[cat_name, 'תיאור'])
+            merchant_total_val = round(_sanitize(float(top_merchants.loc[cat_name, 'merchant_total'])), 2)
+
+        # Monthly sparkline (last 6 months)
+        cat_monthly_data = cat_month[cat_month['קטגוריה'] == cat_name].set_index('חודש')
+        sparkline = [
+            round(_sanitize(float(cat_monthly_data.loc[m, 'month_total'])), 2) if m in cat_monthly_data.index else 0
+            for m in all_months[-6:]
+        ]
+
+        categories.append({
+            "name": cat_name,
+            "total": cat_total,
+            "count": cat_count,
+            "percent": cat_percent,
+            "avg_transaction": cat_avg,
+            "monthly_avg": cat_monthly_avg,
+            "months_active": cat_months_active,
+            "month_change": month_change,
+            "top_merchant": merchant_name,
+            "top_merchant_total": merchant_total_val,
+            "sparkline": sparkline,
+        })
+
+    return {
+        "categories": categories,
+        "total": total,
+        "total_count": total_count,
+        "month_count": month_count,
+        "last_month": last_month,
+        "prev_month": prev_month,
+    }
 
 
 @router.get("/charts/v2/category-transactions")
