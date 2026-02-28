@@ -233,18 +233,28 @@ export interface SavingsGoal {
   created_at: string
 }
 
-// Category snapshot: all categories with count + total
+// Category snapshot: enriched analytical data per category
 export interface CategorySnapshotItem {
   name: string
   total: number
   count: number
   percent: number
+  avg_transaction: number
+  monthly_avg: number
+  months_active: number
+  month_change: number
+  top_merchant: string | null
+  top_merchant_total: number
+  sparkline: number[]
 }
 
 export interface CategorySnapshotData {
   categories: CategorySnapshotItem[]
   total: number
   total_count: number
+  month_count: number
+  last_month: string | null
+  prev_month: string | null
 }
 
 // Month overview: income vs expenses by category for a specific month
