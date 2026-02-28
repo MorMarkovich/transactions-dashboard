@@ -597,12 +597,12 @@ async def get_category_snapshot(
 @router.get("/charts/v2/category-transactions")
 async def get_category_transactions(
     sessionId: str = Query(...),
-    month: str = Query(...),
+    month: str = Query(""),
     category: str = Query(...),
     date_type: str = Query("transaction"),
     sort_order: str = Query("asc"),
 ):
-    """Return all transactions for a given month + category, sorted by amount."""
+    """Return all transactions for a given category, optionally filtered by month."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -610,10 +610,15 @@ async def get_category_transactions(
     if df.empty:
         return {"transactions": [], "total": 0, "count": 0}
 
-    # Filter by month
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
-    df['_month'] = df[date_col].dt.strftime('%m/%Y')
-    filtered = df[(df['_month'] == month) & (df['קטגוריה'] == category) & (df['סכום'] < 0)]
+    # Filter by category + expenses
+    filtered = df[(df['קטגוריה'] == category) & (df['סכום'] < 0)]
+
+    # Optionally filter by month
+    if month:
+        date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+        filtered = filtered.copy()
+        filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
+        filtered = filtered[filtered['_month'] == month]
 
     if filtered.empty:
         return {"transactions": [], "total": 0, "count": 0}
