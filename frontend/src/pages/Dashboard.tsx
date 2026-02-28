@@ -20,7 +20,6 @@ import {
   Tag,
   Activity,
   Clock,
-  Lightbulb,
 } from 'lucide-react'
 import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
