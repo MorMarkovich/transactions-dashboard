@@ -222,21 +222,31 @@ async def get_transactions(
     else:
         df = df.sort_values(by='תאריך', ascending=False)
     
-    # Pagination
+    # Aggregate stats (computed on the full filtered dataset, before pagination)
     total = len(df)
+    total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
+    expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
+    income_count = total - expense_count
+    avg_transaction = round(_sanitize(total_amount / total), 2) if total > 0 else 0
+
+    # Pagination
     start = (page - 1) * page_size
     end = start + page_size
     df_page = df.iloc[start:end]
-    
+
     # Convert to dict with full JSON safety (NaT, Timestamp, numpy scalars, NaN/Inf)
     transactions = [
         {k: _to_json_safe(v) for k, v in record.items()}
         for record in df_page.to_dict('records')
     ]
-    
+
     return {
         "transactions": transactions,
         "total": total,
+        "total_amount": total_amount,
+        "avg_transaction": avg_transaction,
+        "expense_count": expense_count,
+        "income_count": income_count,
         "page": page,
         "page_size": page_size
     }

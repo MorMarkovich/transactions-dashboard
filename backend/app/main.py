@@ -59,6 +59,8 @@ _base = os.path.dirname(__file__)
 STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "static"))
 if not os.path.isdir(STATIC_DIR):
     STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "..", "static"))
+if not os.path.isdir(STATIC_DIR):
+    STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "..", "frontend", "dist"))
 
 if os.path.isdir(STATIC_DIR):
     logger.info("Serving SPA from STATIC_DIR=%s", STATIC_DIR)
