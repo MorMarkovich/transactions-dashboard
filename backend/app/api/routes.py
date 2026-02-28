@@ -452,6 +452,7 @@ async def get_category_snapshot(
     sessionId: str = Query(...),
     month_from: str = Query(default=None),
     month_to: str = Query(default=None),
+    date_type: str = Query(default="transaction"),
 ):
     """Return ALL categories with enriched analytical data. Optional month range filter (MM/YYYY)."""
     if sessionId not in sessions:
@@ -460,6 +461,11 @@ async def get_category_snapshot(
     df = sessions[sessionId]
     expenses = df[df['סכום'] < 0].copy()
 
+    # Determine which month column to use based on date_type
+    month_col = 'חודש'
+    if date_type == 'billing' and 'חודש_חיוב' in expenses.columns:
+        month_col = 'חודש_חיוב'
+
     # Optional month range filtering
     if (month_from or month_to) and not expenses.empty:
         def _month_key(m: str) -> tuple:
@@ -467,10 +473,10 @@ async def get_category_snapshot(
             return (int(parts[1]), int(parts[0]))
         if month_from:
             from_key = _month_key(month_from)
-            expenses = expenses[expenses['חודש'].apply(lambda m: _month_key(m) >= from_key)]
+            expenses = expenses[expenses[month_col].apply(lambda m: _month_key(m) >= from_key)]
         if month_to:
             to_key = _month_key(month_to)
-            expenses = expenses[expenses['חודש'].apply(lambda m: _month_key(m) <= to_key)]
+            expenses = expenses[expenses[month_col].apply(lambda m: _month_key(m) <= to_key)]
 
     if expenses.empty:
         return {"categories": [], "total": 0, "total_count": 0, "month_count": 0}
@@ -493,14 +499,14 @@ async def get_category_snapshot(
     # -- Per-category monthly breakdown for trends --
     # Sort months chronologically (MM/YYYY string sort is wrong: 01/2026 < 09/2025)
     all_months = sorted(
-        expenses['חודש'].unique(),
+        expenses[month_col].unique(),
         key=lambda m: (int(m.split('/')[1]), int(m.split('/')[0])),
     )
     month_count = len(all_months)
 
     cat_month = (
         expenses
-        .groupby(['קטגוריה', 'חודש'])
+        .groupby(['קטגוריה', month_col])
         .agg(month_total=('סכום_מוחלט', 'sum'))
         .reset_index()
     )
@@ -526,14 +532,14 @@ async def get_category_snapshot(
     last_month_totals = {}
     prev_month_totals = {}
     if last_month:
-        lm = cat_month[cat_month['חודש'] == last_month].set_index('קטגוריה')
+        lm = cat_month[cat_month[month_col] == last_month].set_index('קטגוריה')
         last_month_totals = lm['month_total'].to_dict()
     if prev_month:
-        pm = cat_month[cat_month['חודש'] == prev_month].set_index('קטגוריה')
+        pm = cat_month[cat_month[month_col] == prev_month].set_index('קטגוריה')
         prev_month_totals = pm['month_total'].to_dict()
 
     # -- Months active per category --
-    months_active = cat_month.groupby('קטגוריה')['חודש'].nunique().to_dict()
+    months_active = cat_month.groupby('קטגוריה')[month_col].nunique().to_dict()
 
     # -- Build enriched response --
     categories = []
@@ -564,7 +570,7 @@ async def get_category_snapshot(
             merchant_total_val = round(_sanitize(float(top_merchants.loc[cat_name, 'merchant_total'])), 2)
 
         # Monthly sparkline (last 6 months)
-        cat_monthly_data = cat_month[cat_month['קטגוריה'] == cat_name].set_index('חודש')
+        cat_monthly_data = cat_month[cat_month['קטגוריה'] == cat_name].set_index(month_col)
         sparkline = [
             round(_sanitize(float(cat_monthly_data.loc[m, 'month_total'])), 2) if m in cat_monthly_data.index else 0
             for m in all_months[-6:]
