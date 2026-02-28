@@ -74,7 +74,7 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
           position: 'fixed',
           bottom: '24px',
           left: '24px',
-          zIndex: 35,
+          zIndex: 50,
           display: 'flex',
           flexDirection: 'column-reverse',
           alignItems: 'center',
@@ -91,8 +91,8 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
         aria-label={isOpen ? 'סגור פעולות' : 'פעולות מהירות'}
         title={isOpen ? 'סגור פעולות' : 'פעולות מהירות'}
         style={{
-          width: 52,
-          height: 52,
+          width: 44,
+          height: 44,
           borderRadius: '50%',
           border: 'none',
           background: 'linear-gradient(135deg, #818cf8, #a78bfa)',
@@ -102,7 +102,8 @@ export default function QuickActions({ onUploadClick, onExportClick }: QuickActi
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: '0 4px 16px rgba(129, 140, 248, 0.4)',
-          transition: 'box-shadow 200ms ease',
+          transition: 'box-shadow 200ms ease, opacity 200ms ease',
+          opacity: 0.85,
         }}
       >
         {isOpen ? <X size={22} /> : <Plus size={22} />}
