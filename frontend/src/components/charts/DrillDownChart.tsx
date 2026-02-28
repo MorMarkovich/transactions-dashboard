@@ -315,8 +315,10 @@ const DrillDownChart: React.FC<DrillDownChartProps> = React.memo(function DrillD
               data={bars}
               margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 48 : 8 }}
               onClick={(state) => {
-                if (!state?.activePayload?.length) return
-                const clicked = state.activePayload[0].payload as CategoryBar
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const payload = (state as any)?.activePayload as { payload: CategoryBar }[] | undefined
+                if (!payload?.length) return
+                const clicked = payload[0].payload
                 if (level === 'categories') {
                   handleCategoryClick(clicked.fullName)
                 } else if (level === 'merchants') {
