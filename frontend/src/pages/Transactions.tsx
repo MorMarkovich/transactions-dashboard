@@ -79,6 +79,10 @@ export default function Transactions() {
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [total, setTotal] = useState(0)
+  const [serverTotalAmount, setServerTotalAmount] = useState(0)
+  const [serverAvg, setServerAvg] = useState(0)
+  const [expenseCount, setExpenseCount] = useState(0)
+  const [incomeCount, setIncomeCount] = useState(0)
   const [categories, setCategories] = useState<string[]>([])
 
   // Filter / pagination state
@@ -146,6 +150,10 @@ export default function Transactions() {
         )
         setTransactions(response.transactions)
         setTotal(response.total)
+        setServerTotalAmount(response.total_amount ?? 0)
+        setServerAvg(response.avg_transaction ?? 0)
+        setExpenseCount(response.expense_count ?? 0)
+        setIncomeCount(response.income_count ?? 0)
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error loading transactions:', err)
@@ -160,12 +168,13 @@ export default function Transactions() {
   }, [sessionId, filters, page, pageSize])
 
   // ---- Computed stats -------------------------------------------------------
-  const stats = useMemo(() => {
-    const totalAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx['סכום'] ?? 0), 0)
-    const count = total
-    const avg = count > 0 ? totalAmount / Math.min(count, transactions.length) : 0
-    return { count, totalAmount, avg }
-  }, [transactions, total])
+  const stats = useMemo(() => ({
+    count: total,
+    totalAmount: serverTotalAmount,
+    avg: serverAvg,
+    expenseCount,
+    incomeCount,
+  }), [total, serverTotalAmount, serverAvg, expenseCount, incomeCount])
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -244,7 +253,7 @@ export default function Transactions() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{stats.count.toLocaleString('he-IL')}</div>
-            <div className="stat-label">סה"כ עסקאות</div>
+            <div className="stat-label">סה"כ עסקאות{stats.expenseCount > 0 && stats.incomeCount > 0 ? ` (${stats.expenseCount} הוצאות · ${stats.incomeCount} הכנסות)` : ''}</div>
           </div>
         </div>
         <div className="stat-card-compact glass-card">

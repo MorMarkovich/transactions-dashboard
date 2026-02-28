@@ -11,6 +11,7 @@ import {
   Wallet,
   Target,
   Database,
+  PiggyBank,
   Sun,
   Moon,
 } from 'lucide-react'
@@ -51,6 +52,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
       { id: 'merchants', label: 'בתי עסק', icon: <Store size={18} />, action: () => navigate(`/merchants${sessionQuery}`), keywords: ['merchants', 'בתי עסק', 'חנויות'], group: 'ניווט' },
       { id: 'budget', label: 'תקציב', icon: <Target size={18} />, action: () => navigate(`/budget${sessionQuery}`), keywords: ['budget', 'תקציב', 'יעד', 'מגבלה'], group: 'ניווט' },
       { id: 'income', label: 'הכנסות', icon: <Wallet size={18} />, action: () => navigate(`/income${sessionQuery}`), keywords: ['income', 'הכנסות'], group: 'ניווט' },
+      { id: 'savings', label: 'יעדי חיסכון', icon: <PiggyBank size={18} />, action: () => navigate(`/savings${sessionQuery}`), keywords: ['savings', 'חיסכון', 'יעדים', 'חסכון'], group: 'ניווט' },
       { id: 'data', label: 'ניהול נתונים', icon: <Database size={18} />, action: () => navigate(`/data-management${sessionQuery}`), keywords: ['data', 'נתונים', 'ניהול', 'management'], group: 'ניווט' },
       { id: 'theme', label: theme === 'dark' ? 'מצב בהיר' : 'מצב כהה', icon: theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />, action: () => { toggleTheme(); onClose() }, keywords: ['theme', 'dark', 'light', 'כהה', 'בהיר', 'מצב'], group: 'פעולות' },
     ],

@@ -417,7 +417,16 @@ export default function Dashboard() {
       />
 
       {/* ── Financial Health Banner ──────────────────────────────────── */}
-      {metrics && (
+      {metrics && (() => {
+        // Use month-specific data when a month is selected, otherwise global metrics
+        const hasMonthData = selectedMonth && monthOverview
+        const displayExpenses = hasMonthData ? monthOverview.total_expenses : Math.abs(metrics.total_expenses)
+        const displayIncome = hasMonthData ? monthOverview.total_income : metrics.total_income
+        const displayBalance = displayIncome - displayExpenses
+        const displaySavingsRate = displayIncome > 0 ? (displayBalance / displayIncome * 100) : 0
+        const periodLabel = hasMonthData ? selectedMonth : 'כל התקופה'
+
+        return (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -440,40 +449,39 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Activity size={18} style={{ color: 'var(--accent)' }} />
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>בריאות פיננסית</span>
+            <span style={{ fontSize: '0.625rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 500 }}>
+              {periodLabel}
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הוצאות</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {formatCurrency(Math.abs(metrics.total_expenses))}
+                {formatCurrency(displayExpenses)}
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הכנסות</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {formatCurrency(metrics.total_income)}
+                {formatCurrency(displayIncome)}
               </div>
             </div>
-            {metrics.total_income > 0 && (() => {
-              const balance = metrics.total_income - Math.abs(metrics.total_expenses)
-              const savingsRate = ((metrics.total_income - Math.abs(metrics.total_expenses)) / metrics.total_income * 100)
-              return (
-                <>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: balance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                      {balance >= 0 ? '+' : ''}{formatCurrency(balance)}
-                    </div>
+            {displayIncome > 0 && (
+              <>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: displayBalance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+                    {displayBalance >= 0 ? '+' : ''}{formatCurrency(displayBalance)}
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: savingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                      {savingsRate.toFixed(1)}%
-                    </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {displaySavingsRate.toFixed(1)}%
                   </div>
-                </>
-              )
-            })()}
+                </div>
+              </>
+            )}
           </div>
           {/* Last Updated Timestamp */}
           {dataLoadedAt && (
@@ -484,7 +492,8 @@ export default function Dashboard() {
             </div>
           )}
         </motion.div>
-      )}
+        )
+      })()}
 
       {/* ── Date type toggle (billing / transaction) ───────────────── */}
       {hasBillingDate && (

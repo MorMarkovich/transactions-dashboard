@@ -255,7 +255,7 @@ html, body {
 
 .transactions-table th {
     background: var(--bg-elevated);
-    color: var(--accent);
+    color: var(--text-primary);
     padding: 16px 22px;
     text-align: right;
     direction: rtl;
