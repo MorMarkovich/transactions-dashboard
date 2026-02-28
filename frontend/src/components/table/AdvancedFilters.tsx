@@ -146,8 +146,16 @@ export default function AdvancedFilters({
           <select
             value={category}
             onChange={(e) => {
-              setCategory(e.target.value)
-              setTimeout(handleApply, 0)
+              const newCat = e.target.value
+              setCategory(newCat)
+              onFilterChange({
+                search: search || undefined,
+                category: newCat || undefined,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                minAmount: minAmount ? Number(minAmount) : undefined,
+                maxAmount: maxAmount ? Number(maxAmount) : undefined,
+              })
             }}
             style={{
               width: '100%',
