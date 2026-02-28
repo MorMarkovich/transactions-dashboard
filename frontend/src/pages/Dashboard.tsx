@@ -16,7 +16,10 @@ import {
   CreditCard,
   ArrowUpDown,
   Layers,
+  Grid3X3,
+  Tag,
 } from 'lucide-react'
+import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
@@ -47,6 +50,7 @@ import type {
   RecurringTransaction,
   MonthOverviewData,
   IndustryMonthlyData,
+  CategorySnapshotData,
 } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -83,6 +87,7 @@ export default function Dashboard() {
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
   const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
+  const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshotData | null>(null)
 
   // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
@@ -119,6 +124,7 @@ export default function Dashboard() {
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
           transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
+          transactionsApi.getCategorySnapshot(sessionId, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -131,6 +137,7 @@ export default function Dashboard() {
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
         if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
+        if (results[10]) setCategorySnapshot(results[10] as CategorySnapshotData)
 
         // Auto-select most recent month
         const monthly = results[2] as RawMonthlyData
@@ -347,8 +354,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
-
       {/* ── Month selector + overview ──────────────────────────────── */}
       {availableMonths.length > 0 && (
         <motion.div
@@ -541,6 +546,78 @@ export default function Dashboard() {
           )}
         </motion.div>
       )}
+
+      {/* ── Full Category Snapshot ─────────────────────────────────── */}
+      {categorySnapshot && categorySnapshot.categories.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
+        >
+          <div className="section-header-v2">
+            <Grid3X3 size={18} />
+            <span>סיכום הוצאות לפי קטגוריה</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+              ({categorySnapshot.categories.length} קטגוריות · {categorySnapshot.total_count} עסקאות)
+            </span>
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: 'var(--space-sm)',
+          }}>
+            {categorySnapshot.categories.map((cat) => (
+              <Card key={cat.name} variant="glass" padding="sm">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-elevated)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.1rem',
+                    flexShrink: 0,
+                  }}>
+                    {get_icon(cat.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cat.name}
+                      </span>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', flexShrink: 0 }}>
+                        {formatCurrency(cat.total)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Tag size={11} style={{ color: 'var(--text-muted)' }} />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {cat.count} עסקאות
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)' }}>
+                        {cat.percent.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ height: '3px', borderRadius: '2px', background: 'var(--bg-elevated)', marginTop: '6px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(cat.percent, 100)}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Metrics Grid (totals) ─────────────────────────────────── */}
+      <div style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
+        <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
+      </div>
 
       {/* ── Industry monthly comparison ────────────────────────────── */}
       {industryMonthly && industryMonthly.months.length >= 2 && (

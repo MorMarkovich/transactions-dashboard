@@ -233,6 +233,20 @@ export interface SavingsGoal {
   created_at: string
 }
 
+// Category snapshot: all categories with count + total
+export interface CategorySnapshotItem {
+  name: string
+  total: number
+  count: number
+  percent: number
+}
+
+export interface CategorySnapshotData {
+  categories: CategorySnapshotItem[]
+  total: number
+  total_count: number
+}
+
 // Month overview: income vs expenses by category for a specific month
 export interface MonthOverviewCategory {
   name: string
