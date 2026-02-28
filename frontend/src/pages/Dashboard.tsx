@@ -102,6 +102,8 @@ export default function Dashboard() {
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
+  const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
+  const [snapshotExpanded, setSnapshotExpanded] = useState(false)
 
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -290,6 +292,18 @@ export default function Dashboard() {
   }, [industryMonthly, selectedComparisonMonths])
 
   const hasBillingDate = metrics?.has_billing_date ?? false
+
+  // ── Sorted snapshot categories ──────────────────────────────────────
+  const sortedSnapshotCategories = useMemo(() => {
+    if (!categorySnapshot?.categories) return []
+    const cats = [...categorySnapshot.categories]
+    switch (snapshotSort) {
+      case 'change': return cats.sort((a, b) => Math.abs(b.month_change) - Math.abs(a.month_change))
+      case 'count': return cats.sort((a, b) => b.count - a.count)
+      case 'avg': return cats.sort((a, b) => b.avg_transaction - a.avg_transaction)
+      default: return cats.sort((a, b) => b.total - a.total)
+    }
+  }, [categorySnapshot, snapshotSort])
 
   // ── Month selector navigation ──────────────────────────────────────
   const selectedMonthIdx = useMemo(() => {
@@ -670,7 +684,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Full Category Snapshot ─────────────────────────────────── */}
+      {/* ── Full Category Snapshot (Upgraded) ─────────────────────── */}
       {categorySnapshot && categorySnapshot.categories.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -678,70 +692,187 @@ export default function Dashboard() {
           transition={{ delay: 0.12, duration: 0.35 }}
           style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
-          <div className="section-header-v2">
+          {/* Header with stats and sort controls */}
+          <div className="section-header-v2" style={{ flexWrap: 'wrap' }}>
             <Grid3X3 size={18} />
             <span>סיכום הוצאות לפי קטגוריה</span>
             <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              📅 כל התקופה
+              📅 כל התקופה · {categorySnapshot.month_count} חודשים
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
               ({categorySnapshot.categories.length} קטגוריות · {categorySnapshot.total_count === 1 ? 'עסקה אחת' : `${categorySnapshot.total_count} עסקאות`})
             </span>
+          </div>
+
+          {/* Sort controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 'var(--space-sm)', flexWrap: 'wrap' }}>
+            <ArrowUpDown size={13} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 500 }}>מיין לפי:</span>
+            {([
+              { key: 'amount' as const, label: 'סכום' },
+              { key: 'change' as const, label: 'שינוי' },
+              { key: 'count' as const, label: 'כמות' },
+              { key: 'avg' as const, label: 'ממוצע' },
+            ]).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setSnapshotSort(opt.key)}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 'var(--radius-full)',
+                  border: '1px solid',
+                  borderColor: snapshotSort === opt.key ? 'var(--accent)' : 'var(--border)',
+                  background: snapshotSort === opt.key ? 'var(--accent-muted)' : 'transparent',
+                  color: snapshotSort === opt.key ? 'var(--accent)' : 'var(--text-muted)',
+                  fontSize: '0.6875rem',
+                  fontWeight: snapshotSort === opt.key ? 600 : 400,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-family)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
             {selectedMonth && (
-              <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
+              <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic', marginRight: 'auto' }}>
                 לחצו לפירוט עסקאות
               </span>
             )}
           </div>
+
+          {/* Category cards grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
             gap: 'var(--space-sm)',
           }}>
-            {categorySnapshot.categories.map((cat) => (
-              <Card key={cat.name} variant="glass" padding="sm" hover onClick={() => handleCategoryCardClick(cat.name)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-elevated)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.1rem',
-                    flexShrink: 0,
-                  }}>
-                    {get_icon(cat.name)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {cat.name}
-                      </span>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', flexShrink: 0 }}>
-                        {formatCurrency(cat.total)}
-                      </span>
+            {(snapshotExpanded ? sortedSnapshotCategories : sortedSnapshotCategories.slice(0, 8)).map((cat) => {
+              const hasMonth = !!selectedMonth
+              const changeColor = cat.month_change > 5 ? 'var(--danger)' : cat.month_change < -5 ? 'var(--success)' : 'var(--text-muted)'
+              const changeBg = cat.month_change > 5 ? 'var(--danger-muted)' : cat.month_change < -5 ? 'var(--success-muted)' : 'rgba(148, 163, 184, 0.1)'
+              return (
+                <div key={cat.name} style={{ cursor: hasMonth ? 'pointer' : 'default' }}>
+                <Card
+                  variant="glass"
+                  padding="sm"
+                  hover={hasMonth}
+                  onClick={hasMonth ? () => handleCategoryCardClick(cat.name) : undefined}
+                >
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {/* Icon */}
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-elevated)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.2rem',
+                      flexShrink: 0,
+                    }}>
+                      {get_icon(cat.name)}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Tag size={11} style={{ color: 'var(--text-muted)' }} />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {cat.count === 1 ? 'עסקה אחת' : `${cat.count} עסקאות`}
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Row 1: Name + Total */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {cat.name}
+                        </span>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', flexShrink: 0 }}>
+                          {formatCurrency(cat.total)}
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)' }}>
-                        {cat.percent.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div style={{ height: '3px', borderRadius: '2px', background: 'var(--bg-elevated)', marginTop: '6px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(cat.percent, 100)}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+
+                      {/* Row 2: Stats chips */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
+                        {/* Transaction count */}
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Tag size={10} />
+                          {cat.count === 1 ? 'עסקה אחת' : `${cat.count} עסקאות`}
+                        </span>
+                        {/* Percentage */}
+                        <span style={{ fontSize: '0.625rem', color: 'var(--accent)', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)' }}>
+                          {cat.percent.toFixed(1)}%
+                        </span>
+                        {/* Month-over-month change */}
+                        {cat.month_change !== 0 && (
+                          <span style={{
+                            fontSize: '0.625rem', fontWeight: 600,
+                            padding: '1px 6px', borderRadius: 'var(--radius-full)',
+                            background: changeBg, color: changeColor,
+                            display: 'inline-flex', alignItems: 'center', gap: '2px',
+                          }}>
+                            {cat.month_change > 0 ? '↑' : '↓'}{Math.abs(cat.month_change).toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row 3: Analytical details */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          ממוצע: <strong style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(cat.avg_transaction)}</strong>
+                        </span>
+                        <span style={{ color: 'var(--border)' }}>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          חודשי: <strong style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(cat.monthly_avg)}</strong>
+                        </span>
+                      </div>
+
+                      {/* Row 4: Top merchant */}
+                      {cat.top_merchant && (
+                        <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          🏪 {cat.top_merchant} ({formatCurrency(cat.top_merchant_total)})
+                        </div>
+                      )}
+
+                      {/* Row 5: Progress bar + mini sparkline */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                        <div style={{ flex: 1, height: '3px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(cat.percent, 100)}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                        </div>
+                        {cat.sparkline && cat.sparkline.length > 1 && (
+                          <div style={{ flexShrink: 0, opacity: 0.7 }}>
+                            <SparklineChart data={cat.sparkline} color="var(--accent)" width={60} height={16} strokeWidth={1.5} />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </Card>
                 </div>
-              </Card>
-            ))}
+              )
+            })}
           </div>
+
+          {/* Show more / less toggle */}
+          {sortedSnapshotCategories.length > 8 && (
+            <div style={{ textAlign: 'center', marginTop: 'var(--space-sm)' }}>
+              <button
+                onClick={() => setSnapshotExpanded(!snapshotExpanded)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-full)',
+                  padding: '6px 20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: 'var(--accent)',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-family)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {snapshotExpanded
+                  ? 'הצג פחות'
+                  : `הצג עוד ${sortedSnapshotCategories.length - 8} קטגוריות`
+                }
+              </button>
+            </div>
+          )}
         </motion.div>
       )}
 
