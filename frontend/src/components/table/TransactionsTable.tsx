@@ -42,7 +42,11 @@ const TableRow = memo(function TableRow({
     >
       <td className="col-date">{formatDate(tx.תאריך)}</td>
       {showBillingDate && (
-        <td className="col-date">{tx.תאריך_חיוב ? formatDate(tx.תאריך_חיוב) : '—'}</td>
+        <td className="col-date">
+          {tx.תאריך_חיוב
+            ? formatDate(tx.תאריך_חיוב)
+            : <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>לא זמין</span>}
+        </td>
       )}
       <td>{tx.תיאור}</td>
       <td className="col-category">

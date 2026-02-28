@@ -240,7 +240,6 @@ export default function AdvancedFilters({
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
                   טווח תאריכים
-                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginRight: '6px' }}>(dd/mm/yyyy)</span>
                 </label>
                 <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                   <input
