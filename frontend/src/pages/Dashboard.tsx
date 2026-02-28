@@ -20,6 +20,9 @@ import {
   Tag,
   Activity,
   Clock,
+  Search,
+  X,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
@@ -104,6 +107,12 @@ export default function Dashboard() {
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
   const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
   const [snapshotExpanded, setSnapshotExpanded] = useState(false)
+  const [snapshotSearch, setSnapshotSearch] = useState('')
+  const [snapshotExcluded, setSnapshotExcluded] = useState<Set<string>>(new Set())
+  const [snapshotMinAmount, setSnapshotMinAmount] = useState('')
+  const [snapshotMonthFrom, setSnapshotMonthFrom] = useState('')
+  const [snapshotMonthTo, setSnapshotMonthTo] = useState('')
+  const [snapshotShowFilters, setSnapshotShowFilters] = useState(false)
 
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -293,17 +302,42 @@ export default function Dashboard() {
 
   const hasBillingDate = metrics?.has_billing_date ?? false
 
-  // ── Sorted snapshot categories ──────────────────────────────────────
+  // ── Refetch category snapshot when month range changes ───────────────
+  useEffect(() => {
+    if (!sessionId) return
+    if (!snapshotMonthFrom && !snapshotMonthTo) return // initial load already covered
+    const controller = new AbortController()
+    transactionsApi.getCategorySnapshot(sessionId, controller.signal, snapshotMonthFrom || undefined, snapshotMonthTo || undefined)
+      .then((data) => setCategorySnapshot(data))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo])
+
+  // ── Filtered + sorted snapshot categories ─────────────────────────────
   const sortedSnapshotCategories = useMemo(() => {
     if (!categorySnapshot?.categories) return []
-    const cats = [...categorySnapshot.categories]
+    const minAmt = snapshotMinAmount ? parseFloat(snapshotMinAmount) : 0
+    const searchLower = snapshotSearch.toLowerCase().trim()
+    const cats = categorySnapshot.categories.filter((c) => {
+      if (snapshotExcluded.has(c.name)) return false
+      if (searchLower && !c.name.toLowerCase().includes(searchLower) &&
+          !(c.top_merchant && c.top_merchant.toLowerCase().includes(searchLower))) return false
+      if (minAmt > 0 && c.total < minAmt) return false
+      return true
+    })
     switch (snapshotSort) {
       case 'change': return cats.sort((a, b) => Math.abs(b.month_change) - Math.abs(a.month_change))
       case 'count': return cats.sort((a, b) => b.count - a.count)
       case 'avg': return cats.sort((a, b) => b.avg_transaction - a.avg_transaction)
       default: return cats.sort((a, b) => b.total - a.total)
     }
-  }, [categorySnapshot, snapshotSort])
+  }, [categorySnapshot, snapshotSort, snapshotSearch, snapshotExcluded, snapshotMinAmount])
+
+  // Filtered totals for display
+  const snapshotFilteredTotal = useMemo(() =>
+    sortedSnapshotCategories.reduce((s, c) => s + c.total, 0),
+    [sortedSnapshotCategories],
+  )
 
   // ── Month selector navigation ──────────────────────────────────────
   const selectedMonthIdx = useMemo(() => {
@@ -739,7 +773,158 @@ export default function Dashboard() {
                 לחצו לפירוט עסקאות
               </span>
             )}
+
+            {/* Filter toggle button */}
+            <button
+              onClick={() => setSnapshotShowFilters(!snapshotShowFilters)}
+              style={{
+                padding: '3px 10px',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid',
+                borderColor: snapshotShowFilters ? 'var(--accent)' : 'var(--border)',
+                background: snapshotShowFilters ? 'var(--accent-muted)' : 'transparent',
+                color: snapshotShowFilters ? 'var(--accent)' : 'var(--text-muted)',
+                fontSize: '0.6875rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-family)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all 0.15s',
+              }}
+            >
+              <SlidersHorizontal size={11} />
+              סינון
+              {(snapshotSearch || snapshotExcluded.size > 0 || snapshotMinAmount || snapshotMonthFrom || snapshotMonthTo) && (
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              )}
+            </button>
           </div>
+
+          {/* Advanced filter controls */}
+          {snapshotShowFilters && (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px',
+              marginBottom: 'var(--space-sm)', padding: '10px 12px',
+              borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+            }}>
+              {/* Search */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '1 1 180px', minWidth: '140px', maxWidth: '240px' }}>
+                <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder="חיפוש קטגוריה או בית עסק..."
+                  value={snapshotSearch}
+                  onChange={(e) => setSnapshotSearch(e.target.value)}
+                  style={{
+                    width: '100%', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                    padding: '4px 8px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)',
+                    background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Min amount */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 1 150px' }}>
+                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>מינימום ₪</span>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={snapshotMinAmount}
+                  onChange={(e) => setSnapshotMinAmount(e.target.value)}
+                  style={{
+                    width: '70px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                    padding: '4px 8px', fontSize: '0.6875rem', fontFamily: 'var(--font-mono)',
+                    background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                    outline: 'none', direction: 'ltr',
+                  }}
+                />
+              </div>
+
+              {/* Month range */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: '0 1 auto' }}>
+                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>מחודש:</span>
+                <select
+                  value={snapshotMonthFrom}
+                  onChange={(e) => setSnapshotMonthFrom(e.target.value)}
+                  style={{
+                    border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                    padding: '4px 6px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)',
+                    background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer',
+                  }}
+                >
+                  <option value="">הכל</option>
+                  {availableMonths.map((m) => (
+                    <option key={m.month} value={m.month}>{m.month}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>עד:</span>
+                <select
+                  value={snapshotMonthTo}
+                  onChange={(e) => setSnapshotMonthTo(e.target.value)}
+                  style={{
+                    border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+                    padding: '4px 6px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)',
+                    background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer',
+                  }}
+                >
+                  <option value="">הכל</option>
+                  {availableMonths.map((m) => (
+                    <option key={m.month} value={m.month}>{m.month}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Clear all filters */}
+              {(snapshotSearch || snapshotExcluded.size > 0 || snapshotMinAmount || snapshotMonthFrom || snapshotMonthTo) && (
+                <button
+                  onClick={() => { setSnapshotSearch(''); setSnapshotExcluded(new Set()); setSnapshotMinAmount(''); setSnapshotMonthFrom(''); setSnapshotMonthTo('') }}
+                  style={{
+                    padding: '4px 10px', borderRadius: 'var(--radius-full)',
+                    border: '1px solid var(--danger)', background: 'transparent',
+                    color: 'var(--danger)', fontSize: '0.6875rem', fontWeight: 500,
+                    cursor: 'pointer', fontFamily: 'var(--font-family)',
+                    display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  }}
+                >
+                  <X size={10} />
+                  נקה סינון
+                </button>
+              )}
+
+              {/* Excluded categories chips */}
+              {snapshotExcluded.size > 0 && (
+                <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', alignSelf: 'center' }}>מוחרגות:</span>
+                  {[...snapshotExcluded].map((name) => (
+                    <span
+                      key={name}
+                      onClick={() => { const next = new Set(snapshotExcluded); next.delete(name); setSnapshotExcluded(next) }}
+                      style={{
+                        fontSize: '0.625rem', padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                        background: 'var(--danger-muted)', color: 'var(--danger)',
+                        cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px',
+                      }}
+                    >
+                      {name} <X size={9} />
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Filtered stats summary */}
+          {(snapshotSearch || snapshotExcluded.size > 0 || snapshotMinAmount) && categorySnapshot && (
+            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              מציג {sortedSnapshotCategories.length} מתוך {categorySnapshot.categories.length} קטגוריות
+              {' · '}סה״כ מסונן: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{formatCurrency(snapshotFilteredTotal)}</strong>
+              {' '}({categorySnapshot.total > 0 ? ((snapshotFilteredTotal / categorySnapshot.total) * 100).toFixed(1) : 0}% מהסה״כ)
+            </div>
+          )}
 
           {/* Category cards grid */}
           <div style={{
@@ -759,7 +944,25 @@ export default function Dashboard() {
                   hover={hasMonth}
                   onClick={hasMonth ? () => handleCategoryCardClick(cat.name) : undefined}
                 >
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
+                    {/* Exclude button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSnapshotExcluded(prev => new Set([...prev, cat.name])) }}
+                      title={`הסתר ${cat.name}`}
+                      style={{
+                        position: 'absolute', top: '-2px', left: '-2px',
+                        width: '16px', height: '16px', borderRadius: '50%',
+                        border: '1px solid var(--border)', background: 'var(--bg-elevated)',
+                        color: 'var(--text-muted)', fontSize: '10px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 0, opacity: 0.5, transition: 'opacity 0.15s',
+                        zIndex: 2,
+                      }}
+                      onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = '1'; (e.target as HTMLElement).style.color = 'var(--danger)' }}
+                      onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = '0.5'; (e.target as HTMLElement).style.color = 'var(--text-muted)' }}
+                    >
+                      <X size={9} />
+                    </button>
                     {/* Icon */}
                     <div style={{
                       width: '40px',
