@@ -28,7 +28,9 @@ import BarChart from '../components/charts/BarChart'
 import WeekdayChart from '../components/charts/WeekdayChart'
 import CategoryList from '../components/category/CategoryList'
 import MonthOverviewChart from '../components/charts/MonthOverviewChart'
+import DrillDownChart from '../components/charts/DrillDownChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
+import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
@@ -51,6 +53,7 @@ import type {
   MonthOverviewData,
   IndustryMonthlyData,
   CategorySnapshotData,
+  Transaction,
 } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -97,6 +100,30 @@ export default function Dashboard() {
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
+
+  // ── Category drill-down drawer state ────────────────────────────────
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerCategory, setDrawerCategory] = useState('')
+  const [drawerTransactions, setDrawerTransactions] = useState<Transaction[]>([])
+  const [drawerTotal, setDrawerTotal] = useState(0)
+  const [drawerLoading, setDrawerLoading] = useState(false)
+
+  const handleCategoryCardClick = useCallback(async (categoryName: string) => {
+    if (!sessionId || !selectedMonth) return
+    setDrawerCategory(categoryName)
+    setDrawerOpen(true)
+    setDrawerLoading(true)
+    try {
+      const data = await transactionsApi.getCategoryTransactions(sessionId, selectedMonth, categoryName, dateType)
+      setDrawerTransactions(data.transactions)
+      setDrawerTotal(data.total)
+    } catch {
+      setDrawerTransactions([])
+      setDrawerTotal(0)
+    } finally {
+      setDrawerLoading(false)
+    }
+  }, [sessionId, selectedMonth, dateType])
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
@@ -531,16 +558,21 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Grouped bar chart */}
+              {/* Drill-down bar chart: Category → Merchant → Transactions */}
               <Card variant="glass" padding="md">
                 <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <ArrowUpDown size={14} />
-                  הוצאות לעומת הכנסות לפי קטגוריה
+                  פירוט הוצאות — לחצו לצלילה
                 </div>
-                <MonthOverviewChart
-                  categories={monthOverview.categories}
-                  height={280}
-                />
+                {sessionId && selectedMonth && (
+                  <DrillDownChart
+                    categories={monthOverview.categories}
+                    month={selectedMonth}
+                    sessionId={sessionId}
+                    height={280}
+                    dateType={dateType}
+                  />
+                )}
               </Card>
             </div>
           )}
@@ -561,6 +593,11 @@ export default function Dashboard() {
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
               ({categorySnapshot.categories.length} קטגוריות · {categorySnapshot.total_count} עסקאות)
             </span>
+            {selectedMonth && (
+              <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
+                לחצו לפירוט עסקאות
+              </span>
+            )}
           </div>
           <div style={{
             display: 'grid',
@@ -568,7 +605,7 @@ export default function Dashboard() {
             gap: 'var(--space-sm)',
           }}>
             {categorySnapshot.categories.map((cat) => (
-              <Card key={cat.name} variant="glass" padding="sm">
+              <Card key={cat.name} variant="glass" padding="sm" hover onClick={() => handleCategoryCardClick(cat.name)}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{
                     width: '36px',
@@ -911,6 +948,17 @@ export default function Dashboard() {
           .month-overview-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
+
+      {/* ── Category Transactions Drawer ────────────────────────────── */}
+      <CategoryTransactionsDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        category={drawerCategory}
+        month={selectedMonth ?? ''}
+        transactions={drawerTransactions}
+        total={drawerTotal}
+        loading={drawerLoading}
+      />
     </div>
   )
 }

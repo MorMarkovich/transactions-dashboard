@@ -475,6 +475,138 @@ async def get_category_snapshot(sessionId: str = Query(...)):
     return {"categories": categories, "total": total, "total_count": total_count}
 
 
+@router.get("/charts/v2/category-transactions")
+async def get_category_transactions(
+    sessionId: str = Query(...),
+    month: str = Query(...),
+    category: str = Query(...),
+    date_type: str = Query("transaction"),
+    sort_order: str = Query("asc"),
+):
+    """Return all transactions for a given month + category, sorted by amount."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId].copy()
+    if df.empty:
+        return {"transactions": [], "total": 0, "count": 0}
+
+    # Filter by month
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    filtered = df[(df['_month'] == month) & (df['קטגוריה'] == category) & (df['סכום'] < 0)]
+
+    if filtered.empty:
+        return {"transactions": [], "total": 0, "count": 0}
+
+    ascending = sort_order == 'asc'
+    filtered = filtered.sort_values('סכום_מוחלט', ascending=ascending)
+
+    transactions = [
+        {
+            "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
+            "תיאור": str(row['תיאור']),
+            "סכום": _sanitize(round(float(row['סכום']), 2)),
+            "סכום_מוחלט": _sanitize(round(float(row['סכום_מוחלט']), 2)),
+            "קטגוריה": str(row['קטגוריה']),
+        }
+        for _, row in filtered.iterrows()
+    ]
+
+    total = _sanitize(round(float(filtered['סכום_מוחלט'].sum()), 2))
+    return {"transactions": transactions, "total": total, "count": len(transactions)}
+
+
+@router.get("/charts/v2/category-merchants")
+async def get_category_merchants(
+    sessionId: str = Query(...),
+    month: str = Query(...),
+    category: str = Query(...),
+    date_type: str = Query("transaction"),
+):
+    """Return merchant breakdown within a category for a specific month."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId].copy()
+    if df.empty:
+        return {"merchants": [], "total": 0}
+
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    filtered = df[(df['_month'] == month) & (df['קטגוריה'] == category) & (df['סכום'] < 0)]
+
+    if filtered.empty:
+        return {"merchants": [], "total": 0}
+
+    merchant_agg = (
+        filtered
+        .groupby('תיאור')
+        .agg(
+            total=('סכום_מוחלט', 'sum'),
+            count=('סכום_מוחלט', 'size'),
+        )
+        .sort_values('total', ascending=False)
+    )
+
+    merchants = [
+        {
+            "name": str(name),
+            "total": _sanitize(round(float(row['total']), 2)),
+            "count": int(row['count']),
+        }
+        for name, row in merchant_agg.iterrows()
+    ]
+
+    total = _sanitize(round(float(merchant_agg['total'].sum()), 2))
+    return {"merchants": merchants, "total": total}
+
+
+@router.get("/charts/v2/merchant-transactions")
+async def get_merchant_transactions(
+    sessionId: str = Query(...),
+    month: str = Query(...),
+    category: str = Query(...),
+    merchant: str = Query(...),
+    date_type: str = Query("transaction"),
+):
+    """Return individual transactions for a specific merchant within a category/month."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId].copy()
+    if df.empty:
+        return {"transactions": [], "total": 0}
+
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    filtered = df[
+        (df['_month'] == month) &
+        (df['קטגוריה'] == category) &
+        (df['תיאור'] == merchant) &
+        (df['סכום'] < 0)
+    ]
+
+    if filtered.empty:
+        return {"transactions": [], "total": 0}
+
+    filtered = filtered.sort_values('סכום_מוחלט', ascending=True)
+
+    transactions = [
+        {
+            "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
+            "תיאור": str(row['תיאור']),
+            "סכום": _sanitize(round(float(row['סכום']), 2)),
+            "סכום_מוחלט": _sanitize(round(float(row['סכום_מוחלט']), 2)),
+            "קטגוריה": str(row['קטגוריה']),
+        }
+        for _, row in filtered.iterrows()
+    ]
+
+    total = _sanitize(round(float(filtered['סכום_מוחלט'].sum()), 2))
+    return {"transactions": transactions, "total": total}
+
+
 @router.get("/charts/v2/monthly")
 async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
     """Return raw monthly expense totals."""
