@@ -21,8 +21,32 @@ export interface TransactionResponse {
   avg_transaction?: number;
   expense_count?: number;
   income_count?: number;
+  total_expenses?: number;
+  total_income?: number;
+  median_transaction?: number;
+  max_transaction?: { description: string; amount: number } | null;
+  min_transaction?: { description: string; amount: number } | null;
+  category_breakdown?: { name: string; total: number; count: number; percent: number }[];
+  date_from?: string | null;
+  date_to?: string | null;
   page?: number;
   page_size?: number;
+}
+
+export interface SessionInfo {
+  total_rows: number;
+  columns: string[];
+  date_from: string | null;
+  date_to: string | null;
+  billing_date_from: string | null;
+  billing_date_to: string | null;
+  expense_count: number;
+  income_count: number;
+  total_expenses: number;
+  total_income: number;
+  categories: { name: string; count: number; expense_total: number; income_total: number }[];
+  months: string[];
+  has_billing_date: boolean;
 }
 
 export interface MetricsData {

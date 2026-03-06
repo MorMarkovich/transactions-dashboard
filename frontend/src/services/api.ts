@@ -27,6 +27,7 @@ import type {
   CategorySnapshotData,
   CategoryTransactionsData,
   CategoryMerchantsData,
+  SessionInfo,
 } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -110,6 +111,17 @@ export const transactionsApi = {
    */
   getCategories: async (sessionId: string, signal?: AbortSignal): Promise<string[]> => {
     const response = await api.get<string[]>('/api/categories', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Get detailed session metadata (columns, date ranges, categories, etc.)
+   */
+  getSessionInfo: async (sessionId: string, signal?: AbortSignal): Promise<SessionInfo> => {
+    const response = await api.get<SessionInfo>('/api/session-info', {
       params: { sessionId },
       signal,
     });

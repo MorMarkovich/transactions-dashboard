@@ -229,6 +229,47 @@ async def get_transactions(
     income_count = total - expense_count
     avg_transaction = round(_sanitize(total_amount / total), 2) if total > 0 else 0
 
+    # Enhanced stats
+    expenses_df = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()
+    income_df = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
+    total_expenses = round(_sanitize(float(expenses_df['סכום_מוחלט'].sum())), 2) if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns else 0
+    total_income = round(_sanitize(float(income_df['סכום'].sum())), 2) if not income_df.empty else 0
+    median_transaction = round(_sanitize(float(df['סכום_מוחלט'].median())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
+
+    # Max/min transactions
+    max_transaction = None
+    min_transaction = None
+    if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns:
+        max_idx = expenses_df['סכום_מוחלט'].idxmax()
+        min_idx = expenses_df['סכום_מוחלט'].idxmin()
+        max_row = expenses_df.loc[max_idx]
+        min_row = expenses_df.loc[min_idx]
+        max_transaction = {"description": str(max_row.get('תיאור', '')), "amount": round(_sanitize(float(max_row['סכום_מוחלט'])), 2)}
+        min_transaction = {"description": str(min_row.get('תיאור', '')), "amount": round(_sanitize(float(min_row['סכום_מוחלט'])), 2)}
+
+    # Category breakdown (top 10)
+    category_breakdown = []
+    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not expenses_df.empty:
+        cat_group = expenses_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
+        cat_group = cat_group.sort_values('sum', ascending=False).head(10)
+        cat_total = cat_group['sum'].sum()
+        for _, row in cat_group.iterrows():
+            category_breakdown.append({
+                "name": str(row['קטגוריה']),
+                "total": round(_sanitize(float(row['sum'])), 2),
+                "count": int(row['count']),
+                "percent": round(_sanitize(float(row['sum'] / cat_total * 100)), 1) if cat_total > 0 else 0,
+            })
+
+    # Date range
+    date_from = None
+    date_to = None
+    if 'תאריך' in df.columns and total > 0:
+        valid_dates = df['תאריך'].dropna()
+        if len(valid_dates) > 0:
+            date_from = _to_json_safe(valid_dates.min())
+            date_to = _to_json_safe(valid_dates.max())
+
     # Pagination
     start = (page - 1) * page_size
     end = start + page_size
@@ -247,8 +288,91 @@ async def get_transactions(
         "avg_transaction": avg_transaction,
         "expense_count": expense_count,
         "income_count": income_count,
+        "total_expenses": total_expenses,
+        "total_income": total_income,
+        "median_transaction": median_transaction,
+        "max_transaction": max_transaction,
+        "min_transaction": min_transaction,
+        "category_breakdown": category_breakdown,
+        "date_from": date_from,
+        "date_to": date_to,
         "page": page,
         "page_size": page_size
+    }
+
+
+@router.get("/session-info")
+async def get_session_info(sessionId: str = Query(...)):
+    """Get detailed metadata about the current session data."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    total = len(df)
+
+    # Columns available
+    columns = list(df.columns)
+
+    # Date range
+    date_from = None
+    date_to = None
+    if 'תאריך' in df.columns:
+        valid = df['תאריך'].dropna()
+        if len(valid) > 0:
+            date_from = _to_json_safe(valid.min())
+            date_to = _to_json_safe(valid.max())
+
+    # Billing date range
+    billing_date_from = None
+    billing_date_to = None
+    if 'תאריך_חיוב' in df.columns:
+        valid_b = df['תאריך_חיוב'].dropna()
+        if len(valid_b) > 0:
+            billing_date_from = _to_json_safe(valid_b.min())
+            billing_date_to = _to_json_safe(valid_b.max())
+
+    # Expense / income split
+    expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()
+    income = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
+    total_expenses = round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2) if not expenses.empty and 'סכום_מוחלט' in expenses.columns else 0
+    total_income = round(_sanitize(float(income['סכום'].sum())), 2) if not income.empty else 0
+
+    # Categories with counts
+    categories = []
+    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns:
+        cat_group = df.groupby('קטגוריה').agg(
+            count=('סכום', 'size'),
+            expense_total=('סכום_מוחלט', lambda x: round(float(x[df.loc[x.index, 'סכום'] < 0].sum()), 2) if (df.loc[x.index, 'סכום'] < 0).any() else 0),
+            income_total=('סכום', lambda x: round(float(x[x > 0].sum()), 2) if (x > 0).any() else 0),
+        ).reset_index()
+        cat_group = cat_group.sort_values('expense_total', ascending=False)
+        for _, row in cat_group.iterrows():
+            categories.append({
+                "name": str(row['קטגוריה']),
+                "count": int(row['count']),
+                "expense_total": _sanitize(row['expense_total']),
+                "income_total": _sanitize(row['income_total']),
+            })
+
+    # Months in data
+    months = []
+    if 'חודש' in df.columns:
+        months = sorted(df['חודש'].dropna().unique().tolist())
+
+    return {
+        "total_rows": total,
+        "columns": columns,
+        "date_from": date_from,
+        "date_to": date_to,
+        "billing_date_from": billing_date_from,
+        "billing_date_to": billing_date_to,
+        "expense_count": int(len(expenses)),
+        "income_count": int(len(income)),
+        "total_expenses": total_expenses,
+        "total_income": total_income,
+        "categories": categories,
+        "months": months,
+        "has_billing_date": 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any(),
     }
 
 
