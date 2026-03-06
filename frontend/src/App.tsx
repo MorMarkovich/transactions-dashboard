@@ -8,7 +8,15 @@ import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
 const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Transactions = lazy(() => import('./pages/Transactions'))
+const Trends = lazy(() => import('./pages/Trends'))
+const Insights = lazy(() => import('./pages/Insights'))
+const Merchants = lazy(() => import('./pages/Merchants'))
+const Income = lazy(() => import('./pages/Income'))
 const DataManagement = lazy(() => import('./pages/DataManagement'))
+const Budget = lazy(() => import('./pages/Budget'))
+const SavingsGoals = lazy(() => import('./pages/SavingsGoals'))
 
 // Full-screen loader — used only for auth state and the Login page
 function PageLoader() {
@@ -87,7 +95,15 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
-        <Route path="/" element={<ProtectedPage><DataManagement /></ProtectedPage>} />
+        <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
+        <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
+        <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
+        <Route path="/insights" element={<ProtectedPage><Insights /></ProtectedPage>} />
+        <Route path="/merchants" element={<ProtectedPage><Merchants /></ProtectedPage>} />
+        <Route path="/income" element={<ProtectedPage><Income /></ProtectedPage>} />
+        <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
+        <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />
+        <Route path="/data-management" element={<ProtectedPage><DataManagement /></ProtectedPage>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

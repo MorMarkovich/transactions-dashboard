@@ -4,8 +4,6 @@ import { motion } from 'framer-motion'
 import {
   Calendar,
   BarChart3,
-  PieChart,
-  CalendarDays,
   RefreshCw,
   TrendingUp,
   Zap,
@@ -29,10 +27,6 @@ import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
-import DonutChart from '../components/charts/DonutChart'
-import BarChart from '../components/charts/BarChart'
-import WeekdayChart from '../components/charts/WeekdayChart'
-import CategoryList from '../components/category/CategoryList'
 import DrillDownChart from '../components/charts/DrillDownChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
@@ -1263,59 +1257,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Main Charts: Bento Grid ────────────────────────────────── */}
-      <div className="bento-grid" style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
-        {/* Monthly bar chart (2/3 width) */}
-        <div className="bento-2-3">
-          <div className="section-header-v2">
-            <Calendar size={18} />
-            <span>הוצאות לפי חודש</span>
-            {hasBillingDate && (
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-                {dateType === 'billing' ? 'חיוב' : 'עסקה'}
-              </span>
-            )}
-          </div>
-          <Card className="glass-card" padding="md">
-            <BarChart data={monthlyChartData} />
-          </Card>
-        </div>
-
-        {/* Donut chart (1/3 width) */}
-        <div className="bento-1-3">
-          <div className="section-header-v2">
-            <PieChart size={18} />
-            <span>חלוקה לפי קטגוריה</span>
-          </div>
-          <Card className="glass-card" padding="md">
-            {donutChartData.data.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <DonutChart data={donutChartData.data} total={donutChartData.total} />
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Weekday chart (1/3 width) */}
-        <div className="bento-1-3">
-          <div className="section-header-v2">
-            <CalendarDays size={18} />
-            <span>התפלגות לפי יום בשבוע</span>
-          </div>
-          <Card className="glass-card" padding="md">
-            <WeekdayChart data={weekdayChartData} />
-          </Card>
-        </div>
-
-        {/* Category list (2/3 width) */}
-        <div className="bento-2-3">
-          <div className="section-header-v2">
-            <BarChart3 size={18} />
-            <span>פירוט קטגוריות</span>
-          </div>
-          {categories.length > 0 && <CategoryList categories={categories} />}
-        </div>
-      </div>
+      {/* Bento grid charts removed — data available in ניהול נתונים */}
 
       {/* ── Forecast & Velocity ────────────────────────────────────── */}
       {(forecast || velocity) && (
