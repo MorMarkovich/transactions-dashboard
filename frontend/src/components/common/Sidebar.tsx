@@ -157,6 +157,9 @@ export default function Sidebar({
           setUploadStatus('ממזג נתונים...')
           const merged = await transactionsApi.restoreSession(allTransactions)
           if (merged.success && merged.session_id) {
+            if (merged.duplicates_removed && merged.duplicates_removed > 0) {
+              setUploadStatus(`הוסרו ${merged.duplicates_removed} עסקאות כפולות`)
+            }
             saveToSupabase(allTransactions)
             onFileUploaded?.(merged.session_id)
           } else {

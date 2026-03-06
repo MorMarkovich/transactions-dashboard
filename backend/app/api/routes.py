@@ -173,14 +173,34 @@ async def restore_session(body: RestoreSessionRequest):
         if 'חודש_חיוב' not in df.columns and 'תאריך_חיוב' in df.columns:
             df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
 
+        # ── Deduplicate transactions ────────────────────────────────────
+        original_count = len(df)
+        dedup_cols = []
+        if 'תאריך' in df.columns:
+            dedup_cols.append('תאריך')
+        if 'סכום' in df.columns:
+            dedup_cols.append('סכום')
+        if 'תיאור' in df.columns:
+            dedup_cols.append('תיאור')
+
+        if len(dedup_cols) >= 2:
+            df = df.drop_duplicates(subset=dedup_cols, keep='first').reset_index(drop=True)
+
+        duplicates_removed = original_count - len(df)
+
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
+
+        msg = f"Restored {len(df)} transactions"
+        if duplicates_removed > 0:
+            msg += f" ({duplicates_removed} כפילויות הוסרו)"
 
         return {
             "success": True,
             "session_id": session_id,
             "transaction_count": len(df),
-            "message": f"Restored {len(df)} transactions",
+            "duplicates_removed": duplicates_removed,
+            "message": msg,
         }
     except Exception as e:
         import traceback
