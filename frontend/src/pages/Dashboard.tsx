@@ -43,7 +43,6 @@ import type {
   RawDonutData,
   RawMonthlyData,
   RawWeekdayData,
-  CategoryData,
   WeeklySummaryData,
   ForecastData,
   SpendingVelocityData,
@@ -79,9 +78,9 @@ export default function Dashboard() {
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
-  const [donutData, setDonutData] = useState<RawDonutData | null>(null)
+  const [, setDonutData] = useState<RawDonutData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
-  const [weekdayData, setWeekdayData] = useState<RawWeekdayData | null>(null)
+  const [, setWeekdayData] = useState<RawWeekdayData | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummaryData | null>(null)
   const [forecast, setForecast] = useState<ForecastData | null>(null)
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
@@ -243,36 +242,10 @@ export default function Dashboard() {
   }, [sessionId, selectedMonth, dateType])
 
   // ── Derived data ───────────────────────────────────────────────────
-  const categories = useMemo<CategoryData[]>(() => {
-    if (!donutData?.categories) return []
-    return donutData.categories.map((cat) => ({
-      'קטגוריה': cat.name,
-      'סכום_מוחלט': cat.value,
-    }))
-  }, [donutData])
-
-  const monthlyChartData = useMemo(() => {
-    if (!monthlyData?.months) return []
-    return monthlyData.months.map((m) => ({ label: m.month, value: m.amount }))
-  }, [monthlyData])
-
   const monthlyAmounts = useMemo(() => {
     if (!monthlyData?.months) return undefined
     return monthlyData.months.map((m) => m.amount)
   }, [monthlyData])
-
-  const weekdayChartData = useMemo(() => {
-    if (!weekdayData?.days) return []
-    return weekdayData.days.map((d) => ({ day: d.day, amount: d.amount }))
-  }, [weekdayData])
-
-  const donutChartData = useMemo(() => {
-    if (!donutData?.categories) return { data: [], total: 0 }
-    return {
-      data: donutData.categories.map((c) => ({ name: c.name, value: c.value })),
-      total: donutData.total,
-    }
-  }, [donutData])
 
   // List of months to show in selector (last 12 months)
   const availableMonths = useMemo(() => {
