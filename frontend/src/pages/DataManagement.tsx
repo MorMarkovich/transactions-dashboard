@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Database,
@@ -9,10 +10,17 @@ import {
   FileSpreadsheet,
   Calendar,
   ChevronDown,
+  Layers,
+  Tag,
+  TrendingDown,
+  TrendingUp,
+  Columns,
+  Clock,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
-import type { UploadHistory } from '../services/types'
+import { transactionsApi } from '../services/api'
+import type { UploadHistory, Income, SessionInfo } from '../services/types'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
@@ -21,6 +29,7 @@ import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import { ToastContainer, useToast } from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatNumber } from '../utils/formatting'
+import { get_icon } from '../utils/constants'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -127,10 +136,29 @@ function DataManagementSkeleton() {
         <Skeleton variant="rectangular" height={200} />
       </div>
       <div style={{ marginTop: 'var(--space-xl)' }}>
-        <Skeleton variant="rectangular" height={120} />
+        <Skeleton variant="rectangular" height={200} />
       </div>
     </div>
   )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Income type labels                                                 */
+/* ------------------------------------------------------------------ */
+const INCOME_TYPE_LABELS: Record<string, string> = {
+  salary: 'משכורת',
+  freelance: 'פרילנס',
+  rental: 'שכירות',
+  investment: 'השקעות',
+  other: 'אחר',
+}
+
+const RECURRING_LABELS: Record<string, string> = {
+  monthly: 'חודשי',
+  weekly: 'שבועי',
+  yearly: 'שנתי',
+  one_time: 'חד-פעמי',
+  once: 'חד-פעמי',
 }
 
 /* ------------------------------------------------------------------ */
@@ -140,15 +168,21 @@ function DataManagementSkeleton() {
 export default function DataManagement() {
   const { user } = useAuth()
   const { toasts, showToast, removeToast } = useToast()
+  const [searchParams] = useSearchParams()
+  const sessionId = searchParams.get('session_id')
 
   // ── State ─────────────────────────────────────────────────────────────
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
+  const [incomes, setIncomes] = useState<Income[]>([])
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [deletingIncomes, setDeletingIncomes] = useState(false)
   const [deletingTransactions, setDeletingTransactions] = useState(false)
   const [showDeleteIncomesModal, setShowDeleteIncomesModal] = useState(false)
   const [showDeleteTransactionsModal, setShowDeleteTransactionsModal] = useState(false)
   const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false)
+  const [sessionInfoExpanded, setSessionInfoExpanded] = useState(true)
+  const [incomesExpanded, setIncomesExpanded] = useState(true)
 
   // ── Fetch storage info ────────────────────────────────────────────────
   const fetchStorageInfo = useCallback(async () => {
@@ -162,6 +196,26 @@ export default function DataManagement() {
     }
   }, [user, showToast])
 
+  const fetchIncomes = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await supabaseApi.getIncomes(user.id)
+      setIncomes(data)
+    } catch (err) {
+      console.error('Error fetching incomes:', err)
+    }
+  }, [user])
+
+  const fetchSessionInfo = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const data = await transactionsApi.getSessionInfo(sessionId)
+      setSessionInfo(data)
+    } catch (err) {
+      console.error('Error fetching session info:', err)
+    }
+  }, [sessionId])
+
   useEffect(() => {
     if (!user) {
       setLoading(false)
@@ -170,11 +224,11 @@ export default function DataManagement() {
 
     const load = async () => {
       setLoading(true)
-      await fetchStorageInfo()
+      await Promise.all([fetchStorageInfo(), fetchIncomes(), fetchSessionInfo()])
       setLoading(false)
     }
     load()
-  }, [user, fetchStorageInfo])
+  }, [user, fetchStorageInfo, fetchIncomes, fetchSessionInfo])
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleDeleteAllIncomes = async () => {
@@ -184,6 +238,7 @@ export default function DataManagement() {
       await supabaseApi.deleteAllIncomes(user.id)
       showToast('כל ההכנסות נמחקו בהצלחה', 'success')
       setShowDeleteIncomesModal(false)
+      setIncomes([])
       await fetchStorageInfo()
     } catch (err) {
       console.error('Error deleting incomes:', err)
@@ -233,7 +288,7 @@ export default function DataManagement() {
 
       <PageHeader
         title="ניהול נתונים"
-        subtitle="צפייה, ניהול ומחיקה של הנתונים השמורים שלך"
+        subtitle="צפייה מלאה בכל הנתונים שהזנת, ניהול ומחיקה"
         icon={Database}
       />
 
@@ -268,12 +323,259 @@ export default function DataManagement() {
         />
       </div>
 
+      {/* ─── Session Data Explorer ────────────────────────────────────── */}
+      {sessionInfo && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <Card padding="md" className="glass-card">
+            <button
+              onClick={() => setSessionInfoExpanded(!sessionInfoExpanded)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 0',
+                fontFamily: 'var(--font-family)',
+              }}
+            >
+              <Layers size={18} style={{ color: '#818cf8', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                נתוני הסשן הנוכחי
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                ({formatNumber(sessionInfo.total_rows)} שורות)
+              </span>
+              <ChevronDown
+                size={16}
+                style={{
+                  color: 'var(--text-muted)',
+                  marginRight: 'auto',
+                  transition: 'transform 0.2s',
+                  transform: sessionInfoExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            </button>
+
+            {sessionInfoExpanded && (
+              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Summary stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                  <div style={summaryBoxStyle}>
+                    <TrendingDown size={16} style={{ color: '#f87171' }} />
+                    <div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הוצאות</div>
+                      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--danger)', direction: 'ltr', textAlign: 'right' }}>
+                        {formatCurrency(sessionInfo.total_expenses)}
+                      </div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.expense_count)} עסקאות</div>
+                    </div>
+                  </div>
+                  <div style={summaryBoxStyle}>
+                    <TrendingUp size={16} style={{ color: '#34d399' }} />
+                    <div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הכנסות</div>
+                      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--success)', direction: 'ltr', textAlign: 'right' }}>
+                        {formatCurrency(sessionInfo.total_income)}
+                      </div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.income_count)} עסקאות</div>
+                    </div>
+                  </div>
+                  <div style={summaryBoxStyle}>
+                    <Calendar size={16} style={{ color: '#818cf8' }} />
+                    <div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>טווח תאריכים</div>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {sessionInfo.date_from ? formatDate(sessionInfo.date_from) : '—'} — {sessionInfo.date_to ? formatDate(sessionInfo.date_to) : '—'}
+                      </div>
+                      {sessionInfo.has_billing_date && (
+                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          חיוב: {sessionInfo.billing_date_from ? formatDate(sessionInfo.billing_date_from) : '—'} — {sessionInfo.billing_date_to ? formatDate(sessionInfo.billing_date_to) : '—'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={summaryBoxStyle}>
+                    <Clock size={16} style={{ color: '#f59e0b' }} />
+                    <div>
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>חודשים בנתונים</div>
+                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {sessionInfo.months.length > 0 ? sessionInfo.months.join(' · ') : '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columns detected */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <Columns size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>עמודות שזוהו ({sessionInfo.columns.length})</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {sessionInfo.columns.map((col) => (
+                      <span key={col} style={{
+                        padding: '4px 10px',
+                        borderRadius: '16px',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--bg-card)',
+                        fontSize: '0.6875rem',
+                        color: 'var(--text-secondary)',
+                        fontWeight: 500,
+                      }}>
+                        {col}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Categories breakdown */}
+                {sessionInfo.categories.length > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Tag size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>קטגוריות ({sessionInfo.categories.length})</span>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <th style={thStyle}>קטגוריה</th>
+                            <th style={thStyle}>עסקאות</th>
+                            <th style={thStyle}>הוצאות</th>
+                            <th style={thStyle}>הכנסות</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sessionInfo.categories.map((cat, idx) => (
+                            <tr
+                              key={cat.name}
+                              style={{
+                                borderBottom: idx < sessionInfo.categories.length - 1 ? '1px solid var(--border-color)' : 'none',
+                              }}
+                            >
+                              <td style={tdStyle}>
+                                <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
+                                {cat.name}
+                              </td>
+                              <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                                {formatNumber(cat.count)}
+                              </td>
+                              <td style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                                {cat.expense_total > 0 ? formatCurrency(cat.expense_total) : '—'}
+                              </td>
+                              <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                                {cat.income_total > 0 ? formatCurrency(cat.income_total) : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ─── Saved Incomes ────────────────────────────────────────────── */}
+      {incomes.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <Card padding="md" className="glass-card">
+            <button
+              onClick={() => setIncomesExpanded(!incomesExpanded)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 0',
+                fontFamily: 'var(--font-family)',
+              }}
+            >
+              <Wallet size={18} style={{ color: '#34d399', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                הכנסות שמורות
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                ({formatNumber(incomes.length)} רשומות · סה"כ {formatCurrency(incomes.reduce((sum, i) => sum + i.amount, 0))})
+              </span>
+              <ChevronDown
+                size={16}
+                style={{
+                  color: 'var(--text-muted)',
+                  marginRight: 'auto',
+                  transition: 'transform 0.2s',
+                  transform: incomesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}
+              />
+            </button>
+
+            {incomesExpanded && (
+              <div style={{ marginTop: '12px', overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={thStyle}>תיאור</th>
+                      <th style={thStyle}>סכום</th>
+                      <th style={thStyle}>סוג</th>
+                      <th style={thStyle}>תדירות</th>
+                      <th style={thStyle}>נוצר</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incomes.map((income, idx) => (
+                      <tr
+                        key={income.id}
+                        style={{
+                          borderBottom: idx < incomes.length - 1 ? '1px solid var(--border-color)' : 'none',
+                        }}
+                      >
+                        <td style={tdStyle}>{income.description}</td>
+                        <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                          {formatCurrency(income.amount)}
+                        </td>
+                        <td style={tdStyle}>{INCOME_TYPE_LABELS[income.income_type] || income.income_type}</td>
+                        <td style={tdStyle}>{RECURRING_LABELS[income.recurring] || income.recurring}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            {formatDate(income.created_at)}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      )}
+
       {/* ─── Upload history table ───────────────────────────────────── */}
       {uploads.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.35 }}
+          transition={{ delay: 0.35, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
           <div className="section-header-v2">
@@ -481,7 +783,6 @@ export default function DataManagement() {
                   flexWrap: 'wrap',
                 }}
               >
-                {/* Delete all incomes */}
                 <Button
                   variant="danger"
                   icon={<Trash2 size={16} />}
@@ -491,7 +792,6 @@ export default function DataManagement() {
                   מחק את כל ההכנסות
                 </Button>
 
-                {/* Delete all transactions */}
                 <Button
                   variant="danger"
                   icon={<Trash2 size={16} />}
@@ -636,7 +936,7 @@ export default function DataManagement() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Table styles                                                       */
+/*  Shared styles                                                      */
 /* ------------------------------------------------------------------ */
 
 const thStyle: React.CSSProperties = {
@@ -653,4 +953,14 @@ const tdStyle: React.CSSProperties = {
   color: 'var(--text-primary)',
   fontSize: '0.8125rem',
   transition: 'background 0.15s ease',
+}
+
+const summaryBoxStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: '10px',
+  padding: '12px 14px',
+  background: 'var(--glass-bg)',
+  borderRadius: '8px',
+  border: '1px solid var(--glass-border)',
 }
