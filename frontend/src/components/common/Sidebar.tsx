@@ -1,19 +1,11 @@
 import { useState, useRef } from 'react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import {
-  LayoutDashboard,
-  Receipt,
-  TrendingUp,
-  Lightbulb,
-  Store,
-  Wallet,
-  Target,
   Database,
   Upload,
   Loader2,
   X,
   FolderOpen,
-  PiggyBank,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
