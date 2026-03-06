@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Database,
   Wallet,
@@ -16,19 +16,40 @@ import {
   TrendingUp,
   Columns,
   Clock,
+  Hash,
+  Calculator,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  BarChart3,
+  Plus,
+  Loader2,
+  Scale,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
 import { transactionsApi } from '../services/api'
-import type { UploadHistory, Income, SessionInfo } from '../services/types'
+import type {
+  UploadHistory,
+  Income,
+  SessionInfo,
+  Transaction,
+  TransactionFilters,
+} from '../services/types'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
+import Input from '../components/ui/Input'
+import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import TransactionsTable from '../components/table/TransactionsTable'
+import TransactionDrawer from '../components/table/TransactionDrawer'
+import AdvancedFilters from '../components/table/AdvancedFilters'
 import { ToastContainer, useToast } from '../components/ui/Toast'
-import { formatCurrency, formatDate, formatNumber } from '../utils/formatting'
+import { formatCurrency, formatDate, formatNumber, formatPercent } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
 
 /* ------------------------------------------------------------------ */
@@ -39,6 +60,41 @@ interface StorageInfo {
   transactionSets: number
   incomeCount: number
   uploads: UploadHistory[]
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const INCOME_TYPE_OPTIONS = [
+  { value: 'משכורת', label: 'משכורת' },
+  { value: 'פרילנס', label: 'פרילנס' },
+  { value: 'השקעות', label: 'השקעות' },
+  { value: 'מתנה', label: 'מתנה' },
+  { value: 'החזר', label: 'החזר' },
+  { value: 'אחר', label: 'אחר' },
+]
+
+const FREQUENCY_OPTIONS = [
+  { value: 'חד-פעמי', label: 'חד-פעמי' },
+  { value: 'חודשי', label: 'חודשי' },
+  { value: 'שנתי', label: 'שנתי' },
+]
+
+const INCOME_TYPE_LABELS: Record<string, string> = {
+  salary: 'משכורת',
+  freelance: 'פרילנס',
+  rental: 'שכירות',
+  investment: 'השקעות',
+  other: 'אחר',
+}
+
+const RECURRING_LABELS: Record<string, string> = {
+  monthly: 'חודשי',
+  weekly: 'שבועי',
+  yearly: 'שנתי',
+  one_time: 'חד-פעמי',
+  once: 'חד-פעמי',
 }
 
 /* ------------------------------------------------------------------ */
@@ -115,6 +171,87 @@ function InfoCard({ icon, iconBg, label, value, index }: InfoCardProps) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Collapsible section                                                */
+/* ------------------------------------------------------------------ */
+
+function CollapsibleSection({
+  icon,
+  iconColor,
+  title,
+  badge,
+  expanded,
+  onToggle,
+  children,
+  dangerStyle,
+}: {
+  icon: React.ReactNode
+  iconColor?: string
+  title: string
+  badge?: string
+  expanded: boolean
+  onToggle: () => void
+  children: React.ReactNode
+  dangerStyle?: boolean
+}) {
+  return (
+    <Card padding="md" className="glass-card">
+      <button
+        onClick={onToggle}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '4px 0',
+          fontFamily: 'var(--font-family)',
+        }}
+      >
+        <span style={{ flexShrink: 0, color: iconColor }}>{icon}</span>
+        <span
+          style={{
+            fontSize: '0.9375rem',
+            fontWeight: 700,
+            color: dangerStyle ? 'var(--accent-danger, #ef4444)' : 'var(--text-primary)',
+          }}
+        >
+          {title}
+        </span>
+        {badge && (
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+            ({badge})
+          </span>
+        )}
+        <ChevronDown
+          size={16}
+          style={{
+            color: 'var(--text-muted)',
+            marginRight: 'auto',
+            transition: 'transform 0.2s',
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        />
+      </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ marginTop: '16px' }}>{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Loading skeleton                                                   */
 /* ------------------------------------------------------------------ */
 
@@ -124,16 +261,17 @@ function DataManagementSkeleton() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 'var(--space-md)',
         }}
       >
         <Skeleton variant="card" />
         <Skeleton variant="card" />
         <Skeleton variant="card" />
+        <Skeleton variant="card" />
       </div>
       <div style={{ marginTop: 'var(--space-xl)' }}>
-        <Skeleton variant="rectangular" height={200} />
+        <Skeleton variant="rectangular" height={400} />
       </div>
       <div style={{ marginTop: 'var(--space-xl)' }}>
         <Skeleton variant="rectangular" height={200} />
@@ -143,23 +281,58 @@ function DataManagementSkeleton() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Income type labels                                                 */
+/*  Date chip configuration                                            */
 /* ------------------------------------------------------------------ */
-const INCOME_TYPE_LABELS: Record<string, string> = {
-  salary: 'משכורת',
-  freelance: 'פרילנס',
-  rental: 'שכירות',
-  investment: 'השקעות',
-  other: 'אחר',
+
+interface DateChip {
+  label: string
+  key: string
+  getRange: () => { startDate?: string; endDate?: string }
 }
 
-const RECURRING_LABELS: Record<string, string> = {
-  monthly: 'חודשי',
-  weekly: 'שבועי',
-  yearly: 'שנתי',
-  one_time: 'חד-פעמי',
-  once: 'חד-פעמי',
+function toISODate(d: Date): string {
+  return d.toISOString().split('T')[0]
 }
+
+const DATE_CHIPS: DateChip[] = [
+  { label: 'הכל', key: 'all', getRange: () => ({}) },
+  {
+    label: 'היום',
+    key: 'today',
+    getRange: () => {
+      const today = toISODate(new Date())
+      return { startDate: today, endDate: today }
+    },
+  },
+  {
+    label: 'השבוע',
+    key: 'week',
+    getRange: () => {
+      const now = new Date()
+      const start = new Date(now)
+      start.setDate(now.getDate() - now.getDay())
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+  {
+    label: 'החודש',
+    key: 'month',
+    getRange: () => {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+  {
+    label: '3 חודשים',
+    key: '3months',
+    getRange: () => {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate())
+      return { startDate: toISODate(start), endDate: toISODate(now) }
+    },
+  },
+]
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -171,20 +344,69 @@ export default function DataManagement() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
 
-  // ── State ─────────────────────────────────────────────────────────────
+  // ── Storage & session state ─────────────────────────────────────────
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [incomes, setIncomes] = useState<Income[]>([])
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // ── Transactions state ──────────────────────────────────────────────
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [txTotal, setTxTotal] = useState(0)
+  const [txPage, setTxPage] = useState(1)
+  const [txPageSize] = useState(50)
+  const [txFilters, setTxFilters] = useState<{
+    search?: string
+    category?: string
+    startDate?: string
+    endDate?: string
+    minAmount?: number
+    maxAmount?: number
+  }>({})
+  const [activeDateChip, setActiveDateChip] = useState('all')
+  const [txLoading, setTxLoading] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
+
+  // Transaction stats
+  const [serverTotalAmount, setServerTotalAmount] = useState(0)
+  const [serverAvg, setServerAvg] = useState(0)
+  const [expenseCount, setExpenseCount] = useState(0)
+  const [incomeCount, setIncomeCount] = useState(0)
+  const [totalExpenses, setTotalExpenses] = useState(0)
+  const [totalIncome, setTotalIncome] = useState(0)
+  const [medianTransaction, setMedianTransaction] = useState(0)
+  const [maxTransaction, setMaxTransaction] = useState<{ description: string; amount: number } | null>(null)
+  const [minTransaction, setMinTransaction] = useState<{ description: string; amount: number } | null>(null)
+  const [categoryBreakdown, setCategoryBreakdown] = useState<{ name: string; total: number; count: number; percent: number }[]>([])
+  const [dateFrom, setDateFrom] = useState<string | null>(null)
+  const [dateTo, setDateTo] = useState<string | null>(null)
+
+  // Drawer state
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // ── Income form state ───────────────────────────────────────────────
+  const [incDescription, setIncDescription] = useState('')
+  const [incAmount, setIncAmount] = useState('')
+  const [incType, setIncType] = useState('משכורת')
+  const [incRecurring, setIncRecurring] = useState('חד-פעמי')
+  const [submitting, setSubmitting] = useState(false)
+  const [deletingIncomeId, setDeletingIncomeId] = useState<string | null>(null)
+
+  // ── Delete modals ───────────────────────────────────────────────────
   const [deletingIncomes, setDeletingIncomes] = useState(false)
   const [deletingTransactions, setDeletingTransactions] = useState(false)
   const [showDeleteIncomesModal, setShowDeleteIncomesModal] = useState(false)
   const [showDeleteTransactionsModal, setShowDeleteTransactionsModal] = useState(false)
+
+  // ── Section expand state ────────────────────────────────────────────
   const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false)
   const [sessionInfoExpanded, setSessionInfoExpanded] = useState(true)
   const [incomesExpanded, setIncomesExpanded] = useState(true)
+  const [transactionsExpanded, setTransactionsExpanded] = useState(true)
+  const [uploadsExpanded, setUploadsExpanded] = useState(true)
 
-  // ── Fetch storage info ────────────────────────────────────────────────
+  // ── Fetch storage info ──────────────────────────────────────────────
   const fetchStorageInfo = useCallback(async () => {
     if (!user) return
     try {
@@ -230,7 +452,185 @@ export default function DataManagement() {
     load()
   }, [user, fetchStorageInfo, fetchIncomes, fetchSessionInfo])
 
-  // ── Handlers ──────────────────────────────────────────────────────────
+  // ── Fetch categories ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    transactionsApi
+      .getCategories(sessionId, controller.signal)
+      .then(setCategories)
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        console.error('Error loading categories:', err)
+      })
+    return () => controller.abort()
+  }, [sessionId])
+
+  // ── Fetch transactions ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+
+    const fetchTransactions = async () => {
+      setTxLoading(true)
+      const apiFilters: TransactionFilters = {
+        page: txPage,
+        page_size: txPageSize,
+        search: txFilters.search,
+        category: txFilters.category,
+        start_date: txFilters.startDate,
+        end_date: txFilters.endDate,
+      }
+
+      try {
+        const response = await transactionsApi.getTransactions(sessionId, apiFilters, controller.signal)
+        setTransactions(response.transactions)
+        setTxTotal(response.total)
+        setServerTotalAmount(response.total_amount ?? 0)
+        setServerAvg(response.avg_transaction ?? 0)
+        setExpenseCount(response.expense_count ?? 0)
+        setIncomeCount(response.income_count ?? 0)
+        setTotalExpenses(response.total_expenses ?? 0)
+        setTotalIncome(response.total_income ?? 0)
+        setMedianTransaction(response.median_transaction ?? 0)
+        setMaxTransaction(response.max_transaction ?? null)
+        setMinTransaction(response.min_transaction ?? null)
+        setCategoryBreakdown(response.category_breakdown ?? [])
+        setDateFrom(response.date_from ?? null)
+        setDateTo(response.date_to ?? null)
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        console.error('Error loading transactions:', err)
+      } finally {
+        setTxLoading(false)
+      }
+    }
+
+    fetchTransactions()
+    return () => controller.abort()
+  }, [sessionId, txFilters, txPage, txPageSize])
+
+  // ── Computed stats ──────────────────────────────────────────────────
+  const stats = useMemo(() => ({
+    count: txTotal,
+    totalAmount: serverTotalAmount,
+    avg: serverAvg,
+    expenseCount,
+    incomeCount,
+    totalExpenses,
+    totalIncome,
+    medianTransaction,
+  }), [txTotal, serverTotalAmount, serverAvg, expenseCount, incomeCount, totalExpenses, totalIncome, medianTransaction])
+
+  // ── Handlers ────────────────────────────────────────────────────────
+  const handleFilterChange = useCallback(
+    (newFilters: { search?: string; category?: string; startDate?: string; endDate?: string; minAmount?: number; maxAmount?: number }) => {
+      setTxFilters(newFilters)
+      setTxPage(1)
+      setActiveDateChip('all')
+    },
+    [],
+  )
+
+  const handleDateChipClick = useCallback(
+    (chip: DateChip) => {
+      setActiveDateChip(chip.key)
+      const range = chip.getRange()
+      setTxFilters((prev) => ({
+        ...prev,
+        startDate: range.startDate,
+        endDate: range.endDate,
+      }))
+      setTxPage(1)
+    },
+    [],
+  )
+
+  const handleExport = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const blob = await transactionsApi.exportTransactions(sessionId, {
+        category: txFilters.category,
+      })
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'transactions.xlsx'
+      anchor.click()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error exporting:', err)
+    }
+  }, [sessionId, txFilters.category])
+
+  // ── Income handlers ─────────────────────────────────────────────────
+  const handleAddIncome = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    if (!incDescription.trim() || !incAmount) {
+      showToast('נא למלא את כל השדות', 'warning')
+      return
+    }
+    const numAmount = parseFloat(incAmount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      showToast('נא להזין סכום חיובי', 'warning')
+      return
+    }
+
+    setSubmitting(true)
+    const tempId = `temp-${Date.now()}`
+    const optimistic: Income = {
+      id: tempId,
+      user_id: user.id,
+      description: incDescription.trim(),
+      amount: numAmount,
+      income_type: incType,
+      recurring: incRecurring,
+      created_at: new Date().toISOString(),
+    }
+    setIncomes((prev) => [optimistic, ...prev])
+    setIncDescription('')
+    setIncAmount('')
+
+    try {
+      const saved = await supabaseApi.addIncome({
+        user_id: user.id,
+        description: optimistic.description,
+        amount: optimistic.amount,
+        income_type: optimistic.income_type,
+        recurring: optimistic.recurring,
+      })
+      setIncomes((prev) => prev.map((inc) => (inc.id === tempId ? saved : inc)))
+      showToast('הכנסה נוספה בהצלחה', 'success')
+      await fetchStorageInfo()
+    } catch (err) {
+      setIncomes((prev) => prev.filter((inc) => inc.id !== tempId))
+      showToast('שגיאה בהוספת הכנסה', 'error')
+      console.error('Error adding income:', err)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteIncome = async (id: string) => {
+    if (!user) return
+    setDeletingIncomeId(id)
+    const backup = incomes
+    setIncomes((prev) => prev.filter((inc) => inc.id !== id))
+
+    try {
+      await supabaseApi.deleteIncome(id)
+      showToast('הכנסה נמחקה', 'success')
+      await fetchStorageInfo()
+    } catch (err) {
+      setIncomes(backup)
+      showToast('שגיאה במחיקת הכנסה', 'error')
+      console.error('Error deleting income:', err)
+    } finally {
+      setDeletingIncomeId(null)
+    }
+  }
+
   const handleDeleteAllIncomes = async () => {
     if (!user) return
     setDeletingIncomes(true)
@@ -264,7 +664,7 @@ export default function DataManagement() {
     }
   }
 
-  // ── Not logged in ─────────────────────────────────────────────────────
+  // ── Not logged in ───────────────────────────────────────────────────
   if (!user) {
     return (
       <EmptyState
@@ -275,12 +675,12 @@ export default function DataManagement() {
     )
   }
 
-  // ── Loading ───────────────────────────────────────────────────────────
   if (loading) {
     return <DataManagementSkeleton />
   }
 
   const uploads = storageInfo?.uploads ?? []
+  const manualIncome = incomes.reduce((sum, i) => sum + i.amount, 0)
 
   return (
     <div style={{ direction: 'rtl' }}>
@@ -288,15 +688,17 @@ export default function DataManagement() {
 
       <PageHeader
         title="ניהול נתונים"
-        subtitle="צפייה מלאה בכל הנתונים שהזנת, ניהול ומחיקה"
+        subtitle="צפייה מלאה, ניהול, סינון ומחיקה של כל הנתונים שלך"
         icon={Database}
       />
 
-      {/* ─── Storage overview cards ─────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  STORAGE OVERVIEW CARDS                                        */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 'var(--space-md)',
         }}
       >
@@ -312,7 +714,7 @@ export default function DataManagement() {
           icon={<Wallet size={22} style={{ color: '#34d399' }} />}
           iconBg="rgba(16, 185, 129, 0.12)"
           label="הכנסות שמורות"
-          value={formatNumber(storageInfo?.incomeCount ?? 0)}
+          value={formatNumber(incomes.length)}
         />
         <InfoCard
           index={2}
@@ -321,9 +723,236 @@ export default function DataManagement() {
           label="העלאות"
           value={formatNumber(uploads.length)}
         />
+        {sessionId && (
+          <InfoCard
+            index={3}
+            icon={<Receipt size={22} style={{ color: '#f59e0b' }} />}
+            iconBg="rgba(245, 158, 11, 0.12)"
+            label="עסקאות בסשן"
+            value={formatNumber(txTotal)}
+          />
+        )}
       </div>
 
-      {/* ─── Session Data Explorer ────────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  TRANSACTION STATS & TABLE                                     */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {sessionId && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <CollapsibleSection
+            icon={<Receipt size={18} />}
+            iconColor="#818cf8"
+            title="עסקאות — צפייה וניהול"
+            badge={`${formatNumber(txTotal)} עסקאות`}
+            expanded={transactionsExpanded}
+            onToggle={() => setTransactionsExpanded(!transactionsExpanded)}
+          >
+            {/* ── Stats Row 1 ─────────────────────────────────────── */}
+            <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-sm)' }}>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
+                  <Hash size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value">{stats.count.toLocaleString('he-IL')}</div>
+                  <div className="stat-label">סה"כ עסקאות</div>
+                </div>
+              </div>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f87171, #ef4444)' }}>
+                  <TrendingDown size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value" style={{ color: 'var(--danger)' }}>{formatCurrency(stats.totalExpenses)}</div>
+                  <div className="stat-label">{formatNumber(stats.expenseCount)} הוצאות</div>
+                </div>
+              </div>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b, #38f9d7))' }}>
+                  <TrendingUp size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value" style={{ color: 'var(--success)' }}>{formatCurrency(stats.totalIncome)}</div>
+                  <div className="stat-label">{formatNumber(stats.incomeCount)} הכנסות</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Stats Row 2 ─────────────────────────────────────── */}
+            <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-sm)' }}>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
+                  <Calculator size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value">{formatCurrency(stats.avg)}</div>
+                  <div className="stat-label">ממוצע לעסקה</div>
+                </div>
+              </div>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                  <DollarSign size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value">{formatCurrency(stats.medianTransaction)}</div>
+                  <div className="stat-label">חציון עסקה</div>
+                </div>
+              </div>
+              <div className="stat-card-compact glass-card">
+                <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
+                  <Scale size={18} color="#fff" />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-value" style={{ color: (stats.totalIncome - stats.totalExpenses) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {formatCurrency(stats.totalIncome - stats.totalExpenses)}
+                  </div>
+                  <div className="stat-label">מאזן</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Extremes + Date Range ────────────────────────────── */}
+            {(maxTransaction || minTransaction || dateFrom) && (
+              <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '0.8125rem' }}>
+                {maxTransaction && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ArrowUpRight size={16} style={{ color: 'var(--danger)' }} />
+                    <span style={{ color: 'var(--text-secondary)' }}>הוצאה גבוהה:</span>
+                    <span style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatCurrency(maxTransaction.amount)}</span>
+                    <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                      ({maxTransaction.description})
+                    </span>
+                  </div>
+                )}
+                {minTransaction && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ArrowDownRight size={16} style={{ color: 'var(--success)' }} />
+                    <span style={{ color: 'var(--text-secondary)' }}>הוצאה נמוכה:</span>
+                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(minTransaction.amount)}</span>
+                    <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                      ({minTransaction.description})
+                    </span>
+                  </div>
+                )}
+                {dateFrom && dateTo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: 'auto' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>טווח:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Category Breakdown ──────────────────────────────── */}
+            {categoryBreakdown.length > 0 && (
+              <div style={{ marginBottom: 'var(--space-md)' }}>
+                <div className="section-header-v2" style={{ marginBottom: '8px' }}>
+                  <BarChart3 size={18} />
+                  <span>פירוט לפי קטגוריה</span>
+                </div>
+                <div className="glass-card" style={{ padding: '16px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <th style={catThStyle}>קטגוריה</th>
+                        <th style={catThStyle}>עסקאות</th>
+                        <th style={catThStyle}>סה"כ</th>
+                        <th style={catThStyle}>אחוז</th>
+                        <th style={{ ...catThStyle, width: '35%' }}>חלק יחסי</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categoryBreakdown.map((cat, idx) => (
+                        <tr key={cat.name} style={{ borderBottom: idx < categoryBreakdown.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                          <td style={catTdStyle}>
+                            <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
+                            {cat.name}
+                          </td>
+                          <td style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                            {formatNumber(cat.count)}
+                          </td>
+                          <td style={{ ...catTdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--danger)', direction: 'ltr', textAlign: 'center' }}>
+                            {formatCurrency(cat.total)}
+                          </td>
+                          <td style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                            {formatPercent(cat.percent)}
+                          </td>
+                          <td style={catTdStyle}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden' }}>
+                                <div style={{
+                                  width: `${cat.percent}%`,
+                                  height: '100%',
+                                  borderRadius: '3px',
+                                  background: `hsl(${220 + idx * 30}, 70%, 60%)`,
+                                  transition: 'width 0.3s ease',
+                                }} />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ── Advanced Filters ────────────────────────────────── */}
+            <AdvancedFilters
+              onFilterChange={handleFilterChange}
+              onExport={handleExport}
+              categories={categories}
+              loading={txLoading}
+            />
+
+            {/* ── Quick Date Filter Chips ─────────────────────────── */}
+            <div className="filter-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+              {DATE_CHIPS.map((chip) => (
+                <button
+                  key={chip.key}
+                  className={`filter-chip${activeDateChip === chip.key ? ' active' : ''}`}
+                  onClick={() => handleDateChipClick(chip)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Transactions Table ──────────────────────────────── */}
+            <div className="section-header-v2">
+              <span>רשימת עסקאות</span>
+            </div>
+
+            {txLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'var(--space-md)' }}>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Skeleton key={i} variant="rectangular" height={48} />
+                ))}
+              </div>
+            ) : (
+              <TransactionsTable
+                transactions={transactions}
+                total={txTotal}
+                page={txPage}
+                pageSize={txPageSize}
+                onPageChange={setTxPage}
+                onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}
+                showBillingDate={transactions.some((tx) => !!tx.תאריך_חיוב)}
+              />
+            )}
+          </CollapsibleSection>
+        </motion.div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  SESSION DATA EXPLORER                                         */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       {sessionInfo && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -331,246 +960,286 @@ export default function DataManagement() {
           transition={{ delay: 0.25, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <Card padding="md" className="glass-card">
-            <button
-              onClick={() => setSessionInfoExpanded(!sessionInfoExpanded)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px 0',
-                fontFamily: 'var(--font-family)',
-              }}
-            >
-              <Layers size={18} style={{ color: '#818cf8', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                נתוני הסשן הנוכחי
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                ({formatNumber(sessionInfo.total_rows)} שורות)
-              </span>
-              <ChevronDown
-                size={16}
-                style={{
-                  color: 'var(--text-muted)',
-                  marginRight: 'auto',
-                  transition: 'transform 0.2s',
-                  transform: sessionInfoExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}
-              />
-            </button>
-
-            {sessionInfoExpanded && (
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {/* Summary stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                  <div style={summaryBoxStyle}>
-                    <TrendingDown size={16} style={{ color: '#f87171' }} />
-                    <div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הוצאות</div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--danger)', direction: 'ltr', textAlign: 'right' }}>
-                        {formatCurrency(sessionInfo.total_expenses)}
-                      </div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.expense_count)} עסקאות</div>
+          <CollapsibleSection
+            icon={<Layers size={18} />}
+            iconColor="#818cf8"
+            title="נתוני הסשן הנוכחי"
+            badge={`${formatNumber(sessionInfo.total_rows)} שורות`}
+            expanded={sessionInfoExpanded}
+            onToggle={() => setSessionInfoExpanded(!sessionInfoExpanded)}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Summary stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                <div style={summaryBoxStyle}>
+                  <TrendingDown size={16} style={{ color: '#f87171' }} />
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הוצאות</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--danger)', direction: 'ltr', textAlign: 'right' }}>
+                      {formatCurrency(sessionInfo.total_expenses)}
                     </div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.expense_count)} עסקאות</div>
                   </div>
-                  <div style={summaryBoxStyle}>
-                    <TrendingUp size={16} style={{ color: '#34d399' }} />
-                    <div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הכנסות</div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--success)', direction: 'ltr', textAlign: 'right' }}>
-                        {formatCurrency(sessionInfo.total_income)}
-                      </div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.income_count)} עסקאות</div>
+                </div>
+                <div style={summaryBoxStyle}>
+                  <TrendingUp size={16} style={{ color: '#34d399' }} />
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>סה"כ הכנסות</div>
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--success)', direction: 'ltr', textAlign: 'right' }}>
+                      {formatCurrency(sessionInfo.total_income)}
                     </div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{formatNumber(sessionInfo.income_count)} עסקאות</div>
                   </div>
-                  <div style={summaryBoxStyle}>
-                    <Calendar size={16} style={{ color: '#818cf8' }} />
-                    <div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>טווח תאריכים</div>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {sessionInfo.date_from ? formatDate(sessionInfo.date_from) : '—'} — {sessionInfo.date_to ? formatDate(sessionInfo.date_to) : '—'}
-                      </div>
-                      {sessionInfo.has_billing_date && (
-                        <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          חיוב: {sessionInfo.billing_date_from ? formatDate(sessionInfo.billing_date_from) : '—'} — {sessionInfo.billing_date_to ? formatDate(sessionInfo.billing_date_to) : '—'}
-                        </div>
-                      )}
+                </div>
+                <div style={summaryBoxStyle}>
+                  <Calendar size={16} style={{ color: '#818cf8' }} />
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>טווח תאריכים</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {sessionInfo.date_from ? formatDate(sessionInfo.date_from) : '—'} — {sessionInfo.date_to ? formatDate(sessionInfo.date_to) : '—'}
                     </div>
-                  </div>
-                  <div style={summaryBoxStyle}>
-                    <Clock size={16} style={{ color: '#f59e0b' }} />
-                    <div>
-                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>חודשים בנתונים</div>
-                      <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {sessionInfo.months.length > 0 ? sessionInfo.months.join(' · ') : '—'}
+                    {sessionInfo.has_billing_date && (
+                      <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        חיוב: {sessionInfo.billing_date_from ? formatDate(sessionInfo.billing_date_from) : '—'} — {sessionInfo.billing_date_to ? formatDate(sessionInfo.billing_date_to) : '—'}
                       </div>
+                    )}
+                  </div>
+                </div>
+                <div style={summaryBoxStyle}>
+                  <Clock size={16} style={{ color: '#f59e0b' }} />
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>חודשים בנתונים</div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {sessionInfo.months.length > 0 ? sessionInfo.months.join(' · ') : '—'}
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Columns detected */}
+              {/* Columns detected */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <Columns size={14} style={{ color: 'var(--text-muted)' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>עמודות שזוהו ({sessionInfo.columns.length})</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {sessionInfo.columns.map((col) => (
+                    <span key={col} style={{
+                      padding: '4px 10px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-card)',
+                      fontSize: '0.6875rem',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 500,
+                    }}>
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categories breakdown */}
+              {sessionInfo.categories.length > 0 && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Columns size={14} style={{ color: 'var(--text-muted)' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>עמודות שזוהו ({sessionInfo.columns.length})</span>
+                    <Tag size={14} style={{ color: 'var(--text-muted)' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>קטגוריות ({sessionInfo.categories.length})</span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {sessionInfo.columns.map((col) => (
-                      <span key={col} style={{
-                        padding: '4px 10px',
-                        borderRadius: '16px',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--bg-card)',
-                        fontSize: '0.6875rem',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 500,
-                      }}>
-                        {col}
-                      </span>
-                    ))}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <th style={thStyle}>קטגוריה</th>
+                          <th style={thStyle}>עסקאות</th>
+                          <th style={thStyle}>הוצאות</th>
+                          <th style={thStyle}>הכנסות</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessionInfo.categories.map((cat, idx) => (
+                          <tr
+                            key={cat.name}
+                            style={{
+                              borderBottom: idx < sessionInfo.categories.length - 1 ? '1px solid var(--border-color)' : 'none',
+                            }}
+                          >
+                            <td style={tdStyle}>
+                              <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
+                              {cat.name}
+                            </td>
+                            <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                              {formatNumber(cat.count)}
+                            </td>
+                            <td style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                              {cat.expense_total > 0 ? formatCurrency(cat.expense_total) : '—'}
+                            </td>
+                            <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                              {cat.income_total > 0 ? formatCurrency(cat.income_total) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-
-                {/* Categories breakdown */}
-                {sessionInfo.categories.length > 0 && (
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <Tag size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>קטגוריות ({sessionInfo.categories.length})</span>
-                    </div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                            <th style={thStyle}>קטגוריה</th>
-                            <th style={thStyle}>עסקאות</th>
-                            <th style={thStyle}>הוצאות</th>
-                            <th style={thStyle}>הכנסות</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sessionInfo.categories.map((cat, idx) => (
-                            <tr
-                              key={cat.name}
-                              style={{
-                                borderBottom: idx < sessionInfo.categories.length - 1 ? '1px solid var(--border-color)' : 'none',
-                              }}
-                            >
-                              <td style={tdStyle}>
-                                <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
-                                {cat.name}
-                              </td>
-                              <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
-                                {formatNumber(cat.count)}
-                              </td>
-                              <td style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
-                                {cat.expense_total > 0 ? formatCurrency(cat.expense_total) : '—'}
-                              </td>
-                              <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
-                                {cat.income_total > 0 ? formatCurrency(cat.income_total) : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
+              )}
+            </div>
+          </CollapsibleSection>
         </motion.div>
       )}
 
-      {/* ─── Saved Incomes ────────────────────────────────────────────── */}
-      {incomes.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-xl)' }}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  INCOME MANAGEMENT                                             */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.35 }}
+        style={{ marginTop: 'var(--space-xl)' }}
+      >
+        <CollapsibleSection
+          icon={<Wallet size={18} />}
+          iconColor="#34d399"
+          title="ניהול הכנסות"
+          badge={`${formatNumber(incomes.length)} רשומות · סה"כ ${formatCurrency(manualIncome)}`}
+          expanded={incomesExpanded}
+          onToggle={() => setIncomesExpanded(!incomesExpanded)}
         >
-          <Card padding="md" className="glass-card">
-            <button
-              onClick={() => setIncomesExpanded(!incomesExpanded)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px 0',
-                fontFamily: 'var(--font-family)',
-              }}
-            >
-              <Wallet size={18} style={{ color: '#34d399', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                הכנסות שמורות
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                ({formatNumber(incomes.length)} רשומות · סה"כ {formatCurrency(incomes.reduce((sum, i) => sum + i.amount, 0))})
-              </span>
-              <ChevronDown
-                size={16}
-                style={{
-                  color: 'var(--text-muted)',
-                  marginRight: 'auto',
-                  transition: 'transform 0.2s',
-                  transform: incomesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}
-              />
-            </button>
-
-            {incomesExpanded && (
-              <div style={{ marginTop: '12px', overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <th style={thStyle}>תיאור</th>
-                      <th style={thStyle}>סכום</th>
-                      <th style={thStyle}>סוג</th>
-                      <th style={thStyle}>תדירות</th>
-                      <th style={thStyle}>נוצר</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {incomes.map((income, idx) => (
-                      <tr
-                        key={income.id}
-                        style={{
-                          borderBottom: idx < incomes.length - 1 ? '1px solid var(--border-color)' : 'none',
-                        }}
-                      >
-                        <td style={tdStyle}>{income.description}</td>
-                        <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
-                          {formatCurrency(income.amount)}
-                        </td>
-                        <td style={tdStyle}>{INCOME_TYPE_LABELS[income.income_type] || income.income_type}</td>
-                        <td style={tdStyle}>{RECURRING_LABELS[income.recurring] || income.recurring}</td>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                            {formatDate(income.created_at)}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', alignItems: 'start' }}>
+            {/* Add income form */}
+            <div>
+              <div className="glass-card" style={{ padding: '16px' }}>
+                <h4 style={{ margin: '0 0 12px', fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  הוסף הכנסה
+                </h4>
+                <form onSubmit={handleAddIncome} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <Input
+                    label="תיאור"
+                    placeholder="למשל: משכורת ינואר"
+                    value={incDescription}
+                    onChange={(e) => setIncDescription(e.target.value)}
+                  />
+                  <Input
+                    label="סכום"
+                    type="number"
+                    placeholder="0.00"
+                    value={incAmount}
+                    onChange={(e) => setIncAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                    style={{ direction: 'ltr', textAlign: 'left' }}
+                  />
+                  <Select
+                    label="סוג הכנסה"
+                    options={INCOME_TYPE_OPTIONS}
+                    value={incType}
+                    onChange={setIncType}
+                  />
+                  <Select
+                    label="תדירות"
+                    options={FREQUENCY_OPTIONS}
+                    value={incRecurring}
+                    onChange={setIncRecurring}
+                  />
+                  <Button type="submit" fullWidth loading={submitting} icon={<Plus size={16} />}>
+                    הוסף הכנסה
+                  </Button>
+                </form>
               </div>
-            )}
-          </Card>
-        </motion.div>
-      )}
+            </div>
 
-      {/* ─── Upload history table ───────────────────────────────────── */}
+            {/* Income list */}
+            <div>
+              {incomes.length > 0 ? (
+                <div className="glass-card" style={{ padding: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      הכנסות ({incomes.length})
+                    </h4>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
+                    <AnimatePresence mode="popLayout">
+                      {incomes.map((income) => (
+                        <motion.div
+                          key={income.id}
+                          layout
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              padding: '10px 12px',
+                              background: 'var(--bg-elevated, #334155)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-color)',
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {income.description}
+                              </p>
+                              <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {INCOME_TYPE_LABELS[income.income_type] || income.income_type} &middot; {RECURRING_LABELS[income.recurring] || income.recurring} &middot; {formatDate(income.created_at)}
+                              </p>
+                            </div>
+                            <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--accent-secondary, #10b981)', direction: 'ltr', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                              {formatCurrency(income.amount)}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteIncome(income.id)}
+                              disabled={deletingIncomeId === income.id}
+                              aria-label="מחק הכנסה"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 30,
+                                height: 30,
+                                borderRadius: 6,
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                cursor: deletingIncomeId === income.id ? 'not-allowed' : 'pointer',
+                                opacity: deletingIncomeId === income.id ? 0.5 : 1,
+                                transition: 'all 0.15s ease',
+                                flexShrink: 0,
+                              }}
+                              className="income-delete-btn"
+                            >
+                              {deletingIncomeId === income.id ? (
+                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                              ) : (
+                                <Trash2 size={14} />
+                              )}
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card" style={{ padding: '32px 16px', textAlign: 'center' }}>
+                  <Wallet size={32} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                    אין הכנסות שמורות. הוסף הכנסה משמאל.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CollapsibleSection>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  UPLOAD HISTORY                                                */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       {uploads.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -578,26 +1247,18 @@ export default function DataManagement() {
           transition={{ delay: 0.35, duration: 0.35 }}
           style={{ marginTop: 'var(--space-xl)' }}
         >
-          <div className="section-header-v2">
-            <FileSpreadsheet size={18} />
-            <span>היסטוריית העלאות</span>
-          </div>
-
-          <Card className="glass-card" padding="none">
+          <CollapsibleSection
+            icon={<FileSpreadsheet size={18} />}
+            iconColor="#0ea5e9"
+            title="היסטוריית העלאות"
+            badge={`${formatNumber(uploads.length)} העלאות`}
+            expanded={uploadsExpanded}
+            onToggle={() => setUploadsExpanded(!uploadsExpanded)}
+          >
             <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '0.875rem',
-                }}
-              >
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                 <thead>
-                  <tr
-                    style={{
-                      borderBottom: '1px solid var(--border-color)',
-                    }}
-                  >
+                  <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <th style={thStyle}>שם קובץ</th>
                     <th style={thStyle}>שורות</th>
                     <th style={thStyle}>הוצאות</th>
@@ -611,35 +1272,16 @@ export default function DataManagement() {
                       key={upload.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: 0.35 + idx * 0.04 }}
+                      transition={{ delay: 0.05 + idx * 0.04 }}
                       style={{
-                        borderBottom:
-                          idx < uploads.length - 1
-                            ? '1px solid var(--border-color)'
-                            : 'none',
+                        borderBottom: idx < uploads.length - 1 ? '1px solid var(--border-color)' : 'none',
                       }}
                       className="upload-row"
                     >
                       <td style={tdStyle}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          <FileSpreadsheet
-                            size={16}
-                            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
-                          />
-                          <span
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: '200px',
-                            }}
-                          >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <FileSpreadsheet size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
                             {upload.file_name}
                           </span>
                         </div>
@@ -647,42 +1289,15 @@ export default function DataManagement() {
                       <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>
                         {formatNumber(upload.row_count)}
                       </td>
-                      <td
-                        style={{
-                          ...tdStyle,
-                          color: 'var(--accent-danger, #ef4444)',
-                          fontWeight: 600,
-                          fontVariantNumeric: 'tabular-nums',
-                          direction: 'ltr',
-                          textAlign: 'center',
-                        }}
-                      >
+                      <td style={{ ...tdStyle, color: 'var(--accent-danger, #ef4444)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_expenses)}
                       </td>
-                      <td
-                        style={{
-                          ...tdStyle,
-                          color: 'var(--accent-secondary, #10b981)',
-                          fontWeight: 600,
-                          fontVariantNumeric: 'tabular-nums',
-                          direction: 'ltr',
-                          textAlign: 'center',
-                        }}
-                      >
+                      <td style={{ ...tdStyle, color: 'var(--accent-secondary, #10b981)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_income)}
                       </td>
                       <td style={tdStyle}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                        >
-                          <Calendar
-                            size={14}
-                            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
-                          />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                           {formatDate(upload.uploaded_at)}
                         </div>
                       </td>
@@ -691,122 +1306,77 @@ export default function DataManagement() {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </CollapsibleSection>
         </motion.div>
       )}
 
-      {/* ─── Danger zone ────────────────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  DANGER ZONE                                                   */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4, duration: 0.35 }}
         style={{ marginTop: 'var(--space-xl)' }}
       >
-        <Card
-          padding="md"
-          className="glass-card"
+        <CollapsibleSection
+          icon={<AlertTriangle size={18} />}
+          iconColor="#f87171"
+          title="אזור מסוכן"
+          expanded={dangerZoneExpanded}
+          onToggle={() => setDangerZoneExpanded(!dangerZoneExpanded)}
+          dangerStyle
         >
-          <button
-            onClick={() => setDangerZoneExpanded(!dangerZoneExpanded)}
+          <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              width: '100%',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px 0',
-              fontFamily: 'var(--font-family)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '10px',
+              padding: '20px',
             }}
           >
-            <AlertTriangle size={18} style={{ color: '#f87171', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--accent-danger, #ef4444)' }}>
-              אזור מסוכן
-            </span>
-            <ChevronDown
-              size={16}
-              style={{
-                color: 'var(--text-muted)',
-                marginRight: 'auto',
-                transition: 'transform 0.2s',
-                transform: dangerZoneExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              }}
-            />
-          </button>
-
-          {dangerZoneExpanded && (
-            <div
-              style={{
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '10px',
-                padding: '20px',
-                marginTop: '16px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  marginBottom: '16px',
-                }}
-              >
-                <AlertTriangle size={20} style={{ color: '#f87171' }} />
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: 'var(--accent-danger, #ef4444)',
-                  }}
-                >
-                  פעולות בלתי הפיכות
-                </h3>
-              </div>
-
-              <p
-                style={{
-                  margin: '0 0 20px',
-                  fontSize: '0.8125rem',
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.6,
-                }}
-              >
-                פעולות אלו ימחקו נתונים לצמיתות ולא ניתן יהיה לשחזר אותם.
-              </p>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <Button
-                  variant="danger"
-                  icon={<Trash2 size={16} />}
-                  onClick={() => setShowDeleteIncomesModal(true)}
-                  disabled={(storageInfo?.incomeCount ?? 0) === 0}
-                >
-                  מחק את כל ההכנסות
-                </Button>
-
-                <Button
-                  variant="danger"
-                  icon={<Trash2 size={16} />}
-                  onClick={() => setShowDeleteTransactionsModal(true)}
-                  disabled={(storageInfo?.transactionSets ?? 0) === 0}
-                >
-                  מחק את כל העסקאות
-                </Button>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <AlertTriangle size={20} style={{ color: '#f87171' }} />
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--accent-danger, #ef4444)' }}>
+                פעולות בלתי הפיכות
+              </h3>
             </div>
-          )}
-        </Card>
+            <p style={{ margin: '0 0 20px', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              פעולות אלו ימחקו נתונים לצמיתות ולא ניתן יהיה לשחזר אותם.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <Button
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                onClick={() => setShowDeleteIncomesModal(true)}
+                disabled={(storageInfo?.incomeCount ?? 0) === 0}
+              >
+                מחק את כל ההכנסות
+              </Button>
+              <Button
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                onClick={() => setShowDeleteTransactionsModal(true)}
+                disabled={(storageInfo?.transactionSets ?? 0) === 0}
+              >
+                מחק את כל העסקאות
+              </Button>
+            </div>
+          </div>
+        </CollapsibleSection>
       </motion.div>
 
-      {/* ─── Delete incomes modal ───────────────────────────────────── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  MODALS & OVERLAYS                                             */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+
+      {/* Transaction drawer */}
+      <TransactionDrawer
+        transaction={selectedTransaction}
+        isOpen={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setSelectedTransaction(null) }}
+      />
+
+      {/* Delete incomes modal */}
       <Modal
         isOpen={showDeleteIncomesModal}
         onClose={() => setShowDeleteIncomesModal(false)}
@@ -827,46 +1397,24 @@ export default function DataManagement() {
             }}
           >
             <AlertTriangle size={24} style={{ color: '#f87171', flexShrink: 0 }} />
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                color: 'var(--text-primary)',
-                lineHeight: 1.6,
-              }}
-            >
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
               פעולה זו תמחק את כל ההכנסות שלך (
               <strong>{formatNumber(storageInfo?.incomeCount ?? 0)}</strong> רשומות).
               לא ניתן לשחזר נתונים אלו לאחר המחיקה.
             </p>
           </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'flex-start',
-            }}
-          >
-            <Button
-              variant="danger"
-              onClick={handleDeleteAllIncomes}
-              loading={deletingIncomes}
-              icon={<Trash2 size={16} />}
-            >
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
+            <Button variant="danger" onClick={handleDeleteAllIncomes} loading={deletingIncomes} icon={<Trash2 size={16} />}>
               מחק הכל
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteIncomesModal(false)}
-            >
+            <Button variant="secondary" onClick={() => setShowDeleteIncomesModal(false)}>
               ביטול
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* ─── Delete transactions modal ──────────────────────────────── */}
+      {/* Delete transactions modal */}
       <Modal
         isOpen={showDeleteTransactionsModal}
         onClose={() => setShowDeleteTransactionsModal(false)}
@@ -887,39 +1435,17 @@ export default function DataManagement() {
             }}
           >
             <AlertTriangle size={24} style={{ color: '#f87171', flexShrink: 0 }} />
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.875rem',
-                color: 'var(--text-primary)',
-                lineHeight: 1.6,
-              }}
-            >
+            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: 1.6 }}>
               פעולה זו תמחק את כל העסקאות השמורות שלך (
               <strong>{formatNumber(storageInfo?.transactionSets ?? 0)}</strong> סטים).
               לא ניתן לשחזר נתונים אלו לאחר המחיקה.
             </p>
           </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '10px',
-              justifyContent: 'flex-start',
-            }}
-          >
-            <Button
-              variant="danger"
-              onClick={handleDeleteAllTransactions}
-              loading={deletingTransactions}
-              icon={<Trash2 size={16} />}
-            >
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
+            <Button variant="danger" onClick={handleDeleteAllTransactions} loading={deletingTransactions} icon={<Trash2 size={16} />}>
               מחק הכל
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDeleteTransactionsModal(false)}
-            >
+            <Button variant="secondary" onClick={() => setShowDeleteTransactionsModal(false)}>
               ביטול
             </Button>
           </div>
@@ -929,6 +1455,14 @@ export default function DataManagement() {
       <style>{`
         .upload-row:hover td {
           background: var(--bg-elevated, #334155);
+        }
+        .income-delete-btn:hover:not(:disabled) {
+          background: rgba(239, 68, 68, 0.12) !important;
+          color: var(--accent-danger, #ef4444) !important;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
@@ -953,6 +1487,21 @@ const tdStyle: React.CSSProperties = {
   color: 'var(--text-primary)',
   fontSize: '0.8125rem',
   transition: 'background 0.15s ease',
+}
+
+const catThStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  textAlign: 'right',
+  fontWeight: 600,
+  color: 'var(--text-secondary)',
+  fontSize: '0.75rem',
+  whiteSpace: 'nowrap',
+}
+
+const catTdStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  color: 'var(--text-primary)',
+  fontSize: '0.8125rem',
 }
 
 const summaryBoxStyle: React.CSSProperties = {
