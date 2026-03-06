@@ -37,32 +37,9 @@ interface SidebarProps {
 // ─── Navigation Sections ─────────────────────────────────────────────
 const NAV_SECTIONS = [
   {
-    label: 'ראשי',
-    items: [
-      { to: '/', label: 'דשבורד', icon: LayoutDashboard },
-      { to: '/transactions', label: 'עסקאות', icon: Receipt },
-    ],
-  },
-  {
-    label: 'ניתוח',
-    items: [
-      { to: '/trends', label: 'מגמות', icon: TrendingUp },
-      { to: '/insights', label: 'תובנות', icon: Lightbulb },
-      { to: '/merchants', label: 'בתי עסק', icon: Store },
-    ],
-  },
-  {
-    label: 'תקציב',
-    items: [
-      { to: '/budget', label: 'תקציב', icon: Target },
-      { to: '/income', label: 'הכנסות', icon: Wallet },
-      { to: '/savings', label: 'חיסכון', icon: PiggyBank },
-    ],
-  },
-  {
     label: 'ניהול',
     items: [
-      { to: '/data-management', label: 'ניהול מידע', icon: Database },
+      { to: '/', label: 'ניהול נתונים', icon: Database },
     ],
   },
 ]
