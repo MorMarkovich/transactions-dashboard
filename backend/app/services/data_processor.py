@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -145,11 +145,21 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Auto-categorize "שונות" transactions by matching description keywords
     misc_mask = result['קטגוריה'] == 'שונות'
     if misc_mask.any():
+        # Substring-based keywords (longer, unambiguous)
         for kw, cat in KEYWORD_TO_CATEGORY.items():
             match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
             if match.any():
                 result.loc[match, 'קטגוריה'] = cat
-                misc_mask = misc_mask & ~match  # don't re-categorize already matched
+                misc_mask = misc_mask & ~match
+        # Word-boundary keywords (short/ambiguous like "הוט", "hot", "פז")
+        for kw, cat in EXACT_WORD_KEYWORDS.items():
+            if not misc_mask.any():
+                break
+            pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+            match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
+            if match.any():
+                result.loc[match, 'קטגוריה'] = cat
+                misc_mask = misc_mask & ~match
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
