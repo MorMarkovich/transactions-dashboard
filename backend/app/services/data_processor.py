@@ -95,7 +95,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # (salary, etc.) that should stay positive.  If we see them it means
     # the file already has correct signs.
     _income_keywords = [
-        'משכורת', 'שכר', 'salary', 'מענק', 'פנסיה', 'pension',
+        'משכורת', 'salary', 'מענק', 'פנסיה', 'pension',
         'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה',
         'העברת שכר', 'העב שכר', 'שכ"ע', 'שכר עבודה',
     ]
@@ -166,7 +166,14 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Reclassify check withdrawals as rent (שכר דירה)
     desc_lower = result['תיאור'].str.lower()
     for keyword in CHECK_WITHDRAWAL_KEYWORDS:
-        mask = desc_lower.str.contains(keyword.lower(), na=False)
+        kw = keyword.lower()
+        # Short keywords (≤3 chars) need word-boundary matching to avoid
+        # false positives like "צק" matching inside "סטימצקי".
+        if len(kw) <= 3:
+            pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+            mask = desc_lower.str.contains(pattern, na=False, regex=True)
+        else:
+            mask = desc_lower.str.contains(kw, na=False, regex=False)
         if mask.any():
             result.loc[mask, 'קטגוריה'] = 'שכר דירה'
 
