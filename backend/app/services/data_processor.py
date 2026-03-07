@@ -6,6 +6,7 @@ import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
 from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from .ai_categorizer import categorize_transactions
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -93,8 +94,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Also detect bank statements by presence of known income keywords
     # (salary, etc.) that should stay positive.  If we see them it means
     # the file already has correct signs.
-    _income_keywords = ['משכורת', 'שכר', 'salary', 'מענק', 'פנסיה', 'pension',
-                        'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה']
+    _income_keywords = [
+        'משכורת', 'שכר', 'salary', 'מענק', 'פנסיה', 'pension',
+        'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה',
+        'העברת שכר', 'העב שכר', 'שכ"ע', 'שכר עבודה',
+    ]
     if not is_bank_statement and desc_col in result.columns:
         _desc_check = result[desc_col].astype(str).str.lower()
         _has_income_rows = _desc_check.str.contains(
@@ -103,6 +107,18 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         if _has_income_rows:
             # File contains salary/income rows → treat as bank statement
             is_bank_statement = True
+
+    # Also detect bank statements by mixed sign distribution.
+    # Credit-card files are almost entirely positive (>80%); bank
+    # statements (עו"ש) typically have a mix of negative (debits) and
+    # positive (credits like salary, refunds).
+    if not is_bank_statement:
+        _nz = result['סכום'][result['סכום'] != 0]
+        if len(_nz) > 0:
+            _pos_r = (_nz > 0).sum() / len(_nz)
+            _neg_r = (_nz < 0).sum() / len(_nz)
+            if _pos_r >= 0.10 and _neg_r >= 0.10:
+                is_bank_statement = True
 
     non_zero = result['סכום'][result['סכום'] != 0]
     if not is_bank_statement and len(non_zero) > 0:
@@ -120,8 +136,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # turned salary/income rows negative.
     if desc_col in result.columns:
         _desc_for_income = result[desc_col].astype(str).str.lower()
-        _all_income_kw = _income_keywords + ['bit', 'ביט', 'paybox', 'פייבוקס',
-                                              'החזר', 'refund', 'זיכוי']
+        _all_income_kw = _income_keywords + ['החזר', 'refund', 'זיכוי']
         _income_desc_mask = _desc_for_income.str.contains(
             '|'.join(_all_income_kw), na=False,
         )
@@ -179,6 +194,17 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             if match.any():
                 result.loc[match, 'קטגוריה'] = cat
                 misc_mask = misc_mask & ~match
+
+    # AI-powered categorization for remaining "שונות" transactions
+    misc_mask = result['קטגוריה'] == 'שונות'
+    if misc_mask.any():
+        misc_descriptions = result.loc[misc_mask, 'תיאור'].tolist()
+        ai_mapping = categorize_transactions(misc_descriptions)
+        if ai_mapping:
+            misc_indices = result.index[misc_mask].tolist()
+            for local_idx, category in ai_mapping.items():
+                if 0 <= local_idx < len(misc_indices):
+                    result.at[misc_indices[local_idx], 'קטגוריה'] = category
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
