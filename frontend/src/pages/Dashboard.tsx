@@ -279,6 +279,14 @@ export default function Dashboard() {
 
   const hasBillingDate = metrics?.has_billing_date ?? false
 
+  // ── Sync category snapshot month with selectedMonth ──
+  useEffect(() => {
+    if (selectedMonth) {
+      setSnapshotMonthFrom(selectedMonth)
+      setSnapshotMonthTo(selectedMonth)
+    }
+  }, [selectedMonth])
+
   // ── Refetch category snapshot when month range or date type changes ──
   useEffect(() => {
     if (!sessionId) return
