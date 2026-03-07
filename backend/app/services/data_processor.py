@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -141,6 +141,15 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         mask = desc_lower.str.contains(keyword.lower(), na=False)
         if mask.any():
             result.loc[mask, 'קטגוריה'] = 'הוראות קבע'
+
+    # Auto-categorize "שונות" transactions by matching description keywords
+    misc_mask = result['קטגוריה'] == 'שונות'
+    if misc_mask.any():
+        for kw, cat in KEYWORD_TO_CATEGORY.items():
+            match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
+            if match.any():
+                result.loc[match, 'קטגוריה'] = cat
+                misc_mask = misc_mask & ~match  # don't re-categorize already matched
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
