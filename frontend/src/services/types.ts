@@ -65,6 +65,7 @@ export interface FileUploadResponse {
   sheets?: string[];
   transaction_count?: number;
   duplicates_removed?: number;
+  cc_payments_removed?: number;
 }
 
 export interface ChartData {
