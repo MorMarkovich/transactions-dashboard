@@ -16,6 +16,7 @@ from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
+from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -186,18 +187,52 @@ async def restore_session(body: RestoreSessionRequest):
 
         duplicates_removed = original_count - len(df)
 
+        # ── Remove credit-card bill payments from bank statement rows ──
+        # When the user uploads both a bank file and a credit-card file,
+        # the bank file contains a lump-sum payment to the card company
+        # (e.g. "ישראכרט חיוב ₪5,376") while the card file already lists
+        # all the individual charges.  Keeping both would double-count.
+        cc_payments_removed = 0
+        has_billing_date = 'תאריך_חיוב' in df.columns
+        has_desc = 'תיאור' in df.columns
+        if has_billing_date and has_desc:
+            # Rows from credit-card files have a valid billing date;
+            # rows from bank statements have NaT.
+            has_cc_rows = df['תאריך_חיוב'].notna().any()
+            has_bank_rows = df['תאריך_חיוב'].isna().any()
+
+            if has_cc_rows and has_bank_rows:
+                # Among bank-statement rows (NaT billing date), drop those
+                # whose description matches a credit-card company name.
+                desc_lower = df['תיאור'].str.lower()
+                is_bank_row = df['תאריך_חיוב'].isna()
+                is_cc_payment = desc_lower.str.contains(
+                    '|'.join(CREDIT_CARD_PAYMENT_KEYWORDS),
+                    na=False,
+                )
+                cc_payment_mask = is_bank_row & is_cc_payment
+                cc_payments_removed = int(cc_payment_mask.sum())
+                if cc_payments_removed > 0:
+                    df = df[~cc_payment_mask].reset_index(drop=True)
+
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
 
         msg = f"Restored {len(df)} transactions"
+        removed_parts = []
         if duplicates_removed > 0:
-            msg += f" ({duplicates_removed} כפילויות הוסרו)"
+            removed_parts.append(f"{duplicates_removed} כפילויות")
+        if cc_payments_removed > 0:
+            removed_parts.append(f"{cc_payments_removed} חיובי כרטיס אשראי כפולים")
+        if removed_parts:
+            msg += f" (הוסרו: {', '.join(removed_parts)})"
 
         return {
             "success": True,
             "session_id": session_id,
             "transaction_count": len(df),
             "duplicates_removed": duplicates_removed,
+            "cc_payments_removed": cc_payments_removed,
             "message": msg,
         }
     except Exception as e:
