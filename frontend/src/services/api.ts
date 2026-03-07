@@ -72,6 +72,16 @@ export const transactionsApi = {
   },
 
   /**
+   * Delete entire session (clear all in-memory data)
+   */
+  deleteSession: async (sessionId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete<{ success: boolean; message: string }>('/api/session', {
+      params: { sessionId },
+    });
+    return response.data;
+  },
+
+  /**
    * Upload transaction file
    */
   uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {

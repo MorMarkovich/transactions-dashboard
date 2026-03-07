@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Database,
@@ -278,6 +278,7 @@ export default function DataManagement() {
   const { user } = useAuth()
   const { toasts, showToast, removeToast } = useToast()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
 
   // ── Storage & session state ─────────────────────────────────────────
@@ -355,14 +356,22 @@ export default function DataManagement() {
     if (!sessionId) return
     setDeletingFile(fileName)
     try {
-      await transactionsApi.deleteSessionFile(sessionId, fileName)
-      await Promise.all([fetchSessionFiles(), fetchSessionInfo()])
+      const result = await transactionsApi.deleteSessionFile(sessionId, fileName)
+      if (result.remaining === 0) {
+        // All files removed — clear session entirely
+        await transactionsApi.deleteSession(sessionId).catch(() => {})
+        setSessionInfo(null)
+        setSessionFiles([])
+        navigate(window.location.pathname, { replace: true })
+      } else {
+        await Promise.all([fetchSessionFiles(), fetchSessionInfo()])
+      }
     } catch (err) {
       console.error('Error deleting file:', err)
     } finally {
       setDeletingFile(null)
     }
-  }, [sessionId, fetchSessionFiles, fetchSessionInfo])
+  }, [sessionId, fetchSessionFiles, fetchSessionInfo, navigate])
 
   useEffect(() => {
     if (!user) {
@@ -454,6 +463,14 @@ export default function DataManagement() {
       showToast('כל ההכנסות נמחקו בהצלחה', 'success')
       setShowDeleteIncomesModal(false)
       setIncomes([])
+      // Check if transactions are also empty — if so, clear session entirely
+      const info = await supabaseApi.getStorageInfo(user.id)
+      if (info.transactionSets === 0 && sessionId) {
+        await transactionsApi.deleteSession(sessionId).catch(() => {})
+        setSessionInfo(null)
+        setSessionFiles([])
+        navigate(window.location.pathname, { replace: true })
+      }
       await fetchStorageInfo()
     } catch (err) {
       console.error('Error deleting incomes:', err)
@@ -468,8 +485,16 @@ export default function DataManagement() {
     setDeletingTransactions(true)
     try {
       await supabaseApi.deleteAllTransactions(user.id)
+      // Also clear the in-memory backend session
+      if (sessionId) {
+        await transactionsApi.deleteSession(sessionId).catch(() => {})
+      }
       showToast('כל העסקאות נמחקו בהצלחה', 'success')
       setShowDeleteTransactionsModal(false)
+      setSessionInfo(null)
+      setSessionFiles([])
+      // Remove session_id from URL so Dashboard shows empty state
+      navigate(window.location.pathname, { replace: true })
       await fetchStorageInfo()
     } catch (err) {
       console.error('Error deleting transactions:', err)
@@ -607,8 +632,8 @@ export default function DataManagement() {
                       variant="danger"
                       size="sm"
                       onClick={() => handleDeleteFile(file.name)}
-                      disabled={deletingFile === file.name || sessionFiles.length <= 1}
-                      title={sessionFiles.length <= 1 ? 'לא ניתן למחוק את הקובץ האחרון' : `מחק ${file.name}`}
+                      disabled={deletingFile === file.name}
+                      title={`מחק ${file.name}`}
                       style={{ flexShrink: 0 }}
                     >
                       {deletingFile === file.name ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}

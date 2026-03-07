@@ -446,6 +446,14 @@ async def delete_session_file(sessionId: str = Query(...), file_name: str = Quer
     }
 
 
+@router.delete("/session")
+async def delete_session(sessionId: str = Query(...)):
+    """Delete an entire session and all its in-memory data."""
+    if sessionId in sessions:
+        del sessions[sessionId]
+    return {"success": True, "message": "Session cleared"}
+
+
 @router.get("/session-info")
 async def get_session_info(sessionId: str = Query(...)):
     """Get detailed metadata about the current session data."""
