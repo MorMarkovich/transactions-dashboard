@@ -157,8 +157,15 @@ export default function Sidebar({
           setUploadStatus('ממזג נתונים...')
           const merged = await transactionsApi.restoreSession(allTransactions)
           if (merged.success && merged.session_id) {
+            const removedParts: string[] = []
             if (merged.duplicates_removed && merged.duplicates_removed > 0) {
-              setUploadStatus(`הוסרו ${merged.duplicates_removed} עסקאות כפולות`)
+              removedParts.push(`${merged.duplicates_removed} כפילויות`)
+            }
+            if (merged.cc_payments_removed && merged.cc_payments_removed > 0) {
+              removedParts.push(`${merged.cc_payments_removed} חיובי אשראי כפולים`)
+            }
+            if (removedParts.length > 0) {
+              setUploadStatus(`הוסרו: ${removedParts.join(', ')}`)
             }
             saveToSupabase(allTransactions)
             onFileUploaded?.(merged.session_id)
