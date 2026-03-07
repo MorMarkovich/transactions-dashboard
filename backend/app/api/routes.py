@@ -16,7 +16,7 @@ from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
-from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS
+from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -186,6 +186,17 @@ async def restore_session(body: RestoreSessionRequest):
             df = df.drop_duplicates(subset=dedup_cols, keep='first').reset_index(drop=True)
 
         duplicates_removed = original_count - len(df)
+
+        # ── Auto-categorize "שונות" by description keywords ──────────
+        if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+            misc_mask = df['קטגוריה'] == 'שונות'
+            if misc_mask.any():
+                desc_lower = df['תיאור'].str.lower()
+                for kw, cat in KEYWORD_TO_CATEGORY.items():
+                    match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
+                    if match.any():
+                        df.loc[match, 'קטגוריה'] = cat
+                        misc_mask = misc_mask & ~match
 
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
