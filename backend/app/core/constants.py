@@ -112,6 +112,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'japanika', 'ג\'פניקה',
         'שיפודי', 'shipudei', 'restaurant',
         'starbucks', 'סטארבקס', 'מושלי',
+        'עילאי', 'רשי 33',
         'קייטרינג', 'catering',
         'טאקו', 'taco', 'kfc', 'burger king', 'בורגר קינג',
         'subway', 'סאבוויי',
