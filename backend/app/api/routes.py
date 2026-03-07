@@ -17,6 +17,7 @@ from io import BytesIO
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
 from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from ..services.ai_categorizer import categorize_transactions
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -205,6 +206,17 @@ async def restore_session(body: RestoreSessionRequest):
                     if match.any():
                         df.loc[match, 'קטגוריה'] = cat
                         misc_mask = misc_mask & ~match
+
+            # AI categorization for remaining "שונות" transactions
+            misc_mask = df['קטגוריה'] == 'שונות'
+            if misc_mask.any():
+                misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
+                ai_map = categorize_transactions(misc_descs)
+                if ai_map:
+                    misc_idx = df.index[misc_mask].tolist()
+                    for local_i, cat in ai_map.items():
+                        if 0 <= local_i < len(misc_idx):
+                            df.at[misc_idx[local_i], 'קטגוריה'] = cat
 
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
