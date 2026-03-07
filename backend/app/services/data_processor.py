@@ -89,6 +89,21 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # המרת סכומים חיוביים לשליליים (הוצאות) - רק אם רוב הערכים חיוביים
     # לא מבצעים המרה בדוחות עו"ש (זכות/חובה) כי הסימן כבר נכון
     is_bank_statement = 'זכות/חובה' in str(amount_col)
+
+    # Also detect bank statements by presence of known income keywords
+    # (salary, etc.) that should stay positive.  If we see them it means
+    # the file already has correct signs.
+    _income_keywords = ['משכורת', 'שכר', 'salary', 'מענק', 'פנסיה', 'pension',
+                        'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה']
+    if not is_bank_statement and desc_col in result.columns:
+        _desc_check = result[desc_col].astype(str).str.lower()
+        _has_income_rows = _desc_check.str.contains(
+            '|'.join(_income_keywords), na=False,
+        ).any()
+        if _has_income_rows:
+            # File contains salary/income rows → treat as bank statement
+            is_bank_statement = True
+
     non_zero = result['סכום'][result['סכום'] != 0]
     if not is_bank_statement and len(non_zero) > 0:
         positive_ratio = (non_zero > 0).sum() / len(non_zero)
@@ -100,16 +115,20 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             # Flip originally negative amounts to positive (income/refunds)
             result.loc[originally_negative, 'סכום'] = result.loc[originally_negative, 'סכום'].abs()
 
-    # Ensure Bit and Paybox income is recognized: if description matches known
-    # income transfer apps and amount is negative, flip to positive (income)
-    income_app_keywords = ['bit', 'ביט', 'paybox', 'פייבוקס']
-    if 'תיאור' in result.columns:
-        income_app_mask = result['תיאור'].str.lower().str.contains(
-            '|'.join(income_app_keywords), na=False
-        ) & (result['סכום'] > 0)
-        # These are already positive (income) - no action needed
-        # But if they were expenses that should be income, mark them
-        # (This is a safety net for bank statements where Bit/Paybox credits should be income)
+    # After sign-flipping, ensure known income descriptions stay positive.
+    # This catches cases where a credit-card file's sign-flip incorrectly
+    # turned salary/income rows negative.
+    if desc_col in result.columns:
+        _desc_for_income = result[desc_col].astype(str).str.lower()
+        _all_income_kw = _income_keywords + ['bit', 'ביט', 'paybox', 'פייבוקס',
+                                              'החזר', 'refund', 'זיכוי']
+        _income_desc_mask = _desc_for_income.str.contains(
+            '|'.join(_all_income_kw), na=False,
+        )
+        # Only fix rows that are negative but should be income
+        _wrong_sign = _income_desc_mask & (result['סכום'] < 0)
+        if _wrong_sign.any():
+            result.loc[_wrong_sign, 'סכום'] = result.loc[_wrong_sign, 'סכום'].abs()
     
     # ניקוי תיאור
     try:
