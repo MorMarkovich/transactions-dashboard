@@ -174,16 +174,14 @@ async def restore_session(body: RestoreSessionRequest):
             df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
 
         # ── Deduplicate transactions ────────────────────────────────────
+        # Only remove rows that match on ALL three fields (date + amount +
+        # description).  Requiring the description prevents dropping
+        # legitimate different transactions that happen to share the same
+        # date and amount.
         original_count = len(df)
-        dedup_cols = []
-        if 'תאריך' in df.columns:
-            dedup_cols.append('תאריך')
-        if 'סכום' in df.columns:
-            dedup_cols.append('סכום')
-        if 'תיאור' in df.columns:
-            dedup_cols.append('תיאור')
+        dedup_cols = ['תאריך', 'סכום', 'תיאור']
 
-        if len(dedup_cols) >= 2:
+        if all(c in df.columns for c in dedup_cols):
             df = df.drop_duplicates(subset=dedup_cols, keep='first').reset_index(drop=True)
 
         duplicates_removed = original_count - len(df)
