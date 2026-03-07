@@ -373,6 +373,67 @@ async def get_transactions(
     }
 
 
+@router.get("/session-files")
+async def get_session_files(sessionId: str = Query(...)):
+    """List source files in the current session with per-file stats."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if '_source_file' not in df.columns:
+        return {"files": []}
+
+    files = []
+    for name, group in df.groupby('_source_file'):
+        expenses = group[group['סכום'] < 0] if 'סכום' in group.columns else pd.DataFrame()
+        income = group[group['סכום'] > 0] if 'סכום' in group.columns else pd.DataFrame()
+        date_from = None
+        date_to = None
+        if 'תאריך' in group.columns:
+            valid_dates = group['תאריך'].dropna()
+            if not valid_dates.empty:
+                date_from = str(valid_dates.min().date())
+                date_to = str(valid_dates.max().date())
+        files.append({
+            "name": str(name),
+            "transaction_count": len(group),
+            "expense_count": len(expenses),
+            "income_count": len(income),
+            "total_expenses": round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2) if not expenses.empty and 'סכום_מוחלט' in expenses.columns else 0,
+            "total_income": round(_sanitize(float(income['סכום'].sum())), 2) if not income.empty else 0,
+            "date_from": date_from,
+            "date_to": date_to,
+        })
+
+    return {"files": files}
+
+
+@router.delete("/session-files")
+async def delete_session_file(sessionId: str = Query(...), file_name: str = Query(...)):
+    """Remove all transactions from a specific source file."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    if '_source_file' not in df.columns:
+        raise HTTPException(status_code=400, detail="No source file tracking in this session")
+
+    before = len(df)
+    df = df[df['_source_file'] != file_name].reset_index(drop=True)
+    removed = before - len(df)
+
+    if removed == 0:
+        raise HTTPException(status_code=404, detail=f"File '{file_name}' not found in session")
+
+    sessions[sessionId] = df
+    return {
+        "success": True,
+        "removed": removed,
+        "remaining": len(df),
+        "message": f"הוסרו {removed} עסקאות מקובץ {file_name}",
+    }
+
+
 @router.get("/session-info")
 async def get_session_info(sessionId: str = Query(...)):
     """Get detailed metadata about the current session data."""

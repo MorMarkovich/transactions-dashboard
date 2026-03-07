@@ -51,6 +51,26 @@ export const transactionsApi = {
   },
 
   /**
+   * List source files in the current session
+   */
+  getSessionFiles: async (sessionId: string): Promise<{ files: SessionFileInfo[] }> => {
+    const response = await api.get<{ files: SessionFileInfo[] }>('/api/session-files', {
+      params: { sessionId },
+    });
+    return response.data;
+  },
+
+  /**
+   * Remove all transactions from a specific source file
+   */
+  deleteSessionFile: async (sessionId: string, fileName: string): Promise<{ success: boolean; removed: number; remaining: number; message: string }> => {
+    const response = await api.delete<{ success: boolean; removed: number; remaining: number; message: string }>('/api/session-files', {
+      params: { sessionId, file_name: fileName },
+    });
+    return response.data;
+  },
+
+  /**
    * Upload transaction file
    */
   uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {
