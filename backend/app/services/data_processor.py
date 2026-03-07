@@ -98,6 +98,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         'משכורת', 'salary', 'מענק', 'פנסיה', 'pension',
         'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה',
         'העברת שכר', 'העב שכר', 'שכ"ע', 'שכר עבודה',
+        'הפקדת שכר', 'תשלום שכר', 'שכר חודש',
+        'קצבת ילדים', 'מענק עבודה', 'דמי לידה',
     ]
     if not is_bank_statement and desc_col in result.columns:
         _desc_check = result[desc_col].astype(str).str.lower()
@@ -111,13 +113,15 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Also detect bank statements by mixed sign distribution.
     # Credit-card files are almost entirely positive (>80%); bank
     # statements (עו"ש) typically have a mix of negative (debits) and
-    # positive (credits like salary, refunds).
+    # positive (credits like salary, refunds).  Use a low threshold
+    # (3%) because a bank statement may have very few income rows
+    # (e.g. 2 salaries out of 80 transactions = 2.5%).
     if not is_bank_statement:
         _nz = result['סכום'][result['סכום'] != 0]
         if len(_nz) > 0:
             _pos_r = (_nz > 0).sum() / len(_nz)
             _neg_r = (_nz < 0).sum() / len(_nz)
-            if _pos_r >= 0.10 and _neg_r >= 0.10:
+            if _pos_r >= 0.03 and _neg_r >= 0.03:
                 is_bank_statement = True
 
     non_zero = result['סכום'][result['סכום'] != 0]
