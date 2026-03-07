@@ -139,7 +139,7 @@ export default function Sidebar({
             { page: 1, page_size: 50000 }
           )
           // Tag each transaction with its source file name
-          const tagged = (data.transactions as Record<string, unknown>[]).map(tx => ({
+          const tagged = (data.transactions as unknown as Record<string, unknown>[]).map(tx => ({
             ...tx,
             _source_file: files[i].name,
           }))
