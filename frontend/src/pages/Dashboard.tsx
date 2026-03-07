@@ -27,7 +27,6 @@ import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
-import DrillDownChart from '../components/charts/DrillDownChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
@@ -706,22 +705,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Drill-down bar chart: Category → Merchant → Transactions */}
-              <Card variant="glass" padding="md">
-                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ArrowUpDown size={14} />
-                  פירוט הוצאות — לחצו לצלילה
-                </div>
-                {sessionId && selectedMonth && (
-                  <DrillDownChart
-                    categories={monthOverview.categories}
-                    month={selectedMonth}
-                    sessionId={sessionId}
-                    height={280}
-                    dateType={dateType}
-                  />
-                )}
-              </Card>
             </div>
           )}
         </motion.div>
