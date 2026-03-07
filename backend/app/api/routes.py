@@ -16,7 +16,7 @@ from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
-from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY
+from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -194,6 +194,14 @@ async def restore_session(body: RestoreSessionRequest):
                 desc_lower = df['תיאור'].str.lower()
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
+                    if match.any():
+                        df.loc[match, 'קטגוריה'] = cat
+                        misc_mask = misc_mask & ~match
+                for kw, cat in EXACT_WORD_KEYWORDS.items():
+                    if not misc_mask.any():
+                        break
+                    pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+                    match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
                     if match.any():
                         df.loc[match, 'קטגוריה'] = cat
                         misc_mask = misc_mask & ~match

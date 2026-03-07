@@ -625,13 +625,13 @@ export default function Dashboard() {
           ) : monthOverview && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 2fr',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
               gap: 'var(--space-md)',
             }}
               className="month-overview-grid"
             >
               {/* Summary cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+              <>
                 <Card variant="glass" padding="md">
                   <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }} />
@@ -703,7 +703,7 @@ export default function Dashboard() {
                     </div>
                   </Card>
                 )}
-              </div>
+              </>
 
             </div>
           )}
