@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Columns,
   Clock,
+  Hash,
   Plus,
   Loader2,
   Receipt,
