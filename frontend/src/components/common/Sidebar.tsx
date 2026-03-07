@@ -125,56 +125,49 @@ export default function Sidebar({
     setError(null)
 
     try {
-      if (files.length === 1) {
-        setUploadStatus('מעלה קובץ...')
-        const response = await transactionsApi.uploadFile(files[0])
+      // Upload all files, tag each transaction with its source file name
+      const allTransactions: unknown[] = []
+
+      for (let i = 0; i < files.length; i++) {
+        setUploadStatus(files.length === 1
+          ? 'מעלה קובץ...'
+          : `מעלה קובץ ${i + 1} מ-${files.length}...`)
+        const response = await transactionsApi.uploadFile(files[i])
         if (response.success && response.session_id) {
-          // Fetch all transactions in background and save to Supabase
-          transactionsApi.getTransactions(response.session_id, { page: 1, page_size: 50000 })
-            .then(data => saveToSupabase(data.transactions as unknown[]))
-            .catch(() => {})
-          onFileUploaded?.(response.session_id)
+          const data = await transactionsApi.getTransactions(
+            response.session_id,
+            { page: 1, page_size: 50000 }
+          )
+          // Tag each transaction with its source file name
+          const tagged = (data.transactions as Record<string, unknown>[]).map(tx => ({
+            ...tx,
+            _source_file: files[i].name,
+          }))
+          allTransactions.push(...tagged)
+        }
+      }
+
+      if (allTransactions.length > 0) {
+        setUploadStatus('ממזג נתונים...')
+        const merged = await transactionsApi.restoreSession(allTransactions)
+        if (merged.success && merged.session_id) {
+          const removedParts: string[] = []
+          if (merged.duplicates_removed && merged.duplicates_removed > 0) {
+            removedParts.push(`${merged.duplicates_removed} כפילויות`)
+          }
+          if (merged.cc_payments_removed && merged.cc_payments_removed > 0) {
+            removedParts.push(`${merged.cc_payments_removed} חיובי אשראי כפולים`)
+          }
+          if (removedParts.length > 0) {
+            setUploadStatus(`הוסרו: ${removedParts.join(', ')}`)
+          }
+          saveToSupabase(allTransactions)
+          onFileUploaded?.(merged.session_id)
         } else {
-          setError('שגיאה בהעלאת הקובץ')
+          setError('שגיאה במיזוג הקבצים')
         }
       } else {
-        // Multiple files: upload each, merge, create combined session
-        const allTransactions: unknown[] = []
-
-        for (let i = 0; i < files.length; i++) {
-          setUploadStatus(`מעלה קובץ ${i + 1} מ-${files.length}...`)
-          const response = await transactionsApi.uploadFile(files[i])
-          if (response.success && response.session_id) {
-            const data = await transactionsApi.getTransactions(
-              response.session_id,
-              { page: 1, page_size: 50000 }
-            )
-            allTransactions.push(...(data.transactions as unknown[]))
-          }
-        }
-
-        if (allTransactions.length > 0) {
-          setUploadStatus('ממזג נתונים...')
-          const merged = await transactionsApi.restoreSession(allTransactions)
-          if (merged.success && merged.session_id) {
-            const removedParts: string[] = []
-            if (merged.duplicates_removed && merged.duplicates_removed > 0) {
-              removedParts.push(`${merged.duplicates_removed} כפילויות`)
-            }
-            if (merged.cc_payments_removed && merged.cc_payments_removed > 0) {
-              removedParts.push(`${merged.cc_payments_removed} חיובי אשראי כפולים`)
-            }
-            if (removedParts.length > 0) {
-              setUploadStatus(`הוסרו: ${removedParts.join(', ')}`)
-            }
-            saveToSupabase(allTransactions)
-            onFileUploaded?.(merged.session_id)
-          } else {
-            setError('שגיאה במיזוג הקבצים')
-          }
-        } else {
-          setError('לא נמצאו עסקאות בקבצים')
-        }
+        setError('לא נמצאו עסקאות בקבצים')
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: unknown } } }

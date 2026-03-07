@@ -68,6 +68,17 @@ export interface FileUploadResponse {
   cc_payments_removed?: number;
 }
 
+export interface SessionFileInfo {
+  name: string;
+  transaction_count: number;
+  expense_count: number;
+  income_count: number;
+  total_expenses: number;
+  total_income: number;
+  date_from: string | null;
+  date_to: string | null;
+}
+
 export interface ChartData {
   data: Array<{
     labels?: string[];

@@ -36,6 +36,7 @@ import type {
   SessionInfo,
   Transaction,
   TransactionFilters,
+  SessionFileInfo,
 } from '../services/types'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -405,6 +406,9 @@ export default function DataManagement() {
   const [incomesExpanded, setIncomesExpanded] = useState(true)
   const [transactionsExpanded, setTransactionsExpanded] = useState(true)
   const [uploadsExpanded, setUploadsExpanded] = useState(true)
+  const [sessionFiles, setSessionFiles] = useState<SessionFileInfo[]>([])
+  const [filesExpanded, setFilesExpanded] = useState(true)
+  const [deletingFile, setDeletingFile] = useState<string | null>(null)
 
   // ── Fetch storage info ──────────────────────────────────────────────
   const fetchStorageInfo = useCallback(async () => {
@@ -438,6 +442,29 @@ export default function DataManagement() {
     }
   }, [sessionId])
 
+  const fetchSessionFiles = useCallback(async () => {
+    if (!sessionId) return
+    try {
+      const data = await transactionsApi.getSessionFiles(sessionId)
+      setSessionFiles(data.files)
+    } catch {
+      setSessionFiles([])
+    }
+  }, [sessionId])
+
+  const handleDeleteFile = useCallback(async (fileName: string) => {
+    if (!sessionId) return
+    setDeletingFile(fileName)
+    try {
+      await transactionsApi.deleteSessionFile(sessionId, fileName)
+      await Promise.all([fetchSessionFiles(), fetchSessionInfo()])
+    } catch (err) {
+      console.error('Error deleting file:', err)
+    } finally {
+      setDeletingFile(null)
+    }
+  }, [sessionId, fetchSessionFiles, fetchSessionInfo])
+
   useEffect(() => {
     if (!user) {
       setLoading(false)
@@ -446,11 +473,11 @@ export default function DataManagement() {
 
     const load = async () => {
       setLoading(true)
-      await Promise.all([fetchStorageInfo(), fetchIncomes(), fetchSessionInfo()])
+      await Promise.all([fetchStorageInfo(), fetchIncomes(), fetchSessionInfo(), fetchSessionFiles()])
       setLoading(false)
     }
     load()
-  }, [user, fetchStorageInfo, fetchIncomes, fetchSessionInfo])
+  }, [user, fetchStorageInfo, fetchIncomes, fetchSessionInfo, fetchSessionFiles])
 
   // ── Fetch categories ────────────────────────────────────────────────
   useEffect(() => {
@@ -733,6 +760,78 @@ export default function DataManagement() {
           />
         )}
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  UPLOADED FILES MANAGER                                        */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {sessionId && sessionFiles.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <CollapsibleSection
+            icon={<FileSpreadsheet size={18} />}
+            iconColor="#0ea5e9"
+            title="קבצים שהועלו"
+            badge={`${sessionFiles.length} קבצים`}
+            expanded={filesExpanded}
+            onToggle={() => setFilesExpanded(!filesExpanded)}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+              {sessionFiles.map((file) => (
+                <Card key={file.name} variant="glass" padding="sm">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <FileSpreadsheet size={16} style={{ color: '#0ea5e9', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {file.name}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Hash size={11} />
+                          {formatNumber(file.transaction_count)} עסקאות
+                        </span>
+                        {file.total_expenses > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
+                            <TrendingDown size={11} />
+                            {formatCurrency(file.total_expenses)}
+                          </span>
+                        )}
+                        {file.total_income > 0 && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)' }}>
+                            <TrendingUp size={11} />
+                            {formatCurrency(file.total_income)}
+                          </span>
+                        )}
+                        {file.date_from && file.date_to && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={11} />
+                            {file.date_from} — {file.date_to}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteFile(file.name)}
+                      disabled={deletingFile === file.name || sessionFiles.length <= 1}
+                      title={sessionFiles.length <= 1 ? 'לא ניתן למחוק את הקובץ האחרון' : `מחק ${file.name}`}
+                      style={{ flexShrink: 0 }}
+                    >
+                      {deletingFile === file.name ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </CollapsibleSection>
+        </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  TRANSACTION STATS & TABLE                                     */}
