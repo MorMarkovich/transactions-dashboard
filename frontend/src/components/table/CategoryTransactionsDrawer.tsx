@@ -230,6 +230,20 @@ export default function CategoryTransactionsDrawer({
                         >
                           {tx.תיאור}
                         </p>
+                        {tx.הערות && (
+                          <p
+                            style={{
+                              margin: '2px 0 0',
+                              fontSize: '0.75rem',
+                              color: 'var(--text-muted)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {tx.הערות}
+                          </p>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
                           <Calendar size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                           <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>

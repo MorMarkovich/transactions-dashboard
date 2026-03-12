@@ -127,6 +127,22 @@ export const transactionsApi = {
   },
 
   /**
+   * Update manual notes (הערות) for a single transaction
+   */
+  updateTransactionNote: async (
+    sessionId: string,
+    transactionId: number,
+    notes: string,
+  ): Promise<{ success: boolean }> => {
+    const response = await api.post<{ success: boolean }>('/api/transactions/note', {
+      session_id: sessionId,
+      transaction_id: transactionId,
+      notes,
+    });
+    return response.data;
+  },
+
+  /**
    * Get metrics
    */
   getMetrics: async (sessionId: string, signal?: AbortSignal): Promise<MetricsData> => {

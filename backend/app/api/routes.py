@@ -142,6 +142,12 @@ class RestoreSessionRequest(BaseModel):
         return v
 
 
+class UpdateTransactionNoteRequest(BaseModel):
+    session_id: str
+    transaction_id: int
+    notes: Optional[str] = None
+
+
 @router.post("/restore-session")
 async def restore_session(body: RestoreSessionRequest):
     """Restore a backend session from saved transaction JSON data."""
@@ -193,6 +199,10 @@ async def restore_session(body: RestoreSessionRequest):
             misc_mask = df['קטגוריה'] == 'שונות'
             if misc_mask.any():
                 desc_lower = df['תיאור'].str.lower()
+            # Psagot investment transfers override any existing category
+            psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
+            if psagot_mask.any():
+                df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
                     if match.any():
@@ -246,6 +256,20 @@ async def restore_session(body: RestoreSessionRequest):
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
 
+        # Ensure notes column exists
+        if 'הערות' not in df.columns:
+            df['הערות'] = None
+
+        # Ensure stable id column exists and is integer-typed
+        if 'id' not in df.columns:
+            df['id'] = pd.Series(range(len(df)), dtype='int64')
+        else:
+            df['id'] = pd.to_numeric(df['id'], errors='coerce')
+            if df['id'].isna().any():
+                missing_mask = df['id'].isna()
+                df.loc[missing_mask, 'id'] = df.index[missing_mask]
+            df['id'] = df['id'].astype('int64')
+
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
 
@@ -269,6 +293,35 @@ async def restore_session(body: RestoreSessionRequest):
     except Exception as e:
         import traceback
         raise HTTPException(status_code=500, detail=f"{str(e)}\n{traceback.format_exc()}")
+
+
+@router.post("/transactions/note")
+async def update_transaction_note(body: UpdateTransactionNoteRequest):
+    """Update the manual notes (הערות) field for a single transaction."""
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[body.session_id]
+
+    if 'id' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not support transaction updates")
+
+    mask = df['id'] == body.transaction_id
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Normalize empty/whitespace-only strings to None
+    value = body.notes.strip() if body.notes is not None else None
+    if value == "":
+        value = None
+
+    if 'הערות' not in df.columns:
+        df['הערות'] = None
+
+    df.loc[mask, 'הערות'] = value
+    sessions[body.session_id] = df
+
+    return {"success": True}
 
 
 @router.get("/transactions")
