@@ -3,7 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calendar, Tag, CreditCard, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { transactionsApi } from '../../services/api'
-import type { Transaction } from '../../services/types'
+import type { Transaction as BaseTransaction } from '../../services/types'
+
+// Allow extra dynamic fields (e.g. 'ארבע ספרות אחרונות') on top of the core Transaction shape
+interface Transaction extends BaseTransaction {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any
+}
 
 interface TransactionDrawerProps {
   transaction: Transaction | null
