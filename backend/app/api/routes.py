@@ -196,13 +196,13 @@ async def restore_session(body: RestoreSessionRequest):
 
         # ── Auto-categorize "שונות" by description keywords ──────────
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
-            misc_mask = df['קטגוריה'] == 'שונות'
-            if misc_mask.any():
-                desc_lower = df['תיאור'].str.lower()
+            desc_lower = df['תיאור'].str.lower()
             # Psagot investment transfers override any existing category
             psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
             if psagot_mask.any():
                 df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
+            misc_mask = df['קטגוריה'] == 'שונות'
+            if misc_mask.any():
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
                     if match.any():
