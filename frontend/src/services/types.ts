@@ -12,6 +12,8 @@ export interface Transaction {
   יום_בשבוע?: number;
   תאריך_חיוב?: string;
   חודש_חיוב?: string;
+  הערות?: string;
+  id?: number;
 }
 
 export interface TransactionResponse {

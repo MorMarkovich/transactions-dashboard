@@ -169,6 +169,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     
     # Reclassify check withdrawals as rent (שכר דירה)
     desc_lower = result['תיאור'].str.lower()
+
+    # Reclassify Psagot investment transfers as a dedicated category
+    psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
+    if psagot_mask.any():
+        result.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
     for keyword in CHECK_WITHDRAWAL_KEYWORDS:
         kw = keyword.lower()
         # Short keywords (≤3 chars) need word-boundary matching to avoid
@@ -230,6 +235,17 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     else:
         # יצירת DataFrame ריק עם העמודות הנדרשות
         result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])
+
+    # Ensure notes column exists
+    if 'הערות' not in result.columns:
+        result['הערות'] = None
+
+    # Stable row identifier for per-transaction updates from the UI
+    if not result.empty:
+        result['id'] = result.index.astype(int)
+    else:
+        # Keep an empty id column for schema consistency
+        result['id'] = pd.Series(dtype='int64')
     
     # Replace NaN and Infinity with None to ensure valid JSON serialization
     result = result.replace([np.inf, -np.inf], None)

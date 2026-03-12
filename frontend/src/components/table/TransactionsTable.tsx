@@ -55,6 +55,13 @@ const TableRow = memo(function TableRow({
         </span>
         {tx.קטגוריה}
       </td>
+      <td className="col-notes">
+        {tx.הערות ? (
+          <span title={tx.הערות} aria-label="הערות קיימות">
+            📝
+          </span>
+        ) : null}
+      </td>
       <td
         className="col-amount"
         style={{
@@ -236,6 +243,7 @@ export default function TransactionsTable({
               )}
               <SortHeader field="תיאור" label="תיאור" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
               <SortHeader field="קטגוריה" label="קטגוריה" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+              <th scope="col">הערות</th>
               <SortHeader field="סכום" label="סכום" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
             </tr>
           </thead>
@@ -245,7 +253,7 @@ export default function TransactionsTable({
               <>
                 {startIndex > 0 && (
                   <tr style={{ height: startIndex * ROW_HEIGHT }} aria-hidden="true">
-                    <td colSpan={showBillingDate ? 5 : 4} style={{ padding: 0, border: 'none' }} />
+                    <td colSpan={showBillingDate ? 6 : 5} style={{ padding: 0, border: 'none' }} />
                   </tr>
                 )}
                 {visibleTransactions.map((tx, i) => (
@@ -262,7 +270,7 @@ export default function TransactionsTable({
                     style={{ height: (sortedTransactions.length - endIndex) * ROW_HEIGHT }}
                     aria-hidden="true"
                   >
-                    <td colSpan={showBillingDate ? 5 : 4} style={{ padding: 0, border: 'none' }} />
+                    <td colSpan={showBillingDate ? 6 : 5} style={{ padding: 0, border: 'none' }} />
                   </tr>
                 )}
               </>

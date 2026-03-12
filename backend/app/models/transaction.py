@@ -14,3 +14,5 @@ class Transaction(BaseModel):
     סכום_מוחלט: Optional[float] = None
     חודש: Optional[str] = None
     יום_בשבוע: Optional[int] = None
+    הערות: Optional[str] = None
+    id: Optional[int] = None

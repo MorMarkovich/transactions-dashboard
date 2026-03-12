@@ -225,6 +225,16 @@ export default function Transactions() {
     setPage(newPage)
   }, [])
 
+  const handleUpdateTransaction = useCallback(
+    (updated: Transaction) => {
+      setTransactions((prev) =>
+        prev.map((tx) => (tx.id !== undefined && tx.id === updated.id ? updated : tx)),
+      )
+      setSelectedTransaction(updated)
+    },
+    [],
+  )
+
   const handleExport = useCallback(async () => {
     if (!sessionId) return
 
@@ -459,6 +469,8 @@ export default function Transactions() {
         transaction={selectedTransaction}
         isOpen={drawerOpen}
         onClose={() => { setDrawerOpen(false); setSelectedTransaction(null) }}
+        sessionId={sessionId}
+        onUpdateTransaction={handleUpdateTransaction}
       />
     </div>
   )

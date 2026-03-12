@@ -1,23 +1,19 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calendar, Tag, CreditCard, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
-
-interface Transaction {
-  תאריך: string
-  תיאור: string
-  סכום: number
-  קטגוריה?: string
-  [key: string]: any
-}
+import { transactionsApi } from '../../services/api'
+import type { Transaction } from '../../services/types'
 
 interface TransactionDrawerProps {
   transaction: Transaction | null
   isOpen: boolean
   onClose: () => void
+  sessionId: string | null
+  onUpdateTransaction?: (updated: Transaction) => void
 }
 
-export default function TransactionDrawer({ transaction, isOpen, onClose }: TransactionDrawerProps) {
+export default function TransactionDrawer({ transaction, isOpen, onClose, sessionId, onUpdateTransaction }: TransactionDrawerProps) {
   // Close on Escape
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -35,6 +31,35 @@ export default function TransactionDrawer({ transaction, isOpen, onClose }: Tran
 
   const amount = transaction?.סכום ?? 0
   const isExpense = amount < 0
+
+  const [notes, setNotes] = useState<string>(transaction?.הערות ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setNotes(transaction?.הערות ?? '')
+    setError(null)
+    setSaving(false)
+  }, [transaction])
+
+  const handleSaveNotes = useCallback(async () => {
+    if (!transaction || !sessionId || typeof transaction.id !== 'number') {
+      return
+    }
+    try {
+      setSaving(true)
+      setError(null)
+      await transactionsApi.updateTransactionNote(sessionId, transaction.id, notes)
+      if (onUpdateTransaction) {
+        onUpdateTransaction({ ...transaction, הערות: notes })
+      }
+    } catch (e) {
+      console.error('Failed to save notes', e)
+      setError('שמירת ההערות נכשלה. נסו שוב.')
+    } finally {
+      setSaving(false)
+    }
+  }, [transaction, sessionId, notes, onUpdateTransaction])
 
   return (
     <AnimatePresence>
@@ -197,6 +222,68 @@ export default function TransactionDrawer({ transaction, isOpen, onClose }: Tran
                   value={`**** ${transaction['ארבע ספרות אחרונות']}`}
                 />
               )}
+
+              {/* Manual notes */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginTop: '8px',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  הערות
+                </span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="הוסיפו הערה חופשית על העסקה הזו"
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    resize: 'vertical',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md, 8px)',
+                    border: '1px solid var(--glass-border)',
+                    background: 'var(--glass-bg)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.875rem',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                {error && (
+                  <span style={{ color: 'var(--danger)', fontSize: '0.75rem' }}>
+                    {error}
+                  </span>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveNotes}
+                    disabled={saving || !sessionId || !transaction}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '999px',
+                      border: 'none',
+                      background: 'var(--accent-primary, #4f46e5)',
+                      color: '#fff',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      cursor: saving ? 'default' : 'pointer',
+                      opacity: saving ? 0.7 : 1,
+                    }}
+                  >
+                    {saving ? 'שומר...' : 'שמור הערות'}
+                  </button>
+                </div>
+              </div>
             </div>
           </motion.div>
         </>
