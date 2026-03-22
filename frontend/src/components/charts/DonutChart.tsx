@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { formatPercent } from '../../utils/formatting'
 import {
   PieChart,
   Pie,
@@ -59,7 +60,7 @@ interface TooltipProps {
 function ChartTooltip({ active, payload, total }: TooltipProps) {
   if (!active || !payload?.length) return null
   const entry = payload[0]
-  const pct = total > 0 ? ((entry.value / total) * 100).toFixed(1) : '0'
+  const pct = total > 0 ? formatPercent((entry.value / total) * 100) : '0%'
 
   return (
     <div
@@ -77,7 +78,7 @@ function ChartTooltip({ active, payload, total }: TooltipProps) {
         {entry.name}
       </p>
       <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0', fontSize: 'var(--text-sm)' }}>
-        {formatShekel(entry.value)} &middot; {pct}%
+        {formatShekel(entry.value)} &middot; {pct}
       </p>
     </div>
   )
@@ -114,7 +115,7 @@ function renderCustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent
       fontWeight={600}
       style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
     >
-      {`${(percent * 100).toFixed(0)}%`}
+      {formatPercent(percent * 100, 0)}
     </text>
   )
 }

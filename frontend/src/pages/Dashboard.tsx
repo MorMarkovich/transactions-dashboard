@@ -36,7 +36,7 @@ import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
-import { formatCurrency } from '../utils/formatting'
+import { formatCurrency, formatPercent } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import type {
   MetricsData,
@@ -902,7 +902,7 @@ export default function Dashboard() {
                 >
                   <span style={{ fontSize: '0.8rem' }}>{get_icon(cat.name)}</span>
                   {cat.name}
-                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({cat.percent.toFixed(0)}%)</span>
+                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({formatPercent(cat.percent, 0)})</span>
                 </button>
               )
             })}
@@ -1045,7 +1045,7 @@ export default function Dashboard() {
                         </span>
                         {/* Percentage */}
                         <span style={{ fontSize: '0.625rem', color: 'var(--accent)', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)' }}>
-                          {cat.percent.toFixed(1)}%
+                          {formatPercent(cat.percent)}
                         </span>
                         {/* Month-over-month change */}
                         {cat.month_change !== 0 && (
