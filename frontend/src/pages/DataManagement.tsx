@@ -546,8 +546,8 @@ export default function DataManagement() {
           index={0}
           icon={<Database size={22} style={{ color: '#818cf8' }} />}
           iconBg="rgba(129, 140, 248, 0.12)"
-          label="סטים של עסקאות"
-          value={formatNumber(storageInfo?.transactionSets ?? 0)}
+          label="עסקאות נטענו"
+          value={formatNumber(sessionInfo?.total_rows ?? storageInfo?.transactionSets ?? 0)}
         />
         <InfoCard
           index={1}
@@ -561,7 +561,7 @@ export default function DataManagement() {
           icon={<Upload size={22} style={{ color: '#0ea5e9' }} />}
           iconBg="rgba(14, 165, 233, 0.12)"
           label="העלאות"
-          value={formatNumber(uploads.length)}
+          value={formatNumber(sessionFiles.length || uploads.length)}
         />
         {sessionId && (
           <InfoCard
@@ -1142,19 +1142,6 @@ export default function DataManagement() {
         </div>
       </Modal>
 
-      <style>{`
-        .upload-row:hover td {
-          background: var(--bg-elevated, #334155);
-        }
-        .income-delete-btn:hover:not(:disabled) {
-          background: rgba(239, 68, 68, 0.12) !important;
-          color: var(--accent-danger, #ef4444) !important;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

@@ -355,6 +355,7 @@ export default function Income() {
 
             <form
               onSubmit={handleAddIncome}
+              noValidate
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -374,8 +375,14 @@ export default function Income() {
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                min="0"
                 step="0.01"
+                onInvalid={(e) => {
+                  const input = e.target as HTMLInputElement
+                  if (input.validity.rangeUnderflow) {
+                    input.setCustomValidity('הערך חייב להיות 0 או יותר')
+                  }
+                }}
+                onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
                 style={{ direction: 'ltr', textAlign: 'left' }}
               />
 
@@ -694,21 +701,6 @@ export default function Income() {
         </div>
       </div>
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        .income-delete-btn:hover:not(:disabled) {
-          background: rgba(239, 68, 68, 0.12) !important;
-          color: var(--accent-danger, #ef4444) !important;
-        }
-
-        @media (max-width: 768px) {
-          /* Stack to single column on mobile - handled by parent grid */
-        }
-      `}</style>
     </div>
   )
 }

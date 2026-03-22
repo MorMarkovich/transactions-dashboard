@@ -114,6 +114,8 @@ export const transactionsApi = {
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
       if (filters.search) params.append('search', filters.search);
+      if (filters.min_amount != null) params.append('min_amount', filters.min_amount.toString());
+      if (filters.max_amount != null) params.append('max_amount', filters.max_amount.toString());
       if (filters.sort_by) params.append('sort_by', filters.sort_by);
       if (filters.sort_order) params.append('sort_order', filters.sort_order);
       if (filters.page) params.append('page', filters.page.toString());

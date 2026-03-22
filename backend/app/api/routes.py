@@ -331,6 +331,8 @@ async def get_transactions(
     end_date: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = "desc",
     page: int = 1,
@@ -339,9 +341,9 @@ async def get_transactions(
     """Get transactions with filters"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     df = sessions[sessionId].copy()
-    
+
     # Apply filters
     if start_date:
         df = df[df['תאריך'] >= pd.to_datetime(start_date)]
@@ -351,6 +353,11 @@ async def get_transactions(
         df = df[df['קטגוריה'] == category]
     if search:
         df = df[df['תיאור'].str.contains(search, case=False, na=False)]
+    if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
+        if min_amount is not None:
+            df = df[df['סכום_מוחלט'] >= min_amount]
+        if max_amount is not None:
+            df = df[df['סכום_מוחלט'] <= max_amount]
     
     # Sort
     if sort_by:

@@ -503,14 +503,6 @@ export default function Insights() {
           </div>
         </motion.div>
       )}
-
-      <style>{`
-        @media (max-width: 768px) {
-          .insight-card {
-            /* Let the grid handle 1-col on mobile via parent */
-          }
-        }
-      `}</style>
     </div>
   )
 }

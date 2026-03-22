@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useAppNotifications } from '../context/NotificationContext'
 import { motion } from 'framer-motion'
 import {
   Calendar,
@@ -74,6 +75,7 @@ function formatMonthLabel(mmYYYY: string): string {
 export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const { setNotifications } = useAppNotifications()
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
@@ -141,6 +143,24 @@ export default function Dashboard() {
     setDismissedAlerts((prev) => new Set(prev).add(id))
   }, [])
 
+  // ── Push notifications to header notification center ──
+  useEffect(() => {
+    if (!metrics) return
+    const items: { id: string; type: 'anomaly' | 'upload' | 'insight'; title: string; message: string; time: string; read: boolean }[] = []
+    const now = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+
+    for (const a of anomalies) {
+      items.push({ id: `anomaly-${a.date}-${a.description}`, type: 'anomaly', title: 'עסקה חריגה', message: `${a.description}`, time: now, read: false })
+    }
+    if (forecast && forecast.trend_direction === 'up') {
+      items.push({ id: 'forecast-up', type: 'insight', title: 'תחזית הוצאות', message: 'מגמת עלייה בהוצאות', time: now, read: false })
+    }
+    if (metrics.total_income > 0 && Math.abs(metrics.total_expenses) > metrics.total_income) {
+      items.push({ id: 'expenses-exceed-income', type: 'insight', title: 'הוצאות עולות על הכנסות', message: `הוצאות: ${Math.abs(metrics.total_expenses).toLocaleString('he-IL')} > הכנסות: ${metrics.total_income.toLocaleString('he-IL')}`, time: now, read: false })
+    }
+    setNotifications(items)
+  }, [metrics, anomalies, forecast, setNotifications])
+
   // ── Inject responsive CSS once (prevent duplicate <style> elements) ──
   useEffect(() => {
     const STYLE_ID = 'dashboard-responsive-css'
@@ -180,7 +200,6 @@ export default function Dashboard() {
           transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
           transactionsApi.getRecurring(sessionId, signal).catch(() => null),
           transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
-          transactionsApi.getCategorySnapshot(sessionId, signal, undefined, undefined, dateType).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -193,7 +212,6 @@ export default function Dashboard() {
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
         if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
-        if (results[10]) setCategorySnapshot(results[10] as CategorySnapshotData)
 
         setDataLoadedAt(new Date())
 
@@ -208,6 +226,7 @@ export default function Dashboard() {
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
+        if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         const message = err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
         setError(message)
       } finally {
@@ -286,10 +305,9 @@ export default function Dashboard() {
     }
   }, [selectedMonth])
 
-  // ── Refetch category snapshot when month range or date type changes ──
+  // ── Fetch category snapshot when month range or date type changes ──
   useEffect(() => {
     if (!sessionId) return
-    if (!snapshotMonthFrom && !snapshotMonthTo) return // initial load already covered
     const controller = new AbortController()
     transactionsApi.getCategorySnapshot(
       sessionId, controller.signal,

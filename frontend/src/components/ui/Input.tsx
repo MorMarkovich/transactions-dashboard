@@ -114,17 +114,6 @@ export default function Input({
           {error}
         </p>
       )}
-
-      <style>{`
-        .ui-input::placeholder {
-          color: var(--text-muted);
-        }
-
-        .ui-input:focus {
-          border-color: var(--accent-primary) !important;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-        }
-      `}</style>
     </div>
   )
 }

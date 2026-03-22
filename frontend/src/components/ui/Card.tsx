@@ -84,22 +84,6 @@ export default function Card({
       style={style}
     >
       {children}
-
-      <style>{`
-        .card-interactive:hover {
-          transform: translateY(-2px);
-          border-color: var(--border-accent) !important;
-          box-shadow: var(--shadow-lg), var(--shadow-glow-sm);
-        }
-
-        .card-interactive:active {
-          transform: translateY(0);
-        }
-
-        .card-glow-hover:hover {
-          box-shadow: var(--card-glow, 0 0 20px rgba(129,140,248,0.15)) !important;
-        }
-      `}</style>
     </div>
   )
 }

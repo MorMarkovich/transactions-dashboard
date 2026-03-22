@@ -40,6 +40,7 @@ export function formatDate(dateStr: string): string {
  * @param decimals - Number of decimal places (default: 1)
  */
 export function formatPercent(value: number, decimals: number = 1): string {
+  if (value > 0 && value < 1) return '<1%'
   return `${value.toFixed(decimals)}%`
 }
 

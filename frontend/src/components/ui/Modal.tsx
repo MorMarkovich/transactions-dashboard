@@ -181,13 +181,6 @@ export default function Modal({
           </motion.div>
         </motion.div>
       )}
-
-      <style>{`
-        .ui-modal-close:hover {
-          background: var(--bg-elevated, #334155) !important;
-          color: var(--text-primary) !important;
-        }
-      `}</style>
     </AnimatePresence>
   )
 }

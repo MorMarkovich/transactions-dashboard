@@ -132,13 +132,6 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
       >
         <X size={14} />
       </button>
-
-      <style>{`
-        .ui-toast-close:hover {
-          background: var(--bg-elevated, #334155) !important;
-          color: var(--text-primary) !important;
-        }
-      `}</style>
     </motion.div>
   )
 }

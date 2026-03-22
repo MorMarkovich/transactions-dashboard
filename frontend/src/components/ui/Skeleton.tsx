@@ -111,41 +111,6 @@ export default function Skeleton({
       {Array.from({ length: count }, (_, i) => (
         <SkeletonBase key={i} {...props} />
       ))}
-
-      <style>{`
-        .skeleton-shimmer {
-          background: linear-gradient(
-            90deg,
-            var(--bg-card) 25%,
-            var(--bg-elevated, #334155) 50%,
-            var(--bg-card) 75%
-          );
-          background-size: 200% 100%;
-          animation: skeleton-shimmer 1.5s ease-in-out infinite;
-        }
-
-        .skeleton-card {
-          animation: skeleton-pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes skeleton-shimmer {
-          0% {
-            background-position: 200% 0;
-          }
-          100% {
-            background-position: -200% 0;
-          }
-        }
-
-        @keyframes skeleton-pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.7;
-          }
-        }
-      `}</style>
     </>
   )
 }

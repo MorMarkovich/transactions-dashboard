@@ -85,23 +85,6 @@ export default function Select({
           }}
         />
       </div>
-
-      <style>{`
-        .ui-select:focus {
-          border-color: var(--accent-primary) !important;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-        }
-
-        .ui-select:hover:not(:focus) {
-          border-color: var(--border-color-hover);
-        }
-
-        .ui-select option {
-          background: var(--bg-card);
-          color: var(--text-primary);
-          padding: 8px;
-        }
-      `}</style>
     </div>
   )
 }

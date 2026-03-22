@@ -99,41 +99,6 @@ export default function Button({
         ) : null}
         {children && <span>{children}</span>}
       </button>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        .ui-btn:not(:disabled):hover {
-          transform: translateY(-1px);
-          filter: brightness(1.1);
-        }
-
-        .ui-btn:not(:disabled):active {
-          transform: translateY(0);
-          filter: brightness(0.95);
-        }
-
-        .ui-btn-primary:not(:disabled):hover {
-          box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45) !important;
-        }
-
-        .ui-btn-secondary:not(:disabled):hover {
-          border-color: var(--border-color-hover) !important;
-          background: var(--bg-card-hover) !important;
-        }
-
-        .ui-btn-ghost:not(:disabled):hover {
-          background: var(--bg-card) !important;
-          color: var(--text-primary) !important;
-        }
-
-        .ui-btn-danger:not(:disabled):hover {
-          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4) !important;
-        }
-      `}</style>
     </>
   )
 }

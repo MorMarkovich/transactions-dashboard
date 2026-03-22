@@ -107,6 +107,8 @@ export interface TransactionFilters {
   end_date?: string;
   category?: string;
   search?: string;
+  min_amount?: number;
+  max_amount?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   page?: number;
