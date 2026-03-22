@@ -81,24 +81,6 @@ export default function ProgressBar({
           </span>
         )}
       </div>
-
-      <style>{`
-        .progress-bar-shimmer {
-          background: linear-gradient(
-            90deg,
-            transparent 0%,
-            rgba(255, 255, 255, 0.15) 50%,
-            transparent 100%
-          );
-          background-size: 200% 100%;
-          animation: progress-shimmer 2s ease-in-out infinite;
-        }
-
-        @keyframes progress-shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-      `}</style>
     </div>
   )
 }

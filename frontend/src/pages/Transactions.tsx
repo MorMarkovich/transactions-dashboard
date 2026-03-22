@@ -127,6 +127,7 @@ export default function Transactions() {
       .then(setCategories)
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return
+        if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         console.error('Error loading categories:', err)
       })
 
@@ -149,6 +150,8 @@ export default function Transactions() {
         category: filters.category,
         start_date: filters.startDate,
         end_date: filters.endDate,
+        min_amount: filters.minAmount,
+        max_amount: filters.maxAmount,
       }
 
       try {
@@ -173,6 +176,7 @@ export default function Transactions() {
         setDateTo(response.date_to ?? null)
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
+        if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         console.error('Error loading transactions:', err)
       } finally {
         setLoading(false)

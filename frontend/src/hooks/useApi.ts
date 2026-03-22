@@ -39,6 +39,7 @@ export function useApi<T>(
       })
       .catch((err: unknown) => {
         if (abortController.signal.aborted) return
+        if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
 
         const message =
           err instanceof Error ? err.message : 'שגיאה בלתי צפויה'
