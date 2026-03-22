@@ -129,24 +129,6 @@ export default function Tabs({
           </button>
         )
       })}
-
-      <style>{`
-        .ui-tab-pill:not(.ui-tab-active):hover {
-          background: var(--bg-elevated, #334155) !important;
-          color: var(--text-primary) !important;
-        }
-
-        .ui-tab-underline:not(.ui-tab-active):hover {
-          color: var(--text-secondary) !important;
-          border-bottom-color: var(--border-color-hover) !important;
-        }
-
-        .ui-tab:focus-visible {
-          outline: 2px solid var(--accent-primary);
-          outline-offset: 2px;
-          border-radius: 6px;
-        }
-      `}</style>
     </div>
   )
 }

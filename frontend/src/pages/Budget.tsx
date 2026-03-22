@@ -30,21 +30,25 @@ interface BudgetGoal {
   limit: number
 }
 
-const STORAGE_KEY = 'budget-goals'
+const STORAGE_KEY_PREFIX = 'budget-goals'
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
-function loadGoals(): BudgetGoal[] {
+function getStorageKey(sessionId: string | null): string {
+  return sessionId ? `${STORAGE_KEY_PREFIX}-${sessionId}` : STORAGE_KEY_PREFIX
+}
+
+function loadGoals(sessionId: string | null): BudgetGoal[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(getStorageKey(sessionId))
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function saveGoals(goals: BudgetGoal[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(goals))
+function saveGoals(goals: BudgetGoal[], sessionId: string | null) {
+  localStorage.setItem(getStorageKey(sessionId), JSON.stringify(goals))
 }
 
 // ─── Animation ─────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ export default function Budget() {
   const [loading, setLoading] = useState(false)
 
   // Budget goals
-  const [goals, setGoals] = useState<BudgetGoal[]>(loadGoals)
+  const [goals, setGoals] = useState<BudgetGoal[]>(() => loadGoals(sessionId))
   const [newCategory, setNewCategory] = useState('')
   const [newLimit, setNewLimit] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -153,7 +157,7 @@ export default function Budget() {
 
   // Handlers
   const addGoal = useCallback(() => {
-    if (!newCategory || !newLimit || Number(newLimit) <= 0) return
+    if (!newCategory || !newLimit || Number(newLimit) <= 0 || Number(newLimit) > 10_000_000) return
     const goal: BudgetGoal = {
       id: `goal-${Date.now()}`,
       category: newCategory,
@@ -161,7 +165,7 @@ export default function Budget() {
     }
     const updated = [...goals, goal]
     setGoals(updated)
-    saveGoals(updated)
+    saveGoals(updated, sessionId)
     setNewCategory('')
     setNewLimit('')
     setShowForm(false)
@@ -171,7 +175,7 @@ export default function Budget() {
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
       setGoals(updated)
-      saveGoals(updated)
+      saveGoals(updated, sessionId)
     },
     [goals],
   )
@@ -396,6 +400,7 @@ export default function Budget() {
                 <input
                   type="number"
                   min="0"
+                  max="10000000"
                   step="100"
                   value={newLimit}
                   onChange={(e) => setNewLimit(e.target.value)}
@@ -608,13 +613,6 @@ export default function Budget() {
         </motion.div>
       )}
 
-      <style>{`
-        @media (max-width: 768px) {
-          .budget-goals-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   )
 }
