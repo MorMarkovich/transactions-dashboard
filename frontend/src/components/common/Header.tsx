@@ -1,5 +1,6 @@
 import { Sun, Moon, Menu, X, CreditCard, Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import { useAppNotifications } from '../../context/NotificationContext'
 import NotificationCenter from './NotificationCenter'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -16,6 +17,7 @@ const isMac =
 
 export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
+  const { notifications, clearNotifications } = useAppNotifications()
 
   return (
     <header
@@ -160,7 +162,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
         }}
       >
         {/* Notifications */}
-        <NotificationCenter />
+        <NotificationCenter notifications={notifications} onClear={clearNotifications} />
 
         {/* Theme toggle */}
         <button
@@ -185,37 +187,6 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
         </button>
       </div>
 
-      {/* ─── Responsive styles ─── */}
-      <style>{`
-        @media (max-width: 1023px) {
-          .header-hamburger {
-            display: flex !important;
-          }
-          .header-subtitle {
-            display: none !important;
-          }
-          .header-search-bar {
-            display: none !important;
-          }
-        }
-
-        .header-icon-btn:hover {
-          background: var(--bg-card-hover) !important;
-          color: var(--text-primary) !important;
-          border-color: var(--border-hover) !important;
-        }
-
-        .header-hamburger:hover {
-          background: var(--bg-card-hover) !important;
-          color: var(--text-primary) !important;
-          border-color: var(--border-hover) !important;
-        }
-
-        .header-search-bar:hover {
-          border-color: var(--border-accent) !important;
-          background: var(--bg-card-hover) !important;
-        }
-      `}</style>
     </header>
   )
 }

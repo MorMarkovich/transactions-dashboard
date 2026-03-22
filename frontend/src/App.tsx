@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { NotificationProvider } from './context/NotificationContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import Layout from './components/common/Layout'
 import { Loader2 } from 'lucide-react'
@@ -104,7 +105,16 @@ function AppRoutes() {
         <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
         <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />
         <Route path="/data-management" element={<ProtectedPage><DataManagement /></ProtectedPage>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={
+          <ProtectedPage>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', direction: 'rtl' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '16px' }}>404</div>
+              <h2 style={{ margin: '0 0 8px', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>הדף לא נמצא</h2>
+              <p style={{ margin: '0 0 24px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>הכתובת שהזנת אינה קיימת</p>
+              <a href="/" style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.875rem', textDecoration: 'none' }}>חזרה לדשבורד</a>
+            </div>
+          </ProtectedPage>
+        } />
       </Routes>
     </Suspense>
   )
@@ -114,11 +124,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <ErrorBoundary>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AuthProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AuthProvider>
+        </NotificationProvider>
       </ErrorBoundary>
     </ThemeProvider>
   )

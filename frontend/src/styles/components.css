@@ -1,0 +1,212 @@
+/**
+ * Consolidated component styles — moved from inline <style> tags to prevent
+ * CSS text from leaking into the DOM content tree (accessibility, screen readers, SEO).
+ */
+
+/* ── Shared keyframes ────────────────────────────────────────────────── */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Button ──────────────────────────────────────────────────────────── */
+
+.ui-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.ui-btn:not(:disabled):active {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+.ui-btn-primary:not(:disabled):hover {
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45) !important;
+}
+
+.ui-btn-secondary:not(:disabled):hover {
+  border-color: var(--border-color-hover) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+.ui-btn-ghost:not(:disabled):hover {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.ui-btn-danger:not(:disabled):hover {
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4) !important;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────── */
+
+.card-interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-lg), var(--shadow-glow-sm);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+.card-glow-hover:hover {
+  box-shadow: var(--card-glow, 0 0 20px rgba(129,140,248,0.15)) !important;
+}
+
+/* ── Input ───────────────────────────────────────────────────────────── */
+
+.ui-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ui-input:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* ── Select ──────────────────────────────────────────────────────────── */
+
+.ui-select:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.ui-select:hover:not(:focus) {
+  border-color: var(--border-color-hover);
+}
+
+.ui-select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 8px;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────── */
+
+.ui-modal-close:hover {
+  background: var(--bg-elevated, #334155) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────── */
+
+.ui-toast-close:hover {
+  background: var(--bg-elevated, #334155) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────── */
+
+.ui-tab-pill:not(.ui-tab-active):hover {
+  background: var(--bg-elevated, #334155) !important;
+  color: var(--text-primary) !important;
+}
+
+.ui-tab-underline:not(.ui-tab-active):hover {
+  color: var(--text-secondary) !important;
+  border-bottom-color: var(--border-color-hover) !important;
+}
+
+.ui-tab:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Skeleton ────────────────────────────────────────────────────────── */
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--bg-elevated, #334155) 50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.skeleton-card {
+  animation: skeleton-pulse 2s ease-in-out infinite;
+}
+
+/* ── ProgressBar ─────────────────────────────────────────────────────── */
+
+.progress-bar-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+/* ── Income / DataManagement ─────────────────────────────────────────── */
+
+.income-delete-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: var(--accent-danger, #ef4444) !important;
+}
+
+.upload-row:hover td {
+  background: var(--bg-elevated, #334155);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023px) {
+  .header-hamburger {
+    display: flex !important;
+  }
+  .header-subtitle {
+    display: none !important;
+  }
+  .header-search-bar {
+    display: none !important;
+  }
+}
+
+.header-icon-btn:hover {
+  background: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-hover) !important;
+}
+
+.header-hamburger:hover {
+  background: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-hover) !important;
+}
+
+.header-search-bar:hover {
+  border-color: var(--border-accent) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+/* ── Responsive: Budget ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .budget-goals-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

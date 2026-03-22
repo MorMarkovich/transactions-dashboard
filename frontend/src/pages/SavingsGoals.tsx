@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   PiggyBank,
@@ -20,7 +21,7 @@ import type { SavingsGoal } from '../services/types'
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'savings-goals'
+const STORAGE_KEY_PREFIX = 'savings-goals'
 
 const CATEGORIES = [
   'חופשה',
@@ -54,24 +55,31 @@ const cardVariants = {
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
-function loadGoals(): SavingsGoal[] {
+function getStorageKey(sessionId: string | null): string {
+  return sessionId ? `${STORAGE_KEY_PREFIX}-${sessionId}` : STORAGE_KEY_PREFIX
+}
+
+function loadGoals(sessionId: string | null): SavingsGoal[] {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(getStorageKey(sessionId))
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function saveGoals(goals: SavingsGoal[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(goals))
+function saveGoals(goals: SavingsGoal[], sessionId: string | null) {
+  localStorage.setItem(getStorageKey(sessionId), JSON.stringify(goals))
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 
 export default function SavingsGoals() {
+  const [searchParams] = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+
   // State
-  const [goals, setGoals] = useState<SavingsGoal[]>(loadGoals)
+  const [goals, setGoals] = useState<SavingsGoal[]>(() => loadGoals(sessionId))
   const [showForm, setShowForm] = useState(false)
   const [addFundsId, setAddFundsId] = useState<string | null>(null)
   const [addFundsAmount, setAddFundsAmount] = useState('')
@@ -81,6 +89,7 @@ export default function SavingsGoals() {
   const [newTarget, setNewTarget] = useState('')
   const [newCategory, setNewCategory] = useState(CATEGORIES[0])
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
+  const [formError, setFormError] = useState('')
 
   // Summary
   const summary = useMemo(() => {
@@ -93,7 +102,15 @@ export default function SavingsGoals() {
   // ── Handlers ──────────────────────────────────────────────────────────
 
   const addGoal = useCallback(() => {
-    if (!newName.trim() || !newTarget || Number(newTarget) <= 0) return
+    if (!newName.trim()) {
+      setFormError('נא להזין שם ליעד')
+      return
+    }
+    if (!newTarget || Number(newTarget) <= 0) {
+      setFormError('נא להזין סכום יעד חיובי')
+      return
+    }
+    setFormError('')
 
     const goal: SavingsGoal = {
       id: crypto.randomUUID(),
@@ -106,7 +123,7 @@ export default function SavingsGoals() {
     }
     const updated = [...goals, goal]
     setGoals(updated)
-    saveGoals(updated)
+    saveGoals(updated, sessionId)
     setNewName('')
     setNewTarget('')
     setNewCategory(CATEGORIES[0])
@@ -118,7 +135,7 @@ export default function SavingsGoals() {
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
       setGoals(updated)
-      saveGoals(updated)
+      saveGoals(updated, sessionId)
     },
     [goals],
   )
@@ -134,7 +151,7 @@ export default function SavingsGoals() {
           : g,
       )
       setGoals(updated)
-      saveGoals(updated)
+      saveGoals(updated, sessionId)
       setAddFundsId(null)
       setAddFundsAmount('')
     },
@@ -476,18 +493,22 @@ export default function SavingsGoals() {
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: 'flex', gap: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={addGoal}
-                    disabled={!newName.trim() || !newTarget || Number(newTarget) <= 0}
                   >
                     הוסף
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
+                  <Button variant="secondary" size="sm" onClick={() => { setShowForm(false); setFormError('') }}>
                     ביטול
                   </Button>
+                  {formError && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-danger, #ef4444)', fontWeight: 500 }}>
+                      {formError}
+                    </span>
+                  )}
                 </div>
               </div>
             </Card>
