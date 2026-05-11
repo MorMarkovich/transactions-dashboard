@@ -6,10 +6,13 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  passwordRecovery: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>
+  clearPasswordRecovery: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -18,6 +21,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  // True between PASSWORD_RECOVERY event and the user setting a new password.
+  // While true, the protected routes redirect to /reset-password.
+  const [passwordRecovery, setPasswordRecovery] = useState(false)
 
   useEffect(() => {
     // Coordinate the initial getSession() with the onAuthStateChange listener:
@@ -34,12 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return
       settled = true
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+      }
     })
 
     return () => {
@@ -74,13 +83,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    // redirectTo must be in the Supabase project's allow-list
+    // (Authentication → URL Configuration → Redirect URLs).
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
     if (!error) return { error: null }
     return { error: error.message || 'אירעה שגיאה. נסה שוב.' }
   }
 
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (!error) return { error: null }
+    return { error: error.message || 'אירעה שגיאה. נסה שוב.' }
+  }
+
+  const clearPasswordRecovery = () => setPasswordRecovery(false)
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        passwordRecovery,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        updatePassword,
+        clearPasswordRecovery,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

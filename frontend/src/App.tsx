@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
 const Login = lazy(() => import('./pages/Login'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Trends = lazy(() => import('./pages/Trends'))
@@ -60,12 +61,15 @@ function ContentLoader() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, passwordRecovery } = useAuth()
 
   if (loading) {
     return <PageLoader />
   }
 
+  // Force users coming from a password-reset email to set a new password
+  // before they can use the rest of the app.
+  if (passwordRecovery) return <Navigate to="/reset-password" replace />
   if (!user) return <Navigate to="/login" replace />
   return <>{children}</>
 }
@@ -96,6 +100,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
