@@ -72,15 +72,17 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   // Reset on open
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing UI state to externally-controlled isOpen prop
       setQuery('')
       setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [isOpen])
 
-  // Keep selected index in bounds
+  // Keep selected index in bounds when filter shrinks the list
   useEffect(() => {
     if (selectedIndex >= filteredCommands.length) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clamping to derived bound
       setSelectedIndex(Math.max(0, filteredCommands.length - 1))
     }
   }, [filteredCommands.length, selectedIndex])

@@ -88,7 +88,7 @@ export interface ChartData {
     x?: string[];
     y?: number[];
   }>;
-  layout: Record<string, any>;
+  layout: Record<string, unknown>;
 }
 
 export interface CategoryData {

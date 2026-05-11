@@ -20,21 +20,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
+    // Coordinate the initial getSession() with the onAuthStateChange listener:
+    // once either fires, mark loading=false. Ignore late getSession() resolution
+    // if the listener already settled state (avoids clobbering newer sessions).
+    let cancelled = false
+    let settled = false
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled || settled) return
+      settled = true
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return
+      settled = true
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
@@ -64,7 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email)
-    return { error: error?.message ?? null }
+    if (!error) return { error: null }
+    return { error: error.message || 'אירעה שגיאה. נסה שוב.' }
   }
 
   return (
@@ -74,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook is intentionally co-located with provider
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be inside AuthProvider')

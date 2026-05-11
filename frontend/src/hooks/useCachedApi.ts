@@ -48,6 +48,12 @@ export function useCachedApi<T>(
   const [loading, setLoading] = useState<boolean>(!getCached<T>(key, ttl) && !skip)
   const [error, setError] = useState<string | null>(null)
   const fetchIdRef = useRef(0)
+  // Always-fresh fetcher so we don't need it in deps (callers often pass an
+  // inline arrow function, which would otherwise re-fire the effect every render).
+  const fetcherRef = useRef(fetcher)
+  useEffect(() => {
+    fetcherRef.current = fetcher
+  })
 
   useEffect(() => {
     if (skip) return
@@ -55,6 +61,7 @@ export function useCachedApi<T>(
     // Check cache first — return early without fetching
     const cached = getCached<T>(key, ttl)
     if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from external shared-cache store on key change
       setData(cached)
       setLoading(false)
       setError(null)
@@ -67,7 +74,7 @@ export function useCachedApi<T>(
     setLoading(true)
     setError(null)
 
-    fetcher(controller.signal)
+    fetcherRef.current(controller.signal)
       .then((result) => {
         if (fetchId !== fetchIdRef.current) return
         globalCache.set(key, { data: result, timestamp: Date.now() })
@@ -83,19 +90,17 @@ export function useCachedApi<T>(
       })
 
     return () => controller.abort()
-  }, [key, fetcher, ttl, skip])
+  }, [key, ttl, skip])
 
   const retry = useCallback(() => {
     globalCache.delete(key)
-    fetchIdRef.current++
-    // Force a re-render by setting loading
+    const fetchId = ++fetchIdRef.current
     setLoading(true)
     setError(null)
 
     const controller = new AbortController()
-    const fetchId = fetchIdRef.current
 
-    fetcher(controller.signal)
+    fetcherRef.current(controller.signal)
       .then((result) => {
         if (fetchId !== fetchIdRef.current) return
         globalCache.set(key, { data: result, timestamp: Date.now() })
@@ -109,7 +114,7 @@ export function useCachedApi<T>(
         setError(message)
         setLoading(false)
       })
-  }, [key, fetcher])
+  }, [key])
 
   const invalidate = useCallback(() => {
     globalCache.delete(key)

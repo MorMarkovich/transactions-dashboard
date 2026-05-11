@@ -175,6 +175,7 @@ export function ToastContainer({ toasts, removeToast }: {
 // ─── useToast hook ───────────────────────────────────────────────────
 let toastCounter = 0
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook is intentionally co-located with Toast components
 export function useToast() {
   const [toasts, setToasts] = useState<ToastData[]>([])
 

@@ -68,6 +68,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook is intentionally co-located with provider
 export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext)
   if (!context) {

@@ -129,7 +129,7 @@ export default function SavingsGoals() {
     setNewCategory(CATEGORIES[0])
     setNewColor(PRESET_COLORS[0])
     setShowForm(false)
-  }, [newName, newTarget, newCategory, newColor, goals])
+  }, [newName, newTarget, newCategory, newColor, goals, sessionId])
 
   const removeGoal = useCallback(
     (id: string) => {
@@ -137,7 +137,7 @@ export default function SavingsGoals() {
       setGoals(updated)
       saveGoals(updated, sessionId)
     },
-    [goals],
+    [goals, sessionId],
   )
 
   const handleAddFunds = useCallback(
@@ -155,7 +155,7 @@ export default function SavingsGoals() {
       setAddFundsId(null)
       setAddFundsAmount('')
     },
-    [goals, addFundsAmount],
+    [goals, addFundsAmount, sessionId],
   )
 
   return (

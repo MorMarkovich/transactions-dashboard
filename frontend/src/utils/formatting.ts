@@ -21,9 +21,17 @@ export function formatCurrency(amount: number): string {
 
 /**
  * Format a date string for Hebrew display as DD/MM/YYYY.
- * Accepts ISO strings (YYYY-MM-DD) and other Date-parseable formats.
+ * Accepts ISO date-only strings (YYYY-MM-DD) and other Date-parseable formats.
+ * For YYYY-MM-DD inputs, parses as a calendar date so a date doesn't shift by
+ * one day in timezones west of UTC (where `new Date('2026-05-11')` is UTC
+ * midnight and getDate() then returns the previous day).
  */
 export function formatDate(dateStr: string): string {
+  const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (isoDateOnly) {
+    return `${isoDateOnly[3]}/${isoDateOnly[2]}/${isoDateOnly[1]}`
+  }
+
   const date = new Date(dateStr)
   if (isNaN(date.getTime())) return dateStr
 
