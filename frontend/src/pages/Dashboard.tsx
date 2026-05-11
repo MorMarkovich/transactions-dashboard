@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
 import { motion } from 'framer-motion'
@@ -118,24 +118,36 @@ export default function Dashboard() {
   const [drawerTotal, setDrawerTotal] = useState(0)
   const [drawerLoading, setDrawerLoading] = useState(false)
 
+  const drawerFetchRef = useRef<AbortController | null>(null)
   const handleCategoryCardClick = useCallback(async (categoryName: string) => {
     if (!sessionId) return
+    // Abort any in-flight drawer fetch so its later resolution can't overwrite
+    // the newer drawer state (e.g. user clicks rapidly between categories).
+    drawerFetchRef.current?.abort()
+    const controller = new AbortController()
+    drawerFetchRef.current = controller
+
     setDrawerCategory(categoryName)
     setDrawerOpen(true)
     setDrawerLoading(true)
+    setDrawerTransactions([])
+    setDrawerTotal(0)
     try {
-      // Use snapshot date range filters to match what the card displays
       const data = await transactionsApi.getCategoryTransactions(
-        sessionId, '', categoryName, dateType, undefined, undefined,
+        sessionId, '', categoryName, dateType, undefined, controller.signal,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
       )
+      if (controller.signal.aborted) return
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
-    } catch {
+    } catch (err: unknown) {
+      if (controller.signal.aborted) return
+      const name = (err as { name?: string })?.name
+      if (name === 'AbortError' || name === 'CanceledError') return
       setDrawerTransactions([])
       setDrawerTotal(0)
     } finally {
-      setDrawerLoading(false)
+      if (!controller.signal.aborted) setDrawerLoading(false)
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
 

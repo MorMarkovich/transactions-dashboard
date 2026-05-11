@@ -39,6 +39,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook is intentionally co-located with provider
 export function useAppNotifications() {
   return useContext(NotificationContext)
 }

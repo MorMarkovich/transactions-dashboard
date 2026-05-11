@@ -169,7 +169,7 @@ export default function Budget() {
     setNewCategory('')
     setNewLimit('')
     setShowForm(false)
-  }, [newCategory, newLimit, goals])
+  }, [newCategory, newLimit, goals, sessionId])
 
   const removeGoal = useCallback(
     (id: string) => {
@@ -177,7 +177,7 @@ export default function Budget() {
       setGoals(updated)
       saveGoals(updated, sessionId)
     },
-    [goals],
+    [goals, sessionId],
   )
 
   // ── No session ──────────────────────────────────────────────────────

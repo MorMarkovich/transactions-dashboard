@@ -42,15 +42,6 @@ export const supabaseApi = {
 
   // ─── User Settings ────────────────────────────────────────────────────
 
-  getUserSettings: async (userId: string) => {
-    const { data } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    return data;
-  },
-
   updateUserSettings: async (userId: string, settings: { theme?: string }) => {
     const { error } = await supabase
       .from('user_settings')
@@ -73,7 +64,11 @@ export const supabaseApi = {
       .select('data')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    if (error || !data || data.length === 0) return null;
+    // Distinguish "fetch failed" (throw, callers can decide what to do) from
+    // "no data" (return null). Silently swallowing errors here hid Supabase
+    // outages from the Layout restore flow.
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
 
     // New format: single row whose data is already a full array
     if (Array.isArray(data[0].data)) {

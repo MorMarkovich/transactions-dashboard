@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useId, useMemo } from 'react'
 
 interface SparklineChartProps {
   data: number[]
@@ -49,7 +49,10 @@ const SparklineChart: React.FC<SparklineChartProps> = React.memo(function Sparkl
     return { line, area }
   }, [data, width, height])
 
-  const gradientId = useMemo(() => `spark-grad-${Math.random().toString(36).slice(2, 8)}`, [])
+  // useId gives a stable, render-pure id (replaces Math.random which violated
+  // the no-impure-during-render rule and could also collide on SSR rehydration).
+  const reactId = useId()
+  const gradientId = `spark-grad-${reactId.replace(/:/g, '')}`
 
   if (!data || data.length < 2) return null
 

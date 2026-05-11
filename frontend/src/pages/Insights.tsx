@@ -204,8 +204,9 @@ export default function Insights() {
         ])
         setInsights(insightsData)
         setTrendStats(trendStatsData)
-      } catch (err: any) {
-        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+      } catch (err: unknown) {
+        const name = (err as { name?: string })?.name
+        if (name !== 'CanceledError' && name !== 'AbortError') {
           console.error('Error loading insights:', err)
           setError('שגיאה בטעינת התובנות')
         }

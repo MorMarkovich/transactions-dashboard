@@ -1,8 +1,13 @@
 import { formatCurrency } from '../../utils/formatting'
 
+interface TooltipPayloadItem {
+  value?: number
+  name?: string
+}
+
 interface ChartTooltipProps {
   active?: boolean
-  payload?: any[]
+  payload?: TooltipPayloadItem[]
   label?: string
   formatter?: (value: number) => string
   showPercentage?: boolean

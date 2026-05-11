@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { CreditCard, Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react'
@@ -47,6 +47,15 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [name, setName] = useState('')
+
+  // Pending switch-to-login timer (after successful signup). Cleared on unmount
+  // or page switch to avoid setState-on-unmounted warnings.
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    return () => {
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current)
+    }
+  }, [])
 
   const clearForm = () => {
     setEmail('')
@@ -105,7 +114,8 @@ export default function Login() {
     }
     setSuccess('\u05E0\u05E8\u05E9\u05DE\u05EA \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4! \u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05DE\u05D9\u05D9\u05DC')
     setLoading(false)
-    setTimeout(() => switchPage('login'), 2500)
+    if (switchTimerRef.current) clearTimeout(switchTimerRef.current)
+    switchTimerRef.current = setTimeout(() => switchPage('login'), 2500)
   }
 
   const handleReset = async (e: React.FormEvent) => {
@@ -190,9 +200,9 @@ export default function Login() {
 
             {/* Feature badges */}
             <div className="flex flex-wrap gap-3">
-              {FEATURES.map((f, i) => (
+              {FEATURES.map((f) => (
                 <span
-                  key={i}
+                  key={f.text}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',

@@ -98,6 +98,7 @@ export default function Layout({ children }: LayoutProps) {
     }
 
     if (!sessionId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync to absence of session_id query param
       setSessionValidating(false)
       doRestore()
       return
