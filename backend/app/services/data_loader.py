@@ -45,20 +45,25 @@ def load_transaction_file(file_path: str) -> pd.DataFrame:
             if excel_file is not None:
                 try:
                     excel_file.close()
-                except:
+                except Exception:
                     pass
             raise ValueError(f"Error loading Excel file: {str(e)}")
-    
+
     elif file_path.endswith('.csv'):
         # Try different encodings
         encodings = ['utf-8', 'utf-8-sig', 'windows-1255', 'iso-8859-8']
+        tried = []
         for encoding in encodings:
             try:
                 df = pd.read_csv(file_path, encoding=encoding, header=None)
                 return df
-            except (UnicodeDecodeError, pd.errors.EmptyDataError):
+            except (UnicodeDecodeError, pd.errors.EmptyDataError) as e:
+                tried.append(f"{encoding}: {type(e).__name__}")
                 continue
-        raise ValueError("Could not read CSV file with any encoding")
+        raise ValueError(
+            "Could not read CSV file with any of the attempted encodings ("
+            + ", ".join(tried) + ")"
+        )
     
     else:
         raise ValueError(f"Unsupported file format: {file_path}")

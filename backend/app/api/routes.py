@@ -4,6 +4,7 @@ API routes for transactions dashboard
 import uuid
 import os
 import math
+import re
 from typing import Optional, Any
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException
 import json as _json
@@ -13,6 +14,26 @@ from fastapi.responses import FileResponse, StreamingResponse
 import pandas as pd
 import numpy as np
 from io import BytesIO
+
+
+_MONTH_RE = re.compile(r'^(0[1-9]|1[0-2])/\d{4}$')
+
+
+def _parse_month_key(m: Optional[str]) -> Optional[tuple[int, int]]:
+    """Parse 'MM/YYYY' into a (year, month) tuple. Returns None if invalid."""
+    if not m or not isinstance(m, str) or not _MONTH_RE.match(m):
+        return None
+    mm, yyyy = m.split('/')
+    return (int(yyyy), int(mm))
+
+
+def _validated_month_or_none(value: Optional[str], param: str) -> Optional[str]:
+    """Return value if it matches MM/YYYY, raise HTTPException 400 otherwise. None/empty pass through."""
+    if value is None or value == "":
+        return None
+    if not _MONTH_RE.match(value):
+        raise HTTPException(status_code=400, detail=f"Invalid {param} format, expected MM/YYYY")
+    return value
 
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
@@ -29,6 +50,8 @@ from ..utils.validators import detect_amount_column, find_column
 
 router = APIRouter()
 
+logger = __import__("logging").getLogger(__name__)
+
 @router.get("/test")
 async def test():
     return {"status": "ok"}
@@ -40,22 +63,55 @@ sessions: dict[str, pd.DataFrame] = {}
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# Cap upload size at 25 MB. Real transaction exports are well under 1 MB; this
+# stops trivial DoS by an oversized upload from filling memory or disk.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+def _safe_remove(path: Optional[str]) -> None:
+    """Best-effort cleanup of a temp upload file."""
+    if not path:
+        return
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        # File may still be locked on Windows; one short retry then give up.
+        try:
+            import time as _time
+            _time.sleep(0.2)
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            logger.warning("Could not remove temp upload %s", path)
+
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     """Upload and process transaction file"""
-    file_path = None
+    file_path: Optional[str] = None
     try:
-        # Save file temporarily
-        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
+        content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large (limit {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)",
+            )
+
+        # Save file temporarily under a UUID name (ignore user-supplied filename
+        # for the on-disk path to avoid path traversal via the filename).
+        ext = ""
+        if file.filename:
+            _, ext = os.path.splitext(file.filename)
+            ext = ext.lower() if ext.lower() in {".xlsx", ".xls", ".csv"} else ""
+        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{ext}")
         with open(file_path, "wb") as f:
-            content = await file.read()
             f.write(content)
-        
+
         # Load and process file (ensure file is closed before processing)
         df_raw = load_transaction_file(file_path)
         df_clean = clean_dataframe(df_raw)
-        
+
         # Detect columns
         date_col = find_column(df_clean, ['תאריך עסקה', 'תאריך', 'date', 'Date'])
         amount_col = detect_amount_column(df_clean)
@@ -64,14 +120,6 @@ async def upload_file(file: UploadFile = File(...)):
         billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:'])
 
         if not date_col or not amount_col or not desc_col:
-            # Clean up before raising error
-            if file_path and os.path.exists(file_path):
-                try:
-                    import time
-                    time.sleep(0.1)  # Small delay to ensure file is closed
-                    os.remove(file_path)
-                except:
-                    pass
             raise HTTPException(
                 status_code=400,
                 detail=f"Required columns not found. Found columns: {list(df_clean.columns)}"
@@ -79,37 +127,14 @@ async def upload_file(file: UploadFile = File(...)):
 
         # Process data
         df = process_data(df_clean, date_col, amount_col, desc_col, cat_col, billing_date_col)
-        
+
         if df.empty:
-            # Clean up before raising error
-            if file_path and os.path.exists(file_path):
-                try:
-                    import time
-                    time.sleep(0.1)
-                    os.remove(file_path)
-                except:
-                    pass
             raise HTTPException(status_code=400, detail="No valid transactions found")
-        
+
         # Create session
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
-        
-        # Clean up temp file (with delay to ensure pandas closed it)
-        if file_path and os.path.exists(file_path):
-            try:
-                import time
-                time.sleep(0.2)  # Wait for pandas to fully close the file
-                os.remove(file_path)
-            except PermissionError:
-                # If still locked, try again after a longer delay
-                import time
-                time.sleep(0.5)
-                try:
-                    os.remove(file_path)
-                except:
-                    pass  # Ignore if still can't delete
-        
+
         return {
             "success": True,
             "message": f"Loaded {len(df)} transactions",
@@ -118,17 +143,14 @@ async def upload_file(file: UploadFile = File(...)):
         }
     except HTTPException:
         raise
+    except ValueError as e:
+        # Bad input (unsupported format, unparseable, etc.) — client error, not server error.
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        import traceback
-        import time
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        if file_path and os.path.exists(file_path):
-            try:
-                time.sleep(0.2)  # Wait before trying to delete
-                os.remove(file_path)
-            except:
-                pass
-        raise HTTPException(status_code=500, detail=error_detail)
+        logger.exception("Upload failed")
+        raise HTTPException(status_code=500, detail=f"Failed to process file: {e}")
+    finally:
+        _safe_remove(file_path)
 
 
 class RestoreSessionRequest(BaseModel):
@@ -138,7 +160,10 @@ class RestoreSessionRequest(BaseModel):
     @classmethod
     def parse_if_string(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return _json.loads(v)
+            try:
+                return _json.loads(v)
+            except _json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in transactions: {e}") from e
         return v
 
 
@@ -211,7 +236,7 @@ async def restore_session(body: RestoreSessionRequest):
                 for kw, cat in EXACT_WORD_KEYWORDS.items():
                     if not misc_mask.any():
                         break
-                    pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+                    pattern = r'(?:^|[\s\-/])' + re.escape(kw) + r'(?:$|[\s\-/])'
                     match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
                     if match.any():
                         df.loc[match, 'קטגוריה'] = cat
@@ -290,9 +315,11 @@ async def restore_session(body: RestoreSessionRequest):
             "cc_payments_removed": cc_payments_removed,
             "message": msg,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"{str(e)}\n{traceback.format_exc()}")
+        logger.exception("restore-session failed")
+        raise HTTPException(status_code=500, detail=f"Failed to restore session: {e}")
 
 
 @router.post("/transactions/note")
@@ -370,7 +397,7 @@ async def get_transactions(
     total = len(df)
     total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
     expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
-    income_count = total - expense_count
+    income_count = int((df['סכום'] > 0).sum()) if 'סכום' in df.columns else 0
     avg_transaction = round(_sanitize(total_amount / total), 2) if total > 0 else 0
 
     # Enhanced stats
@@ -804,16 +831,19 @@ async def get_category_snapshot(
         month_col = 'חודש_חיוב'
 
     # Optional month range filtering
+    month_from = _validated_month_or_none(month_from, "month_from")
+    month_to = _validated_month_or_none(month_to, "month_to")
     if (month_from or month_to) and not expenses.empty:
-        def _month_key(m: str) -> tuple:
-            parts = m.split('/')
-            return (int(parts[1]), int(parts[0]))
         if month_from:
-            from_key = _month_key(month_from)
-            expenses = expenses[expenses[month_col].apply(lambda m: _month_key(m) >= from_key)]
+            from_key = _parse_month_key(month_from)
+            expenses = expenses[expenses[month_col].apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k >= from_key
+            )]
         if month_to:
-            to_key = _month_key(month_to)
-            expenses = expenses[expenses[month_col].apply(lambda m: _month_key(m) <= to_key)]
+            to_key = _parse_month_key(month_to)
+            expenses = expenses[expenses[month_col].apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k <= to_key
+            )]
 
     if expenses.empty:
         return {"categories": [], "total": 0, "total_count": 0, "month_count": 0}
@@ -836,8 +866,8 @@ async def get_category_snapshot(
     # -- Per-category monthly breakdown for trends --
     # Sort months chronologically (MM/YYYY string sort is wrong: 01/2026 < 09/2025)
     all_months = sorted(
-        expenses[month_col].unique(),
-        key=lambda m: (int(m.split('/')[1]), int(m.split('/')[0])),
+        (m for m in expenses[month_col].unique() if _parse_month_key(m) is not None),
+        key=lambda m: _parse_month_key(m),
     )
     month_count = len(all_months)
 
@@ -966,18 +996,20 @@ async def get_category_transactions(
         filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
         filtered = filtered[filtered['_month'] == month]
     elif month_from or month_to:
+        month_from = _validated_month_or_none(month_from, "month_from")
+        month_to = _validated_month_or_none(month_to, "month_to")
         filtered = filtered.copy()
         filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
-        # Parse MM/YYYY into sortable YYYY-MM for comparison
-        def month_sort_key(m: str) -> str:
-            parts = m.split('/')
-            return f"{parts[1]}-{parts[0]}" if len(parts) == 2 else m
         if month_from:
-            from_key = month_sort_key(month_from)
-            filtered = filtered[filtered['_month'].apply(month_sort_key) >= from_key]
+            from_key = _parse_month_key(month_from)
+            filtered = filtered[filtered['_month'].apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k >= from_key
+            )]
         if month_to:
-            to_key = month_sort_key(month_to)
-            filtered = filtered[filtered['_month'].apply(month_sort_key) <= to_key]
+            to_key = _parse_month_key(month_to)
+            filtered = filtered[filtered['_month'].apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k <= to_key
+            )]
 
     if filtered.empty:
         return {"transactions": [], "total": 0, "count": 0}
