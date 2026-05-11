@@ -1,6 +1,7 @@
 """
 Data processing and cleaning functions
 """
+import re
 import pandas as pd
 import numpy as np
 from typing import Optional
@@ -77,11 +78,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
 
     # Fallback לסכום עסקה מקורי אם סכום חיוב ריק
     amount_col_clean = str(amount_col).strip() if amount_col else ''
-    if amount_col_clean == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
+    if 'סכום חיוב' in amount_col_clean and 'סכום עסקה מקורי' in result.columns:
         try:
             fallback = pd.to_numeric(result['סכום עסקה מקורי'].apply(clean_amount), errors='coerce').fillna(0.0)
-            # עדכון רק היכן שהסכום הוא 0
-            mask_zero = result['סכום'] == 0
+            # עדכון רק היכן שהסכום הוא 0 (עם סבילות לדיוק פלוטינג)
+            mask_zero = result['סכום'].abs() < 1e-9
             if mask_zero.any():
                 result.loc[mask_zero, 'סכום'] = fallback[mask_zero]
         except Exception:
@@ -179,7 +180,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         # Short keywords (≤3 chars) need word-boundary matching to avoid
         # false positives like "צק" matching inside "סטימצקי".
         if len(kw) <= 3:
-            pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+            pattern = r'(?:^|[\s\-/])' + re.escape(kw) + r'(?:$|[\s\-/])'
             mask = desc_lower.str.contains(pattern, na=False, regex=True)
         else:
             mask = desc_lower.str.contains(kw, na=False, regex=False)
@@ -205,7 +206,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         for kw, cat in EXACT_WORD_KEYWORDS.items():
             if not misc_mask.any():
                 break
-            pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
+            pattern = r'(?:^|[\s\-/])' + re.escape(kw) + r'(?:$|[\s\-/])'
             match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
             if match.any():
                 result.loc[match, 'קטגוריה'] = cat

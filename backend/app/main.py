@@ -24,11 +24,11 @@ app = FastAPI(
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global exception: {str(exc)}")
+    logger.error("Global exception: %s", exc)
     logger.error(traceback.format_exc())
     response = JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error", "error": str(exc), "traceback": traceback.format_exc()},
+        content={"detail": "Internal Server Error"},
     )
     # Ensure CORS header is present so the browser can read the error response
     origin = request.headers.get("origin", "*")
@@ -70,13 +70,22 @@ if os.path.isdir(STATIC_DIR):
     if os.path.isdir(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
+    _STATIC_ROOT = os.path.realpath(STATIC_DIR)
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """Serve static file if it exists, otherwise return index.html for SPA routing."""
-        file_path = os.path.join(STATIC_DIR, full_path)
-        if full_path and os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+        index = os.path.join(_STATIC_ROOT, "index.html")
+        if not full_path:
+            return FileResponse(index)
+        # Resolve and confine to STATIC_DIR to block path traversal (e.g. ../../etc/passwd)
+        candidate = os.path.realpath(os.path.join(_STATIC_ROOT, full_path))
+        if (
+            (candidate == _STATIC_ROOT or candidate.startswith(_STATIC_ROOT + os.sep))
+            and os.path.isfile(candidate)
+        ):
+            return FileResponse(candidate)
+        return FileResponse(index)
 else:
     logger.warning("STATIC_DIR=%s not found — SPA catch-all disabled", STATIC_DIR)
 
