@@ -308,9 +308,19 @@ export const transactionsApi = {
   /**
    * Get transaction insights (biggest expense, top merchant, etc.)
    */
-  getInsights: async (sessionId: string, signal?: AbortSignal): Promise<InsightData> => {
+  getInsights: async (
+    sessionId: string,
+    signal?: AbortSignal,
+    monthFrom?: string,
+    monthTo?: string,
+    dateType?: string,
+  ): Promise<InsightData> => {
+    const params: Record<string, string> = { sessionId };
+    if (monthFrom) params.month_from = monthFrom;
+    if (monthTo) params.month_to = monthTo;
+    if (dateType) params.date_type = dateType;
     const response = await api.get<InsightData>('/api/insights', {
-      params: { sessionId },
+      params,
       signal,
     });
     return response.data;
@@ -373,11 +383,21 @@ export const transactionsApi = {
   },
 
   /**
-   * Get weekly summary (this week vs last week)
+   * Get weekly summary (this week vs last week), scoped to a month range.
    */
-  getWeeklySummary: async (sessionId: string, signal?: AbortSignal): Promise<WeeklySummaryData> => {
+  getWeeklySummary: async (
+    sessionId: string,
+    signal?: AbortSignal,
+    monthFrom?: string,
+    monthTo?: string,
+    dateType?: string,
+  ): Promise<WeeklySummaryData> => {
+    const params: Record<string, string> = { sessionId };
+    if (monthFrom) params.month_from = monthFrom;
+    if (monthTo) params.month_to = monthTo;
+    if (dateType) params.date_type = dateType;
     const response = await api.get<WeeklySummaryData>('/api/analytics/weekly-summary', {
-      params: { sessionId },
+      params,
       signal,
     });
     return response.data;

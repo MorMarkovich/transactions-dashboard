@@ -35,9 +35,48 @@ def _validated_month_or_none(value: Optional[str], param: str) -> Optional[str]:
         raise HTTPException(status_code=400, detail=f"Invalid {param} format, expected MM/YYYY")
     return value
 
+
+def _spending_only(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Expenses minus internal transfers (investments, money moved between the
+    user's own accounts). Use this for any KPI labeled "expenses" or
+    "spending" so transfers don't inflate the picture.
+    """
+    if df.empty or 'סכום' not in df.columns:
+        return df.iloc[0:0]
+    exp = df[df['סכום'] < 0]
+    if 'קטגוריה' in exp.columns:
+        exp = exp[~exp['קטגוריה'].isin(TRANSFER_CATEGORIES)]
+    return exp
+
+
+def _apply_month_range(df: pd.DataFrame, month_from: Optional[str], month_to: Optional[str], date_type: str = "transaction") -> pd.DataFrame:
+    """Filter df to a [month_from, month_to] inclusive range (MM/YYYY)."""
+    if df.empty or (not month_from and not month_to):
+        return df
+    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
+    if date_col not in df.columns:
+        return df
+    month_series = df[date_col].dt.strftime('%m/%Y')
+    out = df
+    if month_from:
+        from_key = _parse_month_key(month_from)
+        if from_key is not None:
+            out = out[month_series.apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k >= from_key
+            )]
+            month_series = out[date_col].dt.strftime('%m/%Y')
+    if month_to:
+        to_key = _parse_month_key(month_to)
+        if to_key is not None:
+            out = out[month_series.apply(
+                lambda m: (k := _parse_month_key(m)) is not None and k <= to_key
+            )]
+    return out
+
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
-from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, TRANSFER_CATEGORIES
 from ..services.ai_categorizer import categorize_transactions
 from ..services.chart_generator import (
     create_donut_chart,
@@ -398,30 +437,39 @@ async def get_transactions(
     total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
     expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
     income_count = int((df['סכום'] > 0).sum()) if 'סכום' in df.columns else 0
-    avg_transaction = round(_sanitize(total_amount / total), 2) if total > 0 else 0
 
-    # Enhanced stats
+    # Enhanced stats. We split into expenses, income, and "spending" (expenses
+    # minus internal transfers like investments / between-account moves) so
+    # spending KPIs aren't skewed by money you didn't actually consume.
     expenses_df = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()
     income_df = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
-    total_expenses = round(_sanitize(float(expenses_df['סכום_מוחלט'].sum())), 2) if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns else 0
+    if not expenses_df.empty and 'קטגוריה' in expenses_df.columns:
+        spending_df = expenses_df[~expenses_df['קטגוריה'].isin(TRANSFER_CATEGORIES)]
+    else:
+        spending_df = expenses_df
+    total_expenses = round(_sanitize(float(spending_df['סכום_מוחלט'].sum())), 2) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
     total_income = round(_sanitize(float(income_df['סכום'].sum())), 2) if not income_df.empty else 0
-    median_transaction = round(_sanitize(float(df['סכום_מוחלט'].median())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
+    spending_count = int(len(spending_df)) if not spending_df.empty else 0
+    # Average per *spending* transaction — consistent with /api/metrics
+    avg_transaction = round(_sanitize(total_expenses / spending_count), 2) if spending_count > 0 else 0
+    median_transaction = round(_sanitize(float(spending_df['סכום_מוחלט'].median())), 2) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
 
-    # Max/min transactions
+    # Max/min transactions — excludes transfers so "highest expense" isn't
+    # an investment move or between-account transfer.
     max_transaction = None
     min_transaction = None
-    if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns:
-        max_idx = expenses_df['סכום_מוחלט'].idxmax()
-        min_idx = expenses_df['סכום_מוחלט'].idxmin()
-        max_row = expenses_df.loc[max_idx]
-        min_row = expenses_df.loc[min_idx]
+    if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns:
+        max_idx = spending_df['סכום_מוחלט'].idxmax()
+        min_idx = spending_df['סכום_מוחלט'].idxmin()
+        max_row = spending_df.loc[max_idx]
+        min_row = spending_df.loc[min_idx]
         max_transaction = {"description": str(max_row.get('תיאור', '')), "amount": round(_sanitize(float(max_row['סכום_מוחלט'])), 2)}
         min_transaction = {"description": str(min_row.get('תיאור', '')), "amount": round(_sanitize(float(min_row['סכום_מוחלט'])), 2)}
 
-    # Category breakdown (top 10)
+    # Category breakdown (top 10, expenses excluding transfers)
     category_breakdown = []
-    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not expenses_df.empty:
-        cat_group = expenses_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
+    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not spending_df.empty:
+        cat_group = spending_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
         cat_group = cat_group.sort_values('sum', ascending=False).head(10)
         cat_total = cat_group['sum'].sum()
         for _, row in cat_group.iterrows():
@@ -621,23 +669,30 @@ async def get_metrics(sessionId: str = Query(...)):
     """Get metrics data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     df = sessions[sessionId]
 
     expenses = df[df['סכום'] < 0]
     income = df[df['סכום'] > 0]
+    # "Spending" = expenses excluding internal transfers (investments, between
+    # your own accounts). Same semantic as /api/transactions so KPI cards
+    # agree across pages.
+    if 'קטגוריה' in expenses.columns:
+        spending = expenses[~expenses['קטגוריה'].isin(TRANSFER_CATEGORIES)]
+    else:
+        spending = expenses
 
-    total_transactions = len(expenses)
-    total_expenses = abs(expenses['סכום'].sum()) if len(expenses) > 0 else 0
-    total_income = income['סכום'].sum() if len(income) > 0 else 0
-    average_transaction = expenses['סכום_מוחלט'].mean() if not expenses.empty else 0
+    total_transactions = len(spending)
+    total_expenses = float(spending['סכום_מוחלט'].sum()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
+    total_income = float(income['סכום'].sum()) if not income.empty else 0.0
+    average_transaction = float(spending['סכום_מוחלט'].mean()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
 
-    # Calculate trend (based on expenses only)
+    # Calculate trend (based on spending only)
     trend = None
-    if len(expenses) > 10:
-        mid = len(expenses) // 2
-        first_half_avg = expenses.iloc[:mid]['סכום_מוחלט'].mean()
-        second_half_avg = expenses.iloc[mid:]['סכום_מוחלט'].mean()
+    if len(spending) > 10:
+        mid = len(spending) // 2
+        first_half_avg = spending.iloc[:mid]['סכום_מוחלט'].mean()
+        second_half_avg = spending.iloc[mid:]['סכום_מוחלט'].mean()
         if first_half_avg > 0:
             trend_pct = ((second_half_avg - first_half_avg) / first_half_avg) * 100
             trend = 'up' if trend_pct > 0 else 'down'
@@ -646,9 +701,11 @@ async def get_metrics(sessionId: str = Query(...)):
 
     return {
         "total_transactions": total_transactions,
-        "total_expenses": total_expenses,
-        "total_income": total_income,
-        "average_transaction": average_transaction,
+        "expense_count": int(len(expenses)),
+        "income_count": int(len(income)),
+        "total_expenses": _sanitize(total_expenses),
+        "total_income": _sanitize(total_income),
+        "average_transaction": _sanitize(average_transaction),
         "trend": trend,
         "has_billing_date": bool(has_billing_date),
     }
@@ -1215,13 +1272,21 @@ async def get_trend_v2(sessionId: str = Query(...)):
 
 
 @router.get("/insights")
-async def get_insights(sessionId: str = Query(...)):
+async def get_insights(
+    sessionId: str = Query(...),
+    month_from: Optional[str] = Query(default=None),
+    month_to: Optional[str] = Query(default=None),
+    date_type: str = Query(default="transaction"),
+):
     """Return smart insights derived from transaction data."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    month_from = _validated_month_or_none(month_from, "month_from")
+    month_to = _validated_month_or_none(month_to, "month_to")
+    df_scoped = _apply_month_range(df, month_from, month_to, date_type)
+    expenses = _spending_only(df_scoped).copy()
 
     if expenses.empty:
         return {
@@ -1232,7 +1297,7 @@ async def get_insights(sessionId: str = Query(...)):
             "large_transactions": [],
         }
 
-    # Biggest single expense
+    # Biggest single expense (excludes transfers/investments)
     idx_max = expenses['סכום_מוחלט'].idxmax()
     biggest = expenses.loc[idx_max]
     biggest_expense = {
@@ -1338,7 +1403,7 @@ async def get_trend_stats(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    expenses = _spending_only(df).copy()
 
     if expenses.empty:
         return {
@@ -1623,29 +1688,57 @@ async def get_spending_forecast(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    empty_result = {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
     if df.empty:
-        return {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
+        return empty_result
 
-    expenses = df[df["סכום"] < 0].copy()
+    # Spending only (excludes transfers/investments). Forecast is about
+    # consumption, not money moved between accounts.
+    expenses = _spending_only(df).copy()
     if expenses.empty:
-        return {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
+        return empty_result
 
     expenses["date"] = pd.to_datetime(expenses["תאריך"], dayfirst=True, errors="coerce")
     expenses = expenses.dropna(subset=["date"])
     expenses["month_key"] = expenses["date"].dt.to_period("M")
 
-    monthly = expenses.groupby("month_key")["סכום"].sum().abs().reset_index()
-    monthly.columns = ["month", "amount"]
-    monthly = monthly.sort_values("month")
+    monthly_all = expenses.groupby("month_key")["סכום"].sum().abs().reset_index()
+    monthly_all.columns = ["month", "amount"]
+    monthly_all = monthly_all.sort_values("month").reset_index(drop=True)
 
     monthly_data = [
         {"month": str(row["month"]), "amount": _sanitize(round(row["amount"], 2))}
-        for _, row in monthly.iterrows()
+        for _, row in monthly_all.iterrows()
     ]
+
+    # Drop the current (possibly incomplete) month from the baseline so a
+    # mid-month query doesn't see a half-month total and predict a sharp drop.
+    # Detect by comparing the last month to the latest date in the dataset: if
+    # the latest date is strictly before the last day of that month, it's
+    # incomplete.
+    monthly = monthly_all.copy()
+    if not monthly.empty:
+        last_period = monthly.iloc[-1]["month"]
+        if isinstance(last_period, pd.Period):
+            month_end = last_period.to_timestamp(how="end").normalize()
+            latest_date = expenses["date"].max().normalize()
+            if latest_date < month_end:
+                monthly = monthly.iloc[:-1].reset_index(drop=True)
+
+    if monthly.empty:
+        # Only an incomplete current month exists — can't forecast.
+        return {
+            "forecast_amount": 0,
+            "confidence": "low",
+            "trend_direction": "stable",
+            "monthly_data": monthly_data,
+            "avg_monthly": 0,
+        }
 
     avg_monthly = _sanitize(round(monthly["amount"].mean(), 2))
 
     if len(monthly) < 2:
+        # Single complete month: forecast = that month's spending, no trend.
         return {
             "forecast_amount": avg_monthly,
             "confidence": "low",
@@ -1654,13 +1747,14 @@ async def get_spending_forecast(sessionId: str = Query(...)):
             "avg_monthly": avg_monthly,
         }
 
-    # Linear regression
-    x = np.arange(len(monthly), dtype=float)
-    y = monthly["amount"].values.astype(float)
+    # Linear regression over the last up-to-12 complete months
+    recent = monthly.tail(12).reset_index(drop=True)
+    x = np.arange(len(recent), dtype=float)
+    y = recent["amount"].to_numpy(dtype=float)
 
     coeffs = np.polyfit(x, y, 1)
     slope, intercept = coeffs
-    forecast = float(slope * len(monthly) + intercept)
+    forecast = float(slope * len(recent) + intercept)
     forecast = max(forecast, 0)  # Can't be negative spending
 
     # Confidence based on R² and data points
@@ -1670,9 +1764,9 @@ async def get_spending_forecast(sessionId: str = Query(...)):
     r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
 
     confidence = "low"
-    if len(monthly) >= 6 and r_squared > 0.7:
+    if len(recent) >= 6 and r_squared > 0.7:
         confidence = "high"
-    elif len(monthly) >= 3 and r_squared > 0.4:
+    elif len(recent) >= 3 and r_squared > 0.4:
         confidence = "medium"
 
     trend_direction = "up" if slope > 50 else ("down" if slope < -50 else "stable")
@@ -1687,42 +1781,52 @@ async def get_spending_forecast(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/weekly-summary")
-async def get_weekly_summary(sessionId: str = Query(...)):
-    """This week vs last week comparison."""
+async def get_weekly_summary(
+    sessionId: str = Query(...),
+    month_from: Optional[str] = Query(default=None),
+    month_to: Optional[str] = Query(default=None),
+    date_type: str = Query(default="transaction"),
+):
+    """This week vs last week comparison, scoped to the selected month range."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    empty = {
+        "this_week": {"total": 0, "count": 0, "top_category": ""},
+        "last_week": {"total": 0, "count": 0, "top_category": ""},
+        "change_pct": 0,
+    }
     df = sessions[sessionId]
     if df.empty:
-        return {
-            "this_week": {"total": 0, "count": 0, "top_category": ""},
-            "last_week": {"total": 0, "count": 0, "top_category": ""},
-            "change_pct": 0,
-        }
+        return empty
 
-    df_copy = df.copy()
+    month_from = _validated_month_or_none(month_from, "month_from")
+    month_to = _validated_month_or_none(month_to, "month_to")
+
+    # Spending only (exclude transfers/investments)
+    df_scoped = _spending_only(df)
+    df_scoped = _apply_month_range(df_scoped, month_from, month_to, date_type)
+    if df_scoped.empty:
+        return empty
+
+    df_copy = df_scoped.copy()
     df_copy["date"] = pd.to_datetime(df_copy["תאריך"], dayfirst=True, errors="coerce")
     df_copy = df_copy.dropna(subset=["date"])
-
     if df_copy.empty:
-        return {
-            "this_week": {"total": 0, "count": 0, "top_category": ""},
-            "last_week": {"total": 0, "count": 0, "top_category": ""},
-            "change_pct": 0,
-        }
+        return empty
 
-    # Use the last date in data as "today" reference
+    # Reference "today" is the last date within scope, so the cards align with
+    # the month the user is viewing instead of the whole dataset.
     max_date = df_copy["date"].max()
 
-    # This week: last 7 days from max_date
     this_week_start = max_date - pd.Timedelta(days=6)
     last_week_start = this_week_start - pd.Timedelta(days=7)
     last_week_end = this_week_start - pd.Timedelta(days=1)
 
-    this_week = df_copy[(df_copy["date"] >= this_week_start) & (df_copy["date"] <= max_date) & (df_copy["סכום"] < 0)]
-    last_week = df_copy[(df_copy["date"] >= last_week_start) & (df_copy["date"] <= last_week_end) & (df_copy["סכום"] < 0)]
+    this_week = df_copy[(df_copy["date"] >= this_week_start) & (df_copy["date"] <= max_date)]
+    last_week = df_copy[(df_copy["date"] >= last_week_start) & (df_copy["date"] <= last_week_end)]
 
-    def week_summary(week_df):
+    def week_summary(week_df: pd.DataFrame) -> dict:
         if week_df.empty:
             return {"total": 0, "count": 0, "top_category": ""}
         total = abs(week_df["סכום"].sum())

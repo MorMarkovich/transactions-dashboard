@@ -12,9 +12,12 @@ interface TransactionsTableProps {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
+  onPageSizeChange?: (size: number) => void
   onRowClick?: (transaction: Transaction) => void
   showBillingDate?: boolean
 }
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const
 
 // ─── Constants ─────────────────────────────────────────────────────────
 const ROW_HEIGHT = 48
@@ -45,7 +48,13 @@ const TableRow = memo(function TableRow({
         <td className="col-date">
           {tx.תאריך_חיוב
             ? formatDate(tx.תאריך_חיוב)
-            : <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>לא זמין</span>}
+            : <span
+                aria-label="תאריך חיוב לא זמין למסמך זה"
+                title="תאריך חיוב לא קיים בקובץ המקורי (לרוב בעסקאות בנק)"
+                style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}
+              >
+                —
+              </span>}
         </td>
       )}
       <td>{tx.תיאור}</td>
@@ -119,6 +128,7 @@ export default function TransactionsTable({
   page,
   pageSize,
   onPageChange,
+  onPageSizeChange,
   onRowClick,
   showBillingDate,
 }: TransactionsTableProps) {
@@ -299,15 +309,40 @@ export default function TransactionsTable({
           gap: 'var(--space-sm)',
         }}
       >
-        <span
-          style={{
-            fontSize: '0.875rem',
-            color: 'var(--text-secondary)',
-            fontWeight: 500,
-          }}
-        >
-          סה&quot;כ {total.toLocaleString('he-IL')} עסקאות
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+          <span
+            style={{
+              fontSize: '0.875rem',
+              color: 'var(--text-secondary)',
+              fontWeight: 500,
+            }}
+          >
+            סה&quot;כ {total.toLocaleString('he-IL')} עסקאות
+          </span>
+          {onPageSizeChange && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+              <span>שורות לדף:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                style={{
+                  background: 'var(--bg-input)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '4px 8px',
+                  fontSize: '0.8125rem',
+                  cursor: 'pointer',
+                }}
+                aria-label="שורות לדף"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
 
         <div
           style={{

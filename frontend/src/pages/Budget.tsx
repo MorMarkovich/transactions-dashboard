@@ -603,7 +603,7 @@ export default function Budget() {
                 />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>סה"כ עסקאות</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>עסקאות הוצאה</div>
                 <span style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {metrics.total_transactions.toLocaleString('he-IL')}
                 </span>
