@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, INCOME_KEYWORDS
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, SALARY_KEYWORDS, REFUND_KEYWORDS
 from .ai_categorizer import categorize_transactions
 
 
@@ -223,19 +223,30 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
                 if 0 <= local_idx < len(misc_indices):
                     result.at[misc_indices[local_idx], 'קטגוריה'] = category
 
-    # Income rows that still slipped through into other categories (most
-    # commonly "שונות") should land in a dedicated income bucket so they
-    # don't pollute spending breakdowns. Only re-categorize rows where the
-    # description clearly matches an income keyword.
-    income_mask = (result['סכום'] > 0) & result['תיאור'].notna()
-    if income_mask.any():
-        income_desc_lower = result.loc[income_mask, 'תיאור'].astype(str).str.lower()
-        kw_pattern = '|'.join(re.escape(k.lower()) for k in INCOME_KEYWORDS)
-        income_keyword_match = income_desc_lower.str.contains(kw_pattern, na=False, regex=True)
-        to_relabel = income_mask.copy()
-        to_relabel.loc[income_mask] = income_keyword_match.values
-        if to_relabel.any():
-            result.loc[to_relabel, 'קטגוריה'] = 'משכורת והכנסות'
+    # Reclassify positive-amount rows by description: real income (salary,
+    # pension, benefits) → "משכורת והכנסות"; refunds / credits / BIT receipts
+    # → "החזרים וזיכויים". This prevents refunds and reimbursements from
+    # being counted as "real income" on the dashboard.
+    pos_mask = (result['סכום'] > 0) & result['תיאור'].notna()
+    if pos_mask.any():
+        pos_desc_lower = result.loc[pos_mask, 'תיאור'].astype(str).str.lower()
+
+        salary_pattern = '|'.join(re.escape(k.lower()) for k in SALARY_KEYWORDS)
+        refund_pattern = '|'.join(re.escape(k.lower()) for k in REFUND_KEYWORDS)
+        salary_match = pos_desc_lower.str.contains(salary_pattern, na=False, regex=True)
+        refund_match = pos_desc_lower.str.contains(refund_pattern, na=False, regex=True)
+
+        to_salary = pos_mask.copy()
+        to_salary.loc[pos_mask] = salary_match.values
+        if to_salary.any():
+            result.loc[to_salary, 'קטגוריה'] = 'משכורת והכנסות'
+
+        # Refund pattern only wins where salary pattern didn't (salary > refund
+        # for ambiguous wording).
+        to_refund = pos_mask.copy()
+        to_refund.loc[pos_mask] = (refund_match & ~salary_match).values
+        if to_refund.any():
+            result.loc[to_refund, 'קטגוריה'] = 'החזרים וזיכויים'
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)

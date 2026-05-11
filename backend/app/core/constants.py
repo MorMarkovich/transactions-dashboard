@@ -25,6 +25,7 @@ CATEGORY_ICONS = {
     'חינוך ולימודים': '📚',
     'מנויים ושירותים': '🔁',
     'משכורת והכנסות': '💰',
+    'החזרים וזיכויים': '↩️',
 }
 
 # Categories that represent value moving between the user's own accounts
@@ -34,19 +35,38 @@ CATEGORY_ICONS = {
 TRANSFER_CATEGORIES: set[str] = {
     'העברה להשקעות',
     'העברת כספים',
+    'החזרים וזיכויים',
 }
 
-# Keywords that, when found in a positive-amount row, indicate income
-# (salary, pension, refund, etc.). Used to re-categorize income rows that
-# the source file left in "שונות" (Misc).
-INCOME_KEYWORDS: list[str] = [
+# Categories whose positive amounts represent *real* income (salary, pension,
+# benefits) — as opposed to refunds, credits, or transfers between accounts
+# that also show up as positive amounts. /api/metrics.total_income counts
+# only rows in this set.
+INCOME_CATEGORIES: set[str] = {
+    'משכורת והכנסות',
+}
+
+# Strict "salary / real income" keywords — anything matching these on a
+# positive-amount row goes to "משכורת והכנסות".
+SALARY_KEYWORDS: list[str] = [
     'משכורת', 'salary', 'מענק', 'פנסיה', 'pension',
     'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה',
     'העברת שכר', 'העב שכר', 'שכ"ע', 'שכר עבודה',
     'הפקדת שכר', 'תשלום שכר', 'שכר חודש',
     'קצבת ילדים', 'מענק עבודה', 'דמי לידה',
-    'החזר', 'refund', 'זיכוי',
 ]
+
+# Refund / credit keywords — positive-amount rows matching these go to
+# "החזרים וזיכויים" (refunds & credits), which is treated as a transfer,
+# not real income.
+REFUND_KEYWORDS: list[str] = [
+    'החזר', 'refund', 'זיכוי', 'credit memo',
+    'ביט', 'bit ',
+]
+
+# Legacy alias kept for backwards-compat: anything that should pull a row
+# out of "שונות" into a positive-amount bucket. Currently = salary + refunds.
+INCOME_KEYWORDS: list[str] = SALARY_KEYWORDS + REFUND_KEYWORDS
 
 # Keywords in transaction descriptions that indicate check withdrawals (rent)
 CHECK_WITHDRAWAL_KEYWORDS = [
