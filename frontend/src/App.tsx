@@ -106,6 +106,7 @@ function AppRoutes() {
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
         <Route path="/insights" element={<ProtectedPage><Insights /></ProtectedPage>} />
         <Route path="/merchants" element={<ProtectedPage><Merchants /></ProtectedPage>} />
+        <Route path="/businesses" element={<Navigate to="/merchants" replace />} />
         <Route path="/income" element={<ProtectedPage><Income /></ProtectedPage>} />
         <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
         <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />

@@ -40,6 +40,29 @@ const api = axios.create({
   },
 });
 
+// Retry once on 503 / network error — typical pattern for cold-start backends
+// where the first request lights up the worker pool. Honors Retry-After if
+// the server sends it, otherwise waits ~700 ms before retrying.
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error?.config
+    if (!config || config.__isRetry) return Promise.reject(error)
+    const status = error?.response?.status
+    const retriable =
+      status === 503 ||
+      status === 502 ||
+      status === 504 ||
+      (!error.response && error.code !== 'ERR_CANCELED' && error.name !== 'CanceledError')
+    if (!retriable) return Promise.reject(error)
+    const retryAfter = Number(error?.response?.headers?.['retry-after']) || 0
+    const delayMs = Math.min(retryAfter * 1000 || 700, 3000)
+    await new Promise((r) => setTimeout(r, delayMs))
+    config.__isRetry = true
+    return api(config)
+  },
+)
+
 export const transactionsApi = {
   /**
    * Restore a backend session from saved transaction JSON data

@@ -665,9 +665,13 @@ export default function Income() {
                   color: 'var(--text-muted)',
                 }}
               >
-                {totalIncome > 0
-                  ? `${formatCurrency(totalExpenses)} מתוך ${formatCurrency(totalIncome)}`
-                  : 'הוסף הכנסות כדי לראות יחס הוצאות להכנסות'}
+                {totalIncome > 0 ? (() => {
+                  const rawPct = (totalExpenses / totalIncome) * 100
+                  const pctText = rawPct > 100
+                    ? `${formatCurrency(totalExpenses)} (${rawPct.toFixed(0)}% מההכנסות — חריגה)`
+                    : `${formatCurrency(totalExpenses)} מתוך ${formatCurrency(totalIncome)} (${rawPct.toFixed(0)}%)`
+                  return pctText
+                })() : 'הוסף הכנסות כדי לראות יחס הוצאות להכנסות'}
               </p>
             </Card>
           </motion.div>

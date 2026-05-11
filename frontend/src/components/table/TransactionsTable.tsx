@@ -350,7 +350,10 @@ export default function TransactionsTable({
             alignItems: 'center',
             gap: 'var(--space-sm)',
           }}
+          dir="rtl"
         >
+          {/* RTL order: הקודם (Previous) on the right, הבא (Next) on the left.
+              The arrow icons point the matching direction. */}
           <Button
             variant="secondary"
             size="sm"

@@ -50,6 +50,30 @@ def _spending_only(df: pd.DataFrame) -> pd.DataFrame:
     return exp
 
 
+def _real_income_only(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Positive-amount rows in income categories (salary, pension, benefits).
+    Excludes refunds, BIT receipts, credit-card reimbursements, and
+    investment / between-account transfers.
+    """
+    if df.empty or 'סכום' not in df.columns:
+        return df.iloc[0:0]
+    inc = df[df['סכום'] > 0]
+    if 'קטגוריה' in inc.columns:
+        inc = inc[inc['קטגוריה'].isin(INCOME_CATEGORIES)]
+    return inc
+
+
+def _round_money(value) -> float:
+    """Round to agorot. Eliminates floating-point noise like 61430.909999... ."""
+    if value is None:
+        return 0.0
+    try:
+        return float(round(float(value) + 1e-9, 2))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _apply_month_range(df: pd.DataFrame, month_from: Optional[str], month_to: Optional[str], date_type: str = "transaction") -> pd.DataFrame:
     """Filter df to a [month_from, month_to] inclusive range (MM/YYYY)."""
     if df.empty or (not month_from and not month_to):
@@ -76,7 +100,7 @@ def _apply_month_range(df: pd.DataFrame, month_from: Optional[str], month_to: Op
 
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
-from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, TRANSFER_CATEGORIES
+from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, TRANSFER_CATEGORIES, INCOME_CATEGORIES
 from ..services.ai_categorizer import categorize_transactions
 from ..services.chart_generator import (
     create_donut_chart,
@@ -434,25 +458,26 @@ async def get_transactions(
     
     # Aggregate stats (computed on the full filtered dataset, before pagination)
     total = len(df)
-    total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
+    total_amount = _round_money(float(df['סכום_מוחלט'].sum())) if 'סכום_מוחלט' in df.columns and total > 0 else 0
     expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
-    income_count = int((df['סכום'] > 0).sum()) if 'סכום' in df.columns else 0
 
-    # Enhanced stats. We split into expenses, income, and "spending" (expenses
-    # minus internal transfers like investments / between-account moves) so
-    # spending KPIs aren't skewed by money you didn't actually consume.
+    # Enhanced stats. We split into expenses, real income (salary/pension),
+    # and "spending" (expenses minus internal transfers like investments /
+    # between-account moves) so KPIs aren't skewed by money you didn't
+    # actually consume or earn.
     expenses_df = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()
-    income_df = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
+    income_df = _real_income_only(df)
+    income_count = int(len(income_df))
     if not expenses_df.empty and 'קטגוריה' in expenses_df.columns:
         spending_df = expenses_df[~expenses_df['קטגוריה'].isin(TRANSFER_CATEGORIES)]
     else:
         spending_df = expenses_df
-    total_expenses = round(_sanitize(float(spending_df['סכום_מוחלט'].sum())), 2) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
-    total_income = round(_sanitize(float(income_df['סכום'].sum())), 2) if not income_df.empty else 0
+    total_expenses = _round_money(float(spending_df['סכום_מוחלט'].sum())) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
+    total_income = _round_money(float(income_df['סכום'].sum())) if not income_df.empty else 0
     spending_count = int(len(spending_df)) if not spending_df.empty else 0
     # Average per *spending* transaction — consistent with /api/metrics
-    avg_transaction = round(_sanitize(total_expenses / spending_count), 2) if spending_count > 0 else 0
-    median_transaction = round(_sanitize(float(spending_df['סכום_מוחלט'].median())), 2) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
+    avg_transaction = _round_money(total_expenses / spending_count) if spending_count > 0 else 0
+    median_transaction = _round_money(float(spending_df['סכום_מוחלט'].median())) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
 
     # Max/min transactions — excludes transfers so "highest expense" isn't
     # an investment move or between-account transfer.
@@ -494,9 +519,16 @@ async def get_transactions(
     end = start + page_size
     df_page = df.iloc[start:end]
 
-    # Convert to dict with full JSON safety (NaT, Timestamp, numpy scalars, NaN/Inf)
+    # Whitelist the columns we expose. The raw frame has ~60 columns harvested
+    # from every source-file template (most are null per row); leaking them
+    # all is wasteful and also exposes sensitive fields (card last-4, source
+    # filename). Anything not in this list is dropped from the response.
+    _ALLOWED_COLS = {
+        'id', 'תאריך', 'תאריך_חיוב', 'תיאור', 'סכום', 'סכום_מוחלט',
+        'קטגוריה', 'חודש', 'חודש_חיוב', 'יום_בשבוע', 'הערות', 'סוג עסקה',
+    }
     transactions = [
-        {k: _to_json_safe(v) for k, v in record.items()}
+        {k: _to_json_safe(v) for k, v in record.items() if k in _ALLOWED_COLS}
         for record in df_page.to_dict('records')
     ]
 
@@ -673,18 +705,14 @@ async def get_metrics(sessionId: str = Query(...)):
     df = sessions[sessionId]
 
     expenses = df[df['סכום'] < 0]
-    income = df[df['סכום'] > 0]
-    # "Spending" = expenses excluding internal transfers (investments, between
-    # your own accounts). Same semantic as /api/transactions so KPI cards
-    # agree across pages.
-    if 'קטגוריה' in expenses.columns:
-        spending = expenses[~expenses['קטגוריה'].isin(TRANSFER_CATEGORIES)]
-    else:
-        spending = expenses
+    spending = _spending_only(df)
+    real_income = _real_income_only(df)
+    # All positive-amount rows, kept for diagnostics (refunds + transfers + income)
+    positive_total = float(df.loc[df['סכום'] > 0, 'סכום'].sum()) if 'סכום' in df.columns else 0.0
 
     total_transactions = len(spending)
     total_expenses = float(spending['סכום_מוחלט'].sum()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
-    total_income = float(income['סכום'].sum()) if not income.empty else 0.0
+    total_income = float(real_income['סכום'].sum()) if not real_income.empty else 0.0
     average_transaction = float(spending['סכום_מוחלט'].mean()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
 
     # Calculate trend (based on spending only)
@@ -702,10 +730,13 @@ async def get_metrics(sessionId: str = Query(...)):
     return {
         "total_transactions": total_transactions,
         "expense_count": int(len(expenses)),
-        "income_count": int(len(income)),
-        "total_expenses": _sanitize(total_expenses),
-        "total_income": _sanitize(total_income),
-        "average_transaction": _sanitize(average_transaction),
+        "income_count": int(len(real_income)),
+        "total_expenses": _round_money(total_expenses),
+        "total_income": _round_money(total_income),
+        # Sum of all positive rows including refunds/transfers — useful for
+        # debugging but not displayed as "income".
+        "total_positive": _round_money(positive_total),
+        "average_transaction": _round_money(average_transaction),
         "trend": trend,
         "has_billing_date": bool(has_billing_date),
     }
@@ -880,7 +911,9 @@ async def get_category_snapshot(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    # Use spending-only (exclude transfers/investments) so totals reconcile
+    # with the dashboard's spending KPIs and the month-overview card.
+    expenses = _spending_only(df).copy()
 
     # Determine which month column to use based on date_type
     month_col = 'חודש'
@@ -1360,17 +1393,18 @@ async def get_insights(
 @router.get("/merchants")
 async def get_merchants(
     sessionId: str = Query(...),
-    n: int = Query(default=8, ge=1),
+    n: int = Query(default=20, ge=1, le=500),
 ):
-    """Return top merchants by total spend."""
+    """Return top-n merchants by total spend. Also returns the full distinct
+    merchant count so the UI can tell users that this is a truncated list."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    expenses = _spending_only(df).copy()
 
     if expenses.empty:
-        return {"merchants": []}
+        return {"merchants": [], "total_merchants": 0, "shown": 0}
 
     merchant_agg = (
         expenses
@@ -1381,19 +1415,24 @@ async def get_merchants(
             average=('סכום_מוחלט', 'mean'),
         )
         .sort_values('total', ascending=False)
-        .head(n)
     )
+    total_merchants = int(len(merchant_agg))
+    top = merchant_agg.head(n)
 
     merchants = [
         {
             "name": str(name),
-            "total": round(_sanitize(row['total']), 2),
+            "total": _round_money(row['total']),
             "count": int(row['count']),
-            "average": round(_sanitize(row['average']), 2),
+            "average": _round_money(row['average']),
         }
-        for name, row in merchant_agg.iterrows()
+        for name, row in top.iterrows()
     ]
-    return {"merchants": merchants}
+    return {
+        "merchants": merchants,
+        "total_merchants": total_merchants,
+        "shown": len(merchants),
+    }
 
 
 @router.get("/trend-stats")
@@ -1497,8 +1536,17 @@ async def get_month_overview(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId].copy()
+    empty = {
+        "month": month,
+        "categories": [],
+        "total_expenses": 0,
+        "total_income": 0,
+        "transaction_count": 0,
+        "expense_count": 0,
+        "income_count": 0,
+    }
     if df.empty:
-        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
+        return empty
 
     # Choose date column
     date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
@@ -1506,13 +1554,21 @@ async def get_month_overview(
     month_df = df[df['_month'] == month].copy()
 
     if month_df.empty:
-        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
+        return empty
 
+    # Same definitions as /api/metrics so KPIs and counts reconcile across
+    # pages: spending = expenses excluding transfers; income = real income only.
+    spending = _spending_only(month_df)
+    real_income = _real_income_only(month_df)
+    # Per-category aggregates: use ALL expenses (incl. transfers) and ALL
+    # positive amounts so the breakdown can still surface them as their own
+    # categories — but the headline totals/counts reflect spending-only and
+    # real-income-only.
     expenses = month_df[month_df['סכום'] < 0]
-    income = month_df[month_df['סכום'] > 0]
+    income_all = month_df[month_df['סכום'] > 0]
 
     exp_by_cat = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum()
-    inc_by_cat = income.groupby('קטגוריה')['סכום'].sum()
+    inc_by_cat = income_all.groupby('קטגוריה')['סכום'].sum()
 
     all_cats = set(exp_by_cat.index) | set(inc_by_cat.index)
     categories = []
@@ -1521,22 +1577,27 @@ async def get_month_overview(
         inc_val = float(inc_by_cat.get(cat, 0))
         categories.append({
             "name": str(cat),
-            "expenses": round(_sanitize(exp_val), 2),
-            "income": round(_sanitize(inc_val), 2),
+            "expenses": _round_money(exp_val),
+            "income": _round_money(inc_val),
         })
 
     # Sort by expenses descending
     categories.sort(key=lambda x: x["expenses"], reverse=True)
 
-    total_expenses = round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2) if not expenses.empty else 0
-    total_income = round(_sanitize(float(income['סכום'].sum())), 2) if not income.empty else 0
+    expense_count = int(len(spending))
+    income_count = int(len(real_income))
 
     return {
         "month": month,
         "categories": categories,
-        "total_expenses": total_expenses,
-        "total_income": total_income,
-        "transaction_count": int(len(month_df)),
+        "total_expenses": _round_money(float(spending['סכום_מוחלט'].sum())) if not spending.empty else 0,
+        "total_income": _round_money(float(real_income['סכום'].sum())) if not real_income.empty else 0,
+        # transaction_count is the headline "X עסקאות" badge on the month-
+        # overview card. To match the category-snapshot endpoint (which counts
+        # spending only), we use expense_count here.
+        "transaction_count": expense_count,
+        "expense_count": expense_count,
+        "income_count": income_count,
     }
 
 
@@ -1644,8 +1705,10 @@ async def get_recurring_transactions(sessionId: str = Query(...)):
         mean_delta = deltas.mean()
         std_delta = deltas.std()
 
-        # Classify frequency
-        frequency = "לא ידוע"
+        # Classify frequency. If we can't bucket it confidently, skip the row
+        # entirely — emitting "frequency: unknown" on a 'recurring' list is
+        # contradictory.
+        frequency = None
         if 5 <= mean_delta <= 10:
             frequency = "שבועי"
         elif 12 <= mean_delta <= 18:
@@ -1656,10 +1719,8 @@ async def get_recurring_transactions(sessionId: str = Query(...)):
             frequency = "דו-חודשי"
         elif 80 <= mean_delta <= 100:
             frequency = "רבעוני"
-        else:
-            # Skip if interval is too irregular (std > 7 days)
-            if std_delta > 7:
-                continue
+        if frequency is None:
+            continue
 
         # Estimate next expected date
         last_date = dates.iloc[-1]
@@ -1667,11 +1728,11 @@ async def get_recurring_transactions(sessionId: str = Query(...)):
 
         recurring.append({
             "merchant": str(desc),
-            "average_amount": _sanitize(round(mean_amount, 2)),
+            "average_amount": _round_money(mean_amount),
             "frequency": frequency,
             "count": int(len(group)),
             "next_expected": next_expected,
-            "total": _sanitize(round(amounts.sum(), 2)),
+            "total": _round_money(amounts.sum()),
             "interval_days": _sanitize(round(mean_delta, 1)),
         })
 
@@ -1907,36 +1968,48 @@ async def get_anomalies(sessionId: str = Query(...)):
     if df.empty:
         return {"anomalies": []}
 
-    expenses = df[df["סכום"] < 0].copy()
+    # Anomalies are about spending. Use _spending_only so transfers and
+    # investment moves don't get flagged as "anomalous expenses".
+    expenses = _spending_only(df).copy()
     if expenses.empty or "קטגוריה" not in expenses.columns:
         return {"anomalies": []}
 
     anomalies = []
 
     for cat, group in expenses.groupby("קטגוריה"):
-        if len(group) < 5:
+        # Need a meaningful sample to derive a mean; otherwise the mean and
+        # σ are noise and we'll produce false positives.
+        if len(group) < 8:
             continue
 
         amounts = group["סכום"].abs()
-        mean_amt = amounts.mean()
-        std_amt = amounts.std()
+        # Exclude the outlier itself from the baseline (winsorize-like): use
+        # the median + MAD instead of mean ± σ, so a single huge transaction
+        # doesn't inflate σ and prevent itself from being flagged.
+        median_amt = float(amounts.median())
+        mad = float((amounts - median_amt).abs().median())
+        if mad == 0:
+            continue
+        # MAD-based z-score equivalent: 1.4826 * MAD ≈ σ for normal data
+        sigma_est = 1.4826 * mad
 
-        if std_amt == 0:
+        # Skip pathologically noisy categories (CV-like guard).
+        if median_amt > 0 and sigma_est / median_amt > 2.0:
             continue
 
         for _, row in group.iterrows():
-            amt = abs(row["סכום"])
-            deviation = (amt - mean_amt) / std_amt
+            amt = abs(float(row["סכום"]))
+            deviation = (amt - median_amt) / sigma_est
 
-            if deviation > 2:
+            if deviation > 3:
                 anomalies.append({
                     "description": str(row.get("תיאור", "")),
-                    "amount": _sanitize(round(amt, 2)),
+                    "amount": _round_money(amt),
                     "category": str(cat),
                     "date": str(row.get("תאריך", "")),
                     "deviation": _sanitize(round(deviation, 2)),
-                    "category_mean": _sanitize(round(mean_amt, 2)),
-                    "category_std": _sanitize(round(std_amt, 2)),
+                    "category_mean": _round_money(median_amt),
+                    "category_std": _round_money(sigma_est),
                 })
 
     # Sort by deviation descending, limit to 15
