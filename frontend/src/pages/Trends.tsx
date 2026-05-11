@@ -52,7 +52,7 @@ const STAT_CARDS: StatCard[] = [
   },
   {
     key: 'transaction_count',
-    label: '\u05DE\u05E1\u05E4\u05E8 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA',
+    label: '\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05D4\u05D5\u05E6\u05D0\u05D4',
     icon: <Hash size={18} color="#fff" />,
     gradient: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea 0%, #764ba2 100%))',
     getNumericValue: (s) => s.transaction_count,

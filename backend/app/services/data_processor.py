@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, INCOME_KEYWORDS
 from .ai_categorizer import categorize_transactions
 
 
@@ -222,6 +222,20 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             for local_idx, category in ai_mapping.items():
                 if 0 <= local_idx < len(misc_indices):
                     result.at[misc_indices[local_idx], 'קטגוריה'] = category
+
+    # Income rows that still slipped through into other categories (most
+    # commonly "שונות") should land in a dedicated income bucket so they
+    # don't pollute spending breakdowns. Only re-categorize rows where the
+    # description clearly matches an income keyword.
+    income_mask = (result['סכום'] > 0) & result['תיאור'].notna()
+    if income_mask.any():
+        income_desc_lower = result.loc[income_mask, 'תיאור'].astype(str).str.lower()
+        kw_pattern = '|'.join(re.escape(k.lower()) for k in INCOME_KEYWORDS)
+        income_keyword_match = income_desc_lower.str.contains(kw_pattern, na=False, regex=True)
+        to_relabel = income_mask.copy()
+        to_relabel.loc[income_mask] = income_keyword_match.values
+        if to_relabel.any():
+            result.loc[to_relabel, 'קטגוריה'] = 'משכורת והכנסות'
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)

@@ -24,7 +24,29 @@ CATEGORY_ICONS = {
     'טיסות ותיירות': '✈️',
     'חינוך ולימודים': '📚',
     'מנויים ושירותים': '🔁',
+    'משכורת והכנסות': '💰',
 }
+
+# Categories that represent value moving between the user's own accounts
+# (or to/from investments). These are NOT expenses — KPIs like "total
+# expenses", "highest expense", and category percentages should exclude
+# them so they don't distort the spending picture.
+TRANSFER_CATEGORIES: set[str] = {
+    'העברה להשקעות',
+    'העברת כספים',
+}
+
+# Keywords that, when found in a positive-amount row, indicate income
+# (salary, pension, refund, etc.). Used to re-categorize income rows that
+# the source file left in "שונות" (Misc).
+INCOME_KEYWORDS: list[str] = [
+    'משכורת', 'salary', 'מענק', 'פנסיה', 'pension',
+    'קצבה', 'פיצויים', 'דמי אבטלה', 'הכנסה',
+    'העברת שכר', 'העב שכר', 'שכ"ע', 'שכר עבודה',
+    'הפקדת שכר', 'תשלום שכר', 'שכר חודש',
+    'קצבת ילדים', 'מענק עבודה', 'דמי לידה',
+    'החזר', 'refund', 'זיכוי',
+]
 
 # Keywords in transaction descriptions that indicate check withdrawals (rent)
 CHECK_WITHDRAWAL_KEYWORDS = [

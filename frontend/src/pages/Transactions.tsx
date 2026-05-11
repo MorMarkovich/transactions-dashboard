@@ -96,7 +96,7 @@ export default function Transactions() {
 
   // Filter / pagination state
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(50)
   const [filters, setFilters] = useState<{
     search?: string
     category?: string
@@ -464,6 +464,7 @@ export default function Transactions() {
           page={page}
           pageSize={pageSize}
           onPageChange={handlePageChange}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1) }}
           onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}
           showBillingDate={transactions.some((tx) => !!tx.תאריך_חיוב)}
         />

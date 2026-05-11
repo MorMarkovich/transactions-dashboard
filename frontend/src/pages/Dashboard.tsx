@@ -36,7 +36,7 @@ import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
-import { formatCurrency } from '../utils/formatting'
+import { formatCurrency, formatPercent } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import type {
   MetricsData,
@@ -167,11 +167,23 @@ export default function Dashboard() {
     if (forecast && forecast.trend_direction === 'up') {
       items.push({ id: 'forecast-up', type: 'insight', title: 'תחזית הוצאות', message: 'מגמת עלייה בהוצאות', time: now, read: false })
     }
-    if (metrics.total_income > 0 && Math.abs(metrics.total_expenses) > metrics.total_income) {
-      items.push({ id: 'expenses-exceed-income', type: 'insight', title: 'הוצאות עולות על הכנסות', message: `הוצאות: ${Math.abs(metrics.total_expenses).toLocaleString('he-IL')} > הכנסות: ${metrics.total_income.toLocaleString('he-IL')}`, time: now, read: false })
+    // Scope this alert to the month the user is viewing whenever possible —
+    // showing an all-time delta inside a monthly-overview context was confusing.
+    const scopedIncome = monthOverview?.total_income ?? metrics.total_income
+    const scopedExpenses = monthOverview ? monthOverview.total_expenses : Math.abs(metrics.total_expenses)
+    const scopeLabel = monthOverview ? ` (${monthOverview.month})` : ''
+    if (scopedIncome > 0 && scopedExpenses > scopedIncome) {
+      items.push({
+        id: `expenses-exceed-income-${monthOverview?.month ?? 'all'}`,
+        type: 'insight',
+        title: `הוצאות עולות על הכנסות${scopeLabel}`,
+        message: `הוצאות: ${scopedExpenses.toLocaleString('he-IL')} > הכנסות: ${scopedIncome.toLocaleString('he-IL')}`,
+        time: now,
+        read: false,
+      })
     }
     setNotifications(items)
-  }, [metrics, anomalies, forecast, setNotifications])
+  }, [metrics, monthOverview, anomalies, forecast, setNotifications])
 
   // ── Inject responsive CSS once (prevent duplicate <style> elements) ──
   useEffect(() => {
@@ -268,6 +280,17 @@ export default function Dashboard() {
     }
 
     fetchOverview()
+    return () => controller.abort()
+  }, [sessionId, selectedMonth, dateType])
+
+  // ── Refetch weekly summary scoped to the selected month ───────────
+  useEffect(() => {
+    if (!sessionId || !selectedMonth) return
+    const controller = new AbortController()
+    transactionsApi
+      .getWeeklySummary(sessionId, controller.signal, selectedMonth, selectedMonth, dateType)
+      .then(setWeeklySummary)
+      .catch(() => { /* non-critical */ })
     return () => controller.abort()
   }, [sessionId, selectedMonth, dateType])
 
@@ -512,14 +535,23 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          {/* Last Updated Timestamp */}
-          {dataLoadedAt && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block', flexShrink: 0 }} />
-              <Clock size={11} />
-              <span>עודכן {dataLoadedAt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          )}
+          {/* Last Updated Timestamp — include the date when it isn't today */}
+          {dataLoadedAt && (() => {
+            const now = new Date()
+            const isToday = dataLoadedAt.toDateString() === now.toDateString()
+            const time = dataLoadedAt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+            const date = dataLoadedAt.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })
+            return (
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}
+                title={dataLoadedAt.toLocaleString('he-IL')}
+              >
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block', flexShrink: 0 }} />
+                <Clock size={11} />
+                <span>עודכן {isToday ? time : `${date} ${time}`}</span>
+              </div>
+            )
+          })()}
         </motion.div>
         )
       })()}
@@ -605,28 +637,42 @@ export default function Dashboard() {
             </button>
 
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-              {availableMonths.slice(0, 8).map((m) => (
-                <button
-                  key={m.month}
-                  onClick={() => setSelectedMonth(m.month)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid',
-                    borderColor: selectedMonth === m.month ? 'var(--accent)' : 'var(--border)',
-                    background: selectedMonth === m.month ? 'var(--accent-muted)' : 'transparent',
-                    color: selectedMonth === m.month ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontWeight: selectedMonth === m.month ? 700 : 500,
-                    fontSize: '0.8125rem',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-family)',
-                    transition: 'all 0.15s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatMonthLabel(m.month)}
-                </button>
-              ))}
+              {availableMonths.slice(0, 8).map((m) => {
+                // Flag the user's current calendar month as partial so a mid-
+                // month "drop" doesn't look like a real trend.
+                const now = new Date()
+                const currentMonthKey = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+                const isCurrent = m.month === currentMonthKey
+                return (
+                  <button
+                    key={m.month}
+                    onClick={() => setSelectedMonth(m.month)}
+                    title={isCurrent ? 'חודש נוכחי — נתונים חלקיים' : undefined}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 'var(--radius-full)',
+                      border: '1px solid',
+                      borderColor: selectedMonth === m.month ? 'var(--accent)' : 'var(--border)',
+                      background: selectedMonth === m.month ? 'var(--accent-muted)' : 'transparent',
+                      color: selectedMonth === m.month ? 'var(--accent)' : 'var(--text-secondary)',
+                      fontWeight: selectedMonth === m.month ? 700 : 500,
+                      fontSize: '0.8125rem',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-family)',
+                      transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    {formatMonthLabel(m.month)}
+                    {isCurrent && (
+                      <span aria-label="חודש חלקי" style={{ fontSize: '0.65rem', opacity: 0.7 }}>•חלקי</span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
 
             <button
@@ -914,7 +960,7 @@ export default function Dashboard() {
                 >
                   <span style={{ fontSize: '0.8rem' }}>{get_icon(cat.name)}</span>
                   {cat.name}
-                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({cat.percent.toFixed(0)}%)</span>
+                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({formatPercent(cat.percent)})</span>
                 </button>
               )
             })}

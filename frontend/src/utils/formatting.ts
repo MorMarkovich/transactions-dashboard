@@ -4,19 +4,25 @@
 
 const numberFormatter = new Intl.NumberFormat('he-IL')
 
+// U+200E LEFT-TO-RIGHT MARK — bracketing the currency string forces the whole
+// run to render as a single LTR unit even inside RTL paragraphs. Without it
+// the minus sign and ₪ symbol can swap sides on bidi reordering.
+const LRM = '‎'
+
 /**
  * Format a number as Israeli Shekel currency (e.g. ₪1,234.56).
- * Always places ₪ before the number (LTR-safe, no RTL-marks) so the symbol
- * renders correctly in both RTL and LTR containers.
+ * The result is wrapped with LRM marks so it renders consistently inside both
+ * RTL (Hebrew) and LTR containers.
  */
 export function formatCurrency(amount: number): string {
-  if (amount === 0) return '₪0'
+  if (amount === 0) return `${LRM}₪0${LRM}`
   const abs = Math.abs(amount)
   const formatted = abs.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  return amount < 0 ? `-₪${formatted}` : `₪${formatted}`
+  const body = amount < 0 ? `-₪${formatted}` : `₪${formatted}`
+  return `${LRM}${body}${LRM}`
 }
 
 /**
