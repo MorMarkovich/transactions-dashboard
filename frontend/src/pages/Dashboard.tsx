@@ -1460,12 +1460,26 @@ export default function Dashboard() {
             >
               {monthlyData.months.slice(-6).map((month, idx, arr) => {
                 const prev = idx > 0 ? arr[idx - 1].amount : null
-                const changePct = prev ? ((month.amount - prev) / Math.abs(prev)) * 100 : null
+                // Days-elapsed normalisation (D7): if the displayed month
+                // is the current calendar month, compare per-day rates so
+                // a 6-day-into-month total doesn't look like a giant drop.
+                const [mm, yyyy] = month.month.split('/').map((s) => parseInt(s, 10))
+                const now = new Date()
+                const isCurrent = mm === now.getMonth() + 1 && yyyy === now.getFullYear()
+                const daysInMonth = new Date(yyyy, mm, 0).getDate()
+                const daysElapsed = isCurrent ? now.getDate() : daysInMonth
+                const adjustedCurrent = isCurrent && daysElapsed > 0
+                  ? (month.amount / daysElapsed) * daysInMonth
+                  : month.amount
+                const changePct = prev ? ((adjustedCurrent - prev) / Math.abs(prev)) * 100 : null
                 const isSelected = month.month === selectedMonth
                 return (
                   <div
                     key={month.month}
                     onClick={() => setSelectedMonth(month.month)}
+                    title={isCurrent
+                      ? `חודש חלקי: ${daysElapsed}/${daysInMonth} ימים — האחוז מנורמל לקצב יומי`
+                      : undefined}
                     style={{
                       textAlign: 'center',
                       padding: 'var(--space-md)',
@@ -1477,14 +1491,14 @@ export default function Dashboard() {
                     }}
                   >
                     <div style={{ fontSize: '0.75rem', color: isSelected ? 'var(--accent)' : 'var(--text-muted)', marginBottom: '6px', fontWeight: isSelected ? 600 : 400 }}>
-                      {month.month}
+                      {month.month}{isCurrent && <span style={{ fontSize: '0.625rem', opacity: 0.65, marginRight: '4px' }}>·חלקי</span>}
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
                       {formatCurrency(month.amount)}
                     </div>
                     {changePct !== null && (
                       <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
-                        {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
+                        {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%{isCurrent && <span style={{ opacity: 0.6 }}> ‎·קצב</span>}
                       </div>
                     )}
                   </div>
