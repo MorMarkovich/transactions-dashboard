@@ -128,13 +128,23 @@ export default function Merchants() {
     if (!merchantData?.merchants.length) return null
     const { merchants } = merchantData
     const shownCount = merchants.length
-    // Total distinct merchants — falls back to "shown" if older backend
-    // version doesn't include the field.
     const totalCount = merchantData.total_merchants ?? shownCount
-    const totalSpending = merchants.reduce((sum, m) => sum + Math.abs(m.total), 0)
+    // Prefer the backend-supplied totals (which reconcile with /api/metrics)
+    // over a client-side sum of the truncated top-N list. Falls back to the
+    // visible sum for older backend versions.
+    const visibleSpending = merchants.reduce((sum, m) => sum + Math.abs(m.total), 0)
+    const filteredTotal = merchantData.filtered_total ?? visibleSpending
+    const fullSpend = merchantData.total_spend ?? filteredTotal
     const mostFrequent = merchants.reduce((prev, curr) =>
       curr.count > prev.count ? curr : prev, merchants[0])
-    return { shownCount, totalCount, totalSpending, mostFrequent }
+    return {
+      shownCount,
+      totalCount,
+      visibleSpending,
+      filteredTotal,
+      fullSpend,
+      mostFrequent,
+    }
   }, [merchantData])
 
   // ── No session ────────────────────────────────────────────────────────
@@ -189,15 +199,10 @@ export default function Merchants() {
             <div className="stat-content">
               <div className="stat-value">
                 {summaryStats.shownCount}
-                {summaryStats.totalCount > summaryStats.shownCount && (
-                  <span style={{ fontSize: '0.65em', opacity: 0.6, marginRight: '4px' }}>
-                    {' / '}{summaryStats.totalCount}
-                  </span>
-                )}
               </div>
               <div className="stat-label">
                 {summaryStats.totalCount > summaryStats.shownCount
-                  ? 'בתי עסק (מציג מובילים)'
+                  ? `בתי עסק מובילים (מתוך ${summaryStats.totalCount} שונים)`
                   : 'בתי עסק'}
               </div>
             </div>
@@ -207,7 +212,12 @@ export default function Merchants() {
               <DollarSign size={18} color="#fff" />
             </div>
             <div className="stat-content">
-              <div className="stat-value">{formatCurrency(summaryStats.totalSpending)}</div>
+              <div
+                className="stat-value"
+                title={`בתי עסק: ${formatCurrency(summaryStats.filteredTotal)} · כולל עמלות/מסים: ${formatCurrency(summaryStats.fullSpend)}`}
+              >
+                {formatCurrency(summaryStats.fullSpend)}
+              </div>
               <div className="stat-label">סה"כ הוצאות</div>
             </div>
           </div>

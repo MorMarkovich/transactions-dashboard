@@ -25,6 +25,11 @@
   padding: var(--space-xl);
   padding-bottom: 90px; /* Space for FAB so it doesn't overlap pagination */
   overflow-y: auto;
+  /* min-width: 0 is required for a flex child that contains its own
+     auto-fit/auto-fill grids — without it the child can't shrink below
+     its content width and the first item on a wrapped row gets clipped
+     off the left edge in RTL. */
+  min-width: 0;
   min-height: calc(100vh - var(--header-height, 64px));
   max-width: 100%;
   transition: max-width var(--transition-normal);

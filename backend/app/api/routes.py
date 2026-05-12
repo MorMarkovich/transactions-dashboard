@@ -1491,22 +1491,33 @@ async def get_merchants(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = _spending_only(df).copy()
+    full_expenses = _spending_only(df).copy()
 
-    if expenses.empty:
-        return {"merchants": [], "total_merchants": 0, "shown": 0}
+    if full_expenses.empty:
+        return {"merchants": [], "total_merchants": 0, "shown": 0, "total_spend": 0, "filtered_total": 0}
 
     # Filter out non-merchant rows (tax withholdings, bank fees, interest) so
     # the merchants list shows actual businesses. These row shapes don't
-    # represent a place where the user spent money.
+    # represent a place where the user spent money. We also keep the raw
+    # full-spend totals so the page can report "merchants account for ₪X
+    # out of ₪Y total spend" instead of looking inconsistent vs the
+    # dashboard's spending KPI.
     NON_MERCHANT_TOKENS = ['תשלום מס במקור', 'עמלת הקצאת אשראי', 'עמלת ניהול', 'ריבית', 'דמי כרטיס']
-    desc_lower = expenses['תיאור'].astype(str)
-    is_non_merchant = pd.Series(False, index=expenses.index)
+    desc_lower = full_expenses['תיאור'].astype(str)
+    is_non_merchant = pd.Series(False, index=full_expenses.index)
     for token in NON_MERCHANT_TOKENS:
         is_non_merchant = is_non_merchant | desc_lower.str.contains(token, na=False, regex=False)
-    expenses = expenses[~is_non_merchant]
+    expenses = full_expenses[~is_non_merchant]
+    full_spend_total = _round_money(float(full_expenses['סכום_מוחלט'].sum()))
+
     if expenses.empty:
-        return {"merchants": [], "total_merchants": 0, "shown": 0}
+        return {
+            "merchants": [],
+            "total_merchants": 0,
+            "shown": 0,
+            "total_spend": full_spend_total,
+            "filtered_total": 0,
+        }
 
     # Group by the canonical merchant name (set by the AI classifier at
     # ingest). Falls back to תיאור when the canonical column is missing
@@ -1538,6 +1549,12 @@ async def get_merchants(
         "merchants": merchants,
         "total_merchants": total_merchants,
         "shown": len(merchants),
+        # Full session spending (matches /api/metrics.total_expenses) so the
+        # UI can show \"these merchants account for X / Y\" instead of two
+        # different totals across pages.
+        "total_spend": full_spend_total,
+        # Sum of just the displayed (post-filter) merchant transactions.
+        "filtered_total": _round_money(float(expenses['סכום_מוחלט'].sum())),
     }
 
 
@@ -1928,12 +1945,15 @@ async def get_spending_forecast(sessionId: str = Query(...)):
     # Use the last up-to-12 complete months as the regression baseline.
     recent = monthly.tail(12).reset_index(drop=True)
 
-    # Winsorize at the 90th percentile so spike months (e.g. a Thailand
-    # trip) don't dominate the linear trend. Clamping a single outlier
-    # month at the p90 amount lets the trend reflect typical spending
-    # rather than extrapolating from one big event.
+    # Winsorize at the 75th percentile so spike months (e.g. a Thailand
+    # trip) don't dominate the linear trend. p90 was too lenient — when
+    # the baseline only had a handful of months the 90th percentile was
+    # often the spike itself. p75 gives a stable "typical month" ceiling.
+    # Also forecast against the *median* rather than fitting a regression
+    # when the dataset is small (≤ 4 months), since a 2-point regression
+    # is essentially a slope between two points and is wildly extrapolated.
     y_raw = recent["amount"].to_numpy(dtype=float)
-    cap = float(np.quantile(y_raw, 0.90)) if len(y_raw) >= 4 else float(y_raw.max())
+    cap = float(np.quantile(y_raw, 0.75)) if len(y_raw) >= 3 else float(np.median(y_raw))
     y = np.clip(y_raw, 0, cap)
     capped_indices = [int(i) for i, (raw, c) in enumerate(zip(y_raw, y)) if raw > c]
     x = np.arange(len(recent), dtype=float)
@@ -1942,6 +1962,11 @@ async def get_spending_forecast(sessionId: str = Query(...)):
     slope, intercept = coeffs
     forecast = float(slope * len(recent) + intercept)
     forecast = max(forecast, 0)  # Can't be negative spending
+    # Clamp the forecast to a sensible range around the median observed
+    # month. A linear extrapolation from a tiny baseline can otherwise
+    # produce projections 5-10× higher than anything actually spent.
+    median_month = float(np.median(y_raw)) if len(y_raw) > 0 else 0
+    forecast = min(forecast, max(median_month * 2.0, cap))
 
     # Confidence based on R² and data points. Winsorizing dropped a few
     # outliers, but if many months were capped we have less to trust.
@@ -2038,11 +2063,15 @@ async def get_weekly_summary(
         count = len(week_df)
         top_cat = ""
         if "קטגוריה" in week_df.columns:
-            cats = week_df.groupby("קטגוריה")["סכום"].sum().abs()
-            if not cats.empty:
-                top_cat = str(cats.idxmax())
+            # Use modal category (most-frequent) instead of largest-sum.
+            # The largest-sum metric labelled the entire week with a single
+            # big rent payment's category which was misleading — the modal
+            # category answers "where did most of your spending happen?".
+            cat_counts = week_df["קטגוריה"].value_counts()
+            if not cat_counts.empty:
+                top_cat = str(cat_counts.index[0])
         return {
-            "total": _sanitize(round(total, 2)),
+            "total": _round_money(total),
             "count": int(count),
             "top_category": top_cat,
         }

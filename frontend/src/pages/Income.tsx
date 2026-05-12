@@ -184,7 +184,11 @@ export default function Income() {
   const totalIncome = manualIncome + transactionIncome
   const totalExpenses = metrics?.total_expenses ?? 0
   const balance = totalIncome - totalExpenses
-  const utilization = totalIncome > 0 ? Math.min((totalExpenses / totalIncome) * 100, 100) : 0
+  // Raw utilization can exceed 100% when expenses > income. Keep both:
+  // - utilization: capped at 100 for the bar width
+  // - utilizationRaw: the true percentage for the label and 'חריגה' badge
+  const utilizationRaw = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0
+  const utilization = Math.min(utilizationRaw, 100)
   const savings = totalIncome - totalExpenses
 
   // ── Fetch data ────────────────────────────────────────────────────────
@@ -655,15 +659,20 @@ export default function Income() {
                     fontSize: '0.8125rem',
                     fontWeight: 600,
                     color:
-                      utilization > 90
+                      utilizationRaw > 100
                         ? 'var(--accent-danger, #ef4444)'
-                        : utilization > 70
+                        : utilizationRaw > 70
                         ? 'var(--accent-warning, #f59e0b)'
                         : 'var(--accent-secondary, #10b981)',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
-                  {Math.round(utilization)}%
+                  {Math.round(utilizationRaw)}%
+                  {utilizationRaw > 100 && (
+                    <span style={{ marginRight: '4px', fontSize: '0.7rem', opacity: 0.85 }}>
+                      ·חריגה
+                    </span>
+                  )}
                 </span>
               </div>
               <ProgressBar
