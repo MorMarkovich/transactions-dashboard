@@ -1310,6 +1310,14 @@ async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("tr
         .sort_index()
     )
 
+    # Zero-fill missing months between min and max so the chart axis is
+    # contiguous (otherwise a Sept 2025 → Dec 2025 jump renders as
+    # adjacent bars with a meaningless % delta in the dashboard's
+    # \"השוואה חודשית\" panel).
+    if not monthly.empty:
+        full_range = pd.period_range(monthly.index.min(), monthly.index.max(), freq='M')
+        monthly = monthly.reindex(full_range, fill_value=0.0)
+
     months = [
         {"month": period.strftime('%m/%Y'), "amount": _round_money(v)}
         for period, v in monthly.items()
@@ -1708,7 +1716,7 @@ async def get_industry_monthly(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    expenses = _spending_only(df).copy()
 
     if expenses.empty:
         return {"months": [], "series": []}
@@ -1734,12 +1742,19 @@ async def get_industry_monthly(
     )
     pivot = pivot.sort_index()
 
+    # Zero-fill the months between the first and last observed periods so
+    # the chart axis is contiguous. Previously a 02/2026 → 04/2024 jump
+    # rendered as adjacent bars with a misleading % delta.
+    if not pivot.empty:
+        full_range = pd.period_range(pivot.index.min(), pivot.index.max(), freq='M')
+        pivot = pivot.reindex(full_range, fill_value=0)
+
     months = [period.strftime('%m/%Y') for period in pivot.index]
 
     series = []
     for cat in top_cats:
         if cat in pivot.columns:
-            data = [round(_sanitize(float(v)), 2) for v in pivot[cat].values]
+            data = [_round_money(float(v)) for v in pivot[cat].values]
         else:
             data = [0.0] * len(months)
         series.append({"name": cat, "data": data})
@@ -1751,7 +1766,7 @@ async def get_industry_monthly(
             if cat in pivot.columns:
                 for i, v in enumerate(pivot[cat].values):
                     other_data[i] += float(v)
-        series.append({"name": "אחר", "data": [round(_sanitize(v), 2) for v in other_data]})
+        series.append({"name": "אחר", "data": [_round_money(v) for v in other_data]})
 
     return {"months": months, "series": series}
 
@@ -1861,12 +1876,16 @@ async def get_spending_forecast(sessionId: str = Query(...)):
     expenses = expenses.dropna(subset=["date"])
     expenses["month_key"] = expenses["date"].dt.to_period("M")
 
-    monthly_all = expenses.groupby("month_key")["סכום"].sum().abs().reset_index()
+    monthly_all = expenses.groupby("month_key")["סכום"].sum().abs()
+    if not monthly_all.empty:
+        full_range = pd.period_range(monthly_all.index.min(), monthly_all.index.max(), freq='M')
+        monthly_all = monthly_all.reindex(full_range, fill_value=0.0)
+    monthly_all = monthly_all.reset_index()
     monthly_all.columns = ["month", "amount"]
     monthly_all = monthly_all.sort_values("month").reset_index(drop=True)
 
     monthly_data = [
-        {"month": str(row["month"]), "amount": _sanitize(round(row["amount"], 2))}
+        {"month": str(row["month"]), "amount": _round_money(row["amount"])}
         for _, row in monthly_all.iterrows()
     ]
 
@@ -1894,7 +1913,7 @@ async def get_spending_forecast(sessionId: str = Query(...)):
             "avg_monthly": 0,
         }
 
-    avg_monthly = _sanitize(round(monthly["amount"].mean(), 2))
+    avg_monthly = _round_money(monthly["amount"].mean())
 
     if len(monthly) < 2:
         # Single complete month: forecast = that month's spending, no trend.
@@ -1906,17 +1925,26 @@ async def get_spending_forecast(sessionId: str = Query(...)):
             "avg_monthly": avg_monthly,
         }
 
-    # Linear regression over the last up-to-12 complete months
+    # Use the last up-to-12 complete months as the regression baseline.
     recent = monthly.tail(12).reset_index(drop=True)
+
+    # Winsorize at the 90th percentile so spike months (e.g. a Thailand
+    # trip) don't dominate the linear trend. Clamping a single outlier
+    # month at the p90 amount lets the trend reflect typical spending
+    # rather than extrapolating from one big event.
+    y_raw = recent["amount"].to_numpy(dtype=float)
+    cap = float(np.quantile(y_raw, 0.90)) if len(y_raw) >= 4 else float(y_raw.max())
+    y = np.clip(y_raw, 0, cap)
+    capped_indices = [int(i) for i, (raw, c) in enumerate(zip(y_raw, y)) if raw > c]
     x = np.arange(len(recent), dtype=float)
-    y = recent["amount"].to_numpy(dtype=float)
 
     coeffs = np.polyfit(x, y, 1)
     slope, intercept = coeffs
     forecast = float(slope * len(recent) + intercept)
     forecast = max(forecast, 0)  # Can't be negative spending
 
-    # Confidence based on R² and data points
+    # Confidence based on R² and data points. Winsorizing dropped a few
+    # outliers, but if many months were capped we have less to trust.
     y_pred = np.polyval(coeffs, x)
     ss_res = np.sum((y - y_pred) ** 2)
     ss_tot = np.sum((y - np.mean(y)) ** 2)
@@ -1927,13 +1955,22 @@ async def get_spending_forecast(sessionId: str = Query(...)):
         confidence = "high"
     elif len(recent) >= 3 and r_squared > 0.4:
         confidence = "medium"
+    # If more than 25% of the baseline was capped, downgrade confidence —
+    # the underlying data is too volatile to extrapolate confidently.
+    if len(recent) > 0 and len(capped_indices) / len(recent) > 0.25:
+        confidence = "low" if confidence == "medium" else confidence
+        if confidence == "high":
+            confidence = "medium"
 
     trend_direction = "up" if slope > 50 else ("down" if slope < -50 else "stable")
 
     return {
-        "forecast_amount": _sanitize(round(forecast, 2)),
+        "forecast_amount": _round_money(forecast),
         "confidence": confidence,
         "trend_direction": trend_direction,
+        # Number of months whose raw total was winsorized — exposed so the
+        # UI can show "based on N of M months, X spike months smoothed".
+        "outlier_months_smoothed": len(capped_indices),
         "monthly_data": monthly_data,
         "avg_monthly": avg_monthly,
     }
