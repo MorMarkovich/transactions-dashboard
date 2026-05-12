@@ -115,6 +115,9 @@ export const transactionsApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      // PDF extraction calls Claude — 60s gives the parallel chunks
+      // enough headroom even on a slow upstream.
+      timeout: 90_000,
       signal,
     });
 

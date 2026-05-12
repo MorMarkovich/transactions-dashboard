@@ -164,20 +164,21 @@ def _parse_ai_response(text: str) -> List[dict]:
 
 
 def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
+    """Single Claude call returning a list of transaction dicts (or None on
+    error / no key). Sized to one chunk — the orchestrator below splits a PDF
+    into page-chunks and calls this concurrently."""
     client = _get_client()
     if client is None:
         return None
     try:
-        # Cap input size — Claude can handle a lot, but PDFs sometimes have
-        # giant marketing pages. Trim to the most useful slice.
-        if len(text) > 60_000:
-            text = text[:60_000]
+        # Hard cap per chunk — keep the prompt small so the call returns fast.
+        if len(text) > 18_000:
+            text = text[:18_000]
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            # Long statements produce >8 k JSON output. Bump well above the
-            # previous 8192 cap so we don't truncate mid-array. Haiku 4.5
-            # supports up to 64 k output tokens.
-            max_tokens=32000,
+            # 12k output is plenty for a 2–3 page chunk. Smaller cap = faster
+            # response than the previous 32k single-shot.
+            max_tokens=12000,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
@@ -188,17 +189,102 @@ def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
         stop_reason = getattr(response, "stop_reason", None)
         if stop_reason == "max_tokens":
             logger.warning(
-                "PDF extractor: response hit max_tokens (likely truncated). "
-                "Will attempt salvage of the partial JSON."
+                "PDF extractor: chunk hit max_tokens (will salvage partial)."
             )
         logger.info(
-            "PDF extractor: Claude response (%d chars, stop=%s). First 300: %r",
-            len(raw), stop_reason, raw[:300],
+            "PDF extractor: Claude chunk response (%d chars, stop=%s)",
+            len(raw), stop_reason,
         )
         return _parse_ai_response(raw)
     except Exception as e:
         logger.warning("PDF extractor: AI call failed: %s", e)
         return None
+
+
+def _chunk_pages(pages: List[str], target_chars: int = 8_000) -> List[str]:
+    """Group consecutive pages into chunks under `target_chars` of text so
+    each Claude call is fast and finishes well below max_tokens. Always at
+    least one chunk per non-empty page sequence."""
+    chunks: List[str] = []
+    buf: List[str] = []
+    size = 0
+    for p in pages:
+        if not p.strip():
+            continue
+        if size and size + len(p) > target_chars:
+            chunks.append("\n\n".join(buf))
+            buf = [p]
+            size = len(p)
+        else:
+            buf.append(p)
+            size += len(p)
+    if buf:
+        chunks.append("\n\n".join(buf))
+    return chunks
+
+
+def _call_claude_parallel(filename: str, pages: List[str]) -> Optional[List[dict]]:
+    """Run one Claude extraction per page-chunk in parallel and merge results.
+
+    Latency win: a 7-page statement that took ~45s in one shot returns in
+    closer to the slowest single-chunk's latency (~8-12s) because the calls
+    overlap. Total tokens billed are about the same.
+    """
+    if _get_client() is None:
+        return None
+
+    chunks = _chunk_pages(pages)
+    if not chunks:
+        return []
+
+    # Single-chunk PDFs don't benefit from threading; just call inline.
+    if len(chunks) == 1:
+        return _call_claude(filename, chunks[0])
+
+    logger.info("PDF extractor: dispatching %d parallel Claude chunks", len(chunks))
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    txns: List[dict] = []
+    any_response = False
+    # Cap workers so a 30-page PDF doesn't fire 30 concurrent Anthropic calls.
+    with ThreadPoolExecutor(max_workers=min(6, len(chunks))) as pool:
+        futures = {pool.submit(_call_claude, filename, c): i for i, c in enumerate(chunks)}
+        for fut in as_completed(futures):
+            try:
+                result = fut.result()
+            except Exception as e:
+                logger.warning("PDF extractor: chunk failed: %s", e)
+                continue
+            if result is None:
+                continue
+            any_response = True
+            txns.extend(result)
+
+    if not any_response:
+        return None  # Treat as no-AI so the fallback path runs.
+
+    # Dedupe — chunk boundaries can overlap if the model rephrases the same row.
+    # Use (date, description, amount) as the identity key.
+    seen: set = set()
+    deduped: List[dict] = []
+    for t in txns:
+        if not isinstance(t, dict):
+            continue
+        key = (
+            str(t.get('date', '')),
+            str(t.get('description', '')).strip(),
+            round(float(t.get('amount', 0) or 0), 2),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(t)
+
+    logger.info(
+        "PDF extractor: %d transactions across %d chunks (deduped from %d)",
+        len(deduped), len(chunks), len(txns),
+    )
+    return deduped
 
 
 def _regex_fallback(pages: List[str]) -> List[dict]:
@@ -265,8 +351,7 @@ def extract_pdf_transactions(file_path: str) -> pd.DataFrame:
         )
 
     filename = os.path.basename(file_path)
-    full_text = "\n\n".join(pages)
-    ai_txns = _call_claude(filename, full_text)
+    ai_txns = _call_claude_parallel(filename, pages)
 
     # Track what each path found for the diagnostic error message.
     ai_count = len(ai_txns) if ai_txns is not None else None

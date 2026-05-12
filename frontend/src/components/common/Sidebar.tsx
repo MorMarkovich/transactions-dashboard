@@ -129,9 +129,13 @@ export default function Sidebar({
       const allTransactions: unknown[] = []
 
       for (let i = 0; i < files.length; i++) {
+        const isPdf = /\.pdf$/i.test(files[i].name)
+        // PDFs go through an LLM extractor which can take several seconds —
+        // label the status accordingly so the user doesn't think it stalled.
+        const baseLabel = isPdf ? 'מנתח PDF (עשוי להימשך כדקה)...' : 'מעלה קובץ...'
         setUploadStatus(files.length === 1
-          ? 'מעלה קובץ...'
-          : `מעלה קובץ ${i + 1} מ-${files.length}...`)
+          ? baseLabel
+          : `${baseLabel} (${i + 1} מ-${files.length})`)
         const response = await transactionsApi.uploadFile(files[i])
         if (response.success && response.session_id) {
           const data = await transactionsApi.getTransactions(
