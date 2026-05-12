@@ -177,6 +177,10 @@ export interface MerchantData {
   // are returned in `merchants` — the backend caps the response at top-N).
   total_merchants?: number;
   shown?: number;
+  // Full session spending (matches /api/metrics.total_expenses).
+  total_spend?: number;
+  // Sum of just the displayed (post-filter) merchant transactions.
+  filtered_total?: number;
 }
 
 // Trend Statistics

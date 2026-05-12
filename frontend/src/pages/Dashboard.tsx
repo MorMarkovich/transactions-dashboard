@@ -1229,9 +1229,21 @@ export default function Dashboard() {
               </span>
             )}
           </div>
-          {/* Month selector pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
-            {industryMonthly.months.map((m) => {
+          {/* Month selector pills — newest-first horizontal scroll so the
+              visual order is unambiguous (was wrapping into two rows of
+              chronological halves which read confusingly under RTL). */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'nowrap',
+              overflowX: 'auto',
+              gap: '6px',
+              marginBottom: 'var(--space-sm)',
+              paddingBottom: '4px',
+              direction: 'rtl',
+            }}
+          >
+            {[...industryMonthly.months].reverse().map((m) => {
               const isSelected = selectedComparisonMonths.has(m)
               return (
                 <button
@@ -1316,12 +1328,26 @@ export default function Dashboard() {
               )}
             </div>
             <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.this_week.total)}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.this_week.count} עסקאות · {weeklySummary.this_week.top_category}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {weeklySummary.this_week.count === 0
+                ? 'אין עסקאות השבוע'
+                : `${weeklySummary.this_week.count} עסקאות${weeklySummary.this_week.top_category ? ` · קטגוריה מובילה: ${weeklySummary.this_week.top_category}` : ''}`}
+            </p>
           </div>
           <div className="glass-card" style={{ padding: '18px 22px' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '10px' }}>שבוע שעבר</span>
-            <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.last_week.total)}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.last_week.count} עסקאות · {weeklySummary.last_week.top_category}</p>
+            {weeklySummary.last_week.count === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                אין עסקאות בשבוע הקודם
+              </p>
+            ) : (
+              <>
+                <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.last_week.total)}</p>
+                <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {weeklySummary.last_week.count} עסקאות{weeklySummary.last_week.top_category ? ` · קטגוריה מובילה: ${weeklySummary.last_week.top_category}` : ''}
+                </p>
+              </>
+            )}
           </div>
         </motion.div>
       )}
