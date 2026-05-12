@@ -28,8 +28,12 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-_PDF_DATE_RE = re.compile(r'\b(\d{1,2})[/\.\-](\d{1,2})[/\.\-](\d{2,4})\b')
-_PDF_AMOUNT_RE = re.compile(r'-?\d{1,3}(?:,\d{3})*(?:\.\d{2})')
+# Permissive date pattern — handles DD/MM/YY, DD/MM/YYYY, DD-MM-YY, DD.MM.YY.
+_PDF_DATE_RE = re.compile(r'(?<!\d)(\d{1,2})[/\.\-](\d{1,2})[/\.\-](\d{2,4})(?!\d)')
+# Permissive amount pattern — matches 12.34 / 1,234.56 / 1234 / -1,234.56.
+# We require either a decimal point or a comma separator so we don't trip
+# on plain integers (page numbers, etc.).
+_PDF_AMOUNT_RE = re.compile(r'-?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|-?\d+\.\d{2}')
 
 
 SYSTEM_PROMPT = """You extract transactions from Israeli bank or credit-card PDF statements.
@@ -105,10 +109,19 @@ def _parse_ai_response(text: str) -> List[dict]:
         if text.endswith("```"):
             text = text[:-3]
         text = text.strip()
+    # The model sometimes prefixes a sentence before the JSON. Carve out the
+    # first {...} or [...] block.
+    if text and text[0] not in '{[':
+        for opener, closer in (('{', '}'), ('[', ']')):
+            start = text.find(opener)
+            end = text.rfind(closer)
+            if 0 <= start < end:
+                text = text[start:end + 1]
+                break
     try:
         data = json.loads(text)
     except json.JSONDecodeError as e:
-        logger.warning("PDF extractor: AI returned non-JSON: %s", e)
+        logger.warning("PDF extractor: AI returned non-JSON (first 200 chars): %r — %s", text[:200], e)
         return []
     txns = data.get("transactions") if isinstance(data, dict) else data
     return txns if isinstance(txns, list) else []
@@ -132,7 +145,12 @@ def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
                 "content": USER_PROMPT_TEMPLATE.format(filename=filename, text=text),
             }],
         )
-        return _parse_ai_response(response.content[0].text)
+        raw = response.content[0].text
+        logger.info(
+            "PDF extractor: Claude response (%d chars). First 300: %r",
+            len(raw), raw[:300],
+        )
+        return _parse_ai_response(raw)
     except Exception as e:
         logger.warning("PDF extractor: AI call failed: %s", e)
         return None
@@ -203,16 +221,37 @@ def extract_pdf_transactions(file_path: str) -> pd.DataFrame:
 
     filename = os.path.basename(file_path)
     full_text = "\n\n".join(pages)
-    txns = _call_claude(filename, full_text)
+    ai_txns = _call_claude(filename, full_text)
 
-    if txns is None:
-        logger.info("PDF extractor: falling back to regex (no AI key configured)")
-        txns = _regex_fallback(pages)
+    # Track what each path found for the diagnostic error message.
+    ai_count = len(ai_txns) if ai_txns is not None else None
+    regex_count = None
+
+    txns: List[dict] = ai_txns or []
+    if not txns:
+        # Either no AI key, AI failed, or AI returned 0 rows. Try the regex
+        # fallback so the user still gets *something* out of the PDF.
+        logger.info(
+            "PDF extractor: AI returned %s — running regex fallback",
+            "no result" if ai_txns is None else f"{len(ai_txns)} rows",
+        )
+        regex_txns = _regex_fallback(pages)
+        regex_count = len(regex_txns)
+        if regex_txns:
+            txns = regex_txns
 
     if not txns:
+        # Surface what we tried so the user can decide how to proceed.
+        detail = []
+        if ai_count is None:
+            detail.append("AI parser was not used (no ANTHROPIC_API_KEY)")
+        else:
+            detail.append(f"AI parser returned {ai_count} rows")
+        detail.append(f"regex fallback returned {regex_count if regex_count is not None else 'n/a'} rows")
         raise ValueError(
-            "Could not identify transactions in the PDF. "
-            "If this is an unusual layout, please share a sample."
+            "Could not identify transactions in the PDF (" + "; ".join(detail) +
+            "). The layout may not be supported yet — please share a sample so "
+            "we can add a specific parser."
         )
 
     # Return a DataFrame with proper Hebrew column names. The upload route
