@@ -118,13 +118,49 @@ def _parse_ai_response(text: str) -> List[dict]:
             if 0 <= start < end:
                 text = text[start:end + 1]
                 break
+
+    def _try_load(candidate: str) -> Optional[list]:
+        try:
+            data = json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+        txns = data.get("transactions") if isinstance(data, dict) else data
+        return txns if isinstance(txns, list) else None
+
+    parsed = _try_load(text)
+    if parsed is not None:
+        return parsed
+
+    # Recover from a truncated response (max_tokens cutoff). Walk back to the
+    # last `}` that ends a complete transaction object and re-close the array
+    # / wrapper. We can rescue most of the rows that finished before the cut.
+    salvaged: List[dict] = []
     try:
-        data = json.loads(text)
+        # Locate the transactions array opening.
+        arr_start = text.find('[')
+        if arr_start < 0:
+            return []
+        # Trim back to the last full `}` so the partial last object is dropped.
+        cut = text.rfind('}', 0, len(text))
+        if cut < 0 or cut < arr_start:
+            return []
+        salvageable = text[arr_start:cut + 1] + ']'
+        # If we trimmed inside a wrapper object, parse just the array.
+        decoded = json.loads(salvageable)
+        if isinstance(decoded, list):
+            salvaged = decoded
     except json.JSONDecodeError as e:
-        logger.warning("PDF extractor: AI returned non-JSON (first 200 chars): %r — %s", text[:200], e)
-        return []
-    txns = data.get("transactions") if isinstance(data, dict) else data
-    return txns if isinstance(txns, list) else []
+        logger.warning("PDF extractor: salvage attempt failed: %s", e)
+
+    if salvaged:
+        logger.warning(
+            "PDF extractor: recovered %d transactions from truncated AI response",
+            len(salvaged),
+        )
+        return salvaged
+
+    logger.warning("PDF extractor: AI returned non-JSON (first 200 chars): %r", text[:200])
+    return []
 
 
 def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
@@ -138,7 +174,10 @@ def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
             text = text[:60_000]
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=8192,
+            # Long statements produce >8 k JSON output. Bump well above the
+            # previous 8192 cap so we don't truncate mid-array. Haiku 4.5
+            # supports up to 64 k output tokens.
+            max_tokens=32000,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
@@ -146,9 +185,15 @@ def _call_claude(filename: str, text: str) -> Optional[List[dict]]:
             }],
         )
         raw = response.content[0].text
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason == "max_tokens":
+            logger.warning(
+                "PDF extractor: response hit max_tokens (likely truncated). "
+                "Will attempt salvage of the partial JSON."
+            )
         logger.info(
-            "PDF extractor: Claude response (%d chars). First 300: %r",
-            len(raw), raw[:300],
+            "PDF extractor: Claude response (%d chars, stop=%s). First 300: %r",
+            len(raw), stop_reason, raw[:300],
         )
         return _parse_ai_response(raw)
     except Exception as e:
