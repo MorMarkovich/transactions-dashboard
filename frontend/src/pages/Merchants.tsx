@@ -215,8 +215,19 @@ export default function Merchants() {
             <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
               <Crown size={18} color="#fff" />
             </div>
-            <div className="stat-content">
-              <div className="stat-value">{summaryStats.mostFrequent.name}</div>
+            <div className="stat-content" style={{ minWidth: 0, flex: 1 }}>
+              <div
+                className="stat-value"
+                title={summaryStats.mostFrequent.name}
+                style={{
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  fontSize: '1rem',
+                }}
+              >
+                {summaryStats.mostFrequent.name}
+              </div>
               <div className="stat-label">הכי תדיר ({summaryStats.mostFrequent.count} ביקורים)</div>
             </div>
           </div>

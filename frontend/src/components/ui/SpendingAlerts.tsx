@@ -63,14 +63,31 @@ export default function SpendingAlerts({
       })
     }
 
-    // Anomalies (significant deviations)
-    anomalies.slice(0, 3).forEach((a, i) => {
+    // Anomalies (significant deviations) — collapse duplicates by
+    // (description, category) so a recurring merchant doesn't drown the
+    // list. Keep the highest-deviation example per group.
+    const anomalyGroups = new Map<string, { item: AnomalyItem; count: number }>()
+    for (const a of anomalies) {
+      const key = `${a.description}|${a.category}`
+      const existing = anomalyGroups.get(key)
+      if (!existing) {
+        anomalyGroups.set(key, { item: a, count: 1 })
+      } else {
+        existing.count += 1
+        if ((a.deviation ?? 0) > (existing.item.deviation ?? 0)) {
+          existing.item = a
+        }
+      }
+    }
+    Array.from(anomalyGroups.values()).slice(0, 3).forEach(({ item: a, count }, i) => {
+      const median = a.category_median ?? a.category_mean
+      const suffix = count > 1 ? ` · ${count} עסקאות דומות` : ''
       result.push({
         id: `anomaly-${i}`,
         type: 'warning',
         icon: <AlertTriangle size={18} />,
         title: `חריגה: ${a.description}`,
-        description: `${formatCurrency(a.amount)} (חציון קטגוריה: ${formatCurrency(a.category_median ?? a.category_mean)})`,
+        description: `${formatCurrency(a.amount)} (חציון קטגוריה: ${formatCurrency(median)})${suffix}`,
       })
     })
 

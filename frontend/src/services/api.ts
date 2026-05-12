@@ -40,6 +40,38 @@ const api = axios.create({
   },
 });
 
+// Dedupe per-session warmup promises so concurrent effects share one HTTP
+// call instead of racing each other to the cold-start backend.
+const warmupCache = new Map<string, Promise<{ ready: boolean; rows: number }>>()
+
+// Request-side gate: every API call (except the warmup itself) waits for
+// the shared warmup promise to settle before going out. This eliminates the
+// 503 cascade where 10 endpoints fired in parallel against a cold worker
+// pool. The warmup endpoint is short-circuited so it doesn't deadlock.
+api.interceptors.request.use(async (config) => {
+  const url = (config.url ?? '').toString()
+  if (url.includes('/api/warmup')) return config
+  const sessionId =
+    (config.params && (config.params.sessionId || config.params.session_id)) || undefined
+  const key = (sessionId as string | undefined) || '__no_session__'
+  const existing = warmupCache.get(key)
+  if (existing) {
+    try { await existing } catch { /* swallow — request still goes out */ }
+    return config
+  }
+  // No warmup in flight; fire one inline so this request still has the
+  // worker pool primed by the time the response handler runs.
+  const promise = api
+    .get<{ ready: boolean; rows: number }>('/api/warmup', {
+      params: sessionId ? { sessionId } : {},
+    })
+    .then((r) => r.data)
+    .catch((e) => { warmupCache.delete(key); throw e })
+  warmupCache.set(key, promise)
+  try { await promise } catch { /* fall through */ }
+  return config
+})
+
 // Retry once on 503 / network error — typical pattern for cold-start backends
 // where the first request lights up the worker pool. Honors Retry-After if
 // the server sends it, otherwise waits ~700 ms before retrying.
@@ -62,10 +94,6 @@ api.interceptors.response.use(
     return api(config)
   },
 )
-
-// Dedupe per-session warmup promises so concurrent effects share one HTTP
-// call instead of racing each other to the cold-start backend.
-const warmupCache = new Map<string, Promise<{ ready: boolean; rows: number }>>()
 
 export const transactionsApi = {
   /**

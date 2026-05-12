@@ -71,7 +71,15 @@ function InsightCard({ icon, iconBg, title, value, subtitle, extra, index, backg
       initial="hidden"
       animate="visible"
       variants={cardVariants}
-      style={backgroundGradient ? { background: backgroundGradient, borderRadius: 'var(--radius-lg, 12px)' } : undefined}
+      // Guarantee a visible final state even if the animation never reaches
+      // it (e.g. the parent re-mounts mid-transition or the cardVariants
+      // get stuck). Previously this resulted in ghost cards at ~10% opacity.
+      style={{
+        opacity: 1,
+        ...(backgroundGradient
+          ? { background: backgroundGradient, borderRadius: 'var(--radius-lg, 12px)' }
+          : {}),
+      }}
     >
       <Card
         className="insight-card glass-card"
