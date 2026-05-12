@@ -721,7 +721,9 @@ async def get_session_info(sessionId: str = Query(...)):
         "total_income": total_income,
         "categories": categories,
         "months": months,
-        "has_billing_date": 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any(),
+        # `.notna().any()` returns numpy.bool_, which FastAPI's encoder can't
+        # serialise — wrap to native bool to avoid a 500.
+        "has_billing_date": bool('תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any()),
     }
 
 
@@ -737,21 +739,23 @@ async def get_metrics(sessionId: str = Query(...)):
     spending = _spending_only(df)
     real_income = _real_income_only(df)
     positives = df[df['סכום'] > 0] if 'סכום' in df.columns else df.iloc[0:0]
-    # Positive non-income rows = refunds / credits / between-account transfers
-    refund_or_transfer = positives[~positives['קטגוריה'].isin(INCOME_CATEGORIES)] if 'קטגוריה' in positives.columns else positives
-    # All positive amounts kept for diagnostics
+    # Positive non-income rows = credits in general (refunds, BIT receipts,
+    # between-account transfers, etc.). Naming them "credit" instead of
+    # "refund" to match what they actually are.
+    credits = positives[~positives['קטגוריה'].isin(INCOME_CATEGORIES)] if 'קטגוריה' in positives.columns else positives
     positive_total = float(positives['סכום'].sum()) if not positives.empty else 0.0
 
     # Counts:
     #   total_transactions = every row in the dataset (matches /api/transactions.total)
     #   expense_count      = all negative-amount rows (includes transfers/investments)
     #   income_count       = positive-amount rows in real-income categories only
-    #   refund_count       = positive-amount rows in refund/transfer categories
+    #   credit_count       = positive-amount rows that aren't real income
+    #                        (refunds, BIT receipts, between-account credits, …)
     #   spending_count     = expenses excluding transfers/investments — used by
     #                        the dashboard's "עסקאות הוצאה" KPI
     expense_count = int(len(expenses))
     income_count = int(len(real_income))
-    refund_count = int(len(refund_or_transfer))
+    credit_count = int(len(credits))
     spending_count = int(len(spending))
     total_transactions = int(len(df))
 
@@ -775,7 +779,9 @@ async def get_metrics(sessionId: str = Query(...)):
         "total_transactions": total_transactions,
         "expense_count": expense_count,
         "income_count": income_count,
-        "refund_count": refund_count,
+        "credit_count": credit_count,
+        # Legacy alias — same value as credit_count. Drop once callers migrate.
+        "refund_count": credit_count,
         "spending_count": spending_count,
         "total_expenses": _round_money(total_expenses),
         "total_income": _round_money(total_income),
@@ -1265,7 +1271,10 @@ async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("tr
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
+    # Spending only (excludes transfers/investments) so this endpoint
+    # reconciles with /api/analytics/forecast and the dashboard's spending
+    # KPIs. Previously the two differed by ~₪100/month on the user's data.
+    expenses = _spending_only(df).copy()
 
     if expenses.empty:
         return {"months": []}
@@ -1282,7 +1291,7 @@ async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("tr
     )
 
     months = [
-        {"month": period.strftime('%m/%Y'), "amount": round(_sanitize(v), 2)}
+        {"month": period.strftime('%m/%Y'), "amount": _round_money(v)}
         for period, v in monthly.items()
     ]
     return {"months": months}

@@ -300,14 +300,26 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             result.loc[to_refund, 'קטגוריה'] = 'החזרים וזיכויים'
 
     # ── Net out canceled-transaction pairs ─────────────────────────────
-    # Rows whose `הערות` says "ביטול עסקה" cancel out the original charge.
-    # We drop *both* sides of the pair (the cancellation row and its
-    # matching original) so they don't inflate spending totals — e.g.
+    # Rows with a "ביטול" marker (in הערות, in סוג עסקה, or in the
+    # description itself) cancel out their original charge. We drop both
+    # sides of the pair so they don't inflate spending totals — e.g.
     # an "אל על ‎-₪4,221" charge paired with "אל על +₪4,221  ביטול עסקה"
     # nets to zero and shouldn't appear as the top expense for the month.
-    if 'הערות' in result.columns and 'תאריך' in result.columns and 'תיאור' in result.columns and 'סכום' in result.columns:
-        notes_lower = result['הערות'].astype(str).str.lower()
-        cancel_mask = notes_lower.str.contains('ביטול', na=False)
+    if 'תאריך' in result.columns and 'תיאור' in result.columns and 'סכום' in result.columns:
+        # Look for the cancellation marker in every string-ish column.
+        cancel_mask = pd.Series(False, index=result.index)
+        cancel_indicator_cols = [
+            c for c in result.columns
+            if isinstance(c, str)
+            and c not in ('סכום', 'סכום_מוחלט', 'תאריך', 'תאריך_חיוב', 'יום_בשבוע')
+        ]
+        for col in cancel_indicator_cols:
+            try:
+                col_lower = result[col].astype(str).str.lower()
+                cancel_mask = cancel_mask | col_lower.str.contains('ביטול', na=False)
+            except Exception:
+                continue
+
         if cancel_mask.any():
             to_drop = set()
             for cancel_idx in result.index[cancel_mask].tolist():
@@ -318,9 +330,9 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
                 amount = row['סכום']
                 if pd.isna(merchant) or pd.isna(amount):
                     continue
-                # Look for the opposite-signed counterpart on the same date
-                # with the same merchant and amount.
                 date_val = row['תאריך']
+                # Match by merchant + transaction date + opposite-sign equal
+                # amount. Tolerate ±0.01 ILS for floating-point precision.
                 candidates = result[
                     (result.index != cancel_idx)
                     & (result['תיאור'] == merchant)
@@ -331,6 +343,12 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
                 if not candidates.empty:
                     to_drop.add(cancel_idx)
                     to_drop.add(int(candidates.index[0]))
+                else:
+                    # No paired original on the same date — drop the lone
+                    # cancellation anyway, since it's a credit that nets
+                    # against an out-of-scope original. Keeping it inflates
+                    # total_positive without any offsetting expense.
+                    to_drop.add(cancel_idx)
             if to_drop:
                 result = result.drop(index=list(to_drop)).reset_index(drop=True)
 
