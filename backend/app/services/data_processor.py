@@ -384,6 +384,27 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             if to_drop:
                 result = result.drop(index=list(to_drop)).reset_index(drop=True)
 
+    # ── Auth+capture dedup ────────────────────────────────────────────
+    # Credit-card statements sometimes list the same charge twice — once
+    # as a pre-auth and once as the final settlement, often with slightly
+    # different descriptions but identical (canonical_merchant, date,
+    # amount). Drop exact duplicates on those three keys so a single
+    # hotel booking doesn't count as two "visits" in the merchants /
+    # recurring / anomaly endpoints.
+    if (
+        '_canonical_merchant' in result.columns
+        and 'תאריך' in result.columns
+        and 'סכום' in result.columns
+    ):
+        dedup_cols = ['_canonical_merchant', 'תאריך', 'סכום']
+        before = len(result)
+        result = result.drop_duplicates(subset=dedup_cols, keep='first').reset_index(drop=True)
+        if len(result) < before:
+            import logging as _logging
+            _logging.getLogger(__name__).info(
+                "Auth+capture dedup removed %d rows", before - len(result),
+            )
+
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
     

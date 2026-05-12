@@ -37,7 +37,7 @@ function MerchantsSkeleton() {
     <div style={{ direction: 'rtl' }}>
       <PageHeader
         title="בתי עסק"
-        subtitle="ניתוח הוצאות לפי בתי עסק"
+        subtitle="ניתוח הוצאות לפי בתי עסק (כל הסשן)"
         icon={Store}
       />
       {/* Stats skeleton */}
@@ -185,7 +185,7 @@ export default function Merchants() {
     <div style={{ direction: 'rtl' }}>
       <PageHeader
         title="בתי עסק"
-        subtitle="ניתוח הוצאות לפי בתי עסק"
+        subtitle="ניתוח הוצאות לפי בתי עסק (כל הסשן)"
         icon={Store}
       />
 
