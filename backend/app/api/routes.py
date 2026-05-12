@@ -166,14 +166,20 @@ async def upload_file(file: UploadFile = File(...)):
         ext = ""
         if file.filename:
             _, ext = os.path.splitext(file.filename)
-            ext = ext.lower() if ext.lower() in {".xlsx", ".xls", ".csv"} else ""
+            ext = ext.lower() if ext.lower() in {".xlsx", ".xls", ".csv", ".pdf"} else ""
         file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}{ext}")
         with open(file_path, "wb") as f:
             f.write(content)
 
         # Load and process file (ensure file is closed before processing)
         df_raw = load_transaction_file(file_path)
-        df_clean = clean_dataframe(df_raw)
+        # PDFs come out of the extractor already shaped with named Hebrew
+        # columns ('תאריך', 'תיאור', 'סכום', 'קטגוריה'), so skip the
+        # header-row autodetection that clean_dataframe runs.
+        if ext == '.pdf':
+            df_clean = df_raw
+        else:
+            df_clean = clean_dataframe(df_raw)
 
         # Detect columns
         date_col = find_column(df_clean, ['תאריך עסקה', 'תאריך', 'date', 'Date'])
