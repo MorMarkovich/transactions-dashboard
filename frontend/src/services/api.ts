@@ -63,6 +63,10 @@ api.interceptors.response.use(
   },
 )
 
+// Dedupe per-session warmup promises so concurrent effects share one HTTP
+// call instead of racing each other to the cold-start backend.
+const warmupCache = new Map<string, Promise<{ ready: boolean; rows: number }>>()
+
 export const transactionsApi = {
   /**
    * Restore a backend session from saved transaction JSON data
@@ -111,13 +115,29 @@ export const transactionsApi = {
    * Touch a cheap endpoint to warm the backend worker pool before fanning
    * out to a parallel batch of dashboard endpoints. Optional sessionId
    * primes the session DataFrame too.
+   *
+   * Calls are deduplicated per sessionId — once the first warmup resolves
+   * for a session, subsequent callers get the same promise back without
+   * issuing another HTTP request. This avoids the cold-start race where
+   * the dashboard's main fetch and the category-snapshot effect each
+   * tried to warm in parallel and BOTH 503'd.
    */
-  warmup: async (sessionId?: string, signal?: AbortSignal): Promise<{ ready: boolean; rows: number }> => {
-    const response = await api.get<{ ready: boolean; rows: number }>('/api/warmup', {
-      params: sessionId ? { sessionId } : {},
-      signal,
-    });
-    return response.data;
+  warmup: (sessionId?: string, signal?: AbortSignal): Promise<{ ready: boolean; rows: number }> => {
+    const key = sessionId || '__no_session__'
+    const existing = warmupCache.get(key)
+    if (existing) return existing
+    const promise = api
+      .get<{ ready: boolean; rows: number }>('/api/warmup', {
+        params: sessionId ? { sessionId } : {},
+        signal,
+      })
+      .then((r) => r.data)
+      .catch((e) => {
+        warmupCache.delete(key)  // allow retry next time
+        throw e
+      })
+    warmupCache.set(key, promise)
+    return promise
   },
 
   uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {

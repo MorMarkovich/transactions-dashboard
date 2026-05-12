@@ -349,11 +349,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
-    transactionsApi.getCategorySnapshot(
-      sessionId, controller.signal,
-      snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
-    )
-      .then((data) => setCategorySnapshot(data))
+    // Wait for the shared warmup promise (deduplicated in api.ts) so this
+    // effect doesn't race the main fetchData against a cold backend.
+    transactionsApi.warmup(sessionId, controller.signal)
+      .catch(() => undefined)
+      .then(() => transactionsApi.getCategorySnapshot(
+        sessionId, controller.signal,
+        snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
+      ))
+      .then((data) => { if (data) setCategorySnapshot(data) })
       .catch(() => {})
     return () => controller.abort()
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
