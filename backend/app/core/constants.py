@@ -28,6 +28,57 @@ CATEGORY_ICONS = {
     'החזרים וזיכויים': '↩️',
 }
 
+# Canonical key → category. Used to map variants (with/without commas,
+# common typos, English spellings, etc.) to the single canonical name so
+# downstream aggregations don't split a bucket across spellings.
+def _category_key(name: str) -> str:
+    """Normalise a category string for matching: lowercase + strip
+    punctuation/whitespace. Keep Hebrew letters intact."""
+    if not isinstance(name, str):
+        return ''
+    import re as _re
+    return _re.sub(r'[\s,\.\-_/"\']+', '', name).lower()
+
+
+# Hand-curated alias map for the common typos / spelling variants we've seen
+# from PDF extractors and bank-export quirks. Add new aliases here as they
+# surface — the key is what the source emits, the value is the canonical
+# name (must be a key of CATEGORY_ICONS).
+_CATEGORY_ALIASES: dict[str, str] = {
+    # "שירותי תקשורת" → typo where ר and נ swap (סיר → סינ)
+    'שינותי תקשורת': 'שירותי תקשורת',
+    # Sometimes appears with a different Hebrew quote mark
+    'שירותי תקשורת ': 'שירותי תקשורת',
+}
+
+
+def normalize_category(name: str) -> str:
+    """Return the canonical category name, or the original if no match.
+
+    Matches first by direct equality with CATEGORY_ICONS keys (fast path),
+    then by punctuation-stripped key against the canonical names, then by
+    the alias map. Categories that don't match any known bucket are kept
+    as-is so we don't accidentally erase a legitimately new label.
+    """
+    if not name:
+        return 'שונות'
+    s = str(name).strip()
+    if not s:
+        return 'שונות'
+    if s in CATEGORY_ICONS:
+        return s
+    key = _category_key(s)
+    if not hasattr(normalize_category, '_index'):
+        # Lazy-build a key → canonical lookup.
+        idx: dict[str, str] = {}
+        for canonical in CATEGORY_ICONS:
+            idx[_category_key(canonical)] = canonical
+        for alias, canonical in _CATEGORY_ALIASES.items():
+            idx[_category_key(alias)] = canonical
+        normalize_category._index = idx  # type: ignore[attr-defined]
+    return normalize_category._index.get(key, s)  # type: ignore[attr-defined]
+
+
 # Categories that represent value moving between the user's own accounts
 # (or to/from investments). These are NOT expenses — KPIs like "total
 # expenses", "highest expense", and category percentages should exclude

@@ -52,9 +52,18 @@ export interface SessionInfo {
 }
 
 export interface MetricsData {
+  // total_transactions = expense_count + income_count (reconciles with sums)
   total_transactions: number;
+  // All negative-amount rows (includes transfers/investments)
+  expense_count?: number;
+  // Real income rows (salary/pension), not refunds/transfers
+  income_count?: number;
+  // Expenses minus transfers — the "spending" KPI on the dashboard
+  spending_count?: number;
   total_expenses: number;
   total_income: number;
+  // Sum of all positive amounts (income + refunds + transfers) — diagnostic
+  total_positive?: number;
   average_transaction: number;
   trend?: 'up' | 'down' | null;
   has_billing_date?: boolean;
@@ -68,6 +77,8 @@ export interface FileUploadResponse {
   transaction_count?: number;
   duplicates_removed?: number;
   cc_payments_removed?: number;
+  /** User-provided filename echoed back by /api/upload. */
+  filename?: string;
 }
 
 export interface SessionFileInfo {
@@ -257,7 +268,13 @@ export interface AnomalyItem {
   amount: number;
   category: string;
   date: string;
+  // σ-equivalent deviation (computed against 1.4826 * MAD)
   deviation: number;
+  // Robust stats. Old mean/std fields are kept as legacy aliases.
+  category_median?: number;
+  category_mad?: number;
+  category_sigma_est?: number;
+  sample_size?: number;
   category_mean: number;
   category_std: number;
 }

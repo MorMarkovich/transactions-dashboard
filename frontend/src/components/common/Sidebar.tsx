@@ -142,10 +142,14 @@ export default function Sidebar({
             response.session_id,
             { page: 1, page_size: 50000 }
           )
-          // Tag each transaction with its source file name
+          // Tag each transaction with its source file name. Prefer the
+          // filename echoed back by the backend (which is the user-provided
+          // filename) over files[i].name to avoid the UUID-on-disk fallback
+          // for files that ended up with auto-generated browser names.
+          const sourceFile = response.filename || files[i].name
           const tagged = (data.transactions as unknown as Record<string, unknown>[]).map(tx => ({
             ...tx,
-            _source_file: files[i].name,
+            _source_file: sourceFile,
           }))
           allTransactions.push(...tagged)
         }

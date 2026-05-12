@@ -549,12 +549,20 @@ export default function DataManagement() {
           gap: 'var(--space-md)',
         }}
       >
+        {/* Counters now all read from one source of truth: the active session.
+            Previously \"עסקאות נטענו\" fell back to transactionSets (a count of
+            save batches, not transactions) which produced \"1 / 0 / 462\"
+            mismatches when sessionInfo loaded asynchronously. */}
         <InfoCard
           index={0}
-          icon={<Database size={22} style={{ color: '#818cf8' }} />}
+          icon={<Receipt size={22} style={{ color: '#818cf8' }} />}
           iconBg="rgba(129, 140, 248, 0.12)"
-          label="עסקאות נטענו"
-          value={formatNumber(sessionInfo?.total_rows ?? storageInfo?.transactionSets ?? 0)}
+          label="עסקאות בסשן הנוכחי"
+          value={formatNumber(
+            sessionInfo?.total_rows
+              ?? sessionFiles.reduce((s, f) => s + (f.transaction_count || 0), 0)
+              ?? 0,
+          )}
         />
         <InfoCard
           index={1}
@@ -567,18 +575,16 @@ export default function DataManagement() {
           index={2}
           icon={<Upload size={22} style={{ color: '#0ea5e9' }} />}
           iconBg="rgba(14, 165, 233, 0.12)"
-          label="העלאות"
-          value={formatNumber(sessionFiles.length || uploads.length)}
+          label="קבצים בסשן"
+          value={formatNumber(sessionFiles.length)}
         />
-        {sessionId && (
-          <InfoCard
-            index={3}
-            icon={<Receipt size={22} style={{ color: '#f59e0b' }} />}
-            iconBg="rgba(245, 158, 11, 0.12)"
-            label="עסקאות בסשן"
-            value={formatNumber(sessionInfo?.total_rows ?? 0)}
-          />
-        )}
+        <InfoCard
+          index={3}
+          icon={<Database size={22} style={{ color: '#f59e0b' }} />}
+          iconBg="rgba(245, 158, 11, 0.12)"
+          label="סטים שמורים בענן"
+          value={formatNumber(storageInfo?.transactionSets ?? 0)}
+        />
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -616,14 +622,22 @@ export default function DataManagement() {
                           {formatNumber(file.transaction_count)} עסקאות
                         </span>
                         {file.total_expenses > 0 && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}>
+                          <span
+                            title="סך הוצאות (סכומים שליליים)"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--danger)' }}
+                          >
                             <TrendingDown size={11} />
+                            <span style={{ opacity: 0.7 }}>הוצאות:</span>
                             {formatCurrency(file.total_expenses)}
                           </span>
                         )}
                         {file.total_income > 0 && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)' }}>
+                          <span
+                            title="סך תקבולים (סכומים חיוביים)"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--success)' }}
+                          >
                             <TrendingUp size={11} />
+                            <span style={{ opacity: 0.7 }}>תקבולים:</span>
                             {formatCurrency(file.total_income)}
                           </span>
                         )}

@@ -41,14 +41,14 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
   const cards = useMemo<MetricCardConfig[]>(
     () => [
       {
-        key: 'total_transactions',
+        key: 'spending_count',
         label: 'עסקאות הוצאה',
         icon: <Receipt size={22} color="#fff" />,
         iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         gradientBg: 'var(--gradient-stat-purple)',
         sparklineColor: '#818cf8',
         accentColor: 'var(--accent)',
-        getRawValue: (m) => m.total_transactions,
+        getRawValue: (m) => m.spending_count ?? m.total_transactions,
         formatter: formatNumber,
       },
       {
