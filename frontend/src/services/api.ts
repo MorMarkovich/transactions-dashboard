@@ -107,6 +107,19 @@ export const transactionsApi = {
   /**
    * Upload transaction file
    */
+  /**
+   * Touch a cheap endpoint to warm the backend worker pool before fanning
+   * out to a parallel batch of dashboard endpoints. Optional sessionId
+   * primes the session DataFrame too.
+   */
+  warmup: async (sessionId?: string, signal?: AbortSignal): Promise<{ ready: boolean; rows: number }> => {
+    const response = await api.get<{ ready: boolean; rows: number }>('/api/warmup', {
+      params: sessionId ? { sessionId } : {},
+      signal,
+    });
+    return response.data;
+  },
+
   uploadFile: async (file: File, signal?: AbortSignal): Promise<FileUploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);

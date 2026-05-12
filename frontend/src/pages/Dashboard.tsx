@@ -213,6 +213,11 @@ export default function Dashboard() {
       setError(null)
 
       try {
+        // Prime the backend / session DataFrame before fanning out to the
+        // ten parallel dashboard endpoints — avoids the 503 cold-start
+        // cascade on first load. Failure is non-fatal.
+        await transactionsApi.warmup(sessionId, signal).catch(() => undefined)
+
         const results = await Promise.all([
           transactionsApi.getMetrics(sessionId, signal),
           transactionsApi.getDonutChartV2(sessionId, signal),
