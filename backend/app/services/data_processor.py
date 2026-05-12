@@ -299,6 +299,13 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     else:
         result['_canonical_merchant'] = result['תיאור']
 
+    # Rent check withdrawals carry a unique check number in the description
+    # (e.g. "משיכת שיק:0080000183"), so each monthly rent payment showed up
+    # as a separate "merchant". Collapse them into one canonical name.
+    rent_mask = result['תיאור'].astype(str).str.contains('משיכת שיק', na=False)
+    if rent_mask.any():
+        result.loc[rent_mask, '_canonical_merchant'] = 'שכר דירה (משיכת שיק)'
+
     # Reclassify positive-amount rows by description: real income (salary,
     # pension, benefits) → "משכורת והכנסות"; refunds / credits / BIT receipts
     # → "החזרים וזיכויים". This prevents refunds and reimbursements from

@@ -27,6 +27,7 @@ import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFi
 import { get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
+import DonutChart from '../components/charts/DonutChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
@@ -197,6 +198,12 @@ export default function Dashboard() {
         .dashboard-monthly-comparison { grid-template-columns: repeat(3, 1fr) !important; }
         .month-overview-grid { grid-template-columns: 1fr !important; }
       }
+      /* Keep the auto-fit month-overview grid from spilling outside the
+         main content area on medium-width viewports (W5). min-width: 0 lets
+         flex/grid children shrink below their content width so the first
+         card doesn't clip off the left edge. */
+      .month-overview-grid { min-width: 0; }
+      .month-overview-grid > * { min-width: 0; }
     `
     document.head.appendChild(style)
     return () => { document.getElementById(STYLE_ID)?.remove() }
@@ -536,10 +543,12 @@ export default function Dashboard() {
               </div>
             </div>
             {displayIncome > 0 && (
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: 'center' }} title={`חיסכון: ${formatCurrency(displayBalance)} מתוך הכנסה של ${formatCurrency(displayIncome)}`}>
                 <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {displaySavingsRate.toFixed(1)}%
+                  {displaySavingsRate >= 0
+                    ? `${displaySavingsRate.toFixed(1)}%`
+                    : 'חריגה'}
                 </div>
               </div>
             )}
@@ -766,21 +775,27 @@ export default function Dashboard() {
                   </Card>
                 )}
 
-                {/* Top category */}
+                {/* Top category — donut + ranked legend */}
                 {monthOverview.categories.length > 0 && (
                   <Card variant="glass" padding="md">
                     <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>חלוקה לפי קטגוריה</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <DonutChart
+                      data={monthOverview.categories
+                        .filter((c) => c.expenses > 0)
+                        .map((c) => ({ name: c.name, value: c.expenses }))}
+                      total={monthOverview.total_expenses}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
                       {monthOverview.categories.filter((c) => c.expenses > 0).slice(0, 5).map((cat) => {
                         const pct = monthOverview.total_expenses > 0 ? (cat.expenses / monthOverview.total_expenses) * 100 : 0
                         return (
                           <div key={cat.name}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{cat.name}</span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(0)}%</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{formatPercent(pct)}</span>
                             </div>
                             <div style={{ height: '4px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                              <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
                             </div>
                           </div>
                         )
@@ -1289,7 +1304,12 @@ export default function Dashboard() {
           <div className="glass-card" style={{ padding: '18px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)' }}>השבוע</span>
-              {weeklySummary.change_pct !== 0 && (
+              {/* Suppress the % badge when last week had too few transactions
+                  — a 1-row baseline produces meaningless 498%-type deltas. */}
+              {weeklySummary.change_pct !== 0
+                && weeklySummary.last_week.count >= 3
+                && weeklySummary.this_week.count >= 3
+                && (
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)', color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
                   {weeklySummary.change_pct > 0 ? '↑' : '↓'} {Math.abs(weeklySummary.change_pct)}%
                 </span>

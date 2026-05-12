@@ -171,7 +171,16 @@ export default function Income() {
 
   // ── Computed values ───────────────────────────────────────────────────
   const manualIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0)
-  const transactionIncome = metrics?.total_income ?? 0
+  // Salary / pension / benefits only (positive-amount rows in real income
+  // categories). Refunds and credits are in total_positive but not here.
+  const salaryIncome = metrics?.total_income ?? 0
+  // Refunds, BIT receipts, between-account credits — every positive-amount
+  // row that isn't salary.
+  const creditsTotal = Math.max(0, (metrics?.total_positive ?? 0) - salaryIncome)
+  // Total *income-like* inflow for KPI purposes. Includes credits since
+  // they're real cash arriving in the account; users found "income"
+  // showing ₪84k vs page showing ₪8k confusing.
+  const transactionIncome = (metrics?.total_positive ?? 0)
   const totalIncome = manualIncome + transactionIncome
   const totalExpenses = metrics?.total_expenses ?? 0
   const balance = totalIncome - totalExpenses
@@ -575,11 +584,15 @@ export default function Income() {
             <SummaryCard
               icon={<Wallet size={20} style={{ color: '#34d399' }} />}
               iconBg="rgba(16, 185, 129, 0.12)"
-              label={transactionIncome > 0 && manualIncome > 0
-                ? `סה״כ הכנסות (${formatCurrency(transactionIncome)} מעסקאות + ${formatCurrency(manualIncome)} ידני)`
-                : transactionIncome > 0
-                ? 'סה״כ הכנסות (מעסקאות)'
-                : 'סה״כ הכנסות'}
+              label={(() => {
+                const parts: string[] = []
+                if (salaryIncome > 0) parts.push(`${formatCurrency(salaryIncome)} משכורת`)
+                if (creditsTotal > 0) parts.push(`${formatCurrency(creditsTotal)} זיכויים`)
+                if (manualIncome > 0) parts.push(`${formatCurrency(manualIncome)} ידני`)
+                return parts.length > 0
+                  ? `סה״כ תקבולים (${parts.join(' + ')})`
+                  : 'סה״כ תקבולים'
+              })()}
               value={formatCurrency(totalIncome)}
               numericValue={totalIncome}
               formatter={formatCurrency}

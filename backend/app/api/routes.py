@@ -1443,16 +1443,22 @@ async def get_insights(
     # Average transaction amount
     avg_transaction = round(_sanitize(expenses['סכום_מוחלט'].mean()), 2)
 
-    # Large transactions (above 90th percentile, max 10)
+    # Large transactions (above 90th percentile, max 10) — dedup by the
+    # canonical merchant so 5 identical monthly rent payments don't drown
+    # the list. Keep the most recent example per merchant.
     p90 = expenses['סכום_מוחלט'].quantile(0.9)
     large = expenses[expenses['סכום_מוחלט'] >= p90].nlargest(10, 'סכום_מוחלט')
+    if '_canonical_merchant' in large.columns:
+        large = large.drop_duplicates(subset='_canonical_merchant', keep='first')
+    else:
+        large = large.drop_duplicates(subset='תיאור', keep='first')
     large_transactions = [
         {
             "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
             "תיאור": str(row['תיאור']),
             "קטגוריה": str(row['קטגוריה']),
-            "סכום": round(_sanitize(float(row['סכום'])), 2),
-            "סכום_מוחלט": round(_sanitize(float(row['סכום_מוחלט'])), 2),
+            "סכום": _round_money(float(row['סכום'])),
+            "סכום_מוחלט": _round_money(float(row['סכום_מוחלט'])),
         }
         for _, row in large.iterrows()
     ]
@@ -1479,6 +1485,18 @@ async def get_merchants(
     df = sessions[sessionId]
     expenses = _spending_only(df).copy()
 
+    if expenses.empty:
+        return {"merchants": [], "total_merchants": 0, "shown": 0}
+
+    # Filter out non-merchant rows (tax withholdings, bank fees, interest) so
+    # the merchants list shows actual businesses. These row shapes don't
+    # represent a place where the user spent money.
+    NON_MERCHANT_TOKENS = ['תשלום מס במקור', 'עמלת הקצאת אשראי', 'עמלת ניהול', 'ריבית', 'דמי כרטיס']
+    desc_lower = expenses['תיאור'].astype(str)
+    is_non_merchant = pd.Series(False, index=expenses.index)
+    for token in NON_MERCHANT_TOKENS:
+        is_non_merchant = is_non_merchant | desc_lower.str.contains(token, na=False, regex=False)
+    expenses = expenses[~is_non_merchant]
     if expenses.empty:
         return {"merchants": [], "total_merchants": 0, "shown": 0}
 
@@ -2013,36 +2031,51 @@ async def get_spending_velocity(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    empty = {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
     if df.empty:
-        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+        return empty
 
-    expenses = df[df["סכום"] < 0].copy()
+    # Spending only — transfers/investments aren't "spending velocity"
+    expenses = _spending_only(df).copy()
     if expenses.empty:
-        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+        return empty
 
     expenses["date"] = pd.to_datetime(expenses["תאריך"], dayfirst=True, errors="coerce")
     expenses = expenses.dropna(subset=["date"])
+    if expenses.empty:
+        return empty
 
     daily = expenses.groupby(expenses["date"].dt.date)["סכום"].sum().abs()
     daily = daily.sort_index()
-
     if daily.empty:
-        return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+        return empty
 
-    daily_avg = daily.mean()
-    rolling_7 = daily.tail(7).mean() if len(daily) >= 7 else daily.mean()
-    rolling_30 = daily.tail(30).mean() if len(daily) >= 30 else daily.mean()
+    # Calendar-day averages (NOT averages over days-with-spending). Previously
+    # daily.mean() divided by the count of active days, so a user with one
+    # ₪22k bill day and 6 zero days got "daily ₪22k" instead of ₪22k/7.
+    first_day = pd.Timestamp(daily.index.min())
+    last_day = pd.Timestamp(daily.index.max())
+    total_days = max((last_day - first_day).days + 1, 1)
+    daily_avg = float(daily.sum()) / total_days
+
+    # 7-day / 30-day rolling averages anchored at the last observed day.
+    cutoff_7 = last_day - pd.Timedelta(days=6)
+    cutoff_30 = last_day - pd.Timedelta(days=29)
+    sum_7 = float(daily[daily.index >= cutoff_7.date()].sum())
+    sum_30 = float(daily[daily.index >= cutoff_30.date()].sum())
+    rolling_7 = sum_7 / 7
+    rolling_30 = sum_30 / min(30, total_days)
 
     # Return last 30 daily data points for sparkline
     daily_data = [
-        {"date": str(date), "amount": _sanitize(round(float(amt), 2))}
+        {"date": str(date), "amount": _round_money(float(amt))}
         for date, amt in daily.tail(30).items()
     ]
 
     return {
-        "daily_avg": _sanitize(round(float(daily_avg), 2)),
-        "rolling_7day": _sanitize(round(float(rolling_7), 2)),
-        "rolling_30day": _sanitize(round(float(rolling_30), 2)),
+        "daily_avg": _round_money(daily_avg),
+        "rolling_7day": _round_money(rolling_7),
+        "rolling_30day": _round_money(rolling_30),
         "daily_data": daily_data,
     }
 
