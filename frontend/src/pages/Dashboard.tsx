@@ -162,8 +162,44 @@ export default function Dashboard() {
     const items: { id: string; type: 'anomaly' | 'upload' | 'insight'; title: string; message: string; time: string; read: boolean }[] = []
     const now = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
 
+    // Collapse anomalies by merchant+category before turning them into
+    // notifications so a single recurring outlier (e.g. monthly rent)
+    // doesn't fire 5 separate '+9' badges. Keep the highest-deviation
+    // example per group and annotate the count.
+    const anomalyGroups = new Map<string, { item: typeof anomalies[number]; count: number }>()
     for (const a of anomalies) {
-      items.push({ id: `anomaly-${a.date}-${a.description}`, type: 'anomaly', title: 'עסקה חריגה', message: `${a.description}`, time: now, read: false })
+      const key = `${a.description}|${a.category}`
+      const existing = anomalyGroups.get(key)
+      if (!existing) {
+        anomalyGroups.set(key, { item: a, count: 1 })
+      } else {
+        existing.count += 1
+        if ((a.deviation ?? 0) > (existing.item.deviation ?? 0)) existing.item = a
+      }
+    }
+    // Cap to top 3 distinct anomaly groups; the rest are collapsed into
+    // a single summary item so the bell doesn't overflow.
+    const sortedGroups = Array.from(anomalyGroups.values())
+      .sort((a, b) => (b.item.deviation ?? 0) - (a.item.deviation ?? 0))
+    sortedGroups.slice(0, 3).forEach(({ item: a, count }, i) => {
+      items.push({
+        id: `anomaly-${i}-${a.description}-${a.category}`,
+        type: 'anomaly',
+        title: count > 1 ? `${count} עסקאות חריגות` : 'עסקה חריגה',
+        message: `${a.description}${count > 1 ? ` · קטגוריה: ${a.category}` : ''}`,
+        time: now,
+        read: false,
+      })
+    })
+    if (sortedGroups.length > 3) {
+      items.push({
+        id: 'anomaly-more',
+        type: 'anomaly',
+        title: `עוד ${sortedGroups.length - 3} חריגות`,
+        message: 'ראו את עמוד התובנות לפירוט מלא',
+        time: now,
+        read: false,
+      })
     }
     if (forecast && forecast.trend_direction === 'up') {
       items.push({ id: 'forecast-up', type: 'insight', title: 'תחזית הוצאות', message: 'מגמת עלייה בהוצאות', time: now, read: false })
@@ -1137,7 +1173,7 @@ export default function Dashboard() {
                             background: changeBg, color: changeColor,
                             display: 'inline-flex', alignItems: 'center', gap: '2px',
                           }}>
-                            {cat.month_change > 0 ? '↑' : '↓'}{Math.abs(cat.month_change).toFixed(0)}%
+                            <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{cat.month_change > 0 ? '+' : '−'}{Math.abs(cat.month_change).toFixed(0)}%</span>
                           </span>
                         )}
                       </div>
@@ -1323,7 +1359,7 @@ export default function Dashboard() {
                 && weeklySummary.this_week.count >= 3
                 && (
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)', color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
-                  {weeklySummary.change_pct > 0 ? '↑' : '↓'} {Math.abs(weeklySummary.change_pct)}%
+                  <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{weeklySummary.change_pct > 0 ? '+' : '−'}{Math.abs(weeklySummary.change_pct)}%</span>
                 </span>
               )}
             </div>
@@ -1376,7 +1412,11 @@ export default function Dashboard() {
                   style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)' }}
                 />
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: forecast.trend_direction === 'up' ? 'rgba(239, 68, 68, 0.12)' : forecast.trend_direction === 'down' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(148, 163, 184, 0.12)', color: forecast.trend_direction === 'up' ? 'var(--accent-danger, #ef4444)' : forecast.trend_direction === 'down' ? 'var(--accent-secondary, #10b981)' : 'var(--text-muted)' }}>
-                  {forecast.trend_direction === 'up' ? '↑ עלייה' : forecast.trend_direction === 'down' ? '↓ ירידה' : '→ יציב'}
+                  {forecast.trend_direction === 'up'
+                    ? 'מגמת עלייה'
+                    : forecast.trend_direction === 'down'
+                      ? 'מגמת ירידה'
+                      : 'יציב'}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
@@ -1475,8 +1515,13 @@ export default function Dashboard() {
           <div className="section-header-v2">
             <BarChart3 size={18} />
             <span>השוואה חודשית</span>
-            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-              {monthlyData.months.length} חודשים
+            <span
+              style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}
+              title={`כל הנתונים מכסים ${monthlyData.months.length} חודשים`}
+            >
+              {monthlyData.months.length > 6
+                ? `6 אחרונים · מתוך ${monthlyData.months.length}`
+                : `${monthlyData.months.length} חודשים`}
             </span>
           </div>
           <Card className="glass-card" padding="md">
@@ -1524,7 +1569,7 @@ export default function Dashboard() {
                     </div>
                     {changePct !== null && (
                       <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
-                        {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%{isCurrent && <span style={{ opacity: 0.6 }}> ‎·קצב</span>}
+                        <span dir="ltr" style={{ unicodeBidi: 'isolate' }}>{changePct > 0 ? '+' : '−'}{Math.abs(changePct).toFixed(1)}%</span>{isCurrent && <span style={{ opacity: 0.6 }}> ‎·קצב</span>}
                       </div>
                     )}
                   </div>

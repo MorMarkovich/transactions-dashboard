@@ -127,8 +127,15 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
               </div>
               <div className="stat-label">{card.label}</div>
               {card.key === 'total_expenses' && metrics.trend && (
-                <div className={`stat-trend ${metrics.trend === 'up' ? 'up' : 'down'}`}>
-                  {metrics.trend === 'up' ? '↑ עלייה בהוצאות' : '↓ ירידה בהוצאות'}
+                <div
+                  className={`stat-trend ${metrics.trend === 'up' ? 'up' : 'down'}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  {/* Use real icons instead of ↑/↓ glyphs — the arrows
+                      sometimes get substituted by a Hebrew letter under
+                      certain Windows font-fallback combinations. */}
+                  {metrics.trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                  {metrics.trend === 'up' ? 'עלייה בהוצאות' : 'ירידה בהוצאות'}
                 </div>
               )}
             </div>

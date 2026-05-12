@@ -46,6 +46,17 @@ const COLORS = [
 const formatShekel = (v: number): string =>
   `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+// Compact format for the donut center label (the regular formatter
+// overflowed the donut hole on big totals like ₪101,810.13).
+const formatShekelCompact = (v: number): string => {
+  const abs = Math.abs(v)
+  const sign = v < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}₪${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 10_000) return `${sign}₪${Math.round(abs / 1000)}K`
+  if (abs >= 1_000) return `${sign}₪${(abs / 1000).toFixed(1)}K`
+  return `${sign}₪${abs.toLocaleString('he-IL', { maximumFractionDigits: 0 })}`
+}
+
 /* ------------------------------------------------------------------ */
 /*  Custom tooltip                                                     */
 /* ------------------------------------------------------------------ */
@@ -130,6 +141,10 @@ interface CenterProps {
 }
 
 function CenterLabel({ cx, cy, total }: CenterProps) {
+  // Drop font size when the formatted value would be wider than the donut
+  // hole. Compact format (₪101K vs ₪101,810.13) keeps the label inside.
+  const labelText = formatShekelCompact(total)
+  const valueFontSize = labelText.length > 8 ? 16 : 20
   return (
     <g>
       <text
@@ -146,9 +161,9 @@ function CenterLabel({ cx, cy, total }: CenterProps) {
         y={cy + 14}
         textAnchor="middle"
         dominantBaseline="central"
-        style={{ fill: 'var(--text-primary)', fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-family)' }}
+        style={{ fill: 'var(--text-primary)', fontSize: valueFontSize, fontWeight: 700, fontFamily: 'var(--font-family)' }}
       >
-        {formatShekel(total)}
+        {labelText}
       </text>
     </g>
   )
@@ -178,6 +193,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   }
 
   return (
+    <div style={{ width: '100%', overflow: 'hidden' }}>
     <ResponsiveContainer width="100%" height={340}>
       <PieChart>
         <Pie
@@ -208,6 +224,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
         <Tooltip content={tooltipContent as any} />
       </PieChart>
     </ResponsiveContainer>
+    </div>
   )
 })
 
