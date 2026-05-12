@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, SALARY_KEYWORDS, REFUND_KEYWORDS
+from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, SALARY_KEYWORDS, REFUND_KEYWORDS, normalize_category
 from .ai_categorizer import categorize_transactions
 
 
@@ -206,6 +206,10 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             result['קטגוריה'] = 'שונות'
         # ניקוי ערכים ריקים
         result.loc[result['קטגוריה'].isin(['', 'nan', 'None', 'NaN']), 'קטגוריה'] = 'שונות'
+        # Normalise variants (with/without commas, typos like
+        # "שינותי תקשורת") so the same logical category isn't split into
+        # two buckets across upload sources.
+        result['קטגוריה'] = result['קטגוריה'].apply(normalize_category)
     except Exception:
         result['קטגוריה'] = 'שונות'
     

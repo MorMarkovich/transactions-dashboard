@@ -70,7 +70,7 @@ export default function SpendingAlerts({
         type: 'warning',
         icon: <AlertTriangle size={18} />,
         title: `חריגה: ${a.description}`,
-        description: `${formatCurrency(a.amount)} (ממוצע קטגוריה: ${formatCurrency(a.category_mean)})`,
+        description: `${formatCurrency(a.amount)} (חציון קטגוריה: ${formatCurrency(a.category_median ?? a.category_mean)})`,
       })
     })
 
@@ -101,7 +101,7 @@ export default function SpendingAlerts({
 
     // Savings potential: sum of anomaly amounts above category mean
     if (anomalies.length > 0) {
-      const savingsTotal = anomalies.reduce((sum, a) => sum + Math.max(0, a.amount - a.category_mean), 0)
+      const savingsTotal = anomalies.reduce((sum, a) => sum + Math.max(0, a.amount - (a.category_median ?? a.category_mean)), 0)
       if (savingsTotal > 100) {
         result.push({
           id: 'savings-potential',

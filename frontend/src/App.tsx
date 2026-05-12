@@ -62,10 +62,11 @@ function ContentLoader() {
 
 function BusinessesRedirect() {
   // Preserve the query string (notably session_id) when redirecting the
-  // /businesses alias to /merchants. Plain <Navigate to="/merchants"> strips
-  // search params, which caused the frontend to fall back to a fresh session.
+  // /businesses alias to /merchants. The object-form of `to=` is the
+  // documented way to forward search/hash with React Router — the previous
+  // template-string form occasionally lost the search params.
   const { search, hash } = useLocation()
-  return <Navigate to={`/merchants${search}${hash}`} replace />
+  return <Navigate to={{ pathname: '/merchants', search, hash }} replace />
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

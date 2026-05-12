@@ -208,7 +208,10 @@ async def upload_file(file: UploadFile = File(...)):
             "success": True,
             "message": f"Loaded {len(df)} transactions",
             "session_id": session_id,
-            "transaction_count": len(df)
+            "transaction_count": len(df),
+            # Echo back the user-provided filename so the frontend never has
+            # to fall back to the on-disk UUID name when tagging rows.
+            "filename": file.filename or "",
         }
     except HTTPException:
         raise
@@ -716,7 +719,19 @@ async def get_metrics(sessionId: str = Query(...)):
     # All positive-amount rows, kept for diagnostics (refunds + transfers + income)
     positive_total = float(df.loc[df['סכום'] > 0, 'סכום'].sum()) if 'סכום' in df.columns else 0.0
 
-    total_transactions = len(spending)
+    # Counts:
+    #   expense_count  = all negative-amount rows (includes transfers/investments)
+    #   income_count   = positive-amount rows in real-income categories only
+    #   spending_count = expenses minus transfers/investments — used by the
+    #                    dashboard's "עסקאות הוצאה" KPI
+    #   total_transactions must equal expense_count + income_count; transfers
+    #                    and refunds (positive non-income rows) are accounted
+    #                    for separately via total_positive
+    expense_count = int(len(expenses))
+    income_count = int(len(real_income))
+    spending_count = int(len(spending))
+    total_transactions = expense_count + income_count
+
     total_expenses = float(spending['סכום_מוחלט'].sum()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
     total_income = float(real_income['סכום'].sum()) if not real_income.empty else 0.0
     average_transaction = float(spending['סכום_מוחלט'].mean()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
@@ -735,8 +750,9 @@ async def get_metrics(sessionId: str = Query(...)):
 
     return {
         "total_transactions": total_transactions,
-        "expense_count": int(len(expenses)),
-        "income_count": int(len(real_income)),
+        "expense_count": expense_count,
+        "income_count": income_count,
+        "spending_count": spending_count,
         "total_expenses": _round_money(total_expenses),
         "total_income": _round_money(total_income),
         # Sum of all positive rows including refunds/transfers — useful for
@@ -1990,21 +2006,21 @@ async def get_anomalies(sessionId: str = Query(...)):
     anomalies = []
 
     for cat, group in expenses.groupby("קטגוריה"):
-        # Need a meaningful sample to derive a mean; otherwise the mean and
-        # σ are noise and we'll produce false positives.
-        if len(group) < 8:
+        # Robust-stats anomaly detection needs a meaningful sample.
+        # Bumped from 8 → 12 to cut down on KSP-style false positives where
+        # a single big charge sits in a category of mostly tiny ones.
+        if len(group) < 12:
             continue
 
         amounts = group["סכום"].abs()
-        # Exclude the outlier itself from the baseline (winsorize-like): use
-        # the median + MAD instead of mean ± σ, so a single huge transaction
-        # doesn't inflate σ and prevent itself from being flagged.
+        # Median + MAD instead of mean ± σ — robust to the outlier itself.
         median_amt = float(amounts.median())
-        mad = float((amounts - median_amt).abs().median())
-        if mad == 0:
+        mad_raw = float((amounts - median_amt).abs().median())
+        if mad_raw == 0:
             continue
-        # MAD-based z-score equivalent: 1.4826 * MAD ≈ σ for normal data
-        sigma_est = 1.4826 * mad
+        # σ-equivalent for normally-distributed data (used as denominator
+        # so `deviation` is comparable to a z-score).
+        sigma_est = 1.4826 * mad_raw
 
         # Skip pathologically noisy categories (CV-like guard).
         if median_amt > 0 and sigma_est / median_amt > 2.0:
@@ -2020,12 +2036,15 @@ async def get_anomalies(sessionId: str = Query(...)):
                     "amount": _round_money(amt),
                     "category": str(cat),
                     "date": _to_json_safe(row.get("תאריך")),
+                    # `deviation` is in σ-equivalent units (computed against
+                    # 1.4826 * MAD), so it's comparable to a normal z-score.
                     "deviation": _sanitize(round(deviation, 2)),
-                    # Robust statistics (MAD-based, not mean/std). Old field
-                    # names kept temporarily as aliases for callers that
-                    # haven't migrated yet.
                     "category_median": _round_money(median_amt),
-                    "category_mad": _round_money(sigma_est),
+                    "category_mad": _round_money(mad_raw),
+                    "category_sigma_est": _round_money(sigma_est),
+                    "sample_size": int(len(group)),
+                    # Legacy aliases for callers that haven't migrated yet.
+                    # Will be removed once the UI reads the new fields.
                     "category_mean": _round_money(median_amt),
                     "category_std": _round_money(sigma_est),
                 })
