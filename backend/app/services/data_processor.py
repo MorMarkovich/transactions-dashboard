@@ -7,7 +7,7 @@ import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
 from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, SALARY_KEYWORDS, REFUND_KEYWORDS, normalize_category
-from .ai_categorizer import categorize_transactions
+from .ai_categorizer import categorize_transactions, classify_transactions
 
 
 # Bidirectional control characters that sometimes leak through from PDF/CSV
@@ -263,16 +263,41 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
                 result.loc[match, 'קטגוריה'] = cat
                 misc_mask = misc_mask & ~match
 
-    # AI-powered categorization for remaining "שונות" transactions
-    misc_mask = result['קטגוריה'] == 'שונות'
-    if misc_mask.any():
-        misc_descriptions = result.loc[misc_mask, 'תיאור'].tolist()
-        ai_mapping = categorize_transactions(misc_descriptions)
-        if ai_mapping:
-            misc_indices = result.index[misc_mask].tolist()
-            for local_idx, category in ai_mapping.items():
-                if 0 <= local_idx < len(misc_indices):
-                    result.at[misc_indices[local_idx], 'קטגוריה'] = category
+    # ── AI classification: category + merchant canonical name ─────────
+    # Runs on EVERY row (not just שונות) so we also get a normalised
+    # merchant name for the dedup work the merchants/recurring/anomaly
+    # endpoints rely on. For category, we only OVERRIDE rows that are
+    # still in שונות — keyword matches win, since they're deterministic
+    # and known-correct.
+    if not result.empty and 'תיאור' in result.columns and 'סכום' in result.columns:
+        all_descs = result['תיאור'].astype(str).tolist()
+        all_amts = result['סכום'].astype(float).tolist()
+        classified = classify_transactions(all_descs, all_amts)
+        if classified:
+            # Map local index → row data
+            by_idx = {item['index']: item for item in classified if isinstance(item.get('index'), int)}
+            # Allocate column once with object dtype so we can store None.
+            if '_canonical_merchant' not in result.columns:
+                result['_canonical_merchant'] = None
+            for local_idx, row_idx in enumerate(result.index):
+                item = by_idx.get(local_idx)
+                if not item:
+                    continue
+                merchant = item.get('merchant_canonical')
+                if merchant:
+                    result.at[row_idx, '_canonical_merchant'] = merchant
+                # Only override category when the row is still שונות.
+                if result.at[row_idx, 'קטגוריה'] == 'שונות':
+                    cat = item.get('category')
+                    if cat and cat != 'שונות':
+                        result.at[row_idx, 'קטגוריה'] = cat
+
+    # Fallback canonical: when AI didn't return one (or wasn't available)
+    # use the description verbatim so downstream group-bys still have a key.
+    if '_canonical_merchant' in result.columns:
+        result['_canonical_merchant'] = result['_canonical_merchant'].fillna(result['תיאור'])
+    else:
+        result['_canonical_merchant'] = result['תיאור']
 
     # Reclassify positive-amount rows by description: real income (salary,
     # pension, benefits) → "משכורת והכנסות"; refunds / credits / BIT receipts

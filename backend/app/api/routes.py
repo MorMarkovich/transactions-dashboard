@@ -101,7 +101,7 @@ def _apply_month_range(df: pd.DataFrame, month_from: Optional[str], month_to: Op
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import process_data, clean_dataframe
 from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, TRANSFER_CATEGORIES, INCOME_CATEGORIES
-from ..services.ai_categorizer import categorize_transactions
+from ..services.ai_categorizer import categorize_transactions, classify_transactions
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -333,16 +333,33 @@ async def restore_session(body: RestoreSessionRequest):
                         df.loc[match, 'קטגוריה'] = cat
                         misc_mask = misc_mask & ~match
 
-            # AI categorization for remaining "שונות" transactions
-            misc_mask = df['קטגוריה'] == 'שונות'
-            if misc_mask.any():
-                misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
-                ai_map = categorize_transactions(misc_descs)
-                if ai_map:
-                    misc_idx = df.index[misc_mask].tolist()
-                    for local_i, cat in ai_map.items():
-                        if 0 <= local_i < len(misc_idx):
-                            df.at[misc_idx[local_i], 'קטגוריה'] = cat
+            # AI classification: category + canonical merchant for every row
+            # (not just שונות). Only rows where _canonical_merchant is missing
+            # get touched, so restoring a session that already has canonical
+            # names doesn't re-run the API call.
+            if 'תיאור' in df.columns and 'סכום' in df.columns:
+                if '_canonical_merchant' not in df.columns:
+                    df['_canonical_merchant'] = None
+                needs_canonical = df['_canonical_merchant'].isna() | (df['_canonical_merchant'].astype(str).str.strip() == '')
+                if needs_canonical.any():
+                    sub_descs = df.loc[needs_canonical, 'תיאור'].astype(str).tolist()
+                    sub_amts = df.loc[needs_canonical, 'סכום'].astype(float).tolist()
+                    classified = classify_transactions(sub_descs, sub_amts)
+                    if classified:
+                        sub_idx = df.index[needs_canonical].tolist()
+                        for item in classified:
+                            local = item.get('index')
+                            if not isinstance(local, int) or local < 0 or local >= len(sub_idx):
+                                continue
+                            row_idx = sub_idx[local]
+                            merchant = item.get('merchant_canonical')
+                            if merchant:
+                                df.at[row_idx, '_canonical_merchant'] = merchant
+                            cat = item.get('category')
+                            if cat and df.at[row_idx, 'קטגוריה'] == 'שונות' and cat != 'שונות':
+                                df.at[row_idx, 'קטגוריה'] = cat
+                # Final fallback so we always have a non-null grouping key.
+                df['_canonical_merchant'] = df['_canonical_merchant'].fillna(df['תיאור'])
 
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
@@ -554,6 +571,9 @@ async def get_transactions(
     _ALLOWED_COLS = {
         'id', 'תאריך', 'תאריך_חיוב', 'תיאור', 'סכום', 'סכום_מוחלט',
         'קטגוריה', 'חודש', 'חודש_חיוב', 'יום_בשבוע', 'הערות', 'סוג עסקה',
+        # Canonical merchant set by the AI classifier at ingest. Preserved
+        # across restore-session so merchant grouping survives a reload.
+        '_canonical_merchant',
     }
     transactions = [
         {k: _to_json_safe(v) for k, v in record.items() if k in _ALLOWED_COLS}
@@ -1395,8 +1415,9 @@ async def get_insights(
         "category": str(biggest['קטגוריה']),
     }
 
-    # Top merchant by count
-    merchant_stats = expenses.groupby('תיאור').agg(
+    # Top merchant by count — group by canonical name so variants collapse.
+    _merchant_col = '_canonical_merchant' if '_canonical_merchant' in expenses.columns else 'תיאור'
+    merchant_stats = expenses.groupby(_merchant_col).agg(
         count=('סכום_מוחלט', 'size'),
         total=('סכום_מוחלט', 'sum'),
     )
@@ -1404,7 +1425,7 @@ async def get_insights(
     top_merchant = {
         "name": str(top_merch.name),
         "count": int(top_merch['count']),
-        "total": round(_sanitize(top_merch['total']), 2),
+        "total": _round_money(top_merch['total']),
     }
 
     # Most expensive day of week (by average daily spend)
@@ -1461,9 +1482,13 @@ async def get_merchants(
     if expenses.empty:
         return {"merchants": [], "total_merchants": 0, "shown": 0}
 
+    # Group by the canonical merchant name (set by the AI classifier at
+    # ingest). Falls back to תיאור when the canonical column is missing
+    # (older sessions before this change).
+    group_col = '_canonical_merchant' if '_canonical_merchant' in expenses.columns else 'תיאור'
     merchant_agg = (
         expenses
-        .groupby('תיאור')
+        .groupby(group_col)
         .agg(
             total=('סכום_מוחלט', 'sum'),
             count=('סכום_מוחלט', 'size'),
@@ -1733,8 +1758,10 @@ async def get_recurring_transactions(sessionId: str = Query(...)):
 
     recurring = []
 
-    # Group by description (merchant)
-    for desc, group in expenses.groupby("תיאור"):
+    # Group by canonical merchant name (set by AI at ingest) so processor
+    # prefixes (BKG*, GOOGLE*) and city suffixes don't split the bucket.
+    group_col = '_canonical_merchant' if '_canonical_merchant' in expenses.columns else 'תיאור'
+    for desc, group in expenses.groupby(group_col):
         if len(group) < 3:
             continue
 
