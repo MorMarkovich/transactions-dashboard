@@ -162,6 +162,10 @@ export interface MerchantData {
     count: number;
     average: number;
   }[];
+  // Total number of distinct merchants in the dataset (regardless of how many
+  // are returned in `merchants` — the backend caps the response at top-N).
+  total_merchants?: number;
+  shown?: number;
 }
 
 // Trend Statistics

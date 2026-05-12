@@ -300,6 +300,11 @@ export default function DataManagement() {
   const [deletingTransactions, setDeletingTransactions] = useState(false)
   const [showDeleteIncomesModal, setShowDeleteIncomesModal] = useState(false)
   const [showDeleteTransactionsModal, setShowDeleteTransactionsModal] = useState(false)
+  // Typed-confirmation: the user must type the literal word below to enable
+  // the destructive button. Reset whenever a modal opens/closes.
+  const DELETE_CONFIRM_TOKEN = 'מחק'
+  const [deleteIncomesConfirmText, setDeleteIncomesConfirmText] = useState('')
+  const [deleteTransactionsConfirmText, setDeleteTransactionsConfirmText] = useState('')
 
   // ── Section expand state ────────────────────────────────────────────
   const [dangerZoneExpanded, setDangerZoneExpanded] = useState(false)
@@ -462,6 +467,7 @@ export default function DataManagement() {
       await supabaseApi.deleteAllIncomes(user.id)
       showToast('כל ההכנסות נמחקו בהצלחה', 'success')
       setShowDeleteIncomesModal(false)
+      setDeleteIncomesConfirmText('')
       setIncomes([])
       // Check if transactions are also empty — if so, clear session entirely
       const info = await supabaseApi.getStorageInfo(user.id)
@@ -491,6 +497,7 @@ export default function DataManagement() {
       }
       showToast('כל העסקאות נמחקו בהצלחה', 'success')
       setShowDeleteTransactionsModal(false)
+      setDeleteTransactionsConfirmText('')
       setSessionInfo(null)
       setSessionFiles([])
       // Remove session_id from URL so Dashboard shows empty state
@@ -1069,7 +1076,7 @@ export default function DataManagement() {
       {/* Delete incomes modal */}
       <Modal
         isOpen={showDeleteIncomesModal}
-        onClose={() => setShowDeleteIncomesModal(false)}
+        onClose={() => { setShowDeleteIncomesModal(false); setDeleteIncomesConfirmText('') }}
         title="האם אתה בטוח?"
         size="sm"
       >
@@ -1093,11 +1100,38 @@ export default function DataManagement() {
               לא ניתן לשחזר נתונים אלו לאחר המחיקה.
             </p>
           </div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            הקלד <strong style={{ color: 'var(--text-primary)' }}>{DELETE_CONFIRM_TOKEN}</strong> לאישור
+          </label>
+          <input
+            type="text"
+            value={deleteIncomesConfirmText}
+            onChange={(e) => setDeleteIncomesConfirmText(e.target.value)}
+            autoFocus
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              marginBottom: '16px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-input)',
+              color: 'var(--text-primary)',
+              fontSize: '0.9rem',
+              direction: 'rtl',
+              fontFamily: 'var(--font-family)',
+            }}
+          />
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
-            <Button variant="danger" onClick={handleDeleteAllIncomes} loading={deletingIncomes} icon={<Trash2 size={16} />}>
+            <Button
+              variant="danger"
+              onClick={handleDeleteAllIncomes}
+              loading={deletingIncomes}
+              disabled={deleteIncomesConfirmText.trim() !== DELETE_CONFIRM_TOKEN}
+              icon={<Trash2 size={16} />}
+            >
               מחק הכל
             </Button>
-            <Button variant="secondary" onClick={() => setShowDeleteIncomesModal(false)}>
+            <Button variant="secondary" onClick={() => { setShowDeleteIncomesModal(false); setDeleteIncomesConfirmText('') }}>
               ביטול
             </Button>
           </div>
@@ -1107,7 +1141,7 @@ export default function DataManagement() {
       {/* Delete transactions modal */}
       <Modal
         isOpen={showDeleteTransactionsModal}
-        onClose={() => setShowDeleteTransactionsModal(false)}
+        onClose={() => { setShowDeleteTransactionsModal(false); setDeleteTransactionsConfirmText('') }}
         title="האם אתה בטוח?"
         size="sm"
       >
@@ -1131,11 +1165,38 @@ export default function DataManagement() {
               לא ניתן לשחזר נתונים אלו לאחר המחיקה.
             </p>
           </div>
+          <label style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            הקלד <strong style={{ color: 'var(--text-primary)' }}>{DELETE_CONFIRM_TOKEN}</strong> לאישור
+          </label>
+          <input
+            type="text"
+            value={deleteTransactionsConfirmText}
+            onChange={(e) => setDeleteTransactionsConfirmText(e.target.value)}
+            autoFocus
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              marginBottom: '16px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-input)',
+              color: 'var(--text-primary)',
+              fontSize: '0.9rem',
+              direction: 'rtl',
+              fontFamily: 'var(--font-family)',
+            }}
+          />
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-start' }}>
-            <Button variant="danger" onClick={handleDeleteAllTransactions} loading={deletingTransactions} icon={<Trash2 size={16} />}>
+            <Button
+              variant="danger"
+              onClick={handleDeleteAllTransactions}
+              loading={deletingTransactions}
+              disabled={deleteTransactionsConfirmText.trim() !== DELETE_CONFIRM_TOKEN}
+              icon={<Trash2 size={16} />}
+            >
               מחק הכל
             </Button>
-            <Button variant="secondary" onClick={() => setShowDeleteTransactionsModal(false)}>
+            <Button variant="secondary" onClick={() => { setShowDeleteTransactionsModal(false); setDeleteTransactionsConfirmText('') }}>
               ביטול
             </Button>
           </div>

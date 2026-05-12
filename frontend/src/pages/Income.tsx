@@ -378,10 +378,17 @@ export default function Income() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 step="0.01"
+                min="0.01"
+                required
+                inputMode="decimal"
                 onInvalid={(e) => {
                   const input = e.target as HTMLInputElement
                   if (input.validity.rangeUnderflow) {
-                    input.setCustomValidity('הערך חייב להיות 0 או יותר')
+                    input.setCustomValidity('הערך חייב להיות גדול מאפס')
+                  } else if (input.validity.valueMissing) {
+                    input.setCustomValidity('שדה חובה')
+                  } else if (input.validity.badInput) {
+                    input.setCustomValidity('יש להזין מספר חוקי')
                   }
                 }}
                 onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}

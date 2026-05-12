@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -60,6 +60,14 @@ function ContentLoader() {
   )
 }
 
+function BusinessesRedirect() {
+  // Preserve the query string (notably session_id) when redirecting the
+  // /businesses alias to /merchants. Plain <Navigate to="/merchants"> strips
+  // search params, which caused the frontend to fall back to a fresh session.
+  const { search, hash } = useLocation()
+  return <Navigate to={`/merchants${search}${hash}`} replace />
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, passwordRecovery } = useAuth()
 
@@ -106,7 +114,7 @@ function AppRoutes() {
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
         <Route path="/insights" element={<ProtectedPage><Insights /></ProtectedPage>} />
         <Route path="/merchants" element={<ProtectedPage><Merchants /></ProtectedPage>} />
-        <Route path="/businesses" element={<Navigate to="/merchants" replace />} />
+        <Route path="/businesses" element={<BusinessesRedirect />} />
         <Route path="/income" element={<ProtectedPage><Income /></ProtectedPage>} />
         <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
         <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />

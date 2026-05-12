@@ -10,6 +10,46 @@ from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
 from .ai_categorizer import categorize_transactions
 
 
+# Bidirectional control characters that sometimes leak through from PDF/CSV
+# ingest. Stripping them prevents weird-looking descriptions in the UI.
+_BIDI_CONTROLS = ''.join([
+    '‎',  # LRM
+    '‏',  # RLM
+    '‪',  # LRE
+    '‫',  # RLE
+    '‬',  # PDF
+    '‭',  # LRO
+    '‮',  # RLO
+    '⁦',  # LRI
+    '⁧',  # RLI
+    '⁨',  # FSI
+    '⁩',  # PDI
+])
+_BIDI_RE = re.compile('[' + _BIDI_CONTROLS + ']')
+
+
+def _sanitize_rtl_text(text) -> str:
+    """Clean up RTL artefacts in user-visible strings before storing them.
+
+    Real-world Excel/PDF/CSV exports sometimes embed bidi control marks or
+    leave parentheses visually reversed (e.g. \")עילאי יצחק(\"). We:
+      1. Strip bidi control marks (LRM/RLM/PDF/LRE/LRI/...)
+      2. Swap mismatched leading/trailing parens that imply RTL reversal
+      3. Collapse runs of whitespace
+    """
+    if text is None:
+        return ''
+    s = str(text)
+    if not s:
+        return s
+    s = _BIDI_RE.sub('', s)
+    # A common pattern from RTL-reversed exports: a closing paren *before*
+    # an opening paren. Swap them as a heuristic.
+    s = re.sub(r'\)([^()]*)\(', r'(\1)', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """ניקוי והכנת ה-DataFrame"""
     if df.empty:
@@ -153,6 +193,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # ניקוי תיאור
     try:
         result['תיאור'] = result[desc_col].astype(str).str.strip()
+        result['תיאור'] = result['תיאור'].apply(_sanitize_rtl_text)
         result['תיאור'] = result['תיאור'].replace(['nan', 'None', ''], 'לא ידוע')
     except Exception:
         result['תיאור'] = 'לא ידוע'

@@ -127,11 +127,14 @@ export default function Merchants() {
   const summaryStats = useMemo(() => {
     if (!merchantData?.merchants.length) return null
     const { merchants } = merchantData
-    const uniqueCount = merchants.length
+    const shownCount = merchants.length
+    // Total distinct merchants — falls back to "shown" if older backend
+    // version doesn't include the field.
+    const totalCount = merchantData.total_merchants ?? shownCount
     const totalSpending = merchants.reduce((sum, m) => sum + Math.abs(m.total), 0)
     const mostFrequent = merchants.reduce((prev, curr) =>
       curr.count > prev.count ? curr : prev, merchants[0])
-    return { uniqueCount, totalSpending, mostFrequent }
+    return { shownCount, totalCount, totalSpending, mostFrequent }
   }, [merchantData])
 
   // ── No session ────────────────────────────────────────────────────────
@@ -184,8 +187,19 @@ export default function Merchants() {
               <Users size={18} color="#fff" />
             </div>
             <div className="stat-content">
-              <div className="stat-value">{summaryStats.uniqueCount}</div>
-              <div className="stat-label">בתי עסק</div>
+              <div className="stat-value">
+                {summaryStats.shownCount}
+                {summaryStats.totalCount > summaryStats.shownCount && (
+                  <span style={{ fontSize: '0.65em', opacity: 0.6, marginRight: '4px' }}>
+                    {' / '}{summaryStats.totalCount}
+                  </span>
+                )}
+              </div>
+              <div className="stat-label">
+                {summaryStats.totalCount > summaryStats.shownCount
+                  ? 'בתי עסק (מציג מובילים)'
+                  : 'בתי עסק'}
+              </div>
             </div>
           </div>
           <div className="stat-card-compact glass-card">

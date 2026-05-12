@@ -1566,20 +1566,18 @@ async def get_month_overview(
     # pages: spending = expenses excluding transfers; income = real income only.
     spending = _spending_only(month_df)
     real_income = _real_income_only(month_df)
-    # Per-category aggregates: use ALL expenses (incl. transfers) and ALL
-    # positive amounts so the breakdown can still surface them as their own
-    # categories — but the headline totals/counts reflect spending-only and
-    # real-income-only.
-    expenses = month_df[month_df['סכום'] < 0]
-    income_all = month_df[month_df['סכום'] > 0]
+    # Per-category aggregates over spending only (matches the dashboard's
+    # spending KPIs and the category-snapshot endpoint). Categories with
+    # zero spending are filtered out so the panel doesn't display empty
+    # rows like "טיסות ותיירות 0 / income 205".
+    exp_by_cat = spending.groupby('קטגוריה')['סכום_מוחלט'].sum() if not spending.empty else pd.Series(dtype=float)
+    inc_by_cat = real_income.groupby('קטגוריה')['סכום'].sum() if not real_income.empty else pd.Series(dtype=float)
 
-    exp_by_cat = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum()
-    inc_by_cat = income_all.groupby('קטגוריה')['סכום'].sum()
-
-    all_cats = set(exp_by_cat.index) | set(inc_by_cat.index)
     categories = []
-    for cat in sorted(all_cats):
+    for cat in sorted(set(exp_by_cat.index)):
         exp_val = float(exp_by_cat.get(cat, 0))
+        if exp_val <= 0:
+            continue
         inc_val = float(inc_by_cat.get(cat, 0))
         categories.append({
             "name": str(cat),
@@ -1882,15 +1880,24 @@ async def get_weekly_summary(
     if df_copy.empty:
         return empty
 
-    # Reference "today" is the last date within scope, so the cards align with
-    # the month the user is viewing instead of the whole dataset.
-    max_date = df_copy["date"].max()
+    # Reference "today" semantics:
+    #   - With a month range supplied, anchor at the last day of that range
+    #     (so the cards align with the month the user is viewing).
+    #   - Without a range, anchor at the wall-clock today() in Asia/Jerusalem
+    #     so "this week" actually means the current calendar week, even on a
+    #     stale dataset whose last transaction was weeks ago.
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    if month_from or month_to:
+        anchor = pd.Timestamp(df_copy["date"].max()).normalize()
+    else:
+        anchor = pd.Timestamp(_dt.datetime.now(ZoneInfo('Asia/Jerusalem')).date())
 
-    this_week_start = max_date - pd.Timedelta(days=6)
+    this_week_start = anchor - pd.Timedelta(days=6)
     last_week_start = this_week_start - pd.Timedelta(days=7)
     last_week_end = this_week_start - pd.Timedelta(days=1)
 
-    this_week = df_copy[(df_copy["date"] >= this_week_start) & (df_copy["date"] <= max_date)]
+    this_week = df_copy[(df_copy["date"] >= this_week_start) & (df_copy["date"] <= anchor)]
     last_week = df_copy[(df_copy["date"] >= last_week_start) & (df_copy["date"] <= last_week_end)]
 
     def week_summary(week_df: pd.DataFrame) -> dict:
@@ -2012,8 +2019,13 @@ async def get_anomalies(sessionId: str = Query(...)):
                     "description": str(row.get("תיאור", "")),
                     "amount": _round_money(amt),
                     "category": str(cat),
-                    "date": str(row.get("תאריך", "")),
+                    "date": _to_json_safe(row.get("תאריך")),
                     "deviation": _sanitize(round(deviation, 2)),
+                    # Robust statistics (MAD-based, not mean/std). Old field
+                    # names kept temporarily as aliases for callers that
+                    # haven't migrated yet.
+                    "category_median": _round_money(median_amt),
+                    "category_mad": _round_money(sigma_est),
                     "category_mean": _round_money(median_amt),
                     "category_std": _round_money(sigma_est),
                 })
