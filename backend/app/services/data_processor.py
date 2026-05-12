@@ -154,15 +154,21 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Also detect bank statements by mixed sign distribution.
     # Credit-card files are almost entirely positive (>80%); bank
     # statements (עו"ש) typically have a mix of negative (debits) and
-    # positive (credits like salary, refunds).  Use a low threshold
-    # (3%) because a bank statement may have very few income rows
-    # (e.g. 2 salaries out of 80 transactions = 2.5%).
+    # positive (credits like salary).  We only flip to "bank statement"
+    # semantics if there's a *substantial* portion of each sign — a
+    # credit-card file with a handful of refund rows shouldn't be
+    # misclassified (verified bug: 48 expense rows were left positive
+    # because two refunds tripped a 3 % mixed-signs threshold).
     if not is_bank_statement:
         _nz = result['סכום'][result['סכום'] != 0]
         if len(_nz) > 0:
             _pos_r = (_nz > 0).sum() / len(_nz)
             _neg_r = (_nz < 0).sum() / len(_nz)
-            if _pos_r >= 0.03 and _neg_r >= 0.03:
+            # Require ≥ 15 % of the minority sign before assuming it's a
+            # mixed bank statement (was 3 %). And in either case, if the
+            # majority is over 85 % we treat it as a credit-card file and
+            # let the flip below run.
+            if 0.15 <= _pos_r <= 0.85 and 0.15 <= _neg_r <= 0.85:
                 is_bank_statement = True
 
     non_zero = result['סכום'][result['סכום'] != 0]
@@ -292,6 +298,41 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         to_refund.loc[pos_mask] = (refund_match & ~salary_match).values
         if to_refund.any():
             result.loc[to_refund, 'קטגוריה'] = 'החזרים וזיכויים'
+
+    # ── Net out canceled-transaction pairs ─────────────────────────────
+    # Rows whose `הערות` says "ביטול עסקה" cancel out the original charge.
+    # We drop *both* sides of the pair (the cancellation row and its
+    # matching original) so they don't inflate spending totals — e.g.
+    # an "אל על ‎-₪4,221" charge paired with "אל על +₪4,221  ביטול עסקה"
+    # nets to zero and shouldn't appear as the top expense for the month.
+    if 'הערות' in result.columns and 'תאריך' in result.columns and 'תיאור' in result.columns and 'סכום' in result.columns:
+        notes_lower = result['הערות'].astype(str).str.lower()
+        cancel_mask = notes_lower.str.contains('ביטול', na=False)
+        if cancel_mask.any():
+            to_drop = set()
+            for cancel_idx in result.index[cancel_mask].tolist():
+                if cancel_idx in to_drop:
+                    continue
+                row = result.loc[cancel_idx]
+                merchant = row['תיאור']
+                amount = row['סכום']
+                if pd.isna(merchant) or pd.isna(amount):
+                    continue
+                # Look for the opposite-signed counterpart on the same date
+                # with the same merchant and amount.
+                date_val = row['תאריך']
+                candidates = result[
+                    (result.index != cancel_idx)
+                    & (result['תיאור'] == merchant)
+                    & (result['תאריך'] == date_val)
+                    & ((result['סכום'] + amount).abs() < 0.01)
+                    & (~result.index.isin(to_drop))
+                ]
+                if not candidates.empty:
+                    to_drop.add(cancel_idx)
+                    to_drop.add(int(candidates.index[0]))
+            if to_drop:
+                result = result.drop(index=list(to_drop)).reset_index(drop=True)
 
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)

@@ -119,6 +119,25 @@ logger = __import__("logging").getLogger(__name__)
 async def test():
     return {"status": "ok"}
 
+
+@router.get("/warmup")
+async def warmup(sessionId: Optional[str] = Query(default=None)):
+    """Cheap endpoint the frontend calls before fanning out to 10+ parallel
+    dashboard endpoints. Touches the session DataFrame so worker pool and
+    any lazy imports (pandas, numpy filters) are primed, avoiding the 503
+    cold-start cascade on first dashboard load."""
+    ok = False
+    rows = 0
+    if sessionId and sessionId in sessions:
+        try:
+            df = sessions[sessionId]
+            # Trivial touch — forces pandas to materialize the frame fully.
+            rows = int(len(df))
+            ok = True
+        except Exception as e:
+            logger.warning("warmup failed for session %s: %s", sessionId, e)
+    return {"ready": ok, "rows": rows}
+
 # In-memory storage for sessions (in production, use Redis or database)
 sessions: dict[str, pd.DataFrame] = {}
 
@@ -666,22 +685,23 @@ async def get_session_info(sessionId: str = Query(...)):
     total_expenses = round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2) if not expenses.empty and 'סכום_מוחלט' in expenses.columns else 0
     total_income = round(_sanitize(float(income['סכום'].sum())), 2) if not income.empty else 0
 
-    # Categories with counts
+    # Categories with counts. The previous version used a nested lambda
+    # inside groupby.agg that reached back into the outer df — fragile
+    # under non-unique indices (which restore-session can produce). Split
+    # into two simple groupbys and merge.
     categories = []
-    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns:
-        cat_group = df.groupby('קטגוריה').agg(
-            count=('סכום', 'size'),
-            expense_total=('סכום_מוחלט', lambda x: round(float(x[df.loc[x.index, 'סכום'] < 0].sum()), 2) if (df.loc[x.index, 'סכום'] < 0).any() else 0),
-            income_total=('סכום', lambda x: round(float(x[x > 0].sum()), 2) if (x > 0).any() else 0),
-        ).reset_index()
-        cat_group = cat_group.sort_values('expense_total', ascending=False)
-        for _, row in cat_group.iterrows():
+    if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and 'סכום' in df.columns:
+        counts = df.groupby('קטגוריה').size()
+        exp_totals = df[df['סכום'] < 0].groupby('קטגוריה')['סכום_מוחלט'].sum()
+        inc_totals = df[df['סכום'] > 0].groupby('קטגוריה')['סכום'].sum()
+        for cat in counts.index:
             categories.append({
-                "name": str(row['קטגוריה']),
-                "count": int(row['count']),
-                "expense_total": _sanitize(row['expense_total']),
-                "income_total": _sanitize(row['income_total']),
+                "name": str(cat),
+                "count": int(counts.loc[cat]),
+                "expense_total": _round_money(float(exp_totals.get(cat, 0.0))),
+                "income_total": _round_money(float(inc_totals.get(cat, 0.0))),
             })
+        categories.sort(key=lambda c: c["expense_total"], reverse=True)
 
     # Months in data
     months = []
@@ -716,21 +736,24 @@ async def get_metrics(sessionId: str = Query(...)):
     expenses = df[df['סכום'] < 0]
     spending = _spending_only(df)
     real_income = _real_income_only(df)
-    # All positive-amount rows, kept for diagnostics (refunds + transfers + income)
-    positive_total = float(df.loc[df['סכום'] > 0, 'סכום'].sum()) if 'סכום' in df.columns else 0.0
+    positives = df[df['סכום'] > 0] if 'סכום' in df.columns else df.iloc[0:0]
+    # Positive non-income rows = refunds / credits / between-account transfers
+    refund_or_transfer = positives[~positives['קטגוריה'].isin(INCOME_CATEGORIES)] if 'קטגוריה' in positives.columns else positives
+    # All positive amounts kept for diagnostics
+    positive_total = float(positives['סכום'].sum()) if not positives.empty else 0.0
 
     # Counts:
-    #   expense_count  = all negative-amount rows (includes transfers/investments)
-    #   income_count   = positive-amount rows in real-income categories only
-    #   spending_count = expenses minus transfers/investments — used by the
-    #                    dashboard's "עסקאות הוצאה" KPI
-    #   total_transactions must equal expense_count + income_count; transfers
-    #                    and refunds (positive non-income rows) are accounted
-    #                    for separately via total_positive
+    #   total_transactions = every row in the dataset (matches /api/transactions.total)
+    #   expense_count      = all negative-amount rows (includes transfers/investments)
+    #   income_count       = positive-amount rows in real-income categories only
+    #   refund_count       = positive-amount rows in refund/transfer categories
+    #   spending_count     = expenses excluding transfers/investments — used by
+    #                        the dashboard's "עסקאות הוצאה" KPI
     expense_count = int(len(expenses))
     income_count = int(len(real_income))
+    refund_count = int(len(refund_or_transfer))
     spending_count = int(len(spending))
-    total_transactions = expense_count + income_count
+    total_transactions = int(len(df))
 
     total_expenses = float(spending['סכום_מוחלט'].sum()) if not spending.empty and 'סכום_מוחלט' in spending.columns else 0.0
     total_income = float(real_income['סכום'].sum()) if not real_income.empty else 0.0
@@ -752,6 +775,7 @@ async def get_metrics(sessionId: str = Query(...)):
         "total_transactions": total_transactions,
         "expense_count": expense_count,
         "income_count": income_count,
+        "refund_count": refund_count,
         "spending_count": spending_count,
         "total_expenses": _round_money(total_expenses),
         "total_income": _round_money(total_income),
@@ -2006,10 +2030,10 @@ async def get_anomalies(sessionId: str = Query(...)):
     anomalies = []
 
     for cat, group in expenses.groupby("קטגוריה"):
-        # Robust-stats anomaly detection needs a meaningful sample.
-        # Bumped from 8 → 12 to cut down on KSP-style false positives where
-        # a single big charge sits in a category of mostly tiny ones.
-        if len(group) < 12:
+        # Robust-stats anomaly detection needs a meaningful sample. Bumped
+        # the minimum from 12 → 15 to further reduce false positives on
+        # small categories where one outlier dominates everything.
+        if len(group) < 15:
             continue
 
         amounts = group["סכום"].abs()
@@ -2022,13 +2046,15 @@ async def get_anomalies(sessionId: str = Query(...)):
         # so `deviation` is comparable to a z-score).
         sigma_est = 1.4826 * mad_raw
 
-        # Skip pathologically noisy categories (CV-like guard).
-        if median_amt > 0 and sigma_est / median_amt > 2.0:
+        # Skip pathologically noisy categories — when the spread is on the
+        # same order as the median, the "anomaly" is just sample-size noise.
+        if median_amt <= 1.0 or sigma_est / median_amt > 1.5:
             continue
 
         for _, row in group.iterrows():
             amt = abs(float(row["סכום"]))
             deviation = (amt - median_amt) / sigma_est
+            deviation_mad = (amt - median_amt) / mad_raw
 
             if deviation > 3:
                 anomalies.append({
@@ -2038,7 +2064,9 @@ async def get_anomalies(sessionId: str = Query(...)):
                     "date": _to_json_safe(row.get("תאריך")),
                     # `deviation` is in σ-equivalent units (computed against
                     # 1.4826 * MAD), so it's comparable to a normal z-score.
+                    # `deviation_mad` is in raw MAD units.
                     "deviation": _sanitize(round(deviation, 2)),
+                    "deviation_mad": _sanitize(round(deviation_mad, 2)),
                     "category_median": _round_money(median_amt),
                     "category_mad": _round_money(mad_raw),
                     "category_sigma_est": _round_money(sigma_est),
