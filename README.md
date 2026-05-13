@@ -2,67 +2,69 @@
 
 דאשבורד מקצועי לניתוח עסקאות כרטיס אשראי עם תמיכה מלאה בעברית ו-RTL.
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+## 🛠️ Stack
 
-## ✨ תכונות
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind, Recharts, Framer Motion
+- **Backend:** FastAPI (Python 3.11), Pandas, Supabase, Anthropic AI categorization
+- **Auth & storage:** Supabase
+- **Deployment:** Render (single Docker service — backend serves the built SPA at `/` and the API at `/api/*`)
 
-- 📊 **ניתוח ויזואלי** - גרפים אינטראקטיביים עם Plotly
-- 🏷️ **קטגוריות** - זיהוי אוטומטי של קטגוריות מ-MAX ובנקים אחרים
-- 📑 **תמיכה באקסל** - קריאת קבצי Excel עם מספר גליונות
-- 🔤 **עברית מלאה** - ממשק RTL מותאם לעברית
-- 📥 **ייצוא** - הורדה לאקסל או CSV
+## 🚀 Production deployment (Render)
 
-## 🚀 התקנה מקומית
+Deployment is fully described by `render.yaml` + the root `Dockerfile`.
+
+1. Push to `main` — Render reads `render.yaml` from the default branch.
+2. In the Render dashboard: **New + → Blueprint** → connect this repo.
+3. When prompted, supply the three secrets:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `ANTHROPIC_API_KEY`
+4. Apply. First build is ~5–8 min (npm ci + vite build + python deps).
+
+Health check: `GET /health` → `{"status":"healthy"}`.
+
+The free plan spins down after ~15 min idle (~30s cold start on first request).
+
+## 💻 Local development
+
+Two processes — backend on `:8000`, frontend dev server on `:5173` proxies `/api` to the backend.
 
 ```bash
-# שכפול הפרויקט
-git clone https://github.com/YOUR_USERNAME/transactions-dashboard.git
-cd transactions-dashboard
-
-# יצירת סביבה וירטואלית
-python -m venv venv
-venv\Scripts\activate  # Windows
-# או: source venv/bin/activate  # Linux/Mac
-
-# התקנת תלויות
+# Backend
+cd backend
 pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 
-# הפעלה
-streamlit run app.py
+# Frontend (in a separate terminal)
+cd frontend
+npm install
+npm run dev  # http://localhost:5173
 ```
 
-## 📁 פורמטים נתמכים
+Frontend environment variables (create `frontend/.env.local`):
 
-- **MAX** - קבצי אקסל מ-MAX כרטיסי אשראי
-- **לאומי** - קבצי CSV מבנק לאומי
-- **דיסקונט** - קבצי אקסל מבנק דיסקונט
-- **כללי** - כל קובץ עם עמודות: תאריך, תיאור, סכום
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
 
-## 📸 צילומי מסך
+Backend environment variables:
 
-### דאשבורד ראשי
-- סקירת הוצאות חודשיות
-- התפלגות לפי קטגוריות
-- ניתוח לפי ימים בשבוע
+```
+ANTHROPIC_API_KEY=...  # required for AI categorization
+```
 
-### טבלת עסקאות
-- מיון לפי תאריך/סכום
-- חיפוש וסינון
-- ייצוא לאקסל
+## 🗄️ Supabase setup
 
-## 🛠️ טכנולוגיות
+Run `supabase_setup.sql` once in the Supabase SQL editor to create the required tables and RLS policies.
 
-- **Streamlit** - ממשק משתמש
-- **Pandas** - עיבוד נתונים
-- **Plotly** - גרפים אינטראקטיביים
-- **OpenPyXL** - קריאת קבצי Excel
+## 📁 Supported file formats
 
-## 📄 רישיון
+- **MAX** — Excel from MAX credit cards
+- **Leumi** — CSV from Bank Leumi
+- **Discount** — Excel from Bank Discount
+- **Generic** — any file with date / description / amount columns
 
-MIT License - ראה קובץ LICENSE לפרטים.
+## 📄 License
 
----
-
-נוצר עם ❤️ בישראל
+MIT
