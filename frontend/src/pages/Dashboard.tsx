@@ -38,6 +38,8 @@ import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
+import { supabaseApi } from '../services/supabaseApi'
+import { useAuth } from '../lib/AuthContext'
 import type {
   MetricsData,
   RawDonutData,
@@ -76,6 +78,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const { setNotifications } = useAppNotifications()
+  const { user } = useAuth()
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
@@ -99,6 +102,9 @@ export default function Dashboard() {
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
+  // Bumping this forces every data-fetch effect to re-run; used after a
+  // manual category override so all widgets reflect the new classification.
+  const [refreshKey, setRefreshKey] = useState(0)
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
   const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
   const [snapshotExpanded, setSnapshotExpanded] = useState(false)
@@ -142,6 +148,32 @@ export default function Dashboard() {
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
   }, [])
+
+  // ── Manual category override ──
+  // Persists the new category in two places: (1) the in-memory backend
+  // session, so the current dashboard view updates immediately; (2) a
+  // merchant→category rule in Supabase, so every future upload with the
+  // same merchant string gets the corrected category automatically.
+  const handleCategoryChange = useCallback(
+    async (tx: Transaction, newCategory: string) => {
+      if (!sessionId || tx.id == null) return
+      try {
+        const resp = await transactionsApi.updateTransactionCategory(sessionId, tx.id, newCategory)
+        if (user && resp.merchant) {
+          await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory).catch((e) => {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to persist category rule (will retry on next edit):', e)
+          })
+        }
+      } finally {
+        // Close the drawer and trigger a full data refresh so all widgets
+        // pick up the new classification.
+        setDrawerOpen(false)
+        setRefreshKey((k) => k + 1)
+      }
+    },
+    [sessionId, user],
+  )
 
   // ── Push notifications to header notification center ──
   useEffect(() => {
@@ -236,7 +268,7 @@ export default function Dashboard() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType])
+  }, [sessionId, dateType, refreshKey])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
@@ -257,7 +289,7 @@ export default function Dashboard() {
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType])
+  }, [sessionId, selectedMonth, dateType, refreshKey])
 
   // ── Derived data ───────────────────────────────────────────────────
   const monthlyAmounts = useMemo(() => {
@@ -316,7 +348,7 @@ export default function Dashboard() {
       .then((data) => setCategorySnapshot(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey])
 
   // ── Filtered + sorted snapshot categories (uses extracted pure fn) ────
   const snapshotFilterOpts = useMemo(() => ({
@@ -1423,6 +1455,7 @@ export default function Dashboard() {
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}
+        onCategoryChange={handleCategoryChange}
       />
     </div>
   )

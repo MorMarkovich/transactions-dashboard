@@ -81,10 +81,16 @@ export default function Layout({ children }: LayoutProps) {
     hasTriedRestore.current = true
 
     const doRestore = () => {
-      supabaseApi.getLatestTransactions(user.id)
-        .then(transactions => {
+      // Load saved transactions AND user-defined category rules in parallel,
+      // then pass both to /restore-session so the rules are applied during
+      // re-categorization.
+      Promise.all([
+        supabaseApi.getLatestTransactions(user.id),
+        supabaseApi.getCategoryRules(user.id).catch(() => []),
+      ])
+        .then(([transactions, rules]) => {
           if (!transactions || transactions.length === 0) return
-          return transactionsApi.restoreSession(transactions)
+          return transactionsApi.restoreSession(transactions, rules)
         })
         .then(response => {
           if (response?.success && response.session_id) {
