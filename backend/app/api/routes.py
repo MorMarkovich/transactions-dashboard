@@ -237,16 +237,24 @@ async def restore_session(body: RestoreSessionRequest):
         has_billing_date = 'תאריך_חיוב' in df.columns
         has_desc = 'תיאור' in df.columns
         if has_billing_date and has_desc:
-            # Rows from credit-card files have a valid billing date;
-            # rows from bank statements have NaT.
-            has_cc_rows = df['תאריך_חיוב'].notna().any()
-            has_bank_rows = df['תאריך_חיוב'].isna().any()
+            # Identify bank-statement rows. Newer uploads carry an explicit
+            # _is_bank_row marker that survives concat + Supabase round-trip.
+            # Older uploads (saved before that marker was added) fall back
+            # to the legacy heuristic: bank rows had NaT for תאריך_חיוב.
+            if '_is_bank_row' in df.columns:
+                is_bank_row = df['_is_bank_row'].fillna(False).astype(bool)
+            else:
+                is_bank_row = df['תאריך_חיוב'].isna()
+
+            has_cc_rows = (~is_bank_row).any()
+            has_bank_rows = is_bank_row.any()
 
             if has_cc_rows and has_bank_rows:
-                # Among bank-statement rows (NaT billing date), drop those
-                # whose description matches a credit-card company name.
+                # Among bank-statement rows, drop those whose description
+                # matches a credit-card company name — those are the lump-sum
+                # monthly payments to the card, and the individual charges
+                # are already in the CC file.
                 desc_lower = df['תיאור'].str.lower()
-                is_bank_row = df['תאריך_חיוב'].isna()
                 is_cc_payment = desc_lower.str.contains(
                     '|'.join(CREDIT_CARD_PAYMENT_KEYWORDS),
                     na=False,
@@ -256,15 +264,12 @@ async def restore_session(body: RestoreSessionRequest):
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
 
-        # ── Backfill billing date for bank-statement rows ──
-        # Bank-statement rows have no billing date (תאריך_חיוב = NaT). When
-        # the user views the dashboard "by billing month", those rows would
-        # otherwise be excluded from month-filtered widgets (month-overview,
-        # category-snapshot, monthly chart, etc.), producing inconsistent
-        # totals between widgets. Coalesce billing date with transaction
-        # date so bank rows show up in the same month regardless of which
-        # date toggle the user picks. Must run AFTER the cc-payment dedup
-        # above, which relies on תאריך_חיוב.isna() to identify bank rows.
+        # ── Backfill billing date for legacy bank rows ──
+        # Pre-value-date-fix bank uploads still have תאריך_חיוב = NaT.
+        # Coalesce them with תאריך so all rows show up consistently in
+        # billing-date views. Must run AFTER the cc-payment dedup above
+        # (which can no longer rely on isna() but still uses the explicit
+        # marker for new uploads).
         if 'תאריך_חיוב' in df.columns and 'תאריך' in df.columns:
             df['תאריך_חיוב'] = df['תאריך_חיוב'].fillna(df['תאריך'])
             df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
