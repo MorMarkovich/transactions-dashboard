@@ -344,3 +344,64 @@ async def test_categories_sorted_descending_by_total(client):
     data = resp.json()
     totals = [c["total"] for c in data["categories"]]
     assert totals == sorted(totals, reverse=True)
+
+
+# ---------------------------------------------------------------------------
+# Regression: bank-statement rows (no billing date) must show up consistently
+# in both month-overview and category-snapshot when filtering by billing month.
+# Previously bank rows had חודש_חיוב=NaN, so category-snapshot crashed or
+# excluded them, while month-overview also excluded them — but the two
+# widgets disagreed on totals/counts depending on the pandas version.
+# After the fix, restore-session backfills billing date with transaction
+# date so both widgets see the same rows in the same billing month.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_mixed_cc_and_bank_rows_consistent_across_widgets(client):
+    """month-overview and category-snapshot must report the same totals
+    and counts when the session contains both credit-card rows (with billing
+    date) and bank-statement rows (without billing date)."""
+    import json as _json
+    # Build mixed payload: 3 CC rows + 1 bank rent row + 1 bank income row
+    transactions = [
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -100, "סכום_מוחלט": 100, "תיאור": "cc 1", "קטגוריה": "מזון וצריכה", "חודש": "04/2026"},
+        {"תאריך": "2026-04-12", "תאריך_חיוב": "2026-05-15", "סכום": -200, "סכום_מוחלט": 200, "תיאור": "cc 2", "קטגוריה": "דלק, חשמל וגז", "חודש": "04/2026"},
+        {"תאריך": "2026-04-20", "תאריך_חיוב": "2026-05-15", "סכום": -300, "סכום_מוחלט": 300, "תיאור": "cc 3", "קטגוריה": "עיצוב הבית", "חודש": "04/2026"},
+        {"תאריך": "2026-05-10", "תאריך_חיוב": None, "סכום": -3800, "סכום_מוחלט": 3800, "תיאור": "תשלום שיק", "קטגוריה": "שכר דירה", "חודש": "05/2026"},
+        {"תאריך": "2026-05-05", "תאריך_חיוב": None, "סכום": 12000, "סכום_מוחלט": 12000, "תיאור": "הפקדת שכר", "קטגוריה": "הכנסה", "חודש": "05/2026"},
+    ]
+
+    # Restore session through the public endpoint to exercise the fillna fix
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200, resp.text
+    sid = resp.json()["session_id"]
+
+    # Both endpoints, May 2026 by billing date
+    mo = (await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": sid, "month": "05/2026", "date_type": "billing"},
+    )).json()
+    cs = (await client.get(
+        "/api/charts/v2/category-snapshot",
+        params={"sessionId": sid, "month_from": "05/2026", "month_to": "05/2026", "date_type": "billing"},
+    )).json()
+
+    # Both must agree on expense count and total expenses
+    assert mo["transaction_count"] == cs["total_count"], (
+        f"transaction_count mismatch: month-overview={mo['transaction_count']} "
+        f"vs category-snapshot={cs['total_count']}"
+    )
+    assert mo["total_expenses"] == cs["total"], (
+        f"total_expenses mismatch: month-overview={mo['total_expenses']} "
+        f"vs category-snapshot={cs['total']}"
+    )
+
+    # Rent (bank row) must appear in both
+    mo_cats = {c["name"]: c["expenses"] for c in mo["categories"]}
+    cs_cats = {c["name"]: c["total"] for c in cs["categories"]}
+    assert "שכר דירה" in mo_cats, f"rent missing from month-overview: {list(mo_cats)}"
+    assert "שכר דירה" in cs_cats, f"rent missing from category-snapshot: {list(cs_cats)}"
+    assert mo_cats["שכר דירה"] == cs_cats["שכר דירה"] == 3800
+
+    # Income (bank row) must surface in month-overview total_income
+    assert mo["total_income"] == 12000, f"income missing: {mo['total_income']}"
