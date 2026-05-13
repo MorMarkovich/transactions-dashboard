@@ -61,7 +61,7 @@ async def upload_file(file: UploadFile = File(...)):
         amount_col = detect_amount_column(df_clean)
         desc_col = find_column(df_clean, ['שם בית העסק', 'שם בית עסק', 'תיאור', 'תיאור התנועה', 'description', 'merchant'])
         cat_col = find_column(df_clean, ['קטגוריה', 'category', 'Category'])
-        billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:'])
+        billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:', 'יום ערך'])
 
         if not date_col or not amount_col or not desc_col:
             # Clean up before raising error

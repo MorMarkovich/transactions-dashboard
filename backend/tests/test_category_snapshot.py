@@ -430,3 +430,38 @@ async def test_cc_payment_dedup_still_runs_after_billing_date_backfill(client):
     # The cc-payment row must have been removed
     assert body["cc_payments_removed"] == 1, f"expected dedup to remove 1, got {body}"
     assert body["transaction_count"] == 4
+
+
+@pytest.mark.asyncio
+async def test_bank_value_date_used_as_billing_date(client):
+    """Regression: a bank-statement row with תאריך=30/04 but יום ערך=01/05
+    must be assigned billing month 05/2026, not 04/2026. (Salary deposited on
+    Apr-30 with May-01 value date is real May income, not April income.)
+    """
+    transactions = [
+        {
+            "תאריך": "2026-04-30",
+            "תאריך_חיוב": "2026-05-01",   # came from יום ערך at upload time
+            "סכום": 27081.70,
+            "סכום_מוחלט": 27081.70,
+            "תיאור": "ישראכרט מש משכורת",
+            "קטגוריה": "הכנסה",
+            "חודש": "04/2026",
+            "חודש_חיוב": "05/2026",
+        },
+    ]
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200
+    sid = resp.json()["session_id"]
+
+    # By billing date, this income belongs to May 2026, not April.
+    may = await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": sid, "month": "05/2026", "date_type": "billing"},
+    )
+    apr = await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": sid, "month": "04/2026", "date_type": "billing"},
+    )
+    assert may.json()["total_income"] == 27081.70, f"May income missing: {may.json()}"
+    assert apr.json()["total_income"] == 0, f"April income should be empty: {apr.json()}"
