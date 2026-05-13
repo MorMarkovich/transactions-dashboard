@@ -256,6 +256,19 @@ async def restore_session(body: RestoreSessionRequest):
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
 
+        # ── Backfill billing date for bank-statement rows ──
+        # Bank-statement rows have no billing date (תאריך_חיוב = NaT). When
+        # the user views the dashboard "by billing month", those rows would
+        # otherwise be excluded from month-filtered widgets (month-overview,
+        # category-snapshot, monthly chart, etc.), producing inconsistent
+        # totals between widgets. Coalesce billing date with transaction
+        # date so bank rows show up in the same month regardless of which
+        # date toggle the user picks. Must run AFTER the cc-payment dedup
+        # above, which relies on תאריך_חיוב.isna() to identify bank rows.
+        if 'תאריך_חיוב' in df.columns and 'תאריך' in df.columns:
+            df['תאריך_חיוב'] = df['תאריך_חיוב'].fillna(df['תאריך'])
+            df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
+
         # Ensure notes column exists
         if 'הערות' not in df.columns:
             df['הערות'] = None
@@ -1439,7 +1452,7 @@ async def get_month_overview(
         "categories": categories,
         "total_expenses": total_expenses,
         "total_income": total_income,
-        "transaction_count": int(len(month_df)),
+        "transaction_count": int(len(expenses)),
     }
 
 
