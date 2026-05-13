@@ -193,9 +193,9 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   }
 
   return (
-    <div style={{ width: '100%', overflow: 'hidden' }}>
+    <div style={{ width: '100%' }}>
     <ResponsiveContainer width="100%" height={340}>
-      <PieChart>
+      <PieChart margin={{ top: 12, right: 8, bottom: 12, left: 8 }}>
         <Pie
           data={data}
           dataKey="value"

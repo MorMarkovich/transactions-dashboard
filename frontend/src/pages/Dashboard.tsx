@@ -80,6 +80,10 @@ export default function Dashboard() {
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
+  // Track whether we've ever loaded metrics so date-type toggles don't
+  // trip the skeleton state and blank the whole dashboard.
+  const metricsRef = useRef<MetricsData | null>(null)
+  useEffect(() => { metricsRef.current = metrics }, [metrics])
   const [, setDonutData] = useState<RawDonutData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
   const [, setWeekdayData] = useState<RawWeekdayData | null>(null)
@@ -252,7 +256,12 @@ export default function Dashboard() {
     const { signal } = controller
 
     const fetchData = async () => {
-      setLoading(true)
+      // Only show the skeleton on the *initial* load. Toggling date_type
+      // (or other dep changes) re-fires this effect but the old data is
+      // perfectly usable as a stale-while-revalidate placeholder — the
+      // user shouldn't see the whole dashboard blank out for ~1s.
+      const isInitialLoad = !metricsRef.current
+      if (isInitialLoad) setLoading(true)
       setError(null)
 
       try {
@@ -578,16 +587,22 @@ export default function Dashboard() {
                 {displayBalance >= 0 ? '+' : ''}{formatCurrency(displayBalance)}
               </div>
             </div>
-            {displayIncome > 0 && (
-              <div style={{ textAlign: 'center' }} title={`חיסכון: ${formatCurrency(displayBalance)} מתוך הכנסה של ${formatCurrency(displayIncome)}`}>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {displaySavingsRate >= 0
-                    ? `${displaySavingsRate.toFixed(1)}%`
-                    : 'חריגה'}
-                </div>
+            {/* Always render the שיעור חיסכון slot so the KPI row keeps
+                its shape between date_type modes — empty-state shows '—'
+                with an explanation rather than vanishing the column. */}
+            <div
+              style={{ textAlign: 'center' }}
+              title={displayIncome > 0
+                ? `חיסכון: ${formatCurrency(displayBalance)} מתוך הכנסה של ${formatCurrency(displayIncome)}`
+                : 'אין הכנסות בחודש זה — אי אפשר לחשב שיעור חיסכון'}
+            >
+              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: displayIncome > 0 ? (displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--text-muted)' }}>
+                {displayIncome > 0
+                  ? (displaySavingsRate >= 0 ? `${displaySavingsRate.toFixed(1)}%` : 'חריגה')
+                  : '—'}
               </div>
-            )}
+            </div>
           </div>
           {/* Last Updated Timestamp — include the date when it isn't today */}
           {dataLoadedAt && (() => {
@@ -781,24 +796,32 @@ export default function Dashboard() {
                   </div>
                 </Card>
 
-                {monthOverview.total_income > 0 && (
-                  <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
-                      הכנסות — {formatMonthLabel(monthOverview.month)}
-                    </div>
+                {/* Always render הכנסות + יתרה נטו cards so the grid keeps
+                    its 3-card shape between Transaction/Billing modes. When
+                    income is zero we show a quiet '—' empty-state instead
+                    of dropping the card, which previously created a giant
+                    blank cell on the left. */}
+                <Card variant="glass" padding="md">
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: monthOverview.total_income > 0 ? 'var(--success)' : 'var(--text-muted)', display: 'inline-block', opacity: monthOverview.total_income > 0 ? 1 : 0.5 }} />
+                    הכנסות — {formatMonthLabel(monthOverview.month)}
+                  </div>
+                  {monthOverview.total_income > 0 ? (
                     <AnimatedNumber
                       value={monthOverview.total_income}
                       formatter={formatCurrency}
                       style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
                     />
-                  </Card>
-                )}
+                  ) : (
+                    <div style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', direction: 'ltr' }} title="אין הכנסות בחודש זה (או חסר תאריך חיוב לרשומות הכנסה)">
+                      —
+                    </div>
+                  )}
+                </Card>
 
-                {monthOverview.total_income > 0 && (
-                  <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px' }}>יתרה נטו</div>
-                    {(() => {
+                <Card variant="glass" padding="md">
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px' }}>יתרה נטו</div>
+                  {monthOverview.total_income > 0 ? (() => {
                       const balance = monthOverview.total_income - monthOverview.total_expenses
                       return (
                         <AnimatedNumber
@@ -811,9 +834,12 @@ export default function Dashboard() {
                           }}
                         />
                       )
-                    })()}
-                  </Card>
-                )}
+                    })() : (
+                    <div style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', direction: 'ltr' }} title="אין נתוני הכנסה בחודש זה — אי אפשר לחשב יתרה">
+                      —
+                    </div>
+                  )}
+                </Card>
 
                 {/* Top category — donut + ranked legend */}
                 {monthOverview.categories.length > 0 && (
@@ -889,7 +915,7 @@ export default function Dashboard() {
               <Search size={13} style={{ color: 'var(--text-muted)', position: 'absolute', right: '8px', pointerEvents: 'none' }} />
               <input
                 type="text"
-                placeholder="חיפוש קטגוריה או בית עסק..."
+                placeholder="חיפוש קטגוריה או עסק..."
                 value={snapshotSearch}
                 onChange={(e) => setSnapshotSearch(e.target.value)}
                 style={{
