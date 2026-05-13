@@ -291,16 +291,20 @@ async def restore_session(body: RestoreSessionRequest):
             has_bank_rows = is_bank_row.any()
 
             if has_cc_rows and has_bank_rows:
-                # Among bank-statement rows, drop those whose description
-                # matches a credit-card company name — those are the lump-sum
-                # monthly payments to the card, and the individual charges
-                # are already in the CC file.
+                # Among bank-statement rows, drop outbound card-company
+                # payments only. Positive rows can be legitimate income or
+                # refunds (for example salary paid via Isracard) and must stay.
                 desc_lower = df['תיאור'].str.lower()
                 is_cc_payment = desc_lower.str.contains(
                     '|'.join(CREDIT_CARD_PAYMENT_KEYWORDS),
                     na=False,
                 )
-                cc_payment_mask = is_bank_row & is_cc_payment
+                is_outbound_payment = (
+                    df['סכום'] < 0
+                    if 'סכום' in df.columns
+                    else pd.Series(False, index=df.index)
+                )
+                cc_payment_mask = is_bank_row & is_outbound_payment & is_cc_payment
                 cc_payments_removed = int(cc_payment_mask.sum())
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
