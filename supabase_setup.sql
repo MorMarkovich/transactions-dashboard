@@ -93,3 +93,23 @@ ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own settings" ON public.user_settings FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can upsert own settings" ON public.user_settings FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own settings" ON public.user_settings FOR UPDATE USING (auth.uid() = user_id);
+
+-- 6. User-defined category overrides (learning from manual edits)
+-- When the dashboard misclassifies a transaction, the user can reassign
+-- it. We store the merchant→category mapping so every future upload
+-- with the same merchant string lands in the corrected category.
+CREATE TABLE IF NOT EXISTS public.user_category_rules (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    merchant TEXT NOT NULL,
+    category TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (user_id, merchant)
+);
+
+ALTER TABLE public.user_category_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own category rules" ON public.user_category_rules FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own category rules" ON public.user_category_rules FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own category rules" ON public.user_category_rules FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own category rules" ON public.user_category_rules FOR DELETE USING (auth.uid() = user_id);

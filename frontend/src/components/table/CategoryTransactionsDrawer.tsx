@@ -1,8 +1,8 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
-import { get_icon } from '../../utils/constants'
+import { get_icon, CATEGORY_ICONS } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
 
 interface CategoryTransactionsDrawerProps {
@@ -13,7 +13,17 @@ interface CategoryTransactionsDrawerProps {
   transactions: Transaction[]
   total: number
   loading?: boolean
+  /**
+   * Called when the user saves a new category for a transaction.
+   * The parent is responsible for: (1) calling /api/transactions/category
+   * to update the in-memory session, (2) persisting the merchant→category
+   * rule to Supabase, and (3) refreshing dashboard data.
+   * If undefined, the edit UI is hidden.
+   */
+  onCategoryChange?: (tx: Transaction, newCategory: string) => Promise<void>
 }
+
+const CATEGORY_LIST = Object.keys(CATEGORY_ICONS)
 
 export default function CategoryTransactionsDrawer({
   isOpen,
@@ -23,8 +33,11 @@ export default function CategoryTransactionsDrawer({
   transactions,
   total,
   loading,
+  onCategoryChange,
 }: CategoryTransactionsDrawerProps) {
   const [sortAsc, setSortAsc] = useState(true)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [savingId, setSavingId] = useState<number | null>(null)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -40,6 +53,12 @@ export default function CategoryTransactionsDrawer({
     }
   }, [isOpen, handleKeyDown])
 
+  // Reset edit state when drawer closes or category changes.
+  useEffect(() => {
+    setEditingId(null)
+    setSavingId(null)
+  }, [isOpen, category])
+
   const sorted = useMemo(() => {
     const list = [...transactions]
     list.sort((a, b) => {
@@ -49,6 +68,24 @@ export default function CategoryTransactionsDrawer({
     })
     return list
   }, [transactions, sortAsc])
+
+  const handlePick = useCallback(
+    async (tx: Transaction, newCategory: string) => {
+      if (!onCategoryChange || tx.id == null) return
+      if (newCategory === category) {
+        setEditingId(null)
+        return
+      }
+      setSavingId(tx.id)
+      try {
+        await onCategoryChange(tx, newCategory)
+      } finally {
+        setSavingId(null)
+        setEditingId(null)
+      }
+    },
+    [onCategoryChange, category],
+  )
 
   return (
     <AnimatePresence>
@@ -202,69 +239,144 @@ export default function CategoryTransactionsDrawer({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {sorted.map((tx, i) => (
-                    <div
-                      key={`${tx.תאריך}-${tx.תיאור}-${i}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        background: 'var(--glass-bg)',
-                        borderRadius: 'var(--radius-md, 8px)',
-                        border: '1px solid var(--glass-border)',
-                        gap: '12px',
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: '0.8125rem',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {tx.תיאור}
-                        </p>
-                        {tx.הערות && (
-                          <p
-                            style={{
-                              margin: '2px 0 0',
-                              fontSize: '0.75rem',
-                              color: 'var(--text-muted)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {tx.הערות}
-                          </p>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                          <Calendar size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                            {formatDate(tx.תאריך)}
-                          </span>
-                        </div>
-                      </div>
-                      <span
+                  {sorted.map((tx, i) => {
+                    const isEditing = editingId === tx.id
+                    const isSaving = savingId === tx.id
+                    const canEdit = !!onCategoryChange && tx.id != null
+                    return (
+                      <div
+                        key={`${tx.תאריך}-${tx.תיאור}-${i}`}
                         style={{
-                          fontSize: '0.8125rem',
-                          fontWeight: 700,
-                          fontFamily: 'var(--font-mono)',
-                          color: 'var(--danger)',
-                          direction: 'ltr',
-                          flexShrink: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          padding: '10px 14px',
+                          background: 'var(--glass-bg)',
+                          borderRadius: 'var(--radius-md, 8px)',
+                          border: '1px solid var(--glass-border)',
+                          gap: '8px',
                         }}
                       >
-                        {formatCurrency(tx.סכום)}
-                      </span>
-                    </div>
-                  ))}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: '0.8125rem',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {tx.תיאור}
+                            </p>
+                            {tx.הערות && (
+                              <p
+                                style={{
+                                  margin: '2px 0 0',
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-muted)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {tx.הערות}
+                              </p>
+                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                              <Calendar size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                              <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                {formatDate(tx.תאריך)}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                            <span
+                              style={{
+                                fontSize: '0.8125rem',
+                                fontWeight: 700,
+                                fontFamily: 'var(--font-mono)',
+                                color: 'var(--danger)',
+                                direction: 'ltr',
+                              }}
+                            >
+                              {formatCurrency(tx.סכום)}
+                            </span>
+                            {canEdit && (
+                              <button
+                                onClick={() => setEditingId(isEditing ? null : tx.id ?? null)}
+                                aria-label={isEditing ? 'בטל עריכה' : 'ערוך קטגוריה'}
+                                disabled={isSaving}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: 6,
+                                  border: '1px solid var(--glass-border)',
+                                  background: isEditing ? 'var(--accent)' : 'transparent',
+                                  color: isEditing ? '#fff' : 'var(--text-muted)',
+                                  cursor: isSaving ? 'wait' : 'pointer',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {isEditing && canEdit && (
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '4px',
+                              paddingTop: '8px',
+                              borderTop: '1px solid var(--glass-border)',
+                            }}
+                          >
+                            {CATEGORY_LIST.map((cat) => {
+                              const selected = cat === category
+                              return (
+                                <button
+                                  key={cat}
+                                  onClick={() => handlePick(tx, cat)}
+                                  disabled={isSaving}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '4px 8px',
+                                    fontSize: '0.6875rem',
+                                    borderRadius: 'var(--radius-full)',
+                                    border: selected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                                    background: selected ? 'var(--accent-soft, rgba(125, 125, 255, 0.15))' : 'var(--glass-bg)',
+                                    color: selected ? 'var(--accent)' : 'var(--text-secondary)',
+                                    cursor: isSaving ? 'wait' : 'pointer',
+                                    fontFamily: 'var(--font-family)',
+                                  }}
+                                >
+                                  <span>{get_icon(cat)}</span>
+                                  <span>{cat}</span>
+                                  {selected && <Check size={10} />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
