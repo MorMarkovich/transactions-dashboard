@@ -753,6 +753,14 @@ input:focus, select:focus, textarea:focus {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
+  /* min-width: 0 on the grid + children lets cards shrink below their
+     intrinsic content width on narrow viewports — without it the first
+     card spills off the left edge of the main content area in RTL. */
+  min-width: 0;
+}
+
+.card-grid-responsive > * {
+  min-width: 0;
 }
 
 @media (max-width: 1200px) {

@@ -11,17 +11,26 @@ const LRM = '‎'
 
 /**
  * Format a number as Israeli Shekel currency (e.g. ₪1,234.56).
- * The result is wrapped with LRM marks so it renders consistently inside both
- * RTL (Hebrew) and LTR containers.
+ *
+ * Layout invariants the formatter guarantees so currency is unambiguous
+ * across the app:
+ *   - Always `[sign]₪[digits]` with the sign immediately before the ₪
+ *     (never after, never split). Positive amounts include no plus sign;
+ *     callers that want a leading `+` should add it themselves.
+ *   - No space between the sign / ₪ / digits — tight token.
+ *   - Wrapped in LRM marks so RTL bidi can't reorder the parts.
  */
 export function formatCurrency(amount: number): string {
-  if (amount === 0) return `${LRM}₪0${LRM}`
+  if (amount === 0) return `${LRM}₪0.00${LRM}`
   const abs = Math.abs(amount)
   const formatted = abs.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  const body = amount < 0 ? `-₪${formatted}` : `₪${formatted}`
+  // Use the typographic minus (U+2212) instead of ASCII hyphen so the
+  // glyph isn't reordered by RTL shaping (which sometimes ends up on the
+  // wrong side of ₪ on Windows).
+  const body = amount < 0 ? `−₪${formatted}` : `₪${formatted}`
   return `${LRM}${body}${LRM}`
 }
 
