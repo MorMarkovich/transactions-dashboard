@@ -101,8 +101,12 @@ export default function NotificationCenter({
               top: '44px',
               left: 0,
               width: '320px',
-              maxHeight: '400px',
+              // Cap relative to viewport so the panel doesn't clip on
+              // smaller screens. The internal list scrolls when content
+              // exceeds the cap.
+              maxHeight: 'min(70vh, 480px)',
               overflowY: 'auto',
+              overscrollBehavior: 'contain',
               background: 'var(--glass-bg-hover, var(--bg-elevated))',
               backdropFilter: 'blur(16px)',
               WebkitBackdropFilter: 'blur(16px)',
