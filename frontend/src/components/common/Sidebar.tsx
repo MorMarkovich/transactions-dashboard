@@ -290,7 +290,7 @@ export default function Sidebar({
                 ref={fileInputRef}
                 type="file"
                 id="sidebar-file-upload"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.xls,.csv,.pdf"
                 onChange={handleFileUpload}
                 disabled={uploading}
                 multiple
@@ -323,7 +323,7 @@ export default function Sidebar({
                   <>
                     <Upload size={20} style={{ color: 'var(--accent)' }} />
                     <span>גרור קובץ/ים או לחץ לבחירה</span>
-                    <span className="file-upload-hint" style={{ color: 'var(--text-secondary)' }}>.xlsx, .xls, .csv</span>
+                    <span className="file-upload-hint" style={{ color: 'var(--text-secondary)' }}>.xlsx, .xls, .csv, .pdf</span>
                   </>
                 )}
               </label>

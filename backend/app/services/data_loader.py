@@ -4,9 +4,24 @@ Data loading functions for transaction files
 import pandas as pd
 from typing import Dict
 
+from .isracard_pdf_parser import parse_isracard_pdf
+
 
 def load_transaction_file(file_path: str) -> pd.DataFrame:
-    """Load transaction file (Excel or CSV)"""
+    """Load transaction file (Excel, CSV, or Isracard PDF)"""
+    if file_path.endswith('.pdf'):
+        # Isracard exports statements as PDF (Excel export isn't offered for
+        # all card types). Parse into a DataFrame, then re-emit as the raw
+        # positional layout the rest of the pipeline (clean_dataframe →
+        # process_data) expects: a header row of Hebrew column names with
+        # an empty title row before it so detect_header_row finds it.
+        parsed = parse_isracard_pdf(file_path)
+        if parsed.empty:
+            raise ValueError("No transactions extracted from PDF")
+        header = list(parsed.columns)
+        rows = [[''] * len(header), header] + parsed.values.tolist()
+        return pd.DataFrame(rows)
+
     if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
         # Try to load all sheets and combine
         excel_file = None
