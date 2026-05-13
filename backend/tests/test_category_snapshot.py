@@ -405,3 +405,28 @@ async def test_mixed_cc_and_bank_rows_consistent_across_widgets(client):
 
     # Income (bank row) must surface in month-overview total_income
     assert mo["total_income"] == 12000, f"income missing: {mo['total_income']}"
+
+
+@pytest.mark.asyncio
+async def test_cc_payment_dedup_still_runs_after_billing_date_backfill(client):
+    """Regression: the backfill of תאריך_חיוב→תאריך for bank rows must
+    happen AFTER the cc-payment dedup, so the dedup can still identify
+    bank rows by .isna() and remove lump-sum card payments. Otherwise
+    a payment like 'ישראכרט חיוב' on the bank statement is kept
+    alongside the individual card charges, double-counting expenses."""
+    transactions = [
+        # Three individual CC charges
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -1000, "סכום_מוחלט": 1000, "תיאור": "store a", "קטגוריה": "מזון וצריכה", "חודש": "04/2026"},
+        {"תאריך": "2026-04-15", "תאריך_חיוב": "2026-05-15", "סכום": -2000, "סכום_מוחלט": 2000, "תיאור": "store b", "קטגוריה": "דלק, חשמל וגז", "חודש": "04/2026"},
+        {"תאריך": "2026-04-20", "תאריך_חיוב": "2026-05-15", "סכום": -3000, "סכום_מוחלט": 3000, "תיאור": "store c", "קטגוריה": "עיצוב הבית", "חודש": "04/2026"},
+        # Bank row: lump-sum credit-card payment (must be removed)
+        {"תאריך": "2026-05-15", "תאריך_חיוב": None, "סכום": -6000, "סכום_מוחלט": 6000, "תיאור": "ישראכרט חיוב", "קטגוריה": "שונות", "חודש": "05/2026"},
+        # Bank row: legitimate rent (must be kept)
+        {"תאריך": "2026-05-01", "תאריך_חיוב": None, "סכום": -3800, "סכום_מוחלט": 3800, "תיאור": "תשלום שיק", "קטגוריה": "שכר דירה", "חודש": "05/2026"},
+    ]
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # The cc-payment row must have been removed
+    assert body["cc_payments_removed"] == 1, f"expected dedup to remove 1, got {body}"
+    assert body["transaction_count"] == 4

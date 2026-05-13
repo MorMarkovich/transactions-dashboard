@@ -231,11 +231,6 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         result['חודש'] = result['תאריך'].dt.strftime('%m/%Y')
         result['יום_בשבוע'] = result['תאריך'].dt.dayofweek
         if 'תאריך_חיוב' in result.columns:
-            # Coalesce missing billing dates with transaction date so rows
-            # from bank statements (which have no separate billing cycle)
-            # still appear in billing-month views consistently with the
-            # rest of the dashboard.
-            result['תאריך_חיוב'] = result['תאריך_חיוב'].fillna(result['תאריך'])
             result['חודש_חיוב'] = result['תאריך_חיוב'].dt.strftime('%m/%Y')
     else:
         # יצירת DataFrame ריק עם העמודות הנדרשות
