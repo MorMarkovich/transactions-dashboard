@@ -674,7 +674,7 @@ async def get_session_info(sessionId: str = Query(...)):
         "total_income": total_income,
         "categories": categories,
         "months": months,
-        "has_billing_date": 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any(),
+        "has_billing_date": bool('תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any()),
     }
 
 
