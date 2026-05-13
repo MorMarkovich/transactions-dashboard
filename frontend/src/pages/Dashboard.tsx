@@ -620,17 +620,21 @@ export default function Dashboard() {
         >
           <CreditCard size={15} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>קיבוץ לפי:</span>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', overflow: 'hidden' }} dir="ltr">
             {(['transaction', 'billing'] as const).map((type) => (
               <button
                 key={type}
+                type="button"
                 onClick={() => setDateType(type)}
+                aria-pressed={dateType === type}
                 style={{
                   padding: '5px 14px',
                   fontSize: '0.8rem',
                   fontWeight: 600,
                   fontFamily: 'var(--font-family)',
                   border: 'none',
+                  outline: dateType === type ? '2px solid var(--accent-strong, var(--accent))' : 'none',
+                  outlineOffset: '-2px',
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   background: dateType === type ? 'var(--accent)' : 'transparent',
@@ -814,7 +818,15 @@ export default function Dashboard() {
                 {/* Top category — donut + ranked legend */}
                 {monthOverview.categories.length > 0 && (
                   <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>חלוקה לפי קטגוריה</div>
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--text-muted)',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      חלוקה לפי קטגוריה
+                    </div>
                     <DonutChart
                       data={monthOverview.categories
                         .filter((c) => c.expenses > 0)

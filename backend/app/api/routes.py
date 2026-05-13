@@ -522,7 +522,16 @@ async def get_transactions(
     spending_count = int(len(spending_df)) if not spending_df.empty else 0
     # Average per *spending* transaction — consistent with /api/metrics
     avg_transaction = _round_money(total_expenses / spending_count) if spending_count > 0 else 0
-    median_transaction = _round_money(float(spending_df['סכום_מוחלט'].median())) if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns else 0
+    # Median computed over the absolute-value column. Filter out
+    # micro-transactions (sub-₪1) because foreign-currency conversion
+    # fees / commission rows pull the median down to pennies. Insights
+    # and trend-stats endpoints don't have this problem because they
+    # don't include fee rows.
+    if not spending_df.empty and 'סכום_מוחלט' in spending_df.columns:
+        med_input = spending_df.loc[spending_df['סכום_מוחלט'] >= 1.0, 'סכום_מוחלט']
+        median_transaction = _round_money(float(med_input.median())) if not med_input.empty else 0
+    else:
+        median_transaction = 0
 
     # Max/min transactions — excludes transfers so "highest expense" isn't
     # an investment move or between-account transfer.
@@ -1463,7 +1472,10 @@ async def get_insights(
     large_transactions = [
         {
             "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
-            "תיאור": str(row['תיאור']),
+            # Prefer the canonical merchant name so the insights list shows
+            # "שכר דירה (משיכת שיק)" instead of the raw bank code like
+            # "משיכת שיק:0080000185". Falls back to תיאור for older sessions.
+            "תיאור": str(row.get('_canonical_merchant') or row['תיאור']),
             "קטגוריה": str(row['קטגוריה']),
             "סכום": _round_money(float(row['סכום'])),
             "סכום_מוחלט": _round_money(float(row['סכום_מוחלט'])),
@@ -1987,7 +1999,20 @@ async def get_spending_forecast(sessionId: str = Query(...)):
         if confidence == "high":
             confidence = "medium"
 
-    trend_direction = "up" if slope > 50 else ("down" if slope < -50 else "stable")
+    # Derive direction from the *forecast value* relative to the recent
+    # baseline, not the raw regression slope. The slope can be steeply
+    # positive while the clamped forecast actually falls below recent
+    # months (the user saw "₪2,946 next month · מגמת עלייה" when the
+    # current month was ₪4,253). Threshold: 5 % deviation either way.
+    recent_avg = float(np.mean(y_raw[-3:])) if len(y_raw) >= 1 else 0
+    if recent_avg <= 0:
+        trend_direction = "stable"
+    elif forecast > recent_avg * 1.05:
+        trend_direction = "up"
+    elif forecast < recent_avg * 0.95:
+        trend_direction = "down"
+    else:
+        trend_direction = "stable"
 
     return {
         "forecast_amount": _round_money(forecast),

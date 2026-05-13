@@ -286,7 +286,12 @@ export default function Transactions() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{stats.count.toLocaleString('he-IL')}</div>
-            <div className="stat-label">סה"כ עסקאות</div>
+            <div
+              className="stat-label"
+              title="כולל הוצאות, הכנסות, החזרים והעברות. בלוחות בקרה מוצג רק מספר ההוצאות (לרוב נמוך יותר)."
+            >
+              כל הרשומות בקובץ
+            </div>
           </div>
         </div>
         <div className="stat-card-compact glass-card">

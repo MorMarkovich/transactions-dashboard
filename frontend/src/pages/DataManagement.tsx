@@ -568,7 +568,7 @@ export default function DataManagement() {
           index={1}
           icon={<Wallet size={22} style={{ color: '#34d399' }} />}
           iconBg="rgba(16, 185, 129, 0.12)"
-          label="הכנסות שמורות"
+          label="הכנסות ידניות (Supabase)"
           value={formatNumber(incomes.length)}
         />
         <InfoCard
