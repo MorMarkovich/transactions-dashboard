@@ -494,6 +494,32 @@ async def test_cc_payment_dedup_works_when_bank_row_has_value_date(client):
 
 
 @pytest.mark.asyncio
+async def test_cc_payment_dedup_keeps_positive_isracard_salary(client):
+    """A positive bank income row can contain a credit-card company name.
+    It must not be removed as a duplicate card payment."""
+    transactions = [
+        # Individual CC charge keeps the mixed bank+CC restore path active.
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -100, "סכום_מוחלט": 100, "תיאור": "store a", "קטגוריה": "מזון וצריכה", "חודש": "04/2026", "חודש_חיוב": "05/2026", "_is_bank_row": False},
+        # Bank row: legitimate May income even though the description contains Isracard.
+        {"תאריך": "2026-04-30", "תאריך_חיוב": "2026-05-01", "סכום": 27081.70, "סכום_מוחלט": 27081.70, "תיאור": "ישראכרט מש משכורת", "קטגוריה": "הכנסה", "חודש": "04/2026", "חודש_חיוב": "05/2026", "_is_bank_row": True},
+        # Bank row: real lump-sum card payment should still be removed.
+        {"תאריך": "2026-05-03", "תאריך_חיוב": "2026-05-03", "סכום": -22156.23, "סכום_מוחלט": 22156.23, "תיאור": "ישראכרט חיוב", "קטגוריה": "שונות", "חודש": "05/2026", "חודש_חיוב": "05/2026", "_is_bank_row": True},
+    ]
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cc_payments_removed"] == 1, f"expected only the outbound card payment to be removed, got {body}"
+    assert body["transaction_count"] == 2
+
+    may = await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": body["session_id"], "month": "05/2026", "date_type": "billing"},
+    )
+    assert may.status_code == 200
+    assert may.json()["total_income"] == 27081.70, f"May salary was removed: {may.json()}"
+
+
+@pytest.mark.asyncio
 async def test_category_rules_override_keyword_categorization(client):
     """User-defined category rules must win over the keyword/AI categorizer."""
     # 'אל על' falls into 'טיסות ותיירות' via keyword match. The user has

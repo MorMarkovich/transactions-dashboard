@@ -99,7 +99,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
-  const [dateType, setDateType] = useState<'transaction' | 'billing'>('transaction')
+  const [dateType, setDateType] = useState<'transaction' | 'billing'>('billing')
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   // Bumping this forces every data-fetch effect to re-run; used after a
