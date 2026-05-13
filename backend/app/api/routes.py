@@ -131,8 +131,19 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=error_detail)
 
 
+class CategoryRule(BaseModel):
+    """User-defined override: any transaction whose merchant matches this
+    rule should be classified under `category` regardless of what the
+    keyword/AI categorizer produced."""
+    merchant: str
+    category: str
+
+
 class RestoreSessionRequest(BaseModel):
     transactions: list[Any]
+    # Optional user-defined merchant→category overrides. Applied AFTER
+    # the keyword/AI categorizer runs so they always win.
+    category_rules: list[CategoryRule] = []
 
     @field_validator('transactions', mode='before')
     @classmethod
@@ -141,11 +152,24 @@ class RestoreSessionRequest(BaseModel):
             return _json.loads(v)
         return v
 
+    @field_validator('category_rules', mode='before')
+    @classmethod
+    def parse_rules_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v or []
+
 
 class UpdateTransactionNoteRequest(BaseModel):
     session_id: str
     transaction_id: int
     notes: Optional[str] = None
+
+
+class UpdateTransactionCategoryRequest(BaseModel):
+    session_id: str
+    transaction_id: int
+    category: str
 
 
 @router.post("/restore-session")
@@ -227,6 +251,23 @@ async def restore_session(body: RestoreSessionRequest):
                     for local_i, cat in ai_map.items():
                         if 0 <= local_i < len(misc_idx):
                             df.at[misc_idx[local_i], 'קטגוריה'] = cat
+
+        # ── Apply user-defined category overrides ───────────────────
+        # The user can re-classify a transaction from the dashboard;
+        # the frontend persists each merchant→category rule to Supabase
+        # and passes the full list here on every restore. Rules run
+        # AFTER keyword + AI categorization so they always win, and
+        # they're matched on exact merchant string (we don't try fuzzy
+        # matching here — the dashboard saves the exact description it
+        # observed, and the same description will appear next month).
+        if body.category_rules and 'תיאור' in df.columns and 'קטגוריה' in df.columns:
+            rule_map = {r.merchant: r.category for r in body.category_rules if r.merchant and r.category}
+            if rule_map:
+                desc_str = df['תיאור'].astype(str)
+                for merchant, category in rule_map.items():
+                    mask = desc_str == merchant
+                    if mask.any():
+                        df.loc[mask, 'קטגוריה'] = category
 
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
@@ -340,6 +381,36 @@ async def update_transaction_note(body: UpdateTransactionNoteRequest):
     sessions[body.session_id] = df
 
     return {"success": True}
+
+
+@router.post("/transactions/category")
+async def update_transaction_category(body: UpdateTransactionCategoryRequest):
+    """Reclassify a single transaction's category. Used by the dashboard's
+    'edit category' UI; the merchant→category mapping is persisted to
+    Supabase separately by the frontend so future uploads pick it up via
+    the category_rules field on /restore-session."""
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[body.session_id]
+    if 'id' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not support transaction updates")
+
+    new_category = (body.category or '').strip()
+    if not new_category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+
+    mask = df['id'] == body.transaction_id
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    df.loc[mask, 'קטגוריה'] = new_category
+    sessions[body.session_id] = df
+
+    # Tell the caller what the row's description is, so the frontend can
+    # save a merchant→category rule without a separate round-trip.
+    merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
+    return {"success": True, "merchant": merchant, "category": new_category}
 
 
 @router.get("/transactions")

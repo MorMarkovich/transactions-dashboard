@@ -42,11 +42,17 @@ const api = axios.create({
 
 export const transactionsApi = {
   /**
-   * Restore a backend session from saved transaction JSON data
+   * Restore a backend session from saved transaction JSON data.
+   * Optionally pass user-defined merchant→category rules; the backend
+   * applies them after auto-categorization so they always win.
    */
-  restoreSession: async (transactions: unknown[]): Promise<FileUploadResponse> => {
+  restoreSession: async (
+    transactions: unknown[],
+    categoryRules: { merchant: string; category: string }[] = [],
+  ): Promise<FileUploadResponse> => {
     const response = await api.post<FileUploadResponse>('/api/restore-session', {
       transactions,
+      category_rules: categoryRules,
     });
     return response.data;
   },
@@ -141,6 +147,26 @@ export const transactionsApi = {
       transaction_id: transactionId,
       notes,
     });
+    return response.data;
+  },
+
+  /**
+   * Reclassify a transaction's קטגוריה. Returns the merchant string so
+   * the caller can persist a merchant→category rule.
+   */
+  updateTransactionCategory: async (
+    sessionId: string,
+    transactionId: number,
+    category: string,
+  ): Promise<{ success: boolean; merchant: string | null; category: string }> => {
+    const response = await api.post<{ success: boolean; merchant: string | null; category: string }>(
+      '/api/transactions/category',
+      {
+        session_id: sessionId,
+        transaction_id: transactionId,
+        category,
+      },
+    );
     return response.data;
   },
 

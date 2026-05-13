@@ -491,3 +491,47 @@ async def test_cc_payment_dedup_works_when_bank_row_has_value_date(client):
     body = resp.json()
     assert body["cc_payments_removed"] == 1, f"expected dedup to remove the 'ישראכרט חיוב' row, got {body}"
     assert body["transaction_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_category_rules_override_keyword_categorization(client):
+    """User-defined category rules must win over the keyword/AI categorizer."""
+    # 'אל על' falls into 'טיסות ותיירות' via keyword match. The user has
+    # overridden it to 'שונות' via the dashboard's edit-category UI.
+    transactions = [
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "אל על נתיבי אויר", "קטגוריה": "טיסות ותיירות", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+    ]
+    rules = [{"merchant": "אל על נתיבי אויר", "category": "שונות"}]
+    resp = await client.post(
+        "/api/restore-session",
+        json={"transactions": transactions, "category_rules": rules},
+    )
+    assert resp.status_code == 200, resp.text
+    sid = resp.json()["session_id"]
+    snap = await client.get(
+        "/api/charts/v2/category-snapshot",
+        params={"sessionId": sid, "month_from": "05/2026", "month_to": "05/2026", "date_type": "billing"},
+    )
+    body = snap.json()
+    cats = {c["name"] for c in body["categories"]}
+    assert "שונות" in cats, f"expected user rule to win, got {cats}"
+    assert "טיסות ותיירות" not in cats, f"keyword category should have been overridden, got {cats}"
+
+
+@pytest.mark.asyncio
+async def test_update_transaction_category_endpoint(client):
+    """POST /api/transactions/category reassigns a row's קטגוריה."""
+    transactions = [
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "GETT", "קטגוריה": "תחבורה ורכבים", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+    ]
+    sid = (await client.post("/api/restore-session", json={"transactions": transactions})).json()["session_id"]
+    # The restored row gets id=0 (assigned by restore-session)
+    resp = await client.post(
+        "/api/transactions/category",
+        json={"session_id": sid, "transaction_id": 0, "category": "שונות"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["merchant"] == "GETT"
+    assert body["category"] == "שונות"
