@@ -11,3 +11,5 @@ services:
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
