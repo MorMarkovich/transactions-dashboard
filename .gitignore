@@ -25,9 +25,6 @@ sample_data/
 *.xls
 *.csv
 
-# Streamlit
-.streamlit/secrets.toml
-
 # Cursor
 .cursor/
 
