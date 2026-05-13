@@ -91,6 +91,14 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # לא מבצעים המרה בדוחות עו"ש (זכות/חובה) כי הסימן כבר נכון
     is_bank_statement = 'זכות/חובה' in str(amount_col)
 
+    # A billing-date column is the strongest possible signal that this is
+    # a credit-card file — bank statements (עו"ש) do not have one. When
+    # it's present, skip the weaker heuristics below (salary keywords,
+    # mixed-sign distribution), which can misidentify a CC file that
+    # happens to contain a couple of refund rows and would then leave
+    # every expense row with the wrong sign.
+    is_credit_card_file = bool(billing_date_col and billing_date_col in result.columns)
+
     # Also detect bank statements by presence of known income keywords
     # (salary, etc.) that should stay positive.  If we see them it means
     # the file already has correct signs.
@@ -101,7 +109,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         'הפקדת שכר', 'תשלום שכר', 'שכר חודש',
         'קצבת ילדים', 'מענק עבודה', 'דמי לידה',
     ]
-    if not is_bank_statement and desc_col in result.columns:
+    if not is_bank_statement and not is_credit_card_file and desc_col in result.columns:
         _desc_check = result[desc_col].astype(str).str.lower()
         _has_income_rows = _desc_check.str.contains(
             '|'.join(_income_keywords), na=False,
@@ -116,7 +124,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # positive (credits like salary, refunds).  Use a low threshold
     # (3%) because a bank statement may have very few income rows
     # (e.g. 2 salaries out of 80 transactions = 2.5%).
-    if not is_bank_statement:
+    if not is_bank_statement and not is_credit_card_file:
         _nz = result['סכום'][result['סכום'] != 0]
         if len(_nz) > 0:
             _pos_r = (_nz > 0).sum() / len(_nz)
