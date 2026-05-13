@@ -149,7 +149,10 @@ export default function Sidebar({
 
       if (allTransactions.length > 0) {
         setUploadStatus('ממזג נתונים...')
-        const merged = await transactionsApi.restoreSession(allTransactions)
+        // Load user-defined category rules so freshly merged data picks
+        // them up immediately (no need to wait for a page reload).
+        const rules = user ? await supabaseApi.getCategoryRules(user.id).catch(() => []) : []
+        const merged = await transactionsApi.restoreSession(allTransactions, rules)
         if (merged.success && merged.session_id) {
           const removedParts: string[] = []
           if (merged.duplicates_removed && merged.duplicates_removed > 0) {

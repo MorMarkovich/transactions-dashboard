@@ -248,6 +248,15 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     if 'הערות' not in result.columns:
         result['הערות'] = None
 
+    # Mark whether this batch was processed as a bank statement. We used to
+    # identify bank rows downstream by checking תאריך_חיוב.isna(), but once
+    # we started mapping יום ערך → תאריך_חיוב for bank files that signal
+    # vanished. This explicit marker survives concat + Supabase round-trip
+    # so restore-session can still pick lump-sum credit-card payments out
+    # of bank rows for deduplication.
+    if not result.empty:
+        result['_is_bank_row'] = bool(is_bank_statement)
+
     # Stable row identifier for per-transaction updates from the UI
     if not result.empty:
         result['id'] = result.index.astype(int)

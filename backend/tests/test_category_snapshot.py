@@ -430,3 +430,108 @@ async def test_cc_payment_dedup_still_runs_after_billing_date_backfill(client):
     # The cc-payment row must have been removed
     assert body["cc_payments_removed"] == 1, f"expected dedup to remove 1, got {body}"
     assert body["transaction_count"] == 4
+
+
+@pytest.mark.asyncio
+async def test_bank_value_date_used_as_billing_date(client):
+    """Regression: a bank-statement row with תאריך=30/04 but יום ערך=01/05
+    must be assigned billing month 05/2026, not 04/2026. (Salary deposited on
+    Apr-30 with May-01 value date is real May income, not April income.)
+    """
+    transactions = [
+        {
+            "תאריך": "2026-04-30",
+            "תאריך_חיוב": "2026-05-01",   # came from יום ערך at upload time
+            "סכום": 27081.70,
+            "סכום_מוחלט": 27081.70,
+            "תיאור": "ישראכרט מש משכורת",
+            "קטגוריה": "הכנסה",
+            "חודש": "04/2026",
+            "חודש_חיוב": "05/2026",
+        },
+    ]
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200
+    sid = resp.json()["session_id"]
+
+    # By billing date, this income belongs to May 2026, not April.
+    may = await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": sid, "month": "05/2026", "date_type": "billing"},
+    )
+    apr = await client.get(
+        "/api/charts/v2/month-overview",
+        params={"sessionId": sid, "month": "04/2026", "date_type": "billing"},
+    )
+    assert may.json()["total_income"] == 27081.70, f"May income missing: {may.json()}"
+    assert apr.json()["total_income"] == 0, f"April income should be empty: {apr.json()}"
+
+
+@pytest.mark.asyncio
+async def test_cc_payment_dedup_works_when_bank_row_has_value_date(client):
+    """Regression for Codex P1 on PR #64: once a bank row gets its
+    value date populated as תאריך_חיוב, the previous isna() heuristic
+    can't tell it apart from a CC row. The new _is_bank_row marker
+    must still let restore-session strip the lump-sum 'ישראכרט חיוב'
+    bank-side payment when the corresponding individual CC charges
+    are imported from the CC file."""
+    transactions = [
+        # Individual CC charges (cc file)
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -1000, "סכום_מוחלט": 1000, "תיאור": "store a", "קטגוריה": "מזון וצריכה", "חודש": "04/2026", "חודש_חיוב": "05/2026", "_is_bank_row": False},
+        {"תאריך": "2026-04-15", "תאריך_חיוב": "2026-05-15", "סכום": -2000, "סכום_מוחלט": 2000, "תיאור": "store b", "קטגוריה": "דלק, חשמל וגז", "חודש": "04/2026", "חודש_חיוב": "05/2026", "_is_bank_row": False},
+        # Bank row: lump-sum payment to Isracard — תאריך_חיוב is now
+        # populated from יום ערך (the value-date fix), but the marker
+        # column still tells us this is a bank row.
+        {"תאריך": "2026-05-15", "תאריך_חיוב": "2026-05-16", "סכום": -3000, "סכום_מוחלט": 3000, "תיאור": "ישראכרט חיוב", "קטגוריה": "שונות", "חודש": "05/2026", "חודש_חיוב": "05/2026", "_is_bank_row": True},
+        # Bank row: legitimate rent
+        {"תאריך": "2026-05-01", "תאריך_חיוב": "2026-05-01", "סכום": -3800, "סכום_מוחלט": 3800, "תיאור": "תשלום שיק", "קטגוריה": "שכר דירה", "חודש": "05/2026", "חודש_חיוב": "05/2026", "_is_bank_row": True},
+    ]
+    resp = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["cc_payments_removed"] == 1, f"expected dedup to remove the 'ישראכרט חיוב' row, got {body}"
+    assert body["transaction_count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_category_rules_override_keyword_categorization(client):
+    """User-defined category rules must win over the keyword/AI categorizer."""
+    # 'אל על' falls into 'טיסות ותיירות' via keyword match. The user has
+    # overridden it to 'שונות' via the dashboard's edit-category UI.
+    transactions = [
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "אל על נתיבי אויר", "קטגוריה": "טיסות ותיירות", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+    ]
+    rules = [{"merchant": "אל על נתיבי אויר", "category": "שונות"}]
+    resp = await client.post(
+        "/api/restore-session",
+        json={"transactions": transactions, "category_rules": rules},
+    )
+    assert resp.status_code == 200, resp.text
+    sid = resp.json()["session_id"]
+    snap = await client.get(
+        "/api/charts/v2/category-snapshot",
+        params={"sessionId": sid, "month_from": "05/2026", "month_to": "05/2026", "date_type": "billing"},
+    )
+    body = snap.json()
+    cats = {c["name"] for c in body["categories"]}
+    assert "שונות" in cats, f"expected user rule to win, got {cats}"
+    assert "טיסות ותיירות" not in cats, f"keyword category should have been overridden, got {cats}"
+
+
+@pytest.mark.asyncio
+async def test_update_transaction_category_endpoint(client):
+    """POST /api/transactions/category reassigns a row's קטגוריה."""
+    transactions = [
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "GETT", "קטגוריה": "תחבורה ורכבים", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+    ]
+    sid = (await client.post("/api/restore-session", json={"transactions": transactions})).json()["session_id"]
+    # The restored row gets id=0 (assigned by restore-session)
+    resp = await client.post(
+        "/api/transactions/category",
+        json={"session_id": sid, "transaction_id": 0, "category": "שונות"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["merchant"] == "GETT"
+    assert body["category"] == "שונות"

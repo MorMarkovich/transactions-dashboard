@@ -92,6 +92,54 @@ export const supabaseApi = {
     return transactions.length > 0 ? transactions : null;
   },
 
+  // ─── Category Rules (user-edited categories) ──────────────────────────
+
+  /**
+   * Load every merchant→category override the user has saved. Applied
+   * server-side on /restore-session so they win over the keyword/AI
+   * categorizer.
+   */
+  getCategoryRules: async (userId: string): Promise<{ merchant: string; category: string }[]> => {
+    const { data, error } = await supabase
+      .from('user_category_rules')
+      .select('merchant, category')
+      .eq('user_id', userId);
+    if (error) {
+      // Table may not exist yet on older deployments — degrade gracefully.
+      // eslint-disable-next-line no-console
+      console.warn('getCategoryRules failed:', error.message);
+      return [];
+    }
+    return data || [];
+  },
+
+  /**
+   * Upsert one rule. Called when the user manually changes a transaction's
+   * category in the dashboard.
+   */
+  upsertCategoryRule: async (
+    userId: string,
+    merchant: string,
+    category: string,
+  ): Promise<void> => {
+    const { error } = await supabase
+      .from('user_category_rules')
+      .upsert(
+        { user_id: userId, merchant, category, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,merchant' },
+      );
+    if (error) throw error;
+  },
+
+  deleteCategoryRule: async (userId: string, merchant: string): Promise<void> => {
+    const { error } = await supabase
+      .from('user_category_rules')
+      .delete()
+      .eq('user_id', userId)
+      .eq('merchant', merchant);
+    if (error) throw error;
+  },
+
   // ─── Data Management ──────────────────────────────────────────────────
 
   deleteAllTransactions: async (userId: string): Promise<void> => {

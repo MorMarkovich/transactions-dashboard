@@ -61,7 +61,7 @@ async def upload_file(file: UploadFile = File(...)):
         amount_col = detect_amount_column(df_clean)
         desc_col = find_column(df_clean, ['שם בית העסק', 'שם בית עסק', 'תיאור', 'תיאור התנועה', 'description', 'merchant'])
         cat_col = find_column(df_clean, ['קטגוריה', 'category', 'Category'])
-        billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:'])
+        billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:', 'יום ערך'])
 
         if not date_col or not amount_col or not desc_col:
             # Clean up before raising error
@@ -131,8 +131,19 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=error_detail)
 
 
+class CategoryRule(BaseModel):
+    """User-defined override: any transaction whose merchant matches this
+    rule should be classified under `category` regardless of what the
+    keyword/AI categorizer produced."""
+    merchant: str
+    category: str
+
+
 class RestoreSessionRequest(BaseModel):
     transactions: list[Any]
+    # Optional user-defined merchant→category overrides. Applied AFTER
+    # the keyword/AI categorizer runs so they always win.
+    category_rules: list[CategoryRule] = []
 
     @field_validator('transactions', mode='before')
     @classmethod
@@ -141,11 +152,24 @@ class RestoreSessionRequest(BaseModel):
             return _json.loads(v)
         return v
 
+    @field_validator('category_rules', mode='before')
+    @classmethod
+    def parse_rules_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v or []
+
 
 class UpdateTransactionNoteRequest(BaseModel):
     session_id: str
     transaction_id: int
     notes: Optional[str] = None
+
+
+class UpdateTransactionCategoryRequest(BaseModel):
+    session_id: str
+    transaction_id: int
+    category: str
 
 
 @router.post("/restore-session")
@@ -228,6 +252,23 @@ async def restore_session(body: RestoreSessionRequest):
                         if 0 <= local_i < len(misc_idx):
                             df.at[misc_idx[local_i], 'קטגוריה'] = cat
 
+        # ── Apply user-defined category overrides ───────────────────
+        # The user can re-classify a transaction from the dashboard;
+        # the frontend persists each merchant→category rule to Supabase
+        # and passes the full list here on every restore. Rules run
+        # AFTER keyword + AI categorization so they always win, and
+        # they're matched on exact merchant string (we don't try fuzzy
+        # matching here — the dashboard saves the exact description it
+        # observed, and the same description will appear next month).
+        if body.category_rules and 'תיאור' in df.columns and 'קטגוריה' in df.columns:
+            rule_map = {r.merchant: r.category for r in body.category_rules if r.merchant and r.category}
+            if rule_map:
+                desc_str = df['תיאור'].astype(str)
+                for merchant, category in rule_map.items():
+                    mask = desc_str == merchant
+                    if mask.any():
+                        df.loc[mask, 'קטגוריה'] = category
+
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
         # the bank file contains a lump-sum payment to the card company
@@ -237,16 +278,24 @@ async def restore_session(body: RestoreSessionRequest):
         has_billing_date = 'תאריך_חיוב' in df.columns
         has_desc = 'תיאור' in df.columns
         if has_billing_date and has_desc:
-            # Rows from credit-card files have a valid billing date;
-            # rows from bank statements have NaT.
-            has_cc_rows = df['תאריך_חיוב'].notna().any()
-            has_bank_rows = df['תאריך_חיוב'].isna().any()
+            # Identify bank-statement rows. Newer uploads carry an explicit
+            # _is_bank_row marker that survives concat + Supabase round-trip.
+            # Older uploads (saved before that marker was added) fall back
+            # to the legacy heuristic: bank rows had NaT for תאריך_חיוב.
+            if '_is_bank_row' in df.columns:
+                is_bank_row = df['_is_bank_row'].fillna(False).astype(bool)
+            else:
+                is_bank_row = df['תאריך_חיוב'].isna()
+
+            has_cc_rows = (~is_bank_row).any()
+            has_bank_rows = is_bank_row.any()
 
             if has_cc_rows and has_bank_rows:
-                # Among bank-statement rows (NaT billing date), drop those
-                # whose description matches a credit-card company name.
+                # Among bank-statement rows, drop those whose description
+                # matches a credit-card company name — those are the lump-sum
+                # monthly payments to the card, and the individual charges
+                # are already in the CC file.
                 desc_lower = df['תיאור'].str.lower()
-                is_bank_row = df['תאריך_חיוב'].isna()
                 is_cc_payment = desc_lower.str.contains(
                     '|'.join(CREDIT_CARD_PAYMENT_KEYWORDS),
                     na=False,
@@ -256,15 +305,12 @@ async def restore_session(body: RestoreSessionRequest):
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
 
-        # ── Backfill billing date for bank-statement rows ──
-        # Bank-statement rows have no billing date (תאריך_חיוב = NaT). When
-        # the user views the dashboard "by billing month", those rows would
-        # otherwise be excluded from month-filtered widgets (month-overview,
-        # category-snapshot, monthly chart, etc.), producing inconsistent
-        # totals between widgets. Coalesce billing date with transaction
-        # date so bank rows show up in the same month regardless of which
-        # date toggle the user picks. Must run AFTER the cc-payment dedup
-        # above, which relies on תאריך_חיוב.isna() to identify bank rows.
+        # ── Backfill billing date for legacy bank rows ──
+        # Pre-value-date-fix bank uploads still have תאריך_חיוב = NaT.
+        # Coalesce them with תאריך so all rows show up consistently in
+        # billing-date views. Must run AFTER the cc-payment dedup above
+        # (which can no longer rely on isna() but still uses the explicit
+        # marker for new uploads).
         if 'תאריך_חיוב' in df.columns and 'תאריך' in df.columns:
             df['תאריך_חיוב'] = df['תאריך_חיוב'].fillna(df['תאריך'])
             df['חודש_חיוב'] = df['תאריך_חיוב'].dt.strftime('%m/%Y')
@@ -335,6 +381,36 @@ async def update_transaction_note(body: UpdateTransactionNoteRequest):
     sessions[body.session_id] = df
 
     return {"success": True}
+
+
+@router.post("/transactions/category")
+async def update_transaction_category(body: UpdateTransactionCategoryRequest):
+    """Reclassify a single transaction's category. Used by the dashboard's
+    'edit category' UI; the merchant→category mapping is persisted to
+    Supabase separately by the frontend so future uploads pick it up via
+    the category_rules field on /restore-session."""
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[body.session_id]
+    if 'id' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not support transaction updates")
+
+    new_category = (body.category or '').strip()
+    if not new_category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+
+    mask = df['id'] == body.transaction_id
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    df.loc[mask, 'קטגוריה'] = new_category
+    sessions[body.session_id] = df
+
+    # Tell the caller what the row's description is, so the frontend can
+    # save a merchant→category rule without a separate round-trip.
+    merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
+    return {"success": True, "merchant": merchant, "category": new_category}
 
 
 @router.get("/transactions")
