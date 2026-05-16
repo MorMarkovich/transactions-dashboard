@@ -53,6 +53,7 @@ function IncomeSkeleton() {
   return (
     <div style={{ direction: 'rtl' }}>
       <div
+        className="responsive-grid-2"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -332,6 +333,7 @@ export default function Income() {
 
       {/* ─── 2-column layout ────────────────────────────────────────── */}
       <div
+        className="responsive-grid-2"
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',

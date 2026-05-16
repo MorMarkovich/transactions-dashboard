@@ -155,6 +155,7 @@ function InsightsSkeleton() {
       />
       {/* Skeleton cards grid */}
       <div
+        className="responsive-grid-3"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -266,6 +267,7 @@ export default function Insights() {
 
       {/* ─── Insight cards 3-column grid ──────────────────────────────── */}
       <div
+        className="responsive-grid-3"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -331,6 +333,7 @@ export default function Insights() {
             <span>תובנות נוספות</span>
           </div>
           <div
+            className="responsive-grid-3"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',

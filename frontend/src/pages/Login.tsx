@@ -140,7 +140,7 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-screen flex items-center justify-center px-4 py-6"
       style={{ background: 'var(--bg-primary)', direction: 'rtl' }}
     >
       {/* Background gradient orbs */}
@@ -216,7 +216,7 @@ export default function Login() {
 
         {/* ─── Left side: Form Card ──────────────────────────────────── */}
         <div
-          className="rounded-3xl p-8 md:p-10 order-1"
+          className="rounded-3xl p-6 sm:p-8 md:p-10 order-1"
           style={{
             background: 'var(--bg-card)',
             backdropFilter: 'blur(20px)',
@@ -225,7 +225,7 @@ export default function Login() {
           }}
         >
           {/* Mobile logo (visible only on small screens) */}
-          <div className="md:hidden flex items-center gap-3 mb-8">
+          <div className="md:hidden flex items-center gap-3 mb-6">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #818cf8, #6d28d9)' }}
@@ -233,7 +233,7 @@ export default function Login() {
               <CreditCard className="w-5 h-5 text-white" />
             </div>
             <span
-              className="text-xl font-extrabold"
+              className="text-lg sm:text-xl font-extrabold"
               style={{ color: 'var(--text-primary)' }}
             >
               {'\u05DE\u05E0\u05EA\u05D7 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA'}
@@ -379,7 +379,7 @@ export default function Login() {
                       aria-invalid={!!error || undefined}
                       autoComplete="email"
                     />
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Input
                         type="password"
                         placeholder={'\u05E1\u05D9\u05E1\u05DE\u05D4'}

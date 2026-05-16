@@ -65,6 +65,13 @@
   }
 }
 
+@media (max-width: 420px) {
+  .main-content {
+    padding: var(--space-sm);
+    padding-bottom: 84px;
+  }
+}
+
 /* ========== Desktop >= 1024px ========== */
 @media (min-width: 1024px) {
   .main-content {

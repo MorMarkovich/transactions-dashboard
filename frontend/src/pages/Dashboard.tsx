@@ -206,9 +206,14 @@ export default function Dashboard() {
     style.id = STYLE_ID
     style.textContent = `
       @media (max-width: 768px) {
-        .dashboard-premium-row { grid-template-columns: 1fr !important; }
-        .dashboard-monthly-comparison { grid-template-columns: repeat(3, 1fr) !important; }
-        .month-overview-grid { grid-template-columns: 1fr !important; }
+        .dashboard-premium-row,
+        .dashboard-weekly-row,
+        .dashboard-category-grid,
+        .month-overview-grid { grid-template-columns: minmax(0, 1fr) !important; }
+        .dashboard-monthly-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      }
+      @media (max-width: 420px) {
+        .dashboard-monthly-comparison { grid-template-columns: minmax(0, 1fr) !important; }
       }
     `
     document.head.appendChild(style)
@@ -481,7 +486,7 @@ export default function Dashboard() {
           title={'ברוכים הבאים לדאשבורד!'}
           text={'העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח'}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
+        <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
           <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים וחכמים לתובנות מיידיות</div></div>
           <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי אוטומטי של קטגוריות מהקובץ המקורי</div></div>
           <div className="feature-card"><div className="feature-icon">📑</div><div className="feature-title">תמיכה מלאה</div><div className="feature-desc">Excel עם מספר גליונות, CSV בעברית מלאה</div></div>
@@ -744,7 +749,7 @@ export default function Dashboard() {
           ) : monthOverview && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
               gap: 'var(--space-md)',
             }}
               className="month-overview-grid"
@@ -1076,9 +1081,9 @@ export default function Dashboard() {
           </div>
 
           {/* ─── Category cards grid ─── */}
-          <div style={{
+          <div className="dashboard-category-grid" style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
             gap: 'var(--space-sm)',
           }}>
             {(snapshotExpanded ? sortedSnapshotCategories : sortedSnapshotCategories.slice(0, 8)).map((cat) => {
@@ -1419,6 +1424,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
+          className="dashboard-weekly-row"
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginTop: 'var(--space-lg)', marginBottom: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
           <div className="glass-card" style={{ padding: '18px 22px' }}>
@@ -1501,7 +1507,7 @@ export default function Dashboard() {
                 <Zap size={18} />
                 <span>קצב הוצאות</span>
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יומי</div>
                   <AnimatedNumber value={velocity.daily_avg} formatter={formatCurrency} style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }} />

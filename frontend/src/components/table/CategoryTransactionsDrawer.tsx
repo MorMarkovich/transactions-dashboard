@@ -120,6 +120,7 @@ export default function CategoryTransactionsDrawer({
 
           {/* Drawer */}
           <motion.div
+            className="category-transactions-drawer"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
@@ -267,6 +268,7 @@ export default function CategoryTransactionsDrawer({
                         }}
                       >
                         <div
+                          className="category-transaction-main"
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -309,7 +311,7 @@ export default function CategoryTransactionsDrawer({
                               </span>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <div className="category-transaction-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                             <span
                               style={{
                                 fontSize: '0.8125rem',
@@ -323,6 +325,7 @@ export default function CategoryTransactionsDrawer({
                             </span>
                             {canEdit && (
                               <button
+                                className="category-change-btn"
                                 onClick={() => setEditingId(isEditing ? null : tx.id ?? null)}
                                 aria-label={isEditing ? 'בטל עריכה' : 'ערוך קטגוריה'}
                                 disabled={isSaving}
