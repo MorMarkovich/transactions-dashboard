@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -100,6 +101,8 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   height = 260,
   color = '#818cf8',
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!data.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
@@ -108,13 +111,20 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
     )
   }
 
-  const needsRotation = data.length > 5
+  const needsRotation = data.length > (isCompact ? 3 : 5)
+  const chartHeight = isCompact ? Math.max(220, Math.min(height, 260)) : height
+  const labelLimit = isCompact ? 9 : 14
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <RechartsBarChart
         data={data}
-        margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 40 : 8 }}
+        margin={{
+          top: 8,
+          right: isCompact ? 0 : 8,
+          left: isCompact ? 0 : 4,
+          bottom: needsRotation ? (isCompact ? 34 : 40) : 8,
+        }}
       >
         <BarGradient color={color} />
 
@@ -128,15 +138,15 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           dataKey="label"
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: needsRotation ? 11 : 12,
+            fontSize: isCompact ? 10 : (needsRotation ? 11 : 12),
             fontFamily: 'var(--font-family)',
           }}
-          tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 12) + '…' : v}
+          tickFormatter={(v: string) => v.length > labelLimit ? v.slice(0, labelLimit - 2) + '…' : v}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
           angle={needsRotation ? -35 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
-          height={needsRotation ? 70 : 30}
+          height={needsRotation ? (isCompact ? 58 : 70) : 30}
           interval={0}
         />
 
@@ -144,12 +154,12 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
           axisLine={false}
-          width={56}
+          width={isCompact ? 44 : 56}
           orientation="right"
         />
 
@@ -162,7 +172,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           dataKey="value"
           fill={`url(#${GRADIENT_ID})`}
           radius={[4, 4, 0, 0]}
-          maxBarSize={48}
+          maxBarSize={isCompact ? 34 : 48}
           animationDuration={0}
         />
       </RechartsBarChart>

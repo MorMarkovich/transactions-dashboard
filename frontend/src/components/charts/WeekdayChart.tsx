@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -96,6 +97,8 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
   data,
   height = 230,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!data.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
@@ -103,12 +106,18 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
       </div>
     )
   }
+  const chartHeight = isCompact ? Math.max(210, Math.min(height, 240)) : height
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
         data={data}
-        margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+        margin={{
+          top: 8,
+          right: isCompact ? 0 : 8,
+          left: isCompact ? 0 : 4,
+          bottom: 8,
+        }}
       >
         <WeekdayGradient />
 
@@ -122,7 +131,7 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
           dataKey="day"
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 13,
+            fontSize: isCompact ? 10 : 13,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
@@ -134,12 +143,12 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
           axisLine={false}
-          width={56}
+          width={isCompact ? 44 : 56}
           orientation="right"
         />
 
@@ -152,7 +161,7 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
           dataKey="amount"
           fill={`url(#${GRADIENT_ID})`}
           radius={[4, 4, 0, 0]}
-          maxBarSize={44}
+          maxBarSize={isCompact ? 30 : 44}
           animationDuration={0}
         />
       </BarChart>

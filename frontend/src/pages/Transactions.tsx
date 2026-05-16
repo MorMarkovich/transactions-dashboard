@@ -380,7 +380,7 @@ export default function Transactions() {
             <span>פירוט לפי קטגוריה</span>
           </div>
           <div className="glass-card" style={{ padding: '16px', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+            <table className="mobile-stack-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                   <th style={catThStyle}>קטגוריה</th>
@@ -393,20 +393,20 @@ export default function Transactions() {
               <tbody>
                 {categoryBreakdown.map((cat, idx) => (
                   <tr key={cat.name} style={{ borderBottom: idx < categoryBreakdown.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                    <td style={catTdStyle}>
+                    <td data-label="קטגוריה" style={catTdStyle}>
                       <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
                       {cat.name}
                     </td>
-                    <td style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                    <td data-label="עסקאות" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
                       {formatNumber(cat.count)}
                     </td>
-                    <td style={{ ...catTdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--danger)', direction: 'ltr', textAlign: 'center' }}>
+                    <td data-label={'סה"כ'} style={{ ...catTdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--danger)', direction: 'ltr', textAlign: 'center' }}>
                       {formatCurrency(cat.total)}
                     </td>
-                    <td style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                    <td data-label="אחוז" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
                       {formatPercent(cat.percent)}
                     </td>
-                    <td style={catTdStyle}>
+                    <td data-label="חלק יחסי" style={catTdStyle}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden' }}>
                           <div style={{

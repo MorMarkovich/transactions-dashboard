@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -127,6 +128,8 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   height = 300,
   color = '#818cf8',
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!data.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
@@ -136,10 +139,10 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
       <AreaChart
         data={data}
-        margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+        margin={isCompact ? { top: 8, right: 0, left: 0, bottom: 4 } : { top: 8, right: 8, left: 4, bottom: 8 }}
       >
         <AreaGradient color={color} />
 
@@ -154,24 +157,24 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
           tickFormatter={formatDateLabel}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
-          interval="preserveStartEnd"
+          interval={isCompact ? 'preserveStartEnd' : 'preserveStartEnd'}
         />
 
         <YAxis
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
           axisLine={false}
-          width={56}
+          width={isCompact ? 42 : 56}
           orientation="right"
         />
 

@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { IndustryMonthlyData } from '../../services/types'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 interface IndustryMonthlyChartProps {
   data: IndustryMonthlyData
@@ -89,6 +90,8 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
   data,
   height = 320,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!data.months.length || !data.series.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
@@ -107,6 +110,44 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
   })
 
   const needsRotation = data.months.length > 6
+
+  if (isCompact) {
+    const monthTotals = data.months.map((month, idx) => {
+      const values = data.series
+        .map((series) => ({ name: series.name, value: series.data[idx] ?? 0 }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+      const total = values.reduce((sum, item) => sum + item.value, 0)
+      return { month, total, values: values.slice(0, 3) }
+    })
+    const maxTotal = Math.max(...monthTotals.map((item) => item.total), 1)
+
+    return (
+      <div className="mobile-chart-list">
+        {monthTotals.map((item) => (
+          <div key={item.month} className="mobile-chart-row">
+            <div className="mobile-chart-row-header">
+              <span className="mobile-chart-row-title">{item.month}</span>
+              <span className="mobile-chart-row-value">₪{Math.round(item.total).toLocaleString('he-IL')}</span>
+            </div>
+            <div className="mobile-chart-bar-track">
+              <div
+                className="mobile-chart-bar-fill"
+                style={{ width: `${Math.max((item.total / maxTotal) * 100, 4)}%` }}
+              />
+            </div>
+            <div className="mobile-chart-tags">
+              {item.values.map((entry) => (
+                <span key={entry.name} className="mobile-chart-tag">
+                  {entry.name}: ₪{Math.round(entry.value).toLocaleString('he-IL')}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <ResponsiveContainer width="100%" height={height}>

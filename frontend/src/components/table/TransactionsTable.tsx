@@ -74,6 +74,64 @@ const TableRow = memo(function TableRow({
   )
 })
 
+const MobileTransactionCard = memo(function MobileTransactionCard({
+  tx,
+  onClick,
+  showBillingDate,
+}: {
+  tx: Transaction
+  onClick?: (tx: Transaction) => void
+  showBillingDate?: boolean
+}) {
+  const amount = tx.סכום
+  const isPositive = amount > 0
+
+  return (
+    <button
+      type="button"
+      className="transaction-mobile-card"
+      onClick={() => onClick?.(tx)}
+      aria-disabled={!onClick}
+      tabIndex={onClick ? 0 : -1}
+    >
+      <div className="transaction-mobile-main">
+        <div className="transaction-mobile-title-row">
+          <span className="transaction-mobile-title">{tx.תיאור}</span>
+          <span
+            className="transaction-mobile-amount"
+            style={{ color: isPositive ? 'var(--success)' : 'var(--danger)' }}
+          >
+            {formatCurrency(amount)}
+          </span>
+        </div>
+        <div className="transaction-mobile-meta">
+          <span>{formatDate(tx.תאריך)}</span>
+          {showBillingDate && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                {tx.תאריך_חיוב ? formatDate(tx.תאריך_חיוב) : 'תאריך חיוב לא זמין'}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="transaction-mobile-footer">
+        <span className="transaction-mobile-category">
+          <span aria-hidden="true">{get_icon(tx.קטגוריה)}</span>
+          {tx.קטגוריה}
+        </span>
+        {tx.הערות && (
+          <span className="transaction-mobile-notes" title={tx.הערות}>
+            הערות
+          </span>
+        )}
+      </div>
+    </button>
+  )
+})
+
 // ─── Sortable column header ───────────────────────────────────────────
 type SortField = 'תאריך' | 'סכום' | 'קטגוריה' | 'תיאור'
 type SortDir = 'asc' | 'desc'
@@ -224,9 +282,47 @@ export default function TransactionsTable({
 
   return (
     <div>
+      <div className="transactions-mobile-sort" aria-label="מיון עסקאות">
+        <Button
+          variant={sortField === 'תאריך' ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<ArrowUpDown size={14} />}
+          onClick={() => handleSort('תאריך')}
+        >
+          תאריך
+        </Button>
+        <Button
+          variant={sortField === 'סכום' ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<ArrowUpDown size={14} />}
+          onClick={() => handleSort('סכום')}
+        >
+          סכום
+        </Button>
+        <Button
+          variant={sortField === 'קטגוריה' ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<ArrowUpDown size={14} />}
+          onClick={() => handleSort('קטגוריה')}
+        >
+          קטגוריה
+        </Button>
+      </div>
+
+      <div className="transactions-mobile-list" aria-label="רשימת עסקאות">
+        {sortedTransactions.map((tx, index) => (
+          <MobileTransactionCard
+            key={`${tx.תאריך}-${tx.תיאור}-${index}`}
+            tx={tx}
+            onClick={onRowClick}
+            showBillingDate={showBillingDate}
+          />
+        ))}
+      </div>
+
       <div
         ref={scrollContainerRef}
-        className="table-scroll"
+        className="table-scroll transactions-desktop-table-wrap"
         onScroll={useVirtualScroll ? handleScroll : undefined}
         style={useVirtualScroll ? { maxHeight: '600px', overflow: 'auto' } : undefined}
       >
@@ -290,6 +386,7 @@ export default function TransactionsTable({
 
       {/* Pagination */}
       <div
+        className="transactions-pagination"
         style={{
           display: 'flex',
           alignItems: 'center',

@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { MonthOverviewCategory } from '../../services/types'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 interface MonthOverviewChartProps {
   categories: MonthOverviewCategory[]
@@ -70,6 +71,8 @@ const MonthOverviewChart: React.FC<MonthOverviewChartProps> = React.memo(functio
   categories,
   height = 300,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!categories.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
@@ -91,6 +94,36 @@ const MonthOverviewChart: React.FC<MonthOverviewChartProps> = React.memo(functio
 
   const hasIncome = data.some((d) => d.income > 0)
   const needsRotation = data.length > 5
+  const maxValue = Math.max(...data.map((d) => Math.max(d.expenses, d.income)), 1)
+
+  if (isCompact) {
+    return (
+      <div className="mobile-chart-list">
+        {data.map((item) => (
+          <div key={item.fullName} className="mobile-chart-row">
+            <div className="mobile-chart-row-header">
+              <span className="mobile-chart-row-title">{item.fullName}</span>
+              <span className="mobile-chart-row-value">{formatShekel(item.expenses)}</span>
+            </div>
+            <div className="mobile-chart-bar-track">
+              <div
+                className="mobile-chart-bar-fill"
+                style={{
+                  width: `${Math.max((item.expenses / maxValue) * 100, 4)}%`,
+                  background: 'linear-gradient(90deg, #fb923c, #f87171)',
+                }}
+              />
+            </div>
+            {item.income > 0 && (
+              <div className="mobile-chart-tags">
+                <span className="mobile-chart-tag">הכנסות {formatShekel(item.income)}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <ResponsiveContainer width="100%" height={height}>

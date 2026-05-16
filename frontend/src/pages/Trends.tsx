@@ -215,7 +215,7 @@ export default function Trends() {
           <Card className="glass-card" padding="none">
             <div className="table-scroll">
               <table
-                className="transactions-table"
+                className="transactions-table mobile-stack-table"
                 role="table"
                 aria-label={'\u05D8\u05D1\u05DC\u05EA \u05D4\u05E9\u05D5\u05D5\u05D0\u05D4 \u05D7\u05D5\u05D3\u05E9\u05D9\u05EA'}
               >
@@ -229,11 +229,11 @@ export default function Trends() {
                 <tbody>
                   {trendStats.monthly.map((row) => (
                     <tr key={row.month}>
-                      <td style={{ fontWeight: 600 }}>{row.month}</td>
-                      <td style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      <td data-label={'\u05D7\u05D5\u05D3\u05E9'} style={{ fontWeight: 600 }}>{row.month}</td>
+                      <td data-label={'\u05E1\u05DB\u05D5\u05DD'} style={{ fontVariantNumeric: 'tabular-nums' }}>
                         {formatCurrency(Math.abs(row.amount))}
                       </td>
-                      <td>
+                      <td data-label={'\u05E9\u05D9\u05E0\u05D5\u05D9'}>
                         {row.change_pct !== null ? (
                           <Badge
                             variant={row.change_pct >= 0 ? 'danger' : 'success'}

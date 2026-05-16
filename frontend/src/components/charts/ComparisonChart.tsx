@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -132,6 +133,8 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
   savings,
   height = 260,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   const chartData = useMemo(
     () => [
       { name: 'income', value: income, color: COLORS.income },
@@ -140,12 +143,18 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
     ],
     [income, expenses, savings],
   )
+  const chartHeight = isCompact ? Math.max(220, Math.min(height, 250)) : height
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
         data={chartData}
-        margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
+        margin={{
+          top: 8,
+          right: isCompact ? 0 : 8,
+          left: isCompact ? 0 : 4,
+          bottom: 8,
+        }}
       >
         <ComparisonGradients />
 
@@ -160,7 +169,7 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
           tickFormatter={(key: string) => LABELS[key] ?? key}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 13,
+            fontSize: isCompact ? 11 : 13,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
@@ -172,12 +181,12 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',
-            fontSize: 12,
+            fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
           }}
           tickLine={false}
           axisLine={false}
-          width={56}
+          width={isCompact ? 44 : 56}
           orientation="right"
         />
 
@@ -189,7 +198,7 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
         <Bar
           dataKey="value"
           radius={[4, 4, 0, 0]}
-          maxBarSize={56}
+          maxBarSize={isCompact ? 42 : 56}
           animationDuration={0}
         >
           {chartData.map((entry) => (
