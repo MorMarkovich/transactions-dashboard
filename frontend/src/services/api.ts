@@ -171,6 +171,26 @@ export const transactionsApi = {
   },
 
   /**
+   * Rename or merge a category across the active backend session. Returns
+   * affected merchant descriptions so the caller can persist category rules.
+   */
+  renameCategory: async (
+    sessionId: string,
+    oldCategory: string,
+    newCategory: string,
+  ): Promise<{ success: boolean; old_category: string; new_category: string; affected_count: number; merchants: string[] }> => {
+    const response = await api.post<{ success: boolean; old_category: string; new_category: string; affected_count: number; merchants: string[] }>(
+      '/api/categories/rename',
+      {
+        session_id: sessionId,
+        old_category: oldCategory,
+        new_category: newCategory,
+      },
+    );
+    return response.data;
+  },
+
+  /**
    * Get metrics
    */
   getMetrics: async (sessionId: string, signal?: AbortSignal): Promise<MetricsData> => {

@@ -22,9 +22,11 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  Edit2,
+  Check,
 } from 'lucide-react'
 import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFilters'
-import { get_icon } from '../utils/constants'
+import { CATEGORY_ICONS, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
@@ -116,6 +118,9 @@ export default function Dashboard() {
   const [snapshotMonthTo, setSnapshotMonthTo] = useState('')
   const [snapshotSelectedCats, setSnapshotSelectedCats] = useState<Set<string> | null>(null)
   const [snapshotShowAdvanced, setSnapshotShowAdvanced] = useState(false)
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null)
+  const [categoryRenameValue, setCategoryRenameValue] = useState('')
+  const [savingCategoryName, setSavingCategoryName] = useState<string | null>(null)
 
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -375,6 +380,14 @@ export default function Dashboard() {
     [snapshotFilterOpts],
   )
 
+  const availableCategoryNames = useMemo(
+    () => Array.from(new Set([
+      ...(categorySnapshot?.categories.map((cat) => cat.name) ?? []),
+      ...Object.keys(CATEGORY_ICONS),
+    ])).sort((a, b) => a.localeCompare(b, 'he')),
+    [categorySnapshot],
+  )
+
   const clearAllSnapshotFilters = useCallback(() => {
     setSnapshotSearch('')
     setSnapshotExcluded(new Set())
@@ -384,6 +397,62 @@ export default function Dashboard() {
     setSnapshotMonthTo('')
     setSnapshotSelectedCats(null)
   }, [])
+
+  const startCategoryRename = useCallback((categoryName: string) => {
+    setEditingCategoryName(categoryName)
+    setCategoryRenameValue(categoryName)
+  }, [])
+
+  const cancelCategoryRename = useCallback(() => {
+    setEditingCategoryName(null)
+    setCategoryRenameValue('')
+    setSavingCategoryName(null)
+  }, [])
+
+  const handleCategoryRename = useCallback(
+    async (oldCategory: string) => {
+      if (!sessionId) return
+      const newCategory = categoryRenameValue.trim()
+      if (!newCategory || newCategory === oldCategory) {
+        cancelCategoryRename()
+        return
+      }
+
+      setSavingCategoryName(oldCategory)
+      try {
+        const resp = await transactionsApi.renameCategory(sessionId, oldCategory, newCategory)
+        if (user && resp.merchants.length > 0) {
+          await supabaseApi.upsertCategoryRules(
+            user.id,
+            resp.merchants.map((merchant) => ({ merchant, category: newCategory })),
+          ).catch((e) => {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to persist category rename rules:', e)
+          })
+        }
+
+        setSnapshotExcluded((prev) => {
+          if (!prev.has(oldCategory)) return prev
+          const next = new Set(prev)
+          next.delete(oldCategory)
+          next.add(newCategory)
+          return next
+        })
+        setSnapshotSelectedCats((prev) => {
+          if (!prev || !prev.has(oldCategory)) return prev
+          const next = new Set(prev)
+          next.delete(oldCategory)
+          next.add(newCategory)
+          return next
+        })
+        if (drawerCategory === oldCategory) setDrawerCategory(newCategory)
+        setRefreshKey((k) => k + 1)
+      } finally {
+        cancelCategoryRename()
+      }
+    },
+    [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, user],
+  )
 
   // ── Month selector navigation ──────────────────────────────────────
   const selectedMonthIdx = useMemo(() => {
@@ -1015,6 +1084,8 @@ export default function Dashboard() {
             {(snapshotExpanded ? sortedSnapshotCategories : sortedSnapshotCategories.slice(0, 8)).map((cat) => {
               const changeColor = cat.month_change > 5 ? 'var(--danger)' : cat.month_change < -5 ? 'var(--success)' : 'var(--text-muted)'
               const changeBg = cat.month_change > 5 ? 'var(--danger-muted)' : cat.month_change < -5 ? 'var(--success-muted)' : 'rgba(148, 163, 184, 0.1)'
+              const isRenaming = editingCategoryName === cat.name
+              const isSavingRename = savingCategoryName === cat.name
               return (
                 <div key={cat.name} style={{ cursor: 'pointer' }}>
                 <Card
@@ -1060,9 +1131,80 @@ export default function Dashboard() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {/* Row 1: Name + Total */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
-                        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {cat.name}
-                        </span>
+                        {isRenaming ? (
+                          <form
+                            onClick={(e) => e.stopPropagation()}
+                            onSubmit={(e) => {
+                              e.preventDefault()
+                              handleCategoryRename(cat.name)
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 }}
+                          >
+                            <input
+                              value={categoryRenameValue}
+                              onChange={(e) => setCategoryRenameValue(e.target.value)}
+                              autoFocus
+                              disabled={isSavingRename}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                border: '1px solid var(--accent)',
+                                borderRadius: 'var(--radius-sm)',
+                                padding: '4px 6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: 'var(--bg-primary)',
+                                color: 'var(--text-primary)',
+                                fontFamily: 'var(--font-family)',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              type="submit"
+                              disabled={isSavingRename || !categoryRenameValue.trim()}
+                              title="שמור"
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 6,
+                                border: '1px solid var(--accent)',
+                                background: 'var(--accent)',
+                                color: '#fff',
+                                cursor: isSavingRename ? 'wait' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                              }}
+                            >
+                              <Check size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelCategoryRename}
+                              title="בטל"
+                              style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: 6,
+                                border: '1px solid var(--border)',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </form>
+                        ) : (
+                          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {cat.name}
+                          </span>
+                        )}
                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', flexShrink: 0 }}>
                           {formatCurrency(cat.total)}
                         </span>
@@ -1070,6 +1212,30 @@ export default function Dashboard() {
 
                       {/* Row 2: Stats chips */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '5px', flexWrap: 'wrap' }}>
+                        {!isRenaming && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              startCategoryRename(cat.name)
+                            }}
+                            title="ערוך שם קטגוריה"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              border: '1px solid var(--border)',
+                              background: 'transparent',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                            }}
+                          >
+                            <Edit2 size={11} />
+                          </button>
+                        )}
                         {/* Transaction count */}
                         <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           <Tag size={10} />
@@ -1455,6 +1621,7 @@ export default function Dashboard() {
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}
+        availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
       />
     </div>

@@ -172,6 +172,12 @@ class UpdateTransactionCategoryRequest(BaseModel):
     category: str
 
 
+class RenameCategoryRequest(BaseModel):
+    session_id: str
+    old_category: str
+    new_category: str
+
+
 @router.post("/restore-session")
 async def restore_session(body: RestoreSessionRequest):
     """Restore a backend session from saved transaction JSON data."""
@@ -415,6 +421,45 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
     # save a merchant→category rule without a separate round-trip.
     merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
     return {"success": True, "merchant": merchant, "category": new_category}
+
+
+@router.post("/categories/rename")
+async def rename_category(body: RenameCategoryRequest):
+    """Rename a category across the current in-memory session.
+
+    The frontend persists returned merchant descriptions as category rules so
+    the rename survives session restore and future uploads.
+    """
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    old_category = (body.old_category or '').strip()
+    new_category = (body.new_category or '').strip()
+    if not old_category or not new_category:
+        raise HTTPException(status_code=400, detail="Category names cannot be empty")
+
+    df = sessions[body.session_id]
+    if 'קטגוריה' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not have categories")
+
+    mask = df['קטגוריה'].astype(str) == old_category
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    merchants: list[str] = []
+    if 'תיאור' in df.columns:
+        merchants = sorted({str(v) for v in df.loc[mask, 'תיאור'].dropna().tolist() if str(v).strip()})
+
+    df.loc[mask, 'קטגוריה'] = new_category
+    sessions[body.session_id] = df
+
+    return {
+        "success": True,
+        "old_category": old_category,
+        "new_category": new_category,
+        "affected_count": int(mask.sum()),
+        "merchants": merchants,
+    }
 
 
 @router.get("/transactions")

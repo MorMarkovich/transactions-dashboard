@@ -13,6 +13,7 @@ interface CategoryTransactionsDrawerProps {
   transactions: Transaction[]
   total: number
   loading?: boolean
+  availableCategories?: string[]
   /**
    * Called when the user saves a new category for a transaction.
    * The parent is responsible for: (1) calling /api/transactions/category
@@ -23,8 +24,6 @@ interface CategoryTransactionsDrawerProps {
   onCategoryChange?: (tx: Transaction, newCategory: string) => Promise<void>
 }
 
-const CATEGORY_LIST = Object.keys(CATEGORY_ICONS)
-
 export default function CategoryTransactionsDrawer({
   isOpen,
   onClose,
@@ -33,11 +32,13 @@ export default function CategoryTransactionsDrawer({
   transactions,
   total,
   loading,
+  availableCategories = [],
   onCategoryChange,
 }: CategoryTransactionsDrawerProps) {
   const [sortAsc, setSortAsc] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [savingId, setSavingId] = useState<number | null>(null)
+  const [customCategory, setCustomCategory] = useState('')
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -57,7 +58,14 @@ export default function CategoryTransactionsDrawer({
   useEffect(() => {
     setEditingId(null)
     setSavingId(null)
+    setCustomCategory('')
   }, [isOpen, category])
+
+  const categoryOptions = useMemo(() => {
+    return Array.from(new Set([...availableCategories, ...Object.keys(CATEGORY_ICONS), category]))
+      .filter((cat) => cat && cat.trim())
+      .sort((a, b) => a.localeCompare(b, 'he'))
+  }, [availableCategories, category])
 
   const sorted = useMemo(() => {
     const list = [...transactions]
@@ -72,16 +80,18 @@ export default function CategoryTransactionsDrawer({
   const handlePick = useCallback(
     async (tx: Transaction, newCategory: string) => {
       if (!onCategoryChange || tx.id == null) return
-      if (newCategory === category) {
+      const trimmed = newCategory.trim()
+      if (!trimmed || trimmed === category) {
         setEditingId(null)
         return
       }
       setSavingId(tx.id)
       try {
-        await onCategoryChange(tx, newCategory)
+        await onCategoryChange(tx, trimmed)
       } finally {
         setSavingId(null)
         setEditingId(null)
+        setCustomCategory('')
       }
     },
     [onCategoryChange, category],
@@ -345,7 +355,50 @@ export default function CategoryTransactionsDrawer({
                               borderTop: '1px solid var(--glass-border)',
                             }}
                           >
-                            {CATEGORY_LIST.map((cat) => {
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault()
+                                handlePick(tx, customCategory)
+                              }}
+                              style={{ display: 'flex', gap: '6px', width: '100%', marginBottom: '4px' }}
+                            >
+                              <input
+                                value={customCategory}
+                                onChange={(e) => setCustomCategory(e.target.value)}
+                                placeholder="שם קטגוריה"
+                                disabled={isSaving}
+                                style={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  border: '1px solid var(--glass-border)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  padding: '6px 8px',
+                                  fontSize: '0.75rem',
+                                  background: 'var(--bg-primary)',
+                                  color: 'var(--text-primary)',
+                                  fontFamily: 'var(--font-family)',
+                                  outline: 'none',
+                                }}
+                              />
+                              <button
+                                type="submit"
+                                disabled={isSaving || !customCategory.trim()}
+                                style={{
+                                  border: '1px solid var(--accent)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  background: customCategory.trim() ? 'var(--accent)' : 'transparent',
+                                  color: customCategory.trim() ? '#fff' : 'var(--text-muted)',
+                                  padding: '0 10px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: isSaving || !customCategory.trim() ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'var(--font-family)',
+                                }}
+                              >
+                                שמור
+                              </button>
+                            </form>
+                            {categoryOptions.map((cat) => {
                               const selected = cat === category
                               return (
                                 <button

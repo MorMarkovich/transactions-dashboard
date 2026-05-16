@@ -131,6 +131,25 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  upsertCategoryRules: async (
+    userId: string,
+    rules: { merchant: string; category: string }[],
+  ): Promise<void> => {
+    const rows = rules
+      .filter((r) => r.merchant && r.category)
+      .map((r) => ({
+        user_id: userId,
+        merchant: r.merchant,
+        category: r.category,
+        updated_at: new Date().toISOString(),
+      }));
+    if (rows.length === 0) return;
+    const { error } = await supabase
+      .from('user_category_rules')
+      .upsert(rows, { onConflict: 'user_id,merchant' });
+    if (error) throw error;
+  },
+
   deleteCategoryRule: async (userId: string, merchant: string): Promise<void> => {
     const { error } = await supabase
       .from('user_category_rules')
