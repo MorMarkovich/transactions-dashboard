@@ -520,6 +520,35 @@ async def test_cc_payment_dedup_keeps_positive_isracard_salary(client):
 
 
 @pytest.mark.asyncio
+async def test_rename_category_updates_session_and_returns_merchants(client):
+    transactions = [
+        {"תאריך": "2026-05-01", "תאריך_חיוב": "2026-05-01", "סכום": -100, "סכום_מוחלט": 100, "תיאור": "merchant a", "קטגוריה": "שונות", "חודש": "05/2026", "חודש_חיוב": "05/2026"},
+        {"תאריך": "2026-05-02", "תאריך_חיוב": "2026-05-02", "סכום": -200, "סכום_מוחלט": 200, "תיאור": "merchant b", "קטגוריה": "שונות", "חודש": "05/2026", "חודש_חיוב": "05/2026"},
+        {"תאריך": "2026-05-03", "תאריך_חיוב": "2026-05-03", "סכום": -300, "סכום_מוחלט": 300, "תיאור": "merchant c", "קטגוריה": "מזון וצריכה", "חודש": "05/2026", "חודש_חיוב": "05/2026"},
+    ]
+    restore = await client.post("/api/restore-session", json={"transactions": transactions})
+    assert restore.status_code == 200, restore.text
+    sid = restore.json()["session_id"]
+
+    rename = await client.post(
+        "/api/categories/rename",
+        json={"session_id": sid, "old_category": "שונות", "new_category": "נסיעות"},
+    )
+    assert rename.status_code == 200, rename.text
+    body = rename.json()
+    assert body["affected_count"] == 2
+    assert body["merchants"] == ["merchant a", "merchant b"]
+
+    snap = await client.get(
+        "/api/charts/v2/category-snapshot",
+        params={"sessionId": sid, "month_from": "05/2026", "month_to": "05/2026", "date_type": "billing"},
+    )
+    cats = {c["name"]: c["total"] for c in snap.json()["categories"]}
+    assert cats["נסיעות"] == 300
+    assert "שונות" not in cats
+
+
+@pytest.mark.asyncio
 async def test_category_rules_override_keyword_categorization(client):
     """User-defined category rules must win over the keyword/AI categorizer."""
     # 'אל על' falls into 'טיסות ותיירות' via keyword match. The user has
