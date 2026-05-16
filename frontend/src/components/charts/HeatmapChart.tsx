@@ -48,7 +48,8 @@ const styles = {
   },
   grid: (cols: number) => ({
     display: 'grid',
-    gridTemplateColumns: `minmax(100px, auto) repeat(${cols}, 1fr)`,
+    gridTemplateColumns: `minmax(92px, auto) repeat(${cols}, minmax(42px, 1fr))`,
+    minWidth: Math.max(320, 92 + cols * 44),
     gap: 2,
   }),
   headerCell: {
@@ -76,6 +77,7 @@ const styles = {
     opacity,
     borderRadius: 'var(--radius-sm)',
     minHeight: 32,
+    minWidth: 42,
     cursor: 'pointer',
     transition: 'opacity var(--transition-fast), transform var(--transition-fast)',
   }),

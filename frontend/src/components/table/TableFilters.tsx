@@ -89,7 +89,7 @@ export default function TableFilters({
   return (
     <div className="table-filters">
       <div className="filters-row">
-        <div style={{ flex: 1, minWidth: '200px' }}>
+        <div className="filter-input">
           <Input
             placeholder="חיפוש עסקה..."
             value={search}
@@ -100,7 +100,7 @@ export default function TableFilters({
           />
         </div>
 
-        <div style={{ minWidth: '180px' }}>
+        <div className="filter-select">
           <Select
             options={categoryOptions}
             value={category}

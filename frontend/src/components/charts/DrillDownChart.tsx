@@ -14,6 +14,7 @@ import { ChevronLeft, Calendar, RotateCcw } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { transactionsApi } from '../../services/api'
 import type { CategoryMerchantItem, Transaction } from '../../services/types'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ const DrillDownChart: React.FC<DrillDownChartProps> = React.memo(function DrillD
   const [merchantData, setMerchantData] = useState<CategoryMerchantItem[]>([])
   const [transactionData, setTransactionData] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
+  const isCompact = useMediaQuery('(max-width: 640px)')
 
   // Reset when month or categories change
   useEffect(() => {
@@ -286,12 +288,62 @@ const DrillDownChart: React.FC<DrillDownChartProps> = React.memo(function DrillD
   // Bar chart levels (categories or merchants)
   const bars = level === 'categories' ? categoryBars : merchantBars
   const needsRotation = bars.length > 5
+  const maxBarValue = Math.max(...bars.map((bar) => bar.value), 1)
 
   if (bars.length === 0) {
     return (
       <div>
         {breadcrumb}
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>אין נתונים להצגה</div>
+      </div>
+    )
+  }
+
+  if (isCompact) {
+    return (
+      <div>
+        {breadcrumb}
+        <div style={{ marginTop: '8px' }} className="mobile-chart-list">
+          {bars.map((bar, index) => (
+            <button
+              key={bar.fullName}
+              type="button"
+              className="mobile-chart-row"
+              onClick={() => {
+                if (level === 'categories') {
+                  handleCategoryClick(bar.fullName)
+                } else {
+                  handleMerchantClick(bar.fullName)
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                color: 'inherit',
+                fontFamily: 'var(--font-family)',
+                textAlign: 'right',
+              }}
+            >
+              <div className="mobile-chart-row-header">
+                <span className="mobile-chart-row-title">{bar.fullName}</span>
+                <span className="mobile-chart-row-value">{formatCurrency(bar.value)}</span>
+              </div>
+              <div className="mobile-chart-bar-track">
+                <div
+                  className="mobile-chart-bar-fill"
+                  style={{
+                    width: `${Math.max((bar.value / maxBarValue) * 100, 4)}%`,
+                    background: BAR_COLORS[index % BAR_COLORS.length],
+                  }}
+                />
+              </div>
+              {bar.count > 0 && (
+                <div className="mobile-chart-tags">
+                  <span className="mobile-chart-tag">{bar.count} עסקאות</span>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
     )
   }

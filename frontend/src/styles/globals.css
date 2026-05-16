@@ -350,6 +350,71 @@ video {
     background: var(--bg-card);
 }
 
+@media (max-width: 700px) {
+    .table-scroll:has(.mobile-stack-table) {
+        max-height: none;
+        overflow-x: visible;
+        overflow-y: visible;
+        border: 0;
+        background: transparent;
+    }
+
+    .mobile-stack-table {
+        display: block;
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .mobile-stack-table thead {
+        display: none;
+    }
+
+    .mobile-stack-table tbody {
+        display: grid;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .mobile-stack-table tr {
+        display: block;
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .mobile-stack-table td {
+        display: block;
+        width: 100%;
+        min-height: 34px;
+        padding: 8px 0 !important;
+        border: 0 !important;
+        text-align: left !important;
+        white-space: normal !important;
+    }
+
+    .mobile-stack-table td + td {
+        border-top: 1px solid var(--border-color) !important;
+    }
+
+    .mobile-stack-table td::before {
+        content: attr(data-label);
+        float: right;
+        margin-left: 12px;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1.5;
+    }
+
+    .mobile-stack-table td::after {
+        display: block;
+        clear: both;
+        content: '';
+    }
+}
+
 /* ========== Category Cards ========== */
 .category-card {
     background: var(--bg-card);

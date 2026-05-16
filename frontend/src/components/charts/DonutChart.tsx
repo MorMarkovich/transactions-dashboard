@@ -7,6 +7,7 @@ import {
   Tooltip,
   Label,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -127,9 +128,10 @@ interface CenterProps {
   cx: number
   cy: number
   total: number
+  compact?: boolean
 }
 
-function CenterLabel({ cx, cy, total }: CenterProps) {
+function CenterLabel({ cx, cy, total, compact = false }: CenterProps) {
   return (
     <g>
       <text
@@ -137,7 +139,7 @@ function CenterLabel({ cx, cy, total }: CenterProps) {
         y={cy - 10}
         textAnchor="middle"
         dominantBaseline="central"
-        style={{ fill: 'var(--text-secondary)', fontSize: 13, fontFamily: 'var(--font-family)' }}
+        style={{ fill: 'var(--text-secondary)', fontSize: compact ? 11 : 13, fontFamily: 'var(--font-family)' }}
       >
         {"סה\"כ"}
       </text>
@@ -146,7 +148,7 @@ function CenterLabel({ cx, cy, total }: CenterProps) {
         y={cy + 14}
         textAnchor="middle"
         dominantBaseline="central"
-        style={{ fill: 'var(--text-primary)', fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-family)' }}
+        style={{ fill: 'var(--text-primary)', fontSize: compact ? 16 : 20, fontWeight: 700, fontFamily: 'var(--font-family)' }}
       >
         {formatShekel(total)}
       </text>
@@ -162,6 +164,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   data,
   total,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
   const tooltipContent = useCallback(
     (props: { active?: boolean; payload?: PayloadEntry[] }) => (
       <ChartTooltip {...props} total={total} />
@@ -178,7 +181,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={340}>
+    <ResponsiveContainer width="100%" height={isCompact ? 260 : 340}>
       <PieChart>
         <Pie
           data={data}
@@ -186,11 +189,11 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
           nameKey="name"
           cx="50%"
           cy="50%"
-          innerRadius="60%"
-          outerRadius="85%"
+          innerRadius={isCompact ? '58%' : '60%'}
+          outerRadius={isCompact ? '78%' : '85%'}
           paddingAngle={2}
           animationDuration={0}
-          label={renderCustomLabel as any}
+          label={isCompact ? false : (renderCustomLabel as any)}
           labelLine={false}
         >
           {data.map((_entry, idx) => (
@@ -199,7 +202,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
           <Label
             content={({ viewBox }) => {
               const { cx, cy } = viewBox as { cx: number; cy: number }
-              return <CenterLabel cx={cx} cy={cy} total={total} />
+              return <CenterLabel cx={cx} cy={cy} total={total} compact={isCompact} />
             }}
             position="center"
           />

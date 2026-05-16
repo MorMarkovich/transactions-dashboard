@@ -745,7 +745,7 @@ export default function DataManagement() {
                     <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>קטגוריות ({sessionInfo.categories.length})</span>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                    <table className="mobile-stack-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                           <th style={thStyle}>קטגוריה</th>
@@ -762,17 +762,17 @@ export default function DataManagement() {
                               borderBottom: idx < sessionInfo.categories.length - 1 ? '1px solid var(--border-color)' : 'none',
                             }}
                           >
-                            <td style={tdStyle}>
+                            <td data-label="קטגוריה" style={tdStyle}>
                               <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
                               {cat.name}
                             </td>
-                            <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                            <td data-label="עסקאות" style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
                               {formatNumber(cat.count)}
                             </td>
-                            <td style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                            <td data-label="הוצאות" style={{ ...tdStyle, color: 'var(--danger)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                               {cat.expense_total > 0 ? formatCurrency(cat.expense_total) : '—'}
                             </td>
-                            <td style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                            <td data-label="הכנסות" style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                               {cat.income_total > 0 ? formatCurrency(cat.income_total) : '—'}
                             </td>
                           </tr>
@@ -954,7 +954,7 @@ export default function DataManagement() {
             onToggle={() => setUploadsExpanded(!uploadsExpanded)}
           >
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <table className="mobile-stack-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <th style={thStyle}>שם קובץ</th>
@@ -976,7 +976,7 @@ export default function DataManagement() {
                       }}
                       className="upload-row"
                     >
-                      <td style={tdStyle}>
+                      <td data-label="שם קובץ" style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <FileSpreadsheet size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
@@ -984,16 +984,16 @@ export default function DataManagement() {
                           </span>
                         </div>
                       </td>
-                      <td style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>
+                      <td data-label="שורות" style={{ ...tdStyle, fontVariantNumeric: 'tabular-nums' }}>
                         {formatNumber(upload.row_count)}
                       </td>
-                      <td style={{ ...tdStyle, color: 'var(--accent-danger, #ef4444)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                      <td data-label="הוצאות" style={{ ...tdStyle, color: 'var(--accent-danger, #ef4444)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_expenses)}
                       </td>
-                      <td style={{ ...tdStyle, color: 'var(--accent-secondary, #10b981)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                      <td data-label="הכנסות" style={{ ...tdStyle, color: 'var(--accent-secondary, #10b981)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_income)}
                       </td>
-                      <td style={tdStyle}>
+                      <td data-label="תאריך העלאה" style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Calendar size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                           {formatDate(upload.uploaded_at)}

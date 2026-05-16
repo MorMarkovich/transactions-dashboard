@@ -206,6 +206,111 @@
   }
 }
 
+@media (max-width: 640px) {
+  .advanced-filters-primary {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .advanced-filter-search,
+  .advanced-filter-select {
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  .advanced-filters-primary button,
+  .advanced-filter-actions button {
+    width: 100%;
+  }
+
+  .advanced-filter-range-row,
+  .advanced-filter-actions {
+    align-items: stretch !important;
+    flex-direction: column;
+  }
+
+  .advanced-filter-range-row > span {
+    align-self: center;
+  }
+
+  .advanced-filter-actions input {
+    width: 100% !important;
+  }
+}
+
+.mobile-chart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  direction: rtl;
+}
+
+.mobile-chart-row {
+  width: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  padding: 10px 12px;
+}
+
+.mobile-chart-row-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mobile-chart-row-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.mobile-chart-row-value {
+  color: var(--text-primary);
+  direction: ltr;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mobile-chart-bar-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+}
+
+.mobile-chart-bar-fill {
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: var(--gradient-primary);
+}
+
+.mobile-chart-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mobile-chart-tag {
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 2px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
 .header-icon-btn:hover {
   background: var(--bg-card-hover) !important;
   color: var(--text-primary) !important;

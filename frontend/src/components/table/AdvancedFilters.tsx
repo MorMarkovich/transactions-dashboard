@@ -124,6 +124,7 @@ export default function AdvancedFilters({
     <div style={{ direction: 'rtl', marginBottom: 'var(--space-md)' }}>
       {/* Primary row: search + category + toggle + export */}
       <div
+        className="advanced-filters-primary"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -132,7 +133,7 @@ export default function AdvancedFilters({
         }}
       >
         {/* Search */}
-        <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
+        <div className="advanced-filter-search" style={{ flex: '1 1 200px', minWidth: '180px' }}>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -142,7 +143,7 @@ export default function AdvancedFilters({
         </div>
 
         {/* Category dropdown */}
-        <div style={{ position: 'relative', minWidth: '140px' }}>
+        <div className="advanced-filter-select" style={{ position: 'relative', minWidth: '140px' }}>
           <select
             value={category}
             onChange={(e) => {
@@ -249,7 +250,7 @@ export default function AdvancedFilters({
                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
                   טווח תאריכים
                 </label>
-                <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                <div className="advanced-filter-range-row" style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                   <input
                     type="date"
                     lang="he-IL"
@@ -295,7 +296,7 @@ export default function AdvancedFilters({
                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
                   טווח סכומים
                 </label>
-                <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+                <div className="advanced-filter-range-row" style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                   <input
                     type="number"
                     placeholder="מינימום"
@@ -339,7 +340,7 @@ export default function AdvancedFilters({
               </div>
 
               {/* Apply button */}
-              <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
+              <div className="advanced-filter-actions" style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
                 <Button variant="primary" size="sm" onClick={handleApply}>
                   החל סינון
                 </Button>

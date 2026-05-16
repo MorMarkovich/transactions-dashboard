@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+import useMediaQuery from '../../hooks/useMediaQuery'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -132,10 +133,39 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   data,
   height,
 }) {
+  const isCompact = useMediaQuery('(max-width: 640px)')
+
   if (!data.length) {
     return (
       <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
         אין נתונים להצגה
+      </div>
+    )
+  }
+
+  const maxTotal = Math.max(...data.map((item) => item.total), 1)
+
+  if (isCompact) {
+    return (
+      <div className="mobile-chart-list">
+        {data.map((item) => (
+          <div key={item.name} className="mobile-chart-row">
+            <div className="mobile-chart-row-header">
+              <span className="mobile-chart-row-title">{item.name}</span>
+              <span className="mobile-chart-row-value">{formatShekel(item.total)}</span>
+            </div>
+            <div className="mobile-chart-bar-track">
+              <div
+                className="mobile-chart-bar-fill"
+                style={{ width: `${Math.max((item.total / maxTotal) * 100, 4)}%` }}
+              />
+            </div>
+            <div className="mobile-chart-tags">
+              <span className="mobile-chart-tag">{item.count} ביקורים</span>
+              <span className="mobile-chart-tag">ממוצע {formatShekel(item.average)}</span>
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
