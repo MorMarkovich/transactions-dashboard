@@ -1125,6 +1125,7 @@ async def get_category_transactions(
 
     transactions = [
         {
+            "id": int(row['id']) if 'id' in filtered.columns and pd.notna(row.get('id')) else None,
             "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
             "תיאור": str(row['תיאור']),
             "סכום": _sanitize(round(float(row['סכום']), 2)),
