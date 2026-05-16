@@ -65,6 +65,7 @@ function MerchantsSkeleton() {
 
       {/* Card grid skeleton */}
       <div
+        className="responsive-grid-3"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
@@ -265,9 +266,10 @@ export default function Merchants() {
       </div>
 
       <div
+        className="responsive-card-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
           gap: 'var(--space-md)',
         }}
       >

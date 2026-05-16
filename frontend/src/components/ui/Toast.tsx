@@ -78,8 +78,9 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
         border: `1px solid ${config.color}33`,
         borderRadius: '12px',
         boxShadow: 'var(--shadow-lg)',
-        minWidth: '280px',
-        maxWidth: '420px',
+        width: 'min(420px, calc(100vw - 32px))',
+        minWidth: 0,
+        maxWidth: 'calc(100vw - 32px)',
         direction: 'rtl',
         backdropFilter: 'blur(12px)',
       }}

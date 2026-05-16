@@ -172,7 +172,7 @@ export default function SavingsGoals() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
             gap: 'var(--space-md)',
             marginBottom: 'var(--space-xl)',
           }}
@@ -537,9 +537,10 @@ export default function SavingsGoals() {
         </Card>
       ) : (
         <div
+          className="responsive-card-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
             gap: 'var(--space-md)',
           }}
         >

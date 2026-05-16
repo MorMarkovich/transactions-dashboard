@@ -241,7 +241,7 @@ export default function Budget() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
             gap: 'var(--space-md)',
             marginBottom: 'var(--space-xl)',
           }}
@@ -447,9 +447,10 @@ export default function Budget() {
         </Card>
       ) : (
         <div
+          className="budget-goals-grid responsive-card-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))',
             gap: 'var(--space-md)',
           }}
         >
@@ -573,7 +574,7 @@ export default function Budget() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
                 gap: 'var(--space-lg)',
                 textAlign: 'center',
               }}

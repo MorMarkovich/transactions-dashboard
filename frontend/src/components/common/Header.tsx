@@ -21,6 +21,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
 
   return (
     <header
+      className="app-topbar"
       style={{
         height: 'var(--header-height, 64px)',
         display: 'flex',

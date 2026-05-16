@@ -186,6 +186,26 @@
   }
 }
 
+@media (max-width: 480px) {
+  .app-topbar {
+    padding: 0 var(--space-md) !important;
+    gap: var(--space-sm) !important;
+  }
+
+  .app-topbar h1 {
+    font-size: var(--text-lg) !important;
+    max-width: 52vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-icon-btn,
+  .header-hamburger {
+    width: 34px !important;
+    height: 34px !important;
+  }
+}
+
 .header-icon-btn:hover {
   background: var(--bg-card-hover) !important;
   color: var(--text-primary) !important;
@@ -208,5 +228,26 @@
 @media (max-width: 768px) {
   .budget-goals-grid {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .category-transactions-drawer {
+    max-width: 100vw !important;
+  }
+
+  .category-transaction-main {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .category-transaction-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .category-change-btn {
+    min-height: 32px;
+    padding: 0 10px !important;
   }
 }

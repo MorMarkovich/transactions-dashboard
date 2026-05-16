@@ -89,6 +89,9 @@
 html, body {
     margin: 0;
     padding: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     background: var(--bg-primary);
     color: var(--text-primary);
     direction: rtl;
@@ -96,11 +99,21 @@ html, body {
 }
 
 #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     min-height: 100vh;
     background:
         var(--gradient-glow),
         var(--gradient-bg),
         var(--bg-primary);
+}
+
+img,
+svg,
+canvas,
+video {
+    max-width: 100%;
 }
 
 /* ========== App Header ========== */
@@ -627,6 +640,35 @@ input:focus, select:focus, textarea:focus {
   gap: var(--space-2);
 }
 
+@media (max-width: 768px) {
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .page-header-info,
+  .page-header-text {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .page-header-text h1 {
+    font-size: var(--text-2xl);
+    overflow-wrap: anywhere;
+  }
+
+  .page-header-text p {
+    overflow-wrap: anywhere;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 /* -- Section Header -- */
 .section-header-v2 {
   display: flex;
@@ -755,6 +797,26 @@ input:focus, select:focus, textarea:focus {
   gap: var(--space-4);
 }
 
+.responsive-grid-2,
+.responsive-grid-3,
+.responsive-grid-4,
+.responsive-card-grid,
+.dashboard-category-grid,
+.dashboard-weekly-row {
+  min-width: 0;
+}
+
+.responsive-chart-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-chart-wrap > * {
+  min-width: 0;
+}
+
 @media (max-width: 1200px) {
   .card-grid-responsive {
     grid-template-columns: repeat(2, 1fr);
@@ -764,6 +826,70 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 640px) {
   .card-grid-responsive {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .responsive-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .responsive-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .responsive-grid-2,
+  .responsive-grid-3,
+  .responsive-grid-4,
+  .responsive-card-grid,
+  .dashboard-category-grid,
+  .dashboard-premium-row,
+  .dashboard-weekly-row,
+  .month-overview-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dashboard-monthly-comparison {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .stat-card-compact {
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .stat-card-compact .stat-value {
+    font-size: var(--text-xl);
+    overflow-wrap: anywhere;
+  }
+
+  .stat-card-compact .stat-sparkline {
+    display: none;
+  }
+
+  .section-header-v2 {
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+
+  .filter-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: var(--space-1);
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-monthly-comparison {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .feature-card {
+    padding: var(--space-lg);
   }
 }
 

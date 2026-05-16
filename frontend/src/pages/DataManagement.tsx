@@ -249,6 +249,7 @@ function DataManagementSkeleton() {
   return (
     <div style={{ direction: 'rtl' }}>
       <div
+        className="responsive-grid-4"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
@@ -538,7 +539,7 @@ export default function DataManagement() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
           gap: 'var(--space-md)',
         }}
       >
@@ -667,7 +668,7 @@ export default function DataManagement() {
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Summary stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
                 <div style={summaryBoxStyle}>
                   <TrendingDown size={16} style={{ color: '#f87171' }} />
                   <div>
@@ -803,7 +804,7 @@ export default function DataManagement() {
           expanded={incomesExpanded}
           onToggle={() => setIncomesExpanded(!incomesExpanded)}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', alignItems: 'start' }}>
+          <div className="responsive-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)', alignItems: 'start' }}>
             {/* Add income form */}
             <div>
               <div className="glass-card" style={{ padding: '16px' }}>
