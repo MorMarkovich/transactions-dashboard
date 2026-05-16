@@ -1220,20 +1220,24 @@ export default function Dashboard() {
                             }}
                             title="ערוך שם קטגוריה"
                             style={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: 6,
+                              height: 24,
+                              borderRadius: 'var(--radius-full)',
                               border: '1px solid var(--border)',
-                              background: 'transparent',
-                              color: 'var(--text-muted)',
+                              background: 'var(--bg-elevated)',
+                              color: 'var(--accent)',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              padding: 0,
+                              gap: '4px',
+                              padding: '0 8px',
+                              fontSize: '0.625rem',
+                              fontWeight: 700,
+                              fontFamily: 'var(--font-family)',
                             }}
                           >
                             <Edit2 size={11} />
+                            ערוך שם
                           </button>
                         )}
                         {/* Transaction count */}

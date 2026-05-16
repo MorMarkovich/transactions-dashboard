@@ -330,17 +330,22 @@ export default function CategoryTransactionsDrawer({
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  width: 24,
-                                  height: 24,
-                                  borderRadius: 6,
+                                  height: 26,
+                                  borderRadius: 'var(--radius-full)',
                                   border: '1px solid var(--glass-border)',
-                                  background: isEditing ? 'var(--accent)' : 'transparent',
-                                  color: isEditing ? '#fff' : 'var(--text-muted)',
+                                  background: isEditing ? 'var(--accent)' : 'var(--bg-elevated)',
+                                  color: isEditing ? '#fff' : 'var(--accent)',
                                   cursor: isSaving ? 'wait' : 'pointer',
                                   flexShrink: 0,
+                                  gap: '4px',
+                                  padding: '0 9px',
+                                  fontSize: '0.6875rem',
+                                  fontWeight: 700,
+                                  fontFamily: 'var(--font-family)',
                                 }}
                               >
                                 <Edit2 size={12} />
+                                {isEditing ? 'בטל' : 'שנה קטגוריה'}
                               </button>
                             )}
                           </div>
