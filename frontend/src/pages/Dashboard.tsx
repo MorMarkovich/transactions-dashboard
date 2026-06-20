@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
 import { motion } from 'framer-motion'
@@ -247,6 +247,30 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [sessionId, refreshKey])
 
+  // Rebuild a lost backend session from the latest Supabase snapshot. Returns
+  // true (and navigates to the fresh session) when it recovers. Guarded so a
+  // genuinely broken backend can't cause an endless restore loop.
+  const recoveryAttempts = useRef(0)
+  const tryRecoverSession = useCallback(async (): Promise<boolean> => {
+    if (!user || recoveryAttempts.current >= 2) return false
+    recoveryAttempts.current += 1
+    try {
+      const [transactions, rules] = await Promise.all([
+        supabaseApi.getLatestTransactions(user.id),
+        supabaseApi.getCategoryRules(user.id).catch(() => []),
+      ])
+      if (!transactions || transactions.length === 0) return false
+      const restored = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      if (restored.success && restored.session_id) {
+        navigate(`/?session_id=${restored.session_id}`, { replace: true })
+        return true
+      }
+    } catch {
+      // fall through — caller will surface the original error
+    }
+    return false
+  }, [user, navigate])
+
   // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionId) return
@@ -286,6 +310,7 @@ export default function Dashboard() {
         if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
         setIncomeSources((results[10] as IncomeSourcesData) ?? null)
 
+        recoveryAttempts.current = 0 // healthy load — allow future recovery
         setDataLoadedAt(new Date())
 
         // Auto-select most recent month
@@ -300,6 +325,10 @@ export default function Dashboard() {
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
+        // Stale in-memory session (e.g. backend cold-start on Render's free
+        // tier) → rebuild it from Supabase and retry, instead of erroring.
+        const status = (err as { response?: { status?: number } })?.response?.status
+        if (status === 404 && (await tryRecoverSession())) return
         const message = err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
         setError(message)
       } finally {
