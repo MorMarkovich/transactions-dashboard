@@ -1,0 +1,24 @@
+{
+  "name": "bank-sync",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local, on-demand bank/credit auto-import for מנתח עסקאות. Scrapes Israeli banks locally (israeli-bank-scrapers) and writes the snapshot to Supabase. Credentials never leave this machine.",
+  "scripts": {
+    "setup": "node src/setup.js",
+    "sync": "node src/sync.js",
+    "serve": "node src/server.js",
+    "test": "node --test",
+    "secrets:clear": "node src/setup.js --clear"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "israeli-bank-scrapers": "^5.2.0",
+    "keytar": "^7.9.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
