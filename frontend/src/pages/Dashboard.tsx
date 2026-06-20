@@ -104,6 +104,10 @@ export default function Dashboard() {
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('billing')
+  // Per-person filter: list of owners in the data + the currently selected one
+  // (null = everyone). The selection re-scopes every chart/metric below.
+  const [owners, setOwners] = useState<string[]>([])
+  const [selectedOwner, setSelectedOwner] = useState<string | null>(null)
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   // Bumping this forces every data-fetch effect to re-run; used after a
@@ -138,8 +142,9 @@ export default function Dashboard() {
     setDrawerLoading(true)
     try {
       // Use snapshot date range filters to match what the card displays
+      const sid = await transactionsApi.scopeSession(sessionId, selectedOwner)
       const data = await transactionsApi.getCategoryTransactions(
-        sessionId, '', categoryName, dateType, undefined, undefined,
+        sid, '', categoryName, dateType, undefined, undefined,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
       )
       setDrawerTransactions(data.transactions)
@@ -150,7 +155,7 @@ export default function Dashboard() {
     } finally {
       setDrawerLoading(false)
     }
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner])
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
@@ -222,6 +227,16 @@ export default function Dashboard() {
     return () => { document.getElementById(STYLE_ID)?.remove() }
   }, [])
 
+  // ── Load the list of people (owners) for the per-person filter ──
+  useEffect(() => {
+    if (!sessionId) { setOwners([]); return }
+    const controller = new AbortController()
+    transactionsApi.getOwners(sessionId, controller.signal)
+      .then(setOwners)
+      .catch(() => setOwners([]))
+    return () => controller.abort()
+  }, [sessionId, refreshKey])
+
   // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionId) return
@@ -233,17 +248,19 @@ export default function Dashboard() {
       setError(null)
 
       try {
+        // Re-scope to the selected person; reads use sid, edits use sessionId.
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal)
         const results = await Promise.all([
-          transactionsApi.getMetrics(sessionId, signal),
-          transactionsApi.getDonutChartV2(sessionId, signal),
-          transactionsApi.getMonthlyChartV2(sessionId, dateType, signal),
-          transactionsApi.getWeekdayChartV2(sessionId, signal),
-          transactionsApi.getWeeklySummary(sessionId, signal).catch(() => null),
-          transactionsApi.getForecast(sessionId, signal).catch(() => null),
-          transactionsApi.getSpendingVelocity(sessionId, signal).catch(() => null),
-          transactionsApi.getAnomalies(sessionId, signal).catch(() => null),
-          transactionsApi.getRecurring(sessionId, signal).catch(() => null),
-          transactionsApi.getIndustryMonthly(sessionId, dateType, signal).catch(() => null),
+          transactionsApi.getMetrics(sid, signal),
+          transactionsApi.getDonutChartV2(sid, signal),
+          transactionsApi.getMonthlyChartV2(sid, dateType, signal),
+          transactionsApi.getWeekdayChartV2(sid, signal),
+          transactionsApi.getWeeklySummary(sid, signal).catch(() => null),
+          transactionsApi.getForecast(sid, signal).catch(() => null),
+          transactionsApi.getSpendingVelocity(sid, signal).catch(() => null),
+          transactionsApi.getAnomalies(sid, signal).catch(() => null),
+          transactionsApi.getRecurring(sid, signal).catch(() => null),
+          transactionsApi.getIndustryMonthly(sid, dateType, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -280,7 +297,7 @@ export default function Dashboard() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, refreshKey])
+  }, [sessionId, dateType, refreshKey, selectedOwner])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
@@ -290,7 +307,8 @@ export default function Dashboard() {
     const fetchOverview = async () => {
       setMonthOverviewLoading(true)
       try {
-        const data = await transactionsApi.getMonthOverview(sessionId, selectedMonth, dateType, controller.signal)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+        const data = await transactionsApi.getMonthOverview(sid, selectedMonth, dateType, controller.signal)
         setMonthOverview(data)
       } catch {
         // non-critical
@@ -301,7 +319,7 @@ export default function Dashboard() {
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType, refreshKey])
+  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner])
 
   // ── Derived data ───────────────────────────────────────────────────
   const monthlyAmounts = useMemo(() => {
@@ -353,14 +371,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
-    transactionsApi.getCategorySnapshot(
-      sessionId, controller.signal,
-      snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
-    )
+    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+      .then((sid) => transactionsApi.getCategorySnapshot(
+        sid, controller.signal,
+        snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
+      ))
       .then((data) => setCategorySnapshot(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner])
 
   // ── Filtered + sorted snapshot categories (uses extracted pure fn) ────
   const snapshotFilterOpts = useMemo(() => ({
@@ -567,6 +586,37 @@ export default function Dashboard() {
         subtitle="סקירה כללית של ההוצאות וההכנסות שלך"
         icon={LayoutDashboard}
       />
+
+      {/* ── Per-person filter ────────────────────────────────────────── */}
+      {owners.length > 1 && (
+        <div
+          className="filter-chips"
+          style={{ position: 'relative', zIndex: 1, marginBottom: 'var(--space-md)', alignItems: 'center' }}
+        >
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginInlineEnd: '4px' }}>תצוגה לפי:</span>
+          <span
+            className={`filter-chip ${!selectedOwner ? 'active' : ''}`}
+            onClick={() => setSelectedOwner(null)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(null) }}
+          >
+            הכל
+          </span>
+          {owners.map((o) => (
+            <span
+              key={o}
+              className={`filter-chip ${selectedOwner === o ? 'active' : ''}`}
+              onClick={() => setSelectedOwner(o)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(o) }}
+            >
+              {o}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* ── Financial Health Banner ──────────────────────────────────── */}
       {metrics && (() => {
