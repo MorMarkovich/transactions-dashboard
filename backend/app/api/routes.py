@@ -962,6 +962,41 @@ async def get_donut_v2(sessionId: str = Query(...)):
     return {"categories": categories, "total": total}
 
 
+@router.get("/charts/v2/income-sources")
+async def get_income_sources(sessionId: str = Query(...)):
+    """Income (positive amounts) grouped by source — i.e. where it came from
+    (the payer/description), top 10 + 'אחר'. Respects the scoped session, so the
+    per-person filter applies automatically."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    income = df[df['סכום'] > 0].copy()
+    if income.empty:
+        return {"sources": [], "total": 0}
+
+    grouped = (
+        income
+        .groupby('תיאור')
+        .agg(value=('סכום', 'sum'), count=('סכום', 'size'))
+        .sort_values('value', ascending=False)
+    )
+
+    top = grouped.head(10)
+    other_val = float(grouped['value'].iloc[10:].sum()) if len(grouped) > 10 else 0.0
+    other_cnt = int(grouped['count'].iloc[10:].sum()) if len(grouped) > 10 else 0
+
+    sources = [
+        {"name": str(name), "value": round(_sanitize(float(row['value'])), 2), "count": int(row['count'])}
+        for name, row in top.iterrows()
+    ]
+    if other_val > 0:
+        sources.append({"name": "אחר", "value": round(other_val, 2), "count": other_cnt})
+
+    total = round(_sanitize(float(grouped['value'].sum())), 2)
+    return {"sources": sources, "total": total}
+
+
 @router.get("/charts/v2/category-snapshot")
 async def get_category_snapshot(
     sessionId: str = Query(...),

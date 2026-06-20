@@ -121,6 +121,17 @@ export interface RawDonutData {
   total: number;
 }
 
+export interface IncomeSourceItem {
+  name: string;
+  value: number;
+  count: number;
+}
+
+export interface IncomeSourcesData {
+  sources: IncomeSourceItem[];
+  total: number;
+}
+
 export interface RawMonthlyData {
   months: { month: string; amount: number }[];
 }

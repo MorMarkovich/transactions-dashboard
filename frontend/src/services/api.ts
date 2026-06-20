@@ -9,6 +9,7 @@ import type {
   ChartData,
   TransactionFilters,
   RawDonutData,
+  IncomeSourcesData,
   RawMonthlyData,
   RawWeekdayData,
   RawTrendData,
@@ -333,6 +334,18 @@ export const transactionsApi = {
    */
   getDonutChartV2: async (sessionId: string, signal?: AbortSignal): Promise<RawDonutData> => {
     const response = await api.get<RawDonutData>('/api/charts/v2/donut', {
+      params: { sessionId },
+      signal,
+    });
+    return response.data;
+  },
+
+  /**
+   * Income broken down by source (where it came from). Respects the scoped
+   * session, so it follows the per-person filter.
+   */
+  getIncomeSources: async (sessionId: string, signal?: AbortSignal): Promise<IncomeSourcesData> => {
+    const response = await api.get<IncomeSourcesData>('/api/charts/v2/income-sources', {
       params: { sessionId },
       signal,
     });
