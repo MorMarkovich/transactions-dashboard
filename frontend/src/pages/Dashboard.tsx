@@ -31,6 +31,7 @@ import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
+import DonutChart from '../components/charts/DonutChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
@@ -46,6 +47,7 @@ import { useAuth } from '../lib/AuthContext'
 import type {
   MetricsData,
   RawDonutData,
+  IncomeSourcesData,
   RawMonthlyData,
   RawWeekdayData,
   WeeklySummaryData,
@@ -74,6 +76,13 @@ function formatMonthLabel(mmYYYY: string): string {
   return `${HEBREW_MONTHS[mm] ?? mm} ${yyyy}`
 }
 
+// Legend colors for the income-sources list — same order as DonutChart's
+// palette so the dots match the pie slices.
+const INCOME_COLORS = [
+  '#818cf8', '#34d399', '#f87171', '#fbbf24', '#38bdf8',
+  '#a78bfa', '#f6ad55', '#68d391', '#fc8181', '#63b3ed', '#94a3b8',
+]
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -87,6 +96,7 @@ export default function Dashboard() {
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [, setDonutData] = useState<RawDonutData | null>(null)
+  const [incomeSources, setIncomeSources] = useState<IncomeSourcesData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
   const [, setWeekdayData] = useState<RawWeekdayData | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummaryData | null>(null)
@@ -261,6 +271,7 @@ export default function Dashboard() {
           transactionsApi.getAnomalies(sid, signal).catch(() => null),
           transactionsApi.getRecurring(sid, signal).catch(() => null),
           transactionsApi.getIndustryMonthly(sid, dateType, signal).catch(() => null),
+          transactionsApi.getIncomeSources(sid, signal).catch(() => null),
         ])
 
         setMetrics(results[0] as MetricsData)
@@ -273,6 +284,7 @@ export default function Dashboard() {
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
         if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
+        setIncomeSources((results[10] as IncomeSourcesData) ?? null)
 
         setDataLoadedAt(new Date())
 
@@ -1418,6 +1430,59 @@ export default function Dashboard() {
       <div style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
         <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
       </div>
+
+      {/* ── Income sources (where income came from) ────────────────── */}
+      {incomeSources && incomeSources.sources.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
+        >
+          <div className="section-header-v2" style={{ flexWrap: 'wrap' }}>
+            <span>מקורות הכנסה</span>
+            <span style={{ marginInlineStart: 'auto', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
+              {incomeSources.total.toLocaleString('he-IL')} ₪
+            </span>
+          </div>
+          <div
+            className="responsive-grid-2"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 260px) 1fr',
+              gap: 'var(--space-lg)',
+              alignItems: 'center',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-xl)',
+              padding: 'var(--space-5)',
+            }}
+          >
+            <DonutChart
+              data={incomeSources.sources.map((s) => ({ name: s.name, value: s.value }))}
+              total={incomeSources.total}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: 0 }}>
+              {incomeSources.sources.map((s, i) => {
+                const pct = incomeSources.total > 0 ? (s.value / incomeSources.total) * 100 : 0
+                return (
+                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+                    <span className="category-dot" style={{ background: INCOME_COLORS[i % INCOME_COLORS.length] }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+                      {s.name}
+                      {s.count > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}> · {s.count}</span>}
+                    </span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{Math.round(pct)}%</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--success)', direction: 'ltr', flexShrink: 0 }}>
+                      {s.value.toLocaleString('he-IL')} ₪
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Industry monthly comparison ────────────────────────────── */}
       {industryMonthly && industryMonthly.months.length >= 2 && (
