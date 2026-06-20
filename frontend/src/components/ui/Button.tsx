@@ -26,7 +26,7 @@ const variantStyles: Record<string, React.CSSProperties> = {
     background: 'var(--gradient-primary)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 2px 10px rgba(99, 102, 241, 0.35)',
+    boxShadow: '0 2px 6px -1px rgba(99, 102, 241, 0.4)',
   },
   secondary: {
     background: 'var(--bg-card)',
@@ -44,7 +44,7 @@ const variantStyles: Record<string, React.CSSProperties> = {
     background: 'var(--gradient-danger)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
+    boxShadow: '0 2px 6px -1px rgba(239, 68, 68, 0.35)',
   },
 }
 

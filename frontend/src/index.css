@@ -30,7 +30,13 @@ body {
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Headings — tighter tracking for a more confident, designed feel */
+h1, h2, h3 {
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 /* Scrollbar - single source of truth (no duplicate in globals.css scrollbar section overrides this) */
