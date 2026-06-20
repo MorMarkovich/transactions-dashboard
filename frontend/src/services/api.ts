@@ -42,6 +42,29 @@ const api = axios.create({
 
 export const transactionsApi = {
   /**
+   * List the distinct owners (people) present in the session, for the
+   * per-person filter. Returns [] when transactions aren't owner-tagged.
+   */
+  getOwners: async (sessionId: string, signal?: AbortSignal): Promise<string[]> => {
+    const response = await api.get<string[]>('/api/owners', { params: { sessionId }, signal });
+    return response.data;
+  },
+
+  /**
+   * Resolve a session id filtered to a single owner. Pass the returned id to
+   * the other read endpoints so every chart/metric reflects that person.
+   * An empty owner returns the base session unchanged.
+   */
+  scopeSession: async (sessionId: string, owner: string | null, signal?: AbortSignal): Promise<string> => {
+    if (!owner) return sessionId;
+    const response = await api.post<{ session_id: string }>('/api/session/scope', {
+      session_id: sessionId,
+      owner,
+    }, { signal });
+    return response.data.session_id || sessionId;
+  },
+
+  /**
    * Restore a backend session from saved transaction JSON data.
    * Optionally pass user-defined merchant→category rules; the backend
    * applies them after auto-categorization so they always win.

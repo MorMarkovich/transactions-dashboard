@@ -727,6 +727,46 @@ async def get_session_info(sessionId: str = Query(...)):
     }
 
 
+@router.get("/owners")
+async def get_owners(sessionId: str = Query(...)):
+    """Distinct owners present in the session, for the per-person filter."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    df = sessions[sessionId]
+    if '_owner' not in df.columns:
+        return []
+    vals = [str(o).strip() for o in df['_owner'].dropna().unique().tolist()]
+    return sorted(v for v in vals if v and v.lower() != 'nan')
+
+
+class ScopeSessionRequest(BaseModel):
+    session_id: str
+    owner: Optional[str] = None
+
+
+@router.post("/session/scope")
+async def scope_session(body: ScopeSessionRequest):
+    """Return a session id whose data is filtered to a single owner (_owner).
+
+    The dashboard's per-person filter calls this and then passes the returned id
+    to every existing read endpoint, so all charts/metrics reflect the chosen
+    person without per-endpoint changes. An empty owner (or 'all'/'הכל') returns
+    the base session. The filtered session is rebuilt from the base on every
+    call, so it always reflects the latest edits."""
+    base = body.session_id
+    if base not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    owner = (body.owner or '').strip()
+    if not owner or owner.lower() == 'all' or owner == 'הכל':
+        return {"session_id": base}
+    df = sessions[base]
+    if '_owner' not in df.columns:
+        return {"session_id": base}
+    scoped_id = f"{base}::owner={owner}"
+    sessions[scoped_id] = df[df['_owner'] == owner].reset_index(drop=True)
+    return {"session_id": scoped_id}
+
+
 @router.get("/metrics")
 async def get_metrics(sessionId: str = Query(...)):
     """Get metrics data"""
