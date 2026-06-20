@@ -421,7 +421,7 @@ export default function CategoryTransactionsDrawer({
                                     fontSize: '0.6875rem',
                                     borderRadius: 'var(--radius-full)',
                                     border: selected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
-                                    background: selected ? 'var(--accent-soft, rgba(125, 125, 255, 0.15))' : 'var(--glass-bg)',
+                                    background: selected ? 'var(--accent-muted)' : 'var(--glass-bg)',
                                     color: selected ? 'var(--accent)' : 'var(--text-secondary)',
                                     cursor: isSaving ? 'wait' : 'pointer',
                                     fontFamily: 'var(--font-family)',

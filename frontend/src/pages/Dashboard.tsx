@@ -1431,7 +1431,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)' }}>השבוע</span>
               {weeklySummary.change_pct !== 0 && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)', color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: weeklySummary.change_pct > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(52, 211, 153, 0.12)', color: weeklySummary.change_pct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--success)' }}>
                   {weeklySummary.change_pct > 0 ? '↑' : '↓'} {Math.abs(weeklySummary.change_pct)}%
                 </span>
               )}
@@ -1470,7 +1470,7 @@ export default function Dashboard() {
                   formatter={formatCurrency}
                   style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--text-primary)' }}
                 />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: forecast.trend_direction === 'up' ? 'rgba(239, 68, 68, 0.12)' : forecast.trend_direction === 'down' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(148, 163, 184, 0.12)', color: forecast.trend_direction === 'up' ? 'var(--accent-danger, #ef4444)' : forecast.trend_direction === 'down' ? 'var(--accent-secondary, #10b981)' : 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', background: forecast.trend_direction === 'up' ? 'rgba(239, 68, 68, 0.12)' : forecast.trend_direction === 'down' ? 'rgba(52, 211, 153, 0.12)' : 'rgba(148, 163, 184, 0.12)', color: forecast.trend_direction === 'up' ? 'var(--accent-danger, #ef4444)' : forecast.trend_direction === 'down' ? 'var(--success)' : 'var(--text-muted)' }}>
                   {forecast.trend_direction === 'up' ? '↑ עלייה' : forecast.trend_direction === 'down' ? '↓ ירידה' : '→ יציב'}
                 </span>
               </div>
@@ -1591,7 +1591,7 @@ export default function Dashboard() {
                       textAlign: 'center',
                       padding: 'var(--space-md)',
                       borderRadius: 'var(--radius-md)',
-                      background: isSelected ? 'var(--accent-muted)' : 'var(--bg-tertiary, rgba(255,255,255,0.03))',
+                      background: isSelected ? 'var(--accent-muted)' : 'var(--bg-secondary)',
                       border: isSelected ? '1px solid var(--border-accent)' : '1px solid transparent',
                       cursor: 'pointer',
                       transition: 'all 0.15s',
@@ -1604,7 +1604,7 @@ export default function Dashboard() {
                       {formatCurrency(month.amount)}
                     </div>
                     {changePct !== null && (
-                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)' }}>
+                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--success)' }}>
                         {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
                       </div>
                     )}

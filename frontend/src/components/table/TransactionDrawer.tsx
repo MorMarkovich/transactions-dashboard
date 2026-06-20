@@ -168,7 +168,7 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                   fontSize: '2rem',
                   fontWeight: 800,
                   fontFamily: 'var(--font-mono)',
-                  color: isExpense ? 'var(--accent-danger, #ef4444)' : 'var(--accent-secondary, #10b981)',
+                  color: isExpense ? 'var(--accent-danger, #ef4444)' : 'var(--success)',
                   direction: 'ltr',
                   letterSpacing: '-0.02em',
                 }}
