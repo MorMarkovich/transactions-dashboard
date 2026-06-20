@@ -1,7 +1,7 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
 import { categorize, applyRules } from './categorize.js'
-import { isBankProvider } from './providers.js'
+import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 
 function pad2(n) { return String(n).padStart(2, '0') }
 function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
@@ -41,6 +41,10 @@ export function normalizeTxn(raw, provider, ruleMap) {
     'יום_בשבוע': pandasDow(date),
     'הערות': raw.memo ? String(raw.memo) : null,
     '_is_bank_row': bankRow,
+    // Tag the account so you can filter/reconcile per card in the dashboard
+    // (the existing "source" UI reads _source_file) and in `npm run verify`.
+    '_source_file': PROVIDER_LABELS[provider] || provider,
+    '_provider': provider,
   }
 
   // Billing date — credit cards only.
@@ -66,16 +70,30 @@ export function txnKey(t) {
  * carry server-side categories); new rows are appended; ids are reassigned.
  */
 export function mergeSnapshots(existing, fresh) {
-  const seen = new Set((existing || []).map(txnKey))
   const merged = [...(existing || [])]
+  const byKey = new Map(merged.map((t) => [txnKey(t), t]))
   let added = 0
+  let enriched = 0
   for (const t of fresh) {
     const k = txnKey(t)
-    if (seen.has(k)) continue
-    seen.add(k)
+    const existingRow = byKey.get(k)
+    if (existingRow) {
+      // Same transaction — never double-count, but backfill any fields the
+      // stored row is missing (e.g. account tags added in a later version).
+      let changed = false
+      for (const [field, val] of Object.entries(t)) {
+        if (existingRow[field] === undefined || existingRow[field] === null) {
+          existingRow[field] = val
+          changed = true
+        }
+      }
+      if (changed) enriched++
+      continue
+    }
+    byKey.set(k, t)
     merged.push(t)
     added++
   }
   merged.forEach((t, i) => { t.id = i })
-  return { merged, added }
+  return { merged, added, enriched }
 }

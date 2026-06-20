@@ -70,17 +70,17 @@ export async function runSync(log = () => {}) {
     }
   }
 
-  const { merged, added } = mergeSnapshots(existing, fresh)
+  const { merged, added, enriched } = mergeSnapshots(existing, fresh)
 
-  // Only write if something actually changed, to avoid piling up identical snapshots.
-  if (added > 0) {
-    log(`שומר snapshot (${merged.length} עסקאות, ${added} חדשות)…`)
+  // Write if anything changed (new rows or backfilled fields on existing rows).
+  if (added > 0 || enriched > 0) {
+    log(`שומר snapshot (${merged.length} עסקאות, ${added} חדשות${enriched ? `, ${enriched} עודכנו` : ''})…`)
     await insertSnapshot(supabase, userId, merged)
   } else {
-    log('אין עסקאות חדשות — לא נשמר snapshot חדש.')
+    log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  return { success: true, added, total: merged.length, byProvider, errors }
+  return { success: true, added, enriched, total: merged.length, byProvider, errors }
 }
 
 // Token check helper shared with the server (constant-time compare).
