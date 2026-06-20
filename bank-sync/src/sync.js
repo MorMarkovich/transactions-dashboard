@@ -2,6 +2,8 @@
 // + categorize, merge into the latest Supabase snapshot (dedup), and insert the
 // merged snapshot. Exposed as a function (used by server.js) and runnable
 // directly as a CLI (`npm run sync`).
+import { mkdirSync } from 'node:fs'
+import path from 'node:path'
 import { config, assertConfig } from './config.js'
 import { getJSON, getSecret, credKey, SUPABASE_AUTH_KEY } from './secrets.js'
 import { scrapeProvider } from './scrape.js'
@@ -41,11 +43,19 @@ export async function runSync(log = () => {}) {
     }
     try {
       log(`סורק ${provider}…`)
+      // In debug mode, save a screenshot of the failure screen for inspection.
+      let failureScreenshotPath = ''
+      if (config.keepBrowserOpen) {
+        const dir = path.resolve(process.cwd(), 'debug')
+        mkdirSync(dir, { recursive: true })
+        failureScreenshotPath = path.join(dir, `${provider}-failure.png`)
+      }
       const raw = await scrapeProvider(provider, credentials, {
         monthsBack: config.monthsBack,
         showBrowser: config.showBrowser,
         executablePath: config.chromePath,
         keepBrowserOpen: config.keepBrowserOpen,
+        failureScreenshotPath,
       })
       let count = 0
       for (const t of raw) {
