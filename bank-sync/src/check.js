@@ -16,7 +16,7 @@ import { SALARY_KEYWORDS, isSalary } from './income.js'
 const ils = (n) =>
   `${n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₪`
 
-const SALARY_MIN = Number(process.env.SALARY_MIN) || 4000
+const SALARY_MIN = process.env.SALARY_MIN !== undefined ? Number(process.env.SALARY_MIN) : 0
 
 let warnings = 0
 let problems = 0

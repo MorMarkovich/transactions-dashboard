@@ -40,7 +40,7 @@ export const config = {
   // pay counts as the previous month, 'none' = leave as-is.
   incomeShiftDirection: process.env.INCOME_SHIFT || 'next',
   incomeShiftDay: process.env.INCOME_SHIFT_DAY !== undefined ? Number(process.env.INCOME_SHIFT_DAY) : undefined,
-  salaryMin: Number(process.env.SALARY_MIN) || 4000,
+  salaryMin: process.env.SALARY_MIN !== undefined ? Number(process.env.SALARY_MIN) : 0,
 }
 
 export function assertConfig() {
