@@ -43,13 +43,11 @@ export async function runSync(log = () => {}) {
     }
     try {
       log(`סורק ${provider}…`)
-      // In debug mode, save a screenshot of the failure screen for inspection.
-      let failureScreenshotPath = ''
-      if (config.keepBrowserOpen) {
-        const dir = path.resolve(process.cwd(), 'debug')
-        mkdirSync(dir, { recursive: true })
-        failureScreenshotPath = path.join(dir, `${provider}-failure.png`)
-      }
+      // Always save a screenshot of the failure screen for inspection (only
+      // written on a GENERAL_ERROR; debug/ is gitignored).
+      const debugDir = path.resolve(process.cwd(), 'debug')
+      mkdirSync(debugDir, { recursive: true })
+      const failureScreenshotPath = path.join(debugDir, `${provider}-failure.png`)
       const raw = await scrapeProvider(provider, credentials, {
         monthsBack: config.monthsBack,
         showBrowser: config.showBrowser,
