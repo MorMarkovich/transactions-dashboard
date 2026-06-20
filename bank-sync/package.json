@@ -8,6 +8,7 @@
     "setup": "node src/setup.js",
     "sync": "node src/sync.js",
     "verify": "node src/verify.js",
+    "check": "node src/check.js",
     "serve": "node src/server.js",
     "test": "node --test",
     "secrets:clear": "node src/setup.js --clear"
