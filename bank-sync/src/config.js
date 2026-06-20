@@ -35,6 +35,12 @@ export const config = {
   // for slow SPAs like Discount. Plus a couple of navigation retries.
   scrapeTimeout: process.env.SCRAPE_TIMEOUT !== undefined ? Number(process.env.SCRAPE_TIMEOUT) : 120000,
   navRetryCount: process.env.NAV_RETRY !== undefined ? Number(process.env.NAV_RETRY) : 2,
+  // Income-month attribution for salaries near a month boundary:
+  // 'next' = late-month pay counts as the following month, 'prev' = early-month
+  // pay counts as the previous month, 'none' = leave as-is.
+  incomeShiftDirection: process.env.INCOME_SHIFT || 'next',
+  incomeShiftDay: process.env.INCOME_SHIFT_DAY !== undefined ? Number(process.env.INCOME_SHIFT_DAY) : undefined,
+  salaryMin: Number(process.env.SALARY_MIN) || 4000,
 }
 
 export function assertConfig() {

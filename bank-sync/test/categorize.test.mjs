@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { categorize, applyRules } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots } from '../src/normalize.js'
+import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 
 // ── Categorizer ──────────────────────────────────────────────────────────
 test('supermarket → מזון וצריכה', () => {
@@ -91,6 +92,37 @@ test('normalize: bank row has no billing date; income stays positive', () => {
 test('normalize: zero amount / bad date are dropped', () => {
   assert.equal(normalizeTxn({ date: '2024-01-01T12:00:00', chargedAmount: 0, description: 'x' }, 'leumi', new Map()), null)
   assert.equal(normalizeTxn({ date: 'not-a-date', chargedAmount: 5, description: 'x' }, 'leumi', new Map()), null)
+})
+
+// ── Income month attribution ──────────────────────────────────────────────
+test('isSalary detects keyword and large deposits, ignores expenses', () => {
+  assert.equal(isSalary({ 'סכום': 12000, 'תיאור': 'משכורת' }), true)
+  assert.equal(isSalary({ 'סכום': 5000, 'תיאור': 'העברה כלשהי' }, 4000), true) // large deposit
+  assert.equal(isSalary({ 'סכום': 200, 'תיאור': 'החזר קטן' }), false) // small, no keyword
+  assert.equal(isSalary({ 'סכום': -12000, 'תיאור': 'משכורת' }), false) // negative
+})
+
+test('income shift "next": late-month salary moves to following month', () => {
+  const txns = [
+    { 'תאריך': '2024-01-27', 'סכום': 12000, 'תיאור': 'משכורת', 'חודש': '01/2024' },
+    { 'תאריך': '2024-02-02', 'סכום': 12000, 'תיאור': 'משכורת', 'חודש': '02/2024' },
+    { 'תאריך': '2024-02-05', 'סכום': 15000, 'תיאור': 'משכורת', 'חודש': '02/2024' },
+    { 'תאריך': '2024-01-15', 'סכום': -200, 'תיאור': 'שופרסל', 'חודש': '01/2024' },
+  ]
+  const changed = applyIncomeMonthShift(txns, { direction: 'next', cutoffDay: 25, salaryMin: 4000 })
+  assert.equal(changed, 1) // only the Jan-27 salary shifts
+  assert.equal(txns[0]['חודש'], '02/2024')
+  assert.equal(txns[0]['תאריך_חיוב'], '2024-02-01')
+  assert.equal(txns[1]['חודש'], '02/2024') // unchanged
+  assert.equal(txns[2]['חודש'], '02/2024') // mid-month, unchanged
+  assert.equal(txns[3]['חודש'], '01/2024') // expense untouched
+})
+
+test('income shift crosses year boundary and is idempotent', () => {
+  const txns = [{ 'תאריך': '2024-12-28', 'סכום': 12000, 'תיאור': 'משכורת', 'חודש': '12/2024' }]
+  assert.equal(applyIncomeMonthShift(txns, { direction: 'next', cutoffDay: 25 }), 1)
+  assert.equal(txns[0]['חודש'], '01/2025')
+  assert.equal(applyIncomeMonthShift(txns, { direction: 'next', cutoffDay: 25 }), 0) // idempotent
 })
 
 test('txnKey + mergeSnapshots dedup, count, and reindex', () => {
