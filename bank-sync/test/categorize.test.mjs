@@ -1,0 +1,106 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { categorize, applyRules } from '../src/categorize.js'
+import { normalizeTxn, txnKey, mergeSnapshots } from '../src/normalize.js'
+
+// ── Categorizer ──────────────────────────────────────────────────────────
+test('supermarket → מזון וצריכה', () => {
+  assert.equal(categorize('שופרסל דיל רמת גן'), 'מזון וצריכה')
+})
+
+test('restaurant → מסעדות, קפה וברים', () => {
+  assert.equal(categorize('מקדונלד'), 'מסעדות, קפה וברים')
+})
+
+test('fuel → דלק, חשמל וגז', () => {
+  assert.equal(categorize('סונול תחנת דלק'), 'דלק, חשמל וגז')
+})
+
+test('atm → משיכת מזומן', () => {
+  assert.equal(categorize('משיכת מזומן כספומט'), 'משיכת מזומן')
+})
+
+test('Psagot → העברה להשקעות (override)', () => {
+  assert.equal(categorize('העברה פסגות גמל'), 'העברה להשקעות')
+})
+
+test('check withdrawal → שכר דירה (override)', () => {
+  assert.equal(categorize('משיכת שיקים'), 'שכר דירה')
+})
+
+test('standing order → הוראות קבע (override)', () => {
+  assert.equal(categorize('הוראת קבע ועד בית'), 'הוראות קבע')
+})
+
+test('hotel matches טיסות via substring (before boundary "hot")', () => {
+  assert.equal(categorize('Booking.com Hotel Berlin'), 'טיסות ותיירות')
+})
+
+test('boundary keyword "hot" matches as a whole word', () => {
+  assert.equal(categorize('HOT mobile'), 'שירותי תקשורת')
+})
+
+test('boundary keyword does NOT match inside a word ("hotdog")', () => {
+  assert.equal(categorize('hotdog kiosk zzz'), 'שונות')
+})
+
+test('unknown merchant → שונות', () => {
+  assert.equal(categorize('qwerty zzz 12345'), 'שונות')
+})
+
+test('user rule overrides keyword category', () => {
+  const ruleMap = new Map([['שופרסל דיל', 'מתנות']])
+  const base = categorize('שופרסל דיל')
+  assert.equal(base, 'מזון וצריכה')
+  assert.equal(applyRules(base, 'שופרסל דיל', ruleMap), 'מתנות')
+})
+
+// ── Normalizer ───────────────────────────────────────────────────────────
+test('normalize: signs, abs, month, weekday, card billing date', () => {
+  const raw = {
+    date: '2024-01-01T12:00:00',
+    processedDate: '2024-02-02T12:00:00',
+    chargedAmount: -342.8,
+    description: '  שופרסל דיל  ',
+    memo: 'תשלום 1 מתוך 3',
+  }
+  const t = normalizeTxn(raw, 'max', new Map())
+  assert.equal(t['תאריך'], '2024-01-01')
+  assert.equal(t['סכום'], -342.8)
+  assert.equal(t['סכום_מוחלט'], 342.8)
+  assert.equal(t['חודש'], '01/2024')
+  assert.equal(t['יום_בשבוע'], 0) // 2024-01-01 is Monday → pandas 0
+  assert.equal(t['תיאור'], 'שופרסל דיל')
+  assert.equal(t['קטגוריה'], 'מזון וצריכה')
+  assert.equal(t['הערות'], 'תשלום 1 מתוך 3')
+  assert.equal(t['_is_bank_row'], false) // max is a card
+  assert.equal(t['תאריך_חיוב'], '2024-02-02')
+  assert.equal(t['חודש_חיוב'], '02/2024')
+})
+
+test('normalize: bank row has no billing date; income stays positive', () => {
+  const t = normalizeTxn(
+    { date: '2024-03-10T12:00:00', chargedAmount: 18450, description: 'משכורת' },
+    'leumi', new Map(),
+  )
+  assert.equal(t['_is_bank_row'], true)
+  assert.equal(t['תאריך_חיוב'], undefined)
+  assert.equal(t['סכום'], 18450)
+})
+
+test('normalize: zero amount / bad date are dropped', () => {
+  assert.equal(normalizeTxn({ date: '2024-01-01T12:00:00', chargedAmount: 0, description: 'x' }, 'leumi', new Map()), null)
+  assert.equal(normalizeTxn({ date: 'not-a-date', chargedAmount: 5, description: 'x' }, 'leumi', new Map()), null)
+})
+
+test('txnKey + mergeSnapshots dedup, count, and reindex', () => {
+  const a = { 'תאריך': '2024-01-01', 'סכום': -10, 'תיאור': 'a' }
+  const b = { 'תאריך': '2024-01-02', 'סכום': -20, 'תיאור': 'b' }
+  const bDup = { 'תאריך': '2024-01-02', 'סכום': -20, 'תיאור': 'b' }
+  const c = { 'תאריך': '2024-01-03', 'סכום': -30, 'תיאור': 'c' }
+  assert.equal(txnKey(b), '2024-01-02|-20|b')
+  const { merged, added } = mergeSnapshots([a], [bDup, b, c])
+  assert.equal(added, 2) // b once + c; bDup deduped
+  assert.equal(merged.length, 3)
+  assert.deepEqual(merged.map((t) => t.id), [0, 1, 2])
+})
