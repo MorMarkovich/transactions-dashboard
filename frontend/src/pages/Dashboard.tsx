@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
 import { motion } from 'framer-motion'
 import {
@@ -34,6 +34,7 @@ import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
+import RefreshFromBanks from '../components/common/RefreshFromBanks'
 import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -78,6 +79,7 @@ function formatMonthLabel(mmYYYY: string): string {
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
   const { setNotifications } = useAppNotifications()
   const { user } = useAuth()
@@ -477,19 +479,49 @@ export default function Dashboard() {
     }
   }, [selectedMonthIdx, availableMonths])
 
+  // After the local bank-sync tool writes a fresh snapshot to Supabase, load it
+  // through the normal restore path (same flow as a manual upload).
+  const handleBankSynced = async () => {
+    if (!user) return
+    try {
+      const [transactions, rules] = await Promise.all([
+        supabaseApi.getLatestTransactions(user.id),
+        supabaseApi.getCategoryRules(user.id).catch(() => []),
+      ])
+      if (!transactions || transactions.length === 0) return
+      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      if (merged.success && merged.session_id) {
+        navigate(`/?session_id=${merged.session_id}`)
+      }
+    } catch (err) {
+      console.error('Failed to reload after bank sync:', err)
+    }
+  }
+
   // ── No session ────────────────────────────────────────────────────
   if (!sessionId) {
     return (
       <>
         <EmptyState
-          icon="📊"
-          title={'ברוכים הבאים לדאשבורד!'}
-          text={'העלה קובץ אקסל או CSV מחברת האשראי שלך כדי להתחיל בניתוח'}
+          icon="🏦"
+          title={'חברו את חשבונות הבנק והאשראי'}
+          text={'סנכרנו את העסקאות ישירות מהבנקים וחברות האשראי — בלי להעלות קבצים ידנית.'}
         />
+
+        {/* Primary action — pull transactions straight from the banks */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-lg)' }}>
+          <div style={{ width: '100%', maxWidth: '320px' }}>
+            <RefreshFromBanks onSynced={handleBankSynced} />
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', margin: 0, textAlign: 'center' }}>
+            דורש את כלי הסנכרון המקומי שרץ במחשב שלך · אפשר גם להעלות קובץ מהסרגל הצדי
+          </p>
+        </div>
+
         <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
-          <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים וחכמים לתובנות מיידיות</div></div>
-          <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי אוטומטי של קטגוריות מהקובץ המקורי</div></div>
-          <div className="feature-card"><div className="feature-icon">📑</div><div className="feature-title">תמיכה מלאה</div><div className="feature-desc">Excel עם מספר גליונות, CSV בעברית מלאה</div></div>
+          <div className="feature-card"><div className="feature-icon">🔄</div><div className="feature-title">סנכרון אוטומטי</div><div className="feature-desc">לאומי, דיסקונט, MAX וישראכרט — ישירות לדאשבורד</div></div>
+          <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי חכם של קטגוריות לכל עסקה</div></div>
+          <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים ותובנות מיידיות</div></div>
         </div>
       </>
     )
