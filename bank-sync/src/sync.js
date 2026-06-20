@@ -5,11 +5,25 @@
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { config, assertConfig } from './config.js'
-import { getJSON, getSecret, credKey, SUPABASE_AUTH_KEY } from './secrets.js'
+import { getJSON, credKey, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
+import { PROVIDER_LABELS } from './providers.js'
 import { scrapeProvider } from './scrape.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+
+// The accounts to sync: the keychain registry if present, otherwise a legacy
+// fallback derived from PROVIDERS (one account per provider, owner unknown).
+async function resolveAccounts() {
+  const registry = await getAccounts()
+  if (registry.length) return registry
+  return config.providers.map((provider) => ({
+    key: provider,
+    provider,
+    owner: undefined,
+    label: PROVIDER_LABELS[provider] || provider,
+  }))
+}
 
 /**
  * @param {(msg:string)=>void} [log] progress callback
@@ -37,20 +51,21 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
   const byProvider = {}
   const errors = {}
 
-  for (const provider of config.providers) {
-    const credentials = await getJSON(credKey(provider))
+  const accounts = await resolveAccounts()
+  for (const acct of accounts) {
+    const credentials = await getJSON(credKey(acct.key))
     if (!credentials) {
-      log(`דילוג על ${provider} (אין פרטי התחברות)`) // not set up — skip
+      log(`דילוג על ${acct.label || acct.key} (אין פרטי התחברות)`) // not set up — skip
       continue
     }
     try {
-      log(`סורק ${provider}…`)
+      log(`סורק ${acct.label || acct.key}…`)
       // Always save a screenshot of the failure screen for inspection (only
       // written on a GENERAL_ERROR; debug/ is gitignored).
       const debugDir = path.resolve(process.cwd(), 'debug')
       mkdirSync(debugDir, { recursive: true })
-      const failureScreenshotPath = path.join(debugDir, `${provider}-failure.png`)
-      const raw = await scrapeProvider(provider, credentials, {
+      const failureScreenshotPath = path.join(debugDir, `${acct.key}-failure.png`)
+      const raw = await scrapeProvider(acct.provider, credentials, {
         monthsBack: config.monthsBack,
         showBrowser: config.showBrowser,
         executablePath: config.chromePath,
@@ -62,14 +77,14 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
       })
       let count = 0
       for (const t of raw) {
-        const n = normalizeTxn(t, provider, ruleMap)
+        const n = normalizeTxn(t, acct, ruleMap, config.ownerKeywords)
         if (n) { freshTxns.push(n); count++ }
       }
-      byProvider[provider] = count
-      log(`${provider}: ${count} עסקאות`)
+      byProvider[acct.key] = count
+      log(`${acct.label || acct.key}: ${count} עסקאות`)
     } catch (err) {
-      errors[provider] = err.message || String(err)
-      log(`שגיאה ב-${provider}: ${errors[provider]}`)
+      errors[acct.key] = err.message || String(err)
+      log(`שגיאה ב-${acct.label || acct.key}: ${errors[acct.key]}`)
     }
   }
 

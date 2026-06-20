@@ -2,6 +2,7 @@
 // login, sync token) come from the OS keychain — never from here.
 import 'dotenv/config'
 import { SUPPORTED } from './providers.js'
+import { parseOwnerKeywords } from './owner.js'
 
 function list(value, fallback) {
   if (!value) return fallback
@@ -44,6 +45,8 @@ export const config = {
   // false (default) = split installments so each monthly charge is its own line
   // on its billing date, matching the card statement. true = one combined line.
   combineInstallments: String(process.env.COMBINE_INSTALLMENTS || '').toLowerCase() === 'true',
+  // Owner name → keywords used to attribute joint-account rows to a person.
+  ownerKeywords: parseOwnerKeywords(process.env.OWNER_KEYWORDS),
 }
 
 export function assertConfig() {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { categorize, applyRules } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
+import { detectOwner, JOINT } from '../src/owner.js'
 
 // ── Categorizer ──────────────────────────────────────────────────────────
 test('supermarket → מזון וצריכה', () => {
@@ -54,6 +55,32 @@ test('user rule overrides keyword category', () => {
   const base = categorize('שופרסל דיל')
   assert.equal(base, 'מזון וצריכה')
   assert.equal(applyRules(base, 'שופרסל דיל', ruleMap), 'מתנות')
+})
+
+// ── Owner attribution ──────────────────────────────────────────────────────
+test('detectOwner: a personal account keeps its owner regardless of description', () => {
+  assert.equal(detectOwner('כל תיאור שהוא', 'שלי'), 'שלי')
+  assert.equal(detectOwner('מתנה עבור מור', 'שלי'), 'שלי') // account owner wins on personal cards
+})
+
+test('detectOwner: a joint account attributes by keyword, else joint', () => {
+  assert.equal(detectOwner('בנק פועלים משכורת', JOINT), 'מור')
+  assert.equal(detectOwner('ישראכרט מש משכורת', JOINT), 'שלי')
+  assert.equal(detectOwner('שופרסל דיל', JOINT), JOINT)
+})
+
+test('normalizeTxn tags _owner and account label from a personal account', () => {
+  const acct = { provider: 'isracard', owner: 'שלי', label: 'ישראכרט (שלי)' }
+  const t = normalizeTxn({ date: '2024-01-10T12:00:00', chargedAmount: -50, description: 'קפה' }, acct, new Map())
+  assert.equal(t['_owner'], 'שלי')
+  assert.equal(t['_source_file'], 'ישראכרט (שלי)')
+  assert.equal(t['_provider'], 'isracard')
+})
+
+test('normalizeTxn name-detects owner on a joint bank account', () => {
+  const acct = { provider: 'discount', owner: JOINT, label: 'בנק דיסקונט' }
+  const t = normalizeTxn({ date: '2024-03-05T12:00:00', chargedAmount: 10652, description: 'בנק פועלים משכורת' }, acct, new Map())
+  assert.equal(t['_owner'], 'מור')
 })
 
 // ── Normalizer ───────────────────────────────────────────────────────────
