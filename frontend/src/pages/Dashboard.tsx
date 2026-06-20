@@ -31,7 +31,6 @@ import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
-import DonutChart from '../components/charts/DonutChart'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
@@ -628,8 +627,9 @@ export default function Dashboard() {
         icon={LayoutDashboard}
       />
 
-      {/* ── Per-person filter ────────────────────────────────────────── */}
-      {owners.length > 1 && (
+      {/* ── Per-person filter (הכל = everyone incl. shared; person chips
+              only — "משותף"/shared rows are part of הכל, not a separate view) ── */}
+      {owners.filter((o) => o !== 'משותף').length > 1 && (
         <div
           className="filter-chips"
           style={{ position: 'relative', zIndex: 1, marginBottom: 'var(--space-md)', alignItems: 'center' }}
@@ -644,7 +644,7 @@ export default function Dashboard() {
           >
             הכל
           </span>
-          {owners.map((o) => (
+          {owners.filter((o) => o !== 'משותף').map((o) => (
             <span
               key={o}
               className={`filter-chip ${selectedOwner === o ? 'active' : ''}`}
@@ -1475,28 +1475,23 @@ export default function Dashboard() {
             </span>
           </div>
           <div
-            className="responsive-grid-2"
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 260px) 1fr',
-              gap: 'var(--space-lg)',
-              alignItems: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-xl)',
               padding: 'var(--space-5)',
             }}
           >
-            <DonutChart
-              data={incomeSources.sources.map((s) => ({ name: s.name, value: s.value }))}
-              total={incomeSources.total}
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: 0 }}>
-              {incomeSources.sources.map((s, i) => {
-                const pct = incomeSources.total > 0 ? (s.value / incomeSources.total) * 100 : 0
-                return (
-                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
-                    <span className="category-dot" style={{ background: INCOME_COLORS[i % INCOME_COLORS.length] }} />
+            {incomeSources.sources.map((s, i) => {
+              const pct = incomeSources.total > 0 ? (s.value / incomeSources.total) * 100 : 0
+              const color = INCOME_COLORS[i % INCOME_COLORS.length]
+              return (
+                <div key={s.name}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '6px', minWidth: 0 }}>
+                    <span className="category-dot" style={{ background: color }} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
                       {s.name}
                       {s.count > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}> · {s.count}</span>}
@@ -1506,9 +1501,12 @@ export default function Dashboard() {
                       {s.value.toLocaleString('he-IL')} ₪
                     </span>
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{ height: '8px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.max(pct, 1.5)}%`, height: '100%', background: color, borderRadius: 'var(--radius-full)' }} />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </motion.div>
       )}
