@@ -22,6 +22,12 @@ export const config = {
   providers: list(process.env.PROVIDERS, SUPPORTED).filter((p) => SUPPORTED.includes(p)),
   monthsBack: Number(process.env.MONTHS_BACK) || 3,
   showBrowser: String(process.env.SHOW_BROWSER || '').toLowerCase() === 'true',
+  // Use an already-installed Chrome instead of the (often broken on Apple
+  // Silicon) bundled Chromium. Defaults to the standard macOS Chrome path.
+  chromePath: process.env.CHROME_PATH
+    || (process.platform === 'darwin'
+      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+      : ''),
 }
 
 export function assertConfig() {
