@@ -2,6 +2,7 @@
 // shape (see backend/app/models/transaction.py + data_processor.py).
 import { categorize, applyRules } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
+import { detectOwner } from './owner.js'
 
 function pad2(n) { return String(n).padStart(2, '0') }
 function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
@@ -12,11 +13,17 @@ function pandasDow(d) { return (d.getDay() + 6) % 7 }
 
 /**
  * @param {object} raw   one scraper txn ({ date, processedDate, chargedAmount, originalAmount, description, memo })
- * @param {string} provider
+ * @param {string|{provider:string,owner?:string,label?:string}} account  account (or a bare provider id)
  * @param {Map<string,string>} ruleMap merchant→category overrides
+ * @param {object} [ownerKeywords]  owner → keywords map for joint-account attribution
  * @returns normalized txn, or null if it should be dropped (zero amount / bad date)
  */
-export function normalizeTxn(raw, provider, ruleMap) {
+export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
+  // Accept a bare provider string for backward compatibility.
+  const acct = typeof account === 'string'
+    ? { provider: account, owner: undefined, label: PROVIDER_LABELS[account] || account }
+    : account
+  const provider = acct.provider
   const date = new Date(raw.date)
   if (isNaN(date.getTime())) return null
 
@@ -53,8 +60,10 @@ export function normalizeTxn(raw, provider, ruleMap) {
     '_is_bank_row': bankRow,
     // Tag the account so you can filter/reconcile per card in the dashboard
     // (the existing "source" UI reads _source_file) and in `npm run verify`.
-    '_source_file': PROVIDER_LABELS[provider] || provider,
+    '_source_file': acct.label || PROVIDER_LABELS[provider] || provider,
     '_provider': provider,
+    // Owner attribution: personal account → its owner; joint → name-detected.
+    '_owner': detectOwner(baseDesc, acct.owner, ownerKeywords),
   }
 
   // Billing date — credit cards only.

@@ -39,3 +39,13 @@ export const PROVIDER_FIELDS = {
 
 export const isBankProvider = (p) => BANK_PROVIDERS.includes(p)
 export const isCardProvider = (p) => CARD_PROVIDERS.includes(p)
+
+// A unique account key for the registry: the provider for the first account of
+// that provider, then provider-2, provider-3, … for additional ones (e.g. a
+// second Isracard for a spouse). `existingKeys` is the set already in use.
+export function makeAccountKey(provider, existingKeys) {
+  if (!existingKeys.has(provider)) return provider
+  let i = 2
+  while (existingKeys.has(`${provider}-${i}`)) i++
+  return `${provider}-${i}`
+}

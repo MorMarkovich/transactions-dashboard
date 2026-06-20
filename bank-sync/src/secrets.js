@@ -30,12 +30,24 @@ export async function deleteKey(key) {
   return keytar.deletePassword(SERVICE, key)
 }
 
-export const credKey = (provider) => `cred:${provider}`
+// cred key is per ACCOUNT key now (e.g. 'isracard', 'isracard-2'), but a plain
+// provider id is still a valid account key for single-account providers.
+export const credKey = (accountKey) => `cred:${accountKey}`
 export const SUPABASE_AUTH_KEY = 'supabase:auth'
 export const SYNC_TOKEN_KEY = 'sync:token'
+export const ACCOUNTS_KEY = 'accounts' // registry: [{ key, provider, owner, label }]
 
-// Wipe everything this tool stored.
+export async function getAccounts() {
+  return (await getJSON(ACCOUNTS_KEY)) || []
+}
+export async function setAccounts(accounts) {
+  await setJSON(ACCOUNTS_KEY, accounts)
+}
+
+// Wipe everything this tool stored (all account creds + registry + supabase + token).
 export async function clearAll() {
-  const keys = [SUPABASE_AUTH_KEY, SYNC_TOKEN_KEY, ...SUPPORTED.map(credKey)]
+  const accounts = await getAccounts()
+  const credKeys = [...new Set([...SUPPORTED, ...accounts.map((a) => a.key)])].map(credKey)
+  const keys = [...new Set([SUPABASE_AUTH_KEY, SYNC_TOKEN_KEY, ACCOUNTS_KEY, ...credKeys])]
   await Promise.all(keys.map((k) => keytar.deletePassword(SERVICE, k).catch(() => {})))
 }

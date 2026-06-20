@@ -61,6 +61,9 @@ async function main() {
   console.log(`Total income:   ${ils(income)}`)
   console.log(`Net:            ${ils(expenses + income)}`)
 
+  if (txns.some((t) => t['_owner'])) {
+    printTable('By owner (מי)', group(txns, (t) => t['_owner']), (a, b) => String(a).localeCompare(b))
+  }
   if (txns.some((t) => t['_source_file'])) {
     printTable('By account / card', group(txns, (t) => t['_source_file']), (a, b) => String(a).localeCompare(b))
   } else {
