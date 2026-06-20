@@ -35,9 +35,22 @@ export async function getCategoryRules(supabase, userId) {
 }
 
 // Insert a new snapshot row (insert-only, matching the dashboard's save).
+// Returns the new row id.
 export async function insertSnapshot(supabase, userId, transactions) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('saved_transactions')
     .insert({ user_id: userId, data: transactions })
+    .select('id')
+    .single()
   if (error) throw new Error(`write snapshot failed: ${error.message}`)
+  return data?.id
+}
+
+// Delete the user's older snapshots, keeping `keepId`. Used by a fresh re-sync
+// to replace stale data (e.g. switching combined → split installments).
+export async function deleteOtherSnapshots(supabase, userId, keepId) {
+  let q = supabase.from('saved_transactions').delete().eq('user_id', userId)
+  if (keepId != null) q = q.neq('id', keepId)
+  const { error } = await q
+  if (error) throw new Error(`cleanup of old snapshots failed: ${error.message}`)
 }

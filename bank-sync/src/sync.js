@@ -9,13 +9,13 @@ import { getJSON, getSecret, credKey, SUPABASE_AUTH_KEY } from './secrets.js'
 import { scrapeProvider } from './scrape.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { applyIncomeMonthShift } from './income.js'
-import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot } from './supabaseClient.js'
+import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 
 /**
  * @param {(msg:string)=>void} [log] progress callback
- * @returns {Promise<{success:true, added:number, total:number, byProvider:object, errors:object}>}
+ * @param {{fresh?: boolean}} [opts] fresh = replace all data (ignore + delete old snapshots)
  */
-export async function runSync(log = () => {}) {
+export async function runSync(log = () => {}, { fresh = false } = {}) {
   assertConfig()
 
   const auth = await getJSON(SUPABASE_AUTH_KEY)
@@ -23,16 +23,17 @@ export async function runSync(log = () => {}) {
     throw new Error('No Supabase login stored. Run `npm run setup` first.')
   }
 
-  log('מתחבר ל-Supabase…')
+  log(fresh ? 'מתחבר ל-Supabase (רענון מלא)…' : 'מתחבר ל-Supabase…')
   const { supabase, userId } = await signIn(config.supabaseUrl, config.supabaseAnonKey, auth.email, auth.password)
 
+  // Fresh re-sync ignores the existing snapshot (it's about to be replaced).
   const [existing, rules] = await Promise.all([
-    getLatestSnapshot(supabase, userId),
+    fresh ? Promise.resolve([]) : getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
   ])
   const ruleMap = new Map((rules || []).map((r) => [r.merchant, r.category]))
 
-  const fresh = []
+  const freshTxns = []
   const byProvider = {}
   const errors = {}
 
@@ -57,11 +58,12 @@ export async function runSync(log = () => {}) {
         failureScreenshotPath,
         timeout: config.scrapeTimeout,
         navigationRetryCount: config.navRetryCount,
+        combineInstallments: config.combineInstallments,
       })
       let count = 0
       for (const t of raw) {
         const n = normalizeTxn(t, provider, ruleMap)
-        if (n) { fresh.push(n); count++ }
+        if (n) { freshTxns.push(n); count++ }
       }
       byProvider[provider] = count
       log(`${provider}: ${count} עסקאות`)
@@ -71,7 +73,7 @@ export async function runSync(log = () => {}) {
     }
   }
 
-  const { merged, added, enriched } = mergeSnapshots(existing, fresh)
+  const { merged, added, enriched } = mergeSnapshots(existing, freshTxns)
 
   // Re-attribute boundary salaries to a consistent month (applies to existing
   // rows too, so historical months get corrected).
@@ -82,15 +84,23 @@ export async function runSync(log = () => {}) {
   })
   if (shifted) log(`התאמת חודש להכנסות: ${shifted} משכורות שויכו לחודש הנכון`)
 
-  // Write if anything changed (new rows, backfilled fields, or shifted months).
-  if (added > 0 || enriched > 0 || shifted > 0) {
+  if (fresh) {
+    // Replace everything: write the fresh snapshot, then delete the old ones.
+    if (merged.length === 0) {
+      log('לא נאספו עסקאות — לא בוצע רענון (כדי לא למחוק נתונים קיימים).')
+    } else {
+      log(`כותב snapshot חדש (${merged.length} עסקאות) ומוחק את הישנים…`)
+      const newId = await insertSnapshot(supabase, userId, merged)
+      await deleteOtherSnapshots(supabase, userId, newId)
+    }
+  } else if (added > 0 || enriched > 0 || shifted > 0) {
     log(`שומר snapshot (${merged.length} עסקאות, ${added} חדשות${enriched ? `, ${enriched} עודכנו` : ''})…`)
     await insertSnapshot(supabase, userId, merged)
   } else {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  return { success: true, added, enriched, shifted, total: merged.length, byProvider, errors }
+  return { success: true, fresh, added, enriched, shifted, total: merged.length, byProvider, errors }
 }
 
 // Token check helper shared with the server (constant-time compare).
@@ -101,9 +111,10 @@ export function tokensMatch(a, b) {
   return diff === 0
 }
 
-// CLI entry: `npm run sync`
+// CLI entry: `npm run sync` (add --fresh to replace all data, e.g. via `npm run resync`)
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runSync((m) => console.log('•', m))
+  const fresh = process.argv.includes('--fresh')
+  runSync((m) => console.log('•', m), { fresh })
     .then((r) => {
       console.log('\n✓ Sync complete:', JSON.stringify(r, null, 2))
       if (config.keepBrowserOpen) {

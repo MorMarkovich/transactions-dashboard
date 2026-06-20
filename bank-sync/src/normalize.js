@@ -25,11 +25,21 @@ export function normalizeTxn(raw, provider, ruleMap) {
   const amount = Number(raw.chargedAmount ?? raw.originalAmount ?? 0)
   if (!Number.isFinite(amount) || amount === 0) return null
 
-  const description = (String(raw.description ?? '').trim()) || 'לא ידוע'
+  const baseDesc = (String(raw.description ?? '').trim()) || 'לא ידוע'
   const bankRow = isBankProvider(provider)
 
-  let category = categorize(description)
-  category = applyRules(category, description, ruleMap)
+  // Categorize on the clean merchant name (before any installment suffix).
+  let category = categorize(baseDesc)
+  category = applyRules(category, baseDesc, ruleMap)
+
+  // When installments are split, each monthly charge shares the merchant, date
+  // and amount — tag it with n/total so it stays a distinct row (survives dedup)
+  // and reads clearly on the statement.
+  let description = baseDesc
+  const inst = raw.installments
+  if (inst && Number(inst.total) > 1) {
+    description = `${baseDesc} (תשלום ${inst.number}/${inst.total})`
+  }
 
   const txn = {
     'תאריך': ymd(date),

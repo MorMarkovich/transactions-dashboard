@@ -41,6 +41,9 @@ export const config = {
   incomeShiftDirection: process.env.INCOME_SHIFT || 'next',
   incomeShiftDay: process.env.INCOME_SHIFT_DAY !== undefined ? Number(process.env.INCOME_SHIFT_DAY) : undefined,
   salaryMin: process.env.SALARY_MIN !== undefined ? Number(process.env.SALARY_MIN) : 0,
+  // false (default) = split installments so each monthly charge is its own line
+  // on its billing date, matching the card statement. true = one combined line.
+  combineInstallments: String(process.env.COMBINE_INSTALLMENTS || '').toLowerCase() === 'true',
 }
 
 export function assertConfig() {
