@@ -11,13 +11,11 @@ import { config, assertConfig } from './config.js'
 import { getJSON, SUPABASE_AUTH_KEY } from './secrets.js'
 import { signIn, getLatestSnapshot } from './supabaseClient.js'
 import { txnKey } from './normalize.js'
+import { SALARY_KEYWORDS, isSalary } from './income.js'
 
 const ils = (n) =>
   `${n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₪`
 
-// Salary-like income: positive amount that either matches a salary keyword or
-// is a sizeable recurring deposit.
-const SALARY_KEYWORDS = ['משכורת', 'שכר', 'העברת שכר', 'העב שכר', 'שכר עבודה', 'הפקדת שכר', 'תשלום שכר', 'משכ', 'salary', 'payroll']
 const SALARY_MIN = Number(process.env.SALARY_MIN) || 4000
 
 let warnings = 0
@@ -28,12 +26,6 @@ const fail = (m) => { problems++; console.log(`  ✗ ${m}`) }
 const section = (t) => console.log(`\n=== ${t} ===`)
 
 function dayOf(ymd) { return Number(String(ymd).slice(8, 10)) }
-function isSalary(t) {
-  const amt = Number(t['סכום']) || 0
-  if (amt <= 0) return false
-  const d = String(t['תיאור'] || '').toLowerCase()
-  return SALARY_KEYWORDS.some((k) => d.includes(k)) || amt >= SALARY_MIN
-}
 
 async function main() {
   assertConfig()
@@ -99,7 +91,7 @@ async function main() {
 
   // 5. Income / salary per month — the timing issue you flagged
   section('Income per month (salaries)')
-  const salaries = txns.filter(isSalary)
+  const salaries = txns.filter((t) => isSalary(t, SALARY_MIN))
   const months = [...new Set(txns.map((t) => t['חודש']).filter(Boolean))].sort((a, b) => {
     const [ma, ya] = a.split('/'); const [mb, yb] = b.split('/'); return (ya - yb) || (ma - mb)
   })
@@ -115,11 +107,13 @@ async function main() {
     if (list.length === 0) warn(`${m}: no salary detected`)
     else if (list.length === 2) ok(`${m}: ${list.length} salaries — ${lines}`)
     else warn(`${m}: ${list.length} salaries (expected 2) — ${lines}`)
-    // Boundary salaries — may belong to an adjacent month
+    // Boundary salaries — may belong to an adjacent month (skip ones already
+    // re-attributed by the income-month shift).
     for (const t of list) {
+      if (t['_income_shifted']) continue
       const d = dayOf(t['תאריך'])
-      if (d >= 25) warn(`   ↳ ${t['תאריך']} salary lands late in the month — may really belong to the NEXT month`)
-      else if (d <= 3) warn(`   ↳ ${t['תאריך']} salary lands at month start — may really belong to the PREVIOUS month`)
+      if (d >= 25) warn(`   ↳ ${t['תאריך']} salary lands late in the month — may belong to the NEXT month`)
+      else if (d <= 3) warn(`   ↳ ${t['תאריך']} salary lands at month start — may belong to the PREVIOUS month`)
     }
   }
 

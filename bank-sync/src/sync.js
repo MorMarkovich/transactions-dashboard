@@ -8,6 +8,7 @@ import { config, assertConfig } from './config.js'
 import { getJSON, getSecret, credKey, SUPABASE_AUTH_KEY } from './secrets.js'
 import { scrapeProvider } from './scrape.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
+import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot } from './supabaseClient.js'
 
 /**
@@ -72,15 +73,24 @@ export async function runSync(log = () => {}) {
 
   const { merged, added, enriched } = mergeSnapshots(existing, fresh)
 
-  // Write if anything changed (new rows or backfilled fields on existing rows).
-  if (added > 0 || enriched > 0) {
+  // Re-attribute boundary salaries to a consistent month (applies to existing
+  // rows too, so historical months get corrected).
+  const shifted = applyIncomeMonthShift(merged, {
+    direction: config.incomeShiftDirection,
+    cutoffDay: config.incomeShiftDay,
+    salaryMin: config.salaryMin,
+  })
+  if (shifted) log(`התאמת חודש להכנסות: ${shifted} משכורות שויכו לחודש הנכון`)
+
+  // Write if anything changed (new rows, backfilled fields, or shifted months).
+  if (added > 0 || enriched > 0 || shifted > 0) {
     log(`שומר snapshot (${merged.length} עסקאות, ${added} חדשות${enriched ? `, ${enriched} עודכנו` : ''})…`)
     await insertSnapshot(supabase, userId, merged)
   } else {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  return { success: true, added, enriched, total: merged.length, byProvider, errors }
+  return { success: true, added, enriched, shifted, total: merged.length, byProvider, errors }
 }
 
 // Token check helper shared with the server (constant-time compare).
