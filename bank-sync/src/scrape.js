@@ -19,7 +19,7 @@ function companyId(provider) {
  * @param {{ monthsBack:number, showBrowser:boolean }} opts
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
-export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '' } = {}) {
+export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2 } = {}) {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
@@ -40,6 +40,11 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
     combineInstallments: true,
     showBrowser,
     verbose: false,
+    // Slow SPAs (Discount) need more than the 30s default; extend both the
+    // navigation timeout and puppeteer's element-wait timeout, and retry.
+    timeout,
+    defaultTimeout: timeout,
+    navigationRetryCount,
     ...(launchPath ? { executablePath: launchPath } : {}),
     ...(keepBrowserOpen ? { skipCloseBrowser: true } : {}),
     ...(failureScreenshotPath ? { storeFailureScreenShotPath: failureScreenshotPath } : {}),
