@@ -44,6 +44,7 @@ export async function runSync(log = () => {}) {
       const raw = await scrapeProvider(provider, credentials, {
         monthsBack: config.monthsBack,
         showBrowser: config.showBrowser,
+        executablePath: config.chromePath,
       })
       let count = 0
       for (const t of raw) {

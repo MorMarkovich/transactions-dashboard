@@ -1,5 +1,6 @@
 // Runs israeli-bank-scrapers for one provider. Credentials are passed in by the
 // caller (read from the OS keychain) and never logged.
+import { existsSync } from 'node:fs'
 import { createScraper, CompanyTypes } from 'israeli-bank-scrapers'
 
 // Map our provider ids to israeli-bank-scrapers CompanyTypes.
@@ -18,10 +19,20 @@ function companyId(provider) {
  * @param {{ monthsBack:number, showBrowser:boolean }} opts
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
-export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false } = {}) {
+export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '' } = {}) {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
+
+  // Prefer a real installed Chrome (avoids the bundled-Chromium EBADMACHO /
+  // "spawn Unknown system error -88" launch failures on macOS).
+  let launchPath
+  if (executablePath) {
+    if (!existsSync(executablePath)) {
+      throw new Error(`Chrome not found at "${executablePath}". Set CHROME_PATH in .env to your browser's executable path.`)
+    }
+    launchPath = executablePath
+  }
 
   const scraper = createScraper({
     companyId: companyId(provider),
@@ -29,6 +40,7 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
     combineInstallments: true,
     showBrowser,
     verbose: false,
+    ...(launchPath ? { executablePath: launchPath } : {}),
   })
 
   const result = await scraper.scrape(credentials)
