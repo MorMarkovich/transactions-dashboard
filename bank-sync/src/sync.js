@@ -54,6 +54,8 @@ export async function runSync(log = () => {}) {
         executablePath: config.chromePath,
         keepBrowserOpen: config.keepBrowserOpen,
         failureScreenshotPath,
+        timeout: config.scrapeTimeout,
+        navigationRetryCount: config.navRetryCount,
       })
       let count = 0
       for (const t of raw) {

@@ -31,6 +31,10 @@ export const config = {
   // Debug: leave the scraper's browser window open after it finishes/fails so
   // you can see what the bank showed. Use with `npm run sync` only.
   keepBrowserOpen: String(process.env.KEEP_BROWSER_OPEN || '').toLowerCase() === 'true',
+  // Navigation/element timeout (ms) — the library default of 30s is too short
+  // for slow SPAs like Discount. Plus a couple of navigation retries.
+  scrapeTimeout: process.env.SCRAPE_TIMEOUT !== undefined ? Number(process.env.SCRAPE_TIMEOUT) : 120000,
+  navRetryCount: process.env.NAV_RETRY !== undefined ? Number(process.env.NAV_RETRY) : 2,
 }
 
 export function assertConfig() {
