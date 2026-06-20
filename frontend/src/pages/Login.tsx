@@ -525,7 +525,7 @@ function SuccessMsg({ text }: { text: string }) {
         borderRadius: '8px',
         background: 'rgba(16,185,129,0.1)',
         border: '1px solid rgba(16,185,129,0.2)',
-        color: 'var(--accent-secondary, #10b981)',
+        color: 'var(--success)',
         fontSize: '0.8125rem',
         fontWeight: 500,
       }}

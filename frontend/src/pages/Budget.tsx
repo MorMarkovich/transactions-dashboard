@@ -330,7 +330,7 @@ export default function Budget() {
                 style={{
                   fontSize: '1.5rem',
                   fontWeight: 700,
-                  color: budgetSummary.remaining >= 0 ? 'var(--accent-secondary, #10b981)' : 'var(--accent-danger, #ef4444)',
+                  color: budgetSummary.remaining >= 0 ? 'var(--success)' : 'var(--accent-danger, #ef4444)',
                 }}
               />
             </Card>
@@ -592,7 +592,7 @@ export default function Budget() {
                 <AnimatedNumber
                   value={metrics.total_income}
                   formatter={formatCurrency}
-                  style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-secondary, #10b981)' }}
+                  style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--success)' }}
                 />
               </div>
               <div>

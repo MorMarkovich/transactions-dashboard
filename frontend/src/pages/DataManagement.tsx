@@ -886,7 +886,7 @@ export default function DataManagement() {
                                 {INCOME_TYPE_LABELS[income.income_type] || income.income_type} &middot; {RECURRING_LABELS[income.recurring] || income.recurring} &middot; {formatDate(income.created_at)}
                               </p>
                             </div>
-                            <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--accent-secondary, #10b981)', direction: 'ltr', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--success)', direction: 'ltr', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                               {formatCurrency(income.amount)}
                             </span>
                             <button
@@ -990,7 +990,7 @@ export default function DataManagement() {
                       <td data-label="הוצאות" style={{ ...tdStyle, color: 'var(--accent-danger, #ef4444)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_expenses)}
                       </td>
-                      <td data-label="הכנסות" style={{ ...tdStyle, color: 'var(--accent-secondary, #10b981)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
+                      <td data-label="הכנסות" style={{ ...tdStyle, color: 'var(--success)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', direction: 'ltr', textAlign: 'center' }}>
                         {formatCurrency(upload.total_income)}
                       </td>
                       <td data-label="תאריך העלאה" style={tdStyle}>

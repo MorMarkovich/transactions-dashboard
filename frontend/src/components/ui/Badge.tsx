@@ -13,7 +13,7 @@ const variantStyles: Record<string, { background: string; color: string }> = {
   },
   success: {
     background: 'rgba(16, 185, 129, 0.15)',
-    color: 'var(--accent-secondary, #10b981)',
+    color: 'var(--success)',
   },
   danger: {
     background: 'rgba(239, 68, 68, 0.15)',
@@ -21,15 +21,15 @@ const variantStyles: Record<string, { background: string; color: string }> = {
   },
   warning: {
     background: 'rgba(245, 158, 11, 0.15)',
-    color: 'var(--accent-warning, #f59e0b)',
+    color: 'var(--warning)',
   },
   info: {
     background: 'rgba(14, 165, 233, 0.15)',
-    color: 'var(--accent-info, #0ea5e9)',
+    color: 'var(--info)',
   },
   purple: {
     background: 'rgba(139, 92, 246, 0.15)',
-    color: 'var(--accent-purple, #8b5cf6)',
+    color: 'var(--accent-secondary)',
   },
 }
 

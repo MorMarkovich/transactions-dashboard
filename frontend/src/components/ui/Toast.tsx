@@ -26,7 +26,7 @@ const toastConfig: Record<
 > = {
   success: {
     icon: CheckCircle,
-    color: 'var(--accent-secondary, #10b981)',
+    color: 'var(--success)',
     bg: 'rgba(16, 185, 129, 0.12)',
   },
   error: {
@@ -36,12 +36,12 @@ const toastConfig: Record<
   },
   info: {
     icon: Info,
-    color: 'var(--accent-info, #0ea5e9)',
+    color: 'var(--info)',
     bg: 'rgba(14, 165, 233, 0.12)',
   },
   warning: {
     icon: AlertTriangle,
-    color: 'var(--accent-warning, #f59e0b)',
+    color: 'var(--warning)',
     bg: 'rgba(245, 158, 11, 0.12)',
   },
 }
@@ -75,7 +75,7 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }: Toas
         gap: '10px',
         padding: '12px 16px',
         background: 'var(--bg-card)',
-        border: `1px solid ${config.color}33`,
+        border: `1px solid color-mix(in srgb, ${config.color} 28%, transparent)`,
         borderRadius: '12px',
         boxShadow: 'var(--shadow-lg)',
         width: 'min(420px, calc(100vw - 32px))',

@@ -509,7 +509,7 @@ export default function Income() {
                             style={{
                               fontSize: '0.9375rem',
                               fontWeight: 700,
-                              color: 'var(--accent-secondary, #10b981)',
+                              color: 'var(--success)',
                               direction: 'ltr',
                               fontVariantNumeric: 'tabular-nums',
                               flexShrink: 0,
@@ -576,7 +576,7 @@ export default function Income() {
               value={formatCurrency(totalIncome)}
               numericValue={totalIncome}
               formatter={formatCurrency}
-              valueColor="var(--accent-secondary, #10b981)"
+              valueColor="var(--success)"
             />
 
             <SummaryCard
@@ -598,7 +598,7 @@ export default function Income() {
               formatter={formatCurrency}
               valueColor={
                 balance >= 0
-                  ? 'var(--accent-secondary, #10b981)'
+                  ? 'var(--success)'
                   : 'var(--accent-danger, #ef4444)'
               }
             />
@@ -638,8 +638,8 @@ export default function Income() {
                       utilization > 90
                         ? 'var(--accent-danger, #ef4444)'
                         : utilization > 70
-                        ? 'var(--accent-warning, #f59e0b)'
-                        : 'var(--accent-secondary, #10b981)',
+                        ? 'var(--warning)'
+                        : 'var(--success)',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
@@ -652,7 +652,7 @@ export default function Income() {
                   utilization > 90
                     ? 'var(--gradient-danger)'
                     : utilization > 70
-                    ? 'var(--accent-warning, #f59e0b)'
+                    ? 'var(--warning)'
                     : 'var(--gradient-primary)'
                 }
                 height={10}
