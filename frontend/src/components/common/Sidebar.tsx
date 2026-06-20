@@ -20,6 +20,7 @@ import {
   Info,
 } from 'lucide-react'
 import Badge from '../ui/Badge'
+import RefreshFromBanks from './RefreshFromBanks'
 import { useAuth } from '../../lib/AuthContext'
 import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
@@ -183,6 +184,25 @@ export default function Sidebar({
     }
   }
 
+  // After the local bank-sync tool writes a fresh snapshot to Supabase, reload
+  // it through the same restore path used after a manual upload.
+  const handleBankSynced = async () => {
+    if (!user) return
+    try {
+      const [transactions, rules] = await Promise.all([
+        supabaseApi.getLatestTransactions(user.id),
+        supabaseApi.getCategoryRules(user.id).catch(() => []),
+      ])
+      if (!transactions || transactions.length === 0) return
+      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      if (merged.success && merged.session_id) {
+        onFileUploaded?.(merged.session_id)
+      }
+    } catch (err) {
+      console.error('Failed to reload after bank sync:', err)
+    }
+  }
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files && files.length > 0) {
@@ -331,6 +351,8 @@ export default function Sidebar({
                 )}
               </label>
             </div>
+
+            <RefreshFromBanks onSynced={handleBankSynced} />
 
             {error && <div className="sidebar-error">{error}</div>}
 
