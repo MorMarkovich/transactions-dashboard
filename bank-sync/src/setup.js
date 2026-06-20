@@ -12,20 +12,19 @@ import {
 
 function ask(rl, question, { hidden = false } = {}) {
   return new Promise((resolve) => {
-    if (!hidden) { rl.question(question, (a) => resolve(a.trim())); return }
-    // Masked input: temporarily mute echoed characters.
-    const onData = (char) => {
-      const c = char.toString()
-      if (c === '\n' || c === '\r' || c === '') process.stdin.removeListener('data', onData)
-    }
-    process.stdin.on('data', onData)
-    const origWrite = rl.output.write.bind(rl.output)
-    rl.output.write = (str) => { if (str && str.includes('\n')) origWrite(str) }
-    rl.question(question, (a) => {
-      rl.output.write = origWrite
-      rl.output.write('\n')
-      resolve(a.trim())
+    // rl.question() writes the prompt synchronously using the CURRENT
+    // _writeToOutput, so we let it print the prompt normally first, then (for
+    // secret fields) suppress only the echo of the characters the user types.
+    // Overriding before rl.question would hide the prompt itself.
+    const orig = rl._writeToOutput
+    rl.question(question, (answer) => {
+      rl._writeToOutput = orig
+      if (hidden) rl.output.write('\n')
+      resolve(answer.trim())
     })
+    if (hidden) {
+      rl._writeToOutput = () => {}
+    }
   })
 }
 
@@ -44,7 +43,8 @@ async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 
   console.log('\n=== bank-sync setup ===')
-  console.log('Secrets are stored in your OS keychain — not on disk or in the repo.\n')
+  console.log('Secrets are stored in your OS keychain — not on disk or in the repo.')
+  console.log('(For secret fields, what you type is hidden — just type and press Enter.)\n')
 
   // ── Bank / card credentials ──
   for (const provider of config.providers) {
@@ -52,7 +52,8 @@ async function main() {
     if (!(await askYesNo(rl, `Configure ${label} [${provider}]?`))) continue
     const creds = {}
     for (const field of PROVIDER_FIELDS[provider]) {
-      creds[field.key] = await ask(rl, `  ${field.label}: `, { hidden: field.secret })
+      const tag = field.secret ? ' (hidden)' : ''
+      creds[field.key] = await ask(rl, `  ${field.label}${tag}: `, { hidden: field.secret })
     }
     await setJSON(credKey(provider), creds)
     console.log(`  ✓ ${label} saved.\n`)
@@ -61,7 +62,7 @@ async function main() {
   // ── Supabase login (your dashboard email + password) ──
   console.log('Supabase login — the SAME email/password you use for the dashboard.')
   const email = await ask(rl, '  Email: ')
-  const password = await ask(rl, '  Password: ', { hidden: true })
+  const password = await ask(rl, '  Password (hidden): ', { hidden: true })
   await setJSON(SUPABASE_AUTH_KEY, { email, password })
   console.log('  ✓ Supabase login saved.\n')
 
