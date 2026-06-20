@@ -97,7 +97,8 @@ test('normalize: zero amount / bad date are dropped', () => {
 // ── Income month attribution ──────────────────────────────────────────────
 test('isSalary detects keyword and large deposits, ignores expenses', () => {
   assert.equal(isSalary({ 'סכום': 12000, 'תיאור': 'משכורת' }), true)
-  assert.equal(isSalary({ 'סכום': 5000, 'תיאור': 'העברה כלשהי' }, 4000), true) // large deposit
+  assert.equal(isSalary({ 'סכום': 5000, 'תיאור': 'העברה כלשהי' }, 4000), true) // amount fallback opted in
+  assert.equal(isSalary({ 'סכום': 9000, 'תיאור': 'העברה מאדם כלשהו' }), false) // large but no keyword, default keyword-only
   assert.equal(isSalary({ 'סכום': 200, 'תיאור': 'החזר קטן' }), false) // small, no keyword
   assert.equal(isSalary({ 'סכום': -12000, 'תיאור': 'משכורת' }), false) // negative
 })

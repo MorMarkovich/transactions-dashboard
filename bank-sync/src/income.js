@@ -11,13 +11,15 @@ export const SALARY_KEYWORDS = [
 
 const pad2 = (n) => String(n).padStart(2, '0')
 
-// Salary-like income: a positive amount that either matches a salary keyword or
-// is a sizeable deposit (the spouse's pay may not carry a clear keyword).
-export function isSalary(t, salaryMin = 4000) {
+// Salary-like income: a positive amount that matches a salary keyword. A bare
+// amount threshold (salaryMin > 0) can opt in as a fallback, but it's off by
+// default because it misclassifies large one-off transfers as salary.
+export function isSalary(t, salaryMin = 0) {
   const amt = Number(t['סכום']) || 0
   if (amt <= 0) return false
   const desc = String(t['תיאור'] || '').toLowerCase()
-  return SALARY_KEYWORDS.some((k) => desc.includes(k)) || amt >= salaryMin
+  if (SALARY_KEYWORDS.some((k) => desc.includes(k))) return true
+  return salaryMin > 0 && amt >= salaryMin
 }
 
 /**
