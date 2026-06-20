@@ -19,7 +19,7 @@ function companyId(provider) {
  * @param {{ monthsBack:number, showBrowser:boolean }} opts
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
-export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2 } = {}) {
+export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2, combineInstallments = false } = {}) {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
@@ -37,7 +37,7 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
   const scraper = createScraper({
     companyId: companyId(provider),
     startDate,
-    combineInstallments: true,
+    combineInstallments,
     showBrowser,
     verbose: false,
     // Slow SPAs (Discount) need more than the 30s default; extend both the

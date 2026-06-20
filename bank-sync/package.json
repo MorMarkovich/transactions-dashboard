@@ -7,6 +7,7 @@
   "scripts": {
     "setup": "node src/setup.js",
     "sync": "node src/sync.js",
+    "resync": "node src/sync.js --fresh",
     "verify": "node src/verify.js",
     "check": "node src/check.js",
     "serve": "node src/server.js",

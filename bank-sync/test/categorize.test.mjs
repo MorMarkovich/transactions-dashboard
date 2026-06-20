@@ -89,6 +89,22 @@ test('normalize: bank row has no billing date; income stays positive', () => {
   assert.equal(t['סכום'], 18450)
 })
 
+test('normalize: split installments become distinct, self-describing rows', () => {
+  const base = { date: '2024-01-10T12:00:00', chargedAmount: -100, description: 'חנות' }
+  const t1 = normalizeTxn({ ...base, processedDate: '2024-02-02T12:00:00', installments: { number: 1, total: 3 } }, 'max', new Map())
+  const t2 = normalizeTxn({ ...base, processedDate: '2024-03-02T12:00:00', installments: { number: 2, total: 3 } }, 'max', new Map())
+  assert.equal(t1['תיאור'], 'חנות (תשלום 1/3)')
+  assert.equal(t2['תיאור'], 'חנות (תשלום 2/3)')
+  assert.notEqual(txnKey(t1), txnKey(t2)) // distinct → not collapsed by dedup
+  assert.equal(t1['חודש_חיוב'], '02/2024') // each on its own billing month
+  assert.equal(t2['חודש_חיוב'], '03/2024')
+})
+
+test('normalize: single-payment purchase keeps its plain description', () => {
+  const t = normalizeTxn({ date: '2024-01-10T12:00:00', chargedAmount: -50, description: 'קפה', installments: { number: 1, total: 1 } }, 'max', new Map())
+  assert.equal(t['תיאור'], 'קפה')
+})
+
 test('normalize: zero amount / bad date are dropped', () => {
   assert.equal(normalizeTxn({ date: '2024-01-01T12:00:00', chargedAmount: 0, description: 'x' }, 'leumi', new Map()), null)
   assert.equal(normalizeTxn({ date: 'not-a-date', chargedAmount: 5, description: 'x' }, 'leumi', new Map()), null)
