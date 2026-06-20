@@ -28,6 +28,9 @@ export const config = {
     || (process.platform === 'darwin'
       ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
       : ''),
+  // Debug: leave the scraper's browser window open after it finishes/fails so
+  // you can see what the bank showed. Use with `npm run sync` only.
+  keepBrowserOpen: String(process.env.KEEP_BROWSER_OPEN || '').toLowerCase() === 'true',
 }
 
 export function assertConfig() {
