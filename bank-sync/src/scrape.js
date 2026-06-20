@@ -19,7 +19,7 @@ function companyId(provider) {
  * @param {{ monthsBack:number, showBrowser:boolean }} opts
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
-export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '' } = {}) {
+export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false } = {}) {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
@@ -41,6 +41,7 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
     showBrowser,
     verbose: false,
     ...(launchPath ? { executablePath: launchPath } : {}),
+    ...(keepBrowserOpen ? { skipCloseBrowser: true } : {}),
   })
 
   const result = await scraper.scrape(credentials)

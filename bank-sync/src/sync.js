@@ -45,6 +45,7 @@ export async function runSync(log = () => {}) {
         monthsBack: config.monthsBack,
         showBrowser: config.showBrowser,
         executablePath: config.chromePath,
+        keepBrowserOpen: config.keepBrowserOpen,
       })
       let count = 0
       for (const t of raw) {
@@ -85,7 +86,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   runSync((m) => console.log('•', m))
     .then((r) => {
       console.log('\n✓ Sync complete:', JSON.stringify(r, null, 2))
-      process.exit(0)
+      if (config.keepBrowserOpen) {
+        console.log('\n(KEEP_BROWSER_OPEN=true — the browser window is left open for inspection. Press Ctrl+C here when done.)')
+      } else {
+        process.exit(0)
+      }
     })
     .catch((e) => {
       console.error('\n✗ Sync failed:', e.message)
