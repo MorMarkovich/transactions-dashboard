@@ -225,6 +225,7 @@ async def restore_session(body: RestoreSessionRequest):
         duplicates_removed = original_count - len(df)
 
         # ── Auto-categorize "שונות" by description keywords ──────────
+        ai_categorized: list[dict] = []  # merchant→category the AI resolved (returned for persistence)
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
             desc_lower = df['תיאור'].str.lower()
             # Psagot investment transfers override any existing category
@@ -266,7 +267,24 @@ async def restore_session(body: RestoreSessionRequest):
                         df.loc[remaining.index[hit], 'קטגוריה'] = cat
                         remaining = remaining[~hit]
 
-            # AI categorization for remaining "שונות" transactions
+            # Apply user-defined merchant→category rules BEFORE the AI step, so
+            # rule-covered merchants — including ones the AI resolved on an
+            # earlier load and we persisted as rules — are no longer "שונות" and
+            # the AI skips them. This way each merchant is web-searched at most
+            # once. Rules also win over the keyword categorizer above.
+            if body.category_rules:
+                rule_map = {r.merchant: r.category for r in body.category_rules if r.merchant and r.category}
+                if rule_map:
+                    desc_str = df['תיאור'].astype(str)
+                    for merchant, category in rule_map.items():
+                        rmask = desc_str == merchant
+                        if rmask.any():
+                            df.loc[rmask, 'קטגוריה'] = category
+
+            # AI categorization for remaining "שונות" transactions (Claude, with
+            # web search for merchants it can't identify from the name). The
+            # assignments are returned so the frontend can persist them as rules
+            # — then each merchant is resolved once, not re-searched every load.
             misc_mask = df['קטגוריה'] == 'שונות'
             if misc_mask.any():
                 misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
@@ -276,23 +294,13 @@ async def restore_session(body: RestoreSessionRequest):
                     for local_i, cat in ai_map.items():
                         if 0 <= local_i < len(misc_idx):
                             df.at[misc_idx[local_i], 'קטגוריה'] = cat
+                            ai_categorized.append({
+                                "merchant": str(df.at[misc_idx[local_i], 'תיאור']),
+                                "category": cat,
+                            })
 
-        # ── Apply user-defined category overrides ───────────────────
-        # The user can re-classify a transaction from the dashboard;
-        # the frontend persists each merchant→category rule to Supabase
-        # and passes the full list here on every restore. Rules run
-        # AFTER keyword + AI categorization so they always win, and
-        # they're matched on exact merchant string (we don't try fuzzy
-        # matching here — the dashboard saves the exact description it
-        # observed, and the same description will appear next month).
-        if body.category_rules and 'תיאור' in df.columns and 'קטגוריה' in df.columns:
-            rule_map = {r.merchant: r.category for r in body.category_rules if r.merchant and r.category}
-            if rule_map:
-                desc_str = df['תיאור'].astype(str)
-                for merchant, category in rule_map.items():
-                    mask = desc_str == merchant
-                    if mask.any():
-                        df.loc[mask, 'קטגוריה'] = category
+        # (User-defined category rules are applied above, before the AI step,
+        # so rule-covered merchants skip the web search — see that block.)
 
         # ── Remove credit-card bill payments from bank statement rows ──
         # When the user uploads both a bank file and a credit-card file,
@@ -376,6 +384,7 @@ async def restore_session(body: RestoreSessionRequest):
             "transaction_count": len(df),
             "duplicates_removed": duplicates_removed,
             "cc_payments_removed": cc_payments_removed,
+            "ai_categorized": ai_categorized,
             "message": msg,
         }
     except Exception as e:

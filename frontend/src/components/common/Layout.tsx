@@ -94,6 +94,13 @@ export default function Layout({ children }: LayoutProps) {
         })
         .then(response => {
           if (response?.success && response.session_id) {
+            // Persist anything the AI resolved (incl. via web search) as rules,
+            // so each merchant is identified once and not re-searched next time.
+            if (response.ai_categorized?.length) {
+              supabaseApi
+                .upsertCategoryRules(user.id, response.ai_categorized)
+                .catch(() => {}) // best-effort; categories already applied this session
+            }
             // Preserve current page path when restoring session
             const currentPath = window.location.pathname
             navigate(`${currentPath}?session_id=${response.session_id}`, { replace: true })
