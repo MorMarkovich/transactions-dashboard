@@ -136,7 +136,7 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
               <SparklineChart
                 data={sparklineData}
                 color={card.sparklineColor}
-                width={64}
+                width={48}
                 height={28}
               />
             </div>
