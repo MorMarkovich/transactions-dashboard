@@ -88,6 +88,13 @@ def _get_client():
         return None
 
 
+# Per-process cache: description → resolved category (or 'שונות' for a miss).
+# The dashboard re-runs restore-session on every cold-start recovery, always over
+# the same leftover "שונות" rows. Caching means a warm backend asks Claude about
+# each distinct description at most once, instead of on every page load.
+_CACHE: dict[str, str] = {}
+
+
 def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]:
     """
     Categorize a list of transaction descriptions using Claude AI.
@@ -106,10 +113,21 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
         logger.info("AI categorization skipped: ANTHROPIC_API_KEY not set")
         return None
 
-    # Format transactions for the prompt
-    tx_lines = "\n".join(
-        f"{i}. {desc}" for i, desc in enumerate(descriptions)
-    )
+    # Serve from cache first; only query Claude for descriptions we've never seen.
+    mapping: dict[int, str] = {}
+    to_query: list[tuple[int, str]] = []  # (original index, description)
+    for i, desc in enumerate(descriptions):
+        cached = _CACHE.get(desc)
+        if cached is None:
+            to_query.append((i, desc))
+        elif cached != 'שונות':
+            mapping[i] = cached
+
+    if not to_query:
+        return mapping
+
+    # Format only the uncached transactions for the prompt
+    tx_lines = "\n".join(f"{i}. {desc}" for i, (_, desc) in enumerate(to_query))
     user_prompt = USER_PROMPT_TEMPLATE.format(transactions=tx_lines)
 
     try:
@@ -132,20 +150,33 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
 
         results = json.loads(text)
 
-        # Build mapping, validating categories
-        mapping: dict[int, str] = {}
+        # Local index (into to_query) → validated category
+        queried: dict[int, str] = {}
         for item in results:
             idx = item.get("index")
             cat = item.get("category", "").strip()
             if idx is not None and cat in VALID_CATEGORIES and cat != 'שונות':
-                mapping[int(idx)] = cat
+                queried[int(idx)] = cat
 
-        logger.info(f"AI categorized {len(mapping)}/{len(descriptions)} transactions")
+        # Apply to the original indices and remember every result (hits AND
+        # misses) so we never re-query the same description.
+        for local_idx, (orig_idx, desc) in enumerate(to_query):
+            cat = queried.get(local_idx)
+            if cat:
+                mapping[orig_idx] = cat
+                _CACHE[desc] = cat
+            else:
+                _CACHE[desc] = 'שונות'
+
+        logger.info(
+            f"AI categorized {len(mapping)}/{len(descriptions)} "
+            f"({len(to_query)} queried, {len(descriptions) - len(to_query)} from cache)"
+        )
         return mapping
 
     except json.JSONDecodeError as e:
         logger.warning(f"AI categorization JSON parse error: {e}")
-        return None
+        return mapping or None
     except Exception as e:
         logger.warning(f"AI categorization failed: {e}")
-        return None
+        return mapping or None

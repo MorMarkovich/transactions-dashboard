@@ -78,6 +78,14 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'דרכון', 'passport', 'visa fee',
         'אגודה', 'agoda', 'kayak', 'skyscanner',
         'הרץ', 'hertz', 'avis rent', 'budget rent', 'סיקסט', 'sixt',
+        # ── Israeli travel agencies & airlines ──
+        'איסתא', 'issta', 'אופיר טורס', 'ophir tours', 'דיזנהויז', 'גוליבר',
+        'ארקיע', 'arkia', 'ישראייר', 'israir', 'wizzair', 'pegasus',
+        'ארקיע', 'דקה 90', 'eldan', 'אלדן', 'lastminute',
+        'fattal', 'פתאל', 'isrotel', 'ישרוטל', 'דן פנורמה', 'לאונרדו',
+        'leonardo', 'club hotel', 'קלאב הוטל', 'הרברט סמואל', 'רימונים',
+        'צימר', 'zimmer', 'אכסניה', 'אכסניית', 'trip.com', 'getyourguide',
+        'rentalcars', 'נסיעות לחו"ל', 'חבילת נופש', 'בתי מלון',
     ],
     'מזון וצריכה': [
         # ── Supermarkets & grocery ──
@@ -99,6 +107,13 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
         # ── Pharmacy/health stores ──
         'פארם', 'pharm',
+        # ── More Israeli supermarket / grocery chains ──
+        'shufersal', 'rami levy', 'osher ad', 'יינות ביתן',
+        'סופרמרקט', 'מרכול', 'יש חסד', 'יש בשכונה', 'ברכל', 'קינג סטור',
+        'מחסני מזון', 'סופר יהודה', 'סופר דוש', 'מעדניה', 'מאפיית', 'מאפיה',
+        'קצביית', 'דברי מאפה', 'יקב', 'גבינות',
+        'שוק העיר', 'שוק מהדרין', 'תנובה', 'שטראוס', 'יטבתה',
+        'ביכורי השדה', 'סלסלת',
     ],
     'מסעדות, קפה וברים': [
         'מסעדה', 'מסעדת', 'קפה ', 'בית קפה', 'פיצה', 'פיצריה',
@@ -119,6 +134,17 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'subway', 'סאבוויי',
         'שניצל', 'גלידה', 'ice cream', 'בייקרי', 'bakery', 'מאפייה',
         'cafe', 'rest.',
+        # ── More restaurants, cafes, bars & delivery ──
+        'מזנון', 'ביסטרו', 'bistro', 'בראסרי', 'גריל', 'grill', 'טאבון',
+        'pub', 'פאב', 'בירה', 'beer',
+        'פיצה האט', 'pizza hut', 'בנדיקט', 'benedict', 'מוזס', 'moses',
+        'אגאדיר', 'agadir', 'הומבורגר', 'גולדה', 'goldas', 'אניטה', 'anita',
+        'מקס ברנר', 'max brenner', 'גירף', 'giraffe', 'טוני וספה',
+        'בורגרים', 'הבורגר', 'שייקסבורגר', 'black bar',
+        'קונדיטוריה', 'בייגל', 'bagel', 'דונאטס', 'donut', 'קרואסון',
+        'cup o joe', 'ארקפה', 'arcaffe', 'נספרסו', 'nespresso',
+        'קפה לואיז', 'ולנטינה', 'casa',
+        'מקדונלדס', 'שקשוקה',
     ],
     'תחבורה ורכבים': [
         'רב קו', 'רב-קו', 'ravkav', 'אגד', 'egged',
@@ -132,11 +158,24 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'ביטוח רכב', 'רישוי', 'רישיון רכב', 'אגרה',
         'כביש 6', 'כביש אגרה', 'מנהרות', 'מנהרת', 'tunnel',
         'משלוח', 'שליח', 'delivery',
+        # ── More transport, parking, car services ──
+        'רכבת קלה', 'הרכבת הקלה', 'מטרונית', 'דן באב',
+        'autotel', 'אוטוטל', 'car2go', 'sharenow', 'באבל דן',
+        'אחוזת חוף', 'חניון', 'parking lot',
+        'שטיפת רכב', 'רחיצת', 'car wash', 'מכונאי', 'פנצ\'ר', 'גרר',
+        'מצבר', 'חלפים', 'מכון רישוי', 'בדיקת רכב', 'ליסינג',
+        'leasing', 'אלבר', 'albar', 'קל אוטו', 'אוויס רנט',
+        'אלדן רכב', 'ניו קופל',
     ],
     'דלק, חשמל וגז': [
         'דלק', 'תדלוק', 'סונול', 'sonol', 'דור אלון', 'doralon',
         'delek', 'fuel', 'חברת החשמל', 'חשמל',
         'ten דלק',
+        # ── More fuel stations & utility (gas/electric) ──
+        'paz', 'yellow', 'מנטה', 'menta', 'אלונית', 'alonit',
+        'תחנת דלק', 'דלקן', 'pazomat', 'פזומט',
+        'סופרגז', 'supergas', 'אמישראגז', 'amisragas', 'פזגז', 'דורגז',
+        'אמ.ש.ר.ג', 'בלוני גז', 'תאגיד החשמל',
     ],
     'רפואה ובתי מרקחת': [
         'מכבי', 'כללית', 'מאוחדת', 'לאומית',
@@ -149,6 +188,14 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'פסיכולוג', 'פסיכיאטר', 'therapist', 'therapy',
         'בית חולים', 'hospital',
         'תרופות', 'medication',
+        # ── More clinics, hospitals, labs, optics ──
+        'אסותא', 'assuta', 'הרצליה מדיקל', 'איכילוב', 'תל השומר', 'שיבא',
+        'רמב"ם', 'סורוקה', 'הדסה', 'בלינסון', 'וולפסון',
+        'טרם', 'terem', 'ביקור רופא', 'מוקד רופאים', 'נטלי', 'natali',
+        'שח"ל', 'femi', 'פמי', 'מעבדה', 'מעבדות', 'בדיקות דם',
+        'אופטיקנה', 'אופטיק', 'הלפרין', 'ירדן אופטיק', 'erroca',
+        'ארוקה', 'אורטופד', 'אורתודונט', 'שתל שיניים', 'יישור שיניים',
+        'דיאטנית', 'תזונאי', 'נטורופת', 'הומאופת', 'קוסמטיקה רפואית',
     ],
     'עירייה וממשלה': [
         'עירייה', 'עיריית', 'ארנונה',
@@ -156,6 +203,11 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'רשות האוכלוסין', 'רשות המיסים',
         'מס הכנסה', 'ביטוח לאומי', 'מע"מ',
         'אגרת', 'קנס', 'דוח חניה',
+        # ── More municipal / government / water ──
+        'מועצה אזורית', 'מועצה מקומית', 'מתנ"ס', 'תאגיד מים', 'מי אביבים',
+        'הגיחון', 'מי שבע', 'מי רעננה', 'מי נע', 'מים וביוב', 'מי כרמל',
+        'דואר ישראל', 'דואר', 'רשות מקרקעי', 'טאבו', 'הוצאה לפועל',
+        'בתי המשפט', 'משטרת ישראל', 'אגף הגביה', 'היטל', 'אגרות',
     ],
     'חשמל ומחשבים': [
         'באג מולטי', 'bug multi', 'ksp',
@@ -171,6 +223,17 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'שיאומי', 'xiaomi',
         'youtube', 'יוטיוב', 'disney', 'דיסני',
         'hbo', 'prime video',
+        # ── More electronics retailers & digital services ──
+        'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem',
+        'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price',
+        'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין',
+        'temu', 'טמו', 'banggood', 'aliexpress',
+        'openai', 'chatgpt', 'anthropic', 'claude', 'midjourney', 'github',
+        'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'אייקלאוד',
+        'office 365', 'microsoft 365', 'אופיס 365',
+        'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle',
+        'epic games', 'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'discord',
+        'אלקטרוניק', 'electronics', 'גיימינג',
     ],
     'אופנה': [
         'זארה', 'zara', 'h&m', 'פול אנד בר', 'pull&bear',
@@ -186,6 +249,17 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'פרימדונה', 'primadonna', 'קוסמטיקה', 'cosmetic',
         'איפור', 'makeup', 'בשמים', 'perfume',
         'לורן', 'lauren', 'טומי', 'tommy',
+        # ── More fashion, footwear, beauty & jewelry ──
+        'נקסט', 'next', 'gap', 'old navy', 'lacoste', 'לקוסט', 'ralph',
+        'massimo', 'מסימו', 'oysho', 'אוישו', 'victoria', 'דלתא', 'delta',
+        'reebok', 'ריבוק', 'under armour', 'new balance', 'crocs', 'קרוקס',
+        'סקצ\'רס', 'skechers', 'timberland', 'aldo', 'אלדו', 'scoop', 'סקופ',
+        'גולברי', 'golbary', 'אדיקה', 'adika', 'factory 54',
+        'פקטורי 54', 'superdry', 'tfc', 'carter',
+        'תכשיט', 'jewelry', 'pandora', 'פנדורה', 'magnolia', 'מגנוליה',
+        'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה',
+        'body shop', 'laline', 'ללין',
+        'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet',
     ],
     'עיצוב הבית': [
         'איקאה', 'ikea', 'הום סנטר', 'home center',
@@ -194,6 +268,13 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'כלי בית', 'מצעים', 'שטיח', 'וילון',
         'פוקס הום', 'fox home',
         'אלקטרה', 'electra',
+        # ── More furniture, homeware, renovation ──
+        'ביתילי', 'bitili', 'נעמן', 'naaman', 'ורדינון', 'vardinon',
+        'כספי', 'תמי 4', 'tami4', 'עמינח', 'aminach', 'הוליווד',
+        'רהיטי', 'furniture', 'מזרן', 'mattress', 'דורגל',
+        'טמבור', 'tambour', 'נירלט', 'nirlat', 'צבע', 'paint',
+        'כלי עבודה', 'ברזל', 'גמיש', 'urban', 'הכל לבית', 'בית וגן',
+        'מ. שטרן', 'דקור', 'decor', 'wishlist',
     ],
     'פנאי, בידור וספורט': [
         'סינמה', 'cinema', 'סינמה סיטי', 'yes planet',
@@ -205,11 +286,29 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'גן חיות', 'zoo',
         'בריכה', 'שחייה', 'swimming',
         'יוגה', 'yoga', 'פילאטיס', 'pilates',
+        # ── More cinemas (incl. Hebrew names), shows, sport, attractions ──
+        'יס פלאנט', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'סינמטק',
+        'מוזיאון', 'museum', 'ספארי', 'safari', 'לונה פארק', 'סופרלנד',
+        'גימבורי', 'gymboree', 'משחקייה', 'אסקייפ', 'חדר בריחה', 'באולינג',
+        'bowling', 'קרטינג', 'karting', 'פיינטבול', 'לייזר טאג', 'סקייט',
+        'דקאתלון', 'decathlon', 'מגה ספורט', 'sport5', 'אצטדיון',
+        'טוטו', 'winner', 'ווינר', 'מפעל הפיס', 'pais',
+        'זאפה', 'zappa', 'ברבי', 'barby', 'בלוק', 'האנגר', 'hangar',
+        'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא', 'היכל התרבות',
+        'ספא', 'מכון כושר', 'energym', 'בלאק בוקס',
     ],
     'ביטוח': [
-        'ביטוח', 'insurance', 'הראל', 'מגדל ביטוח',
-        'כלל ביטוח', 'הפניקס', 'מנורה', 'איילון',
-        'פוליסה', 'policy',
+        'ביטוח', 'insurance', 'מגדל ביטוח',
+        'כלל ביטוח', 'הפניקס', 'פוליסה', 'policy',
+        # ── Insurance companies (specific forms to avoid mall/brand clashes) ──
+        # NOTE: bare 'איילון' was removed — it matched "יס פלאנט איילון"
+        # (a cinema at the Ayalon mall) and any purchase at קניון איילון.
+        'איילון חב', 'איילון ביטוח', 'ביטוח איילון', 'איילון פנסיה',
+        'הראל ביטוח', 'הראל פנסיה', 'הראל השקעות', 'מנורה מבטחים',
+        'הכשרה ביטוח', 'ביטוח ישיר', 'ביטוח חקלאי', 'שירביט', 'shirbit',
+        'ליברה', 'libra', 'wobi', 'וובי', '9 מיליון', 'aig', 'איי איי ג\'י',
+        'פספורטכרד', 'passportcard', 'דייויד שילד', 'davidshield',
+        'קצין הביטוח', 'דמי ביטוח', 'גמל', 'פנסיה', 'השתלמות',
     ],
     'שירותי תקשורת': [
         'סלקום', 'cellcom', 'פרטנר', 'partner',
@@ -219,12 +318,19 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'we4g',
         'סלולר', 'cellular',
         'רמי לוי תקשורת',
+        # ── More ISPs / telecom ──
+        '012', '013', '014', '019', 'נטוויז\'ן', 'netvision',
+        'triple c', 'אינטרנט רימון', 'fiber', 'סיבים', 'פרי tv',
+        'free telecom', 'הוט טלקום', 'partner tv', 'yes tv',
     ],
     'העברת כספים': [
         'העברה ל', 'העברת כספים', 'העברה בנקאית',
         'paypal', 'פייפאל',
         'paybox', 'פייבוקס', 'pepper', 'פפר',
         'western union', 'ווסטרן יוניון',
+        # ── More money-transfer services ──
+        'moneygram', 'מאני גרם', 'gmt', 'העברת זה"ב', 'wire transfer',
+        'remitly', 'wise transfer',
     ],
     'חיות מחמד': [
         'וטרינר', 'veterinary', 'חיות מחמד', 'חיות',
@@ -232,6 +338,9 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'מזון לחיות', 'כלב', 'חתול',
         'אניפט', 'anipet', 'פטלנד', 'petland',
         'תן לחיות',
+        # ── More pet shops / services ──
+        'פטס', 'all4pet', 'biopet', 'דוקטור בייקר', 'אקווריום',
+        'aquarium', 'פנסיון כלבים', 'מספרת כלבים', 'אילוף כלבים', 'וט מרקט',
     ],
     'משיכת מזומן': [
         'משיכת מזומן', 'כספומט', 'atm', 'cash withdrawal', 'מזומן',
@@ -243,12 +352,23 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'שכר לימוד', 'tuition', 'קורס', 'course',
         'ספרים', 'books', 'סטימצקי', 'steimatzky',
         'צעצועים', 'toys',
+        # ── More education / childcare / courses ──
+        'צהרון', 'מעון', 'משפחתון', 'גנון', 'קייטנה', 'מתנ"ס',
+        'קונסרבטוריון', 'שיעור', 'מורה פרטי', 'אולפן', 'ברליץ', 'berlitz',
+        'wall street', 'udemy', 'coursera', 'duolingo', 'דואולינגו',
+        'מורה לנהיגה', 'שיעורי נהיגה', 'בית ספר לנהיגה', 'אקדמיה',
+        'הטכניון', 'ספרי לימוד', 'משחקי קופסה', 'lego', 'לגו',
+        'אקדמיה ל', 'הסמכה',
     ],
     'מנויים ושירותים': [
         'מנוי', 'subscription',
         'membership', 'annual fee',
         'דמי ניהול', 'עמלת',
         'google one',
+        # ── More subscriptions / service fees ──
+        'דמי כרטיס', 'דמי חבר', 'דמי שירות', 'דמי טיפול', 'patreon',
+        'פטראון', 'substack', 'linkedin', 'לינקדאין', 'zoom', 'amazon prime',
+        'דמי מנוי', 'חידוש מנוי',
     ],
 }
 
