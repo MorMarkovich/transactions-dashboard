@@ -763,7 +763,7 @@ input:focus, select:focus, textarea:focus {
 .stat-card-compact {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
@@ -798,8 +798,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .stat-card-compact .stat-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -813,13 +813,17 @@ input:focus, select:focus, textarea:focus {
 }
 
 .stat-card-compact .stat-value {
-  font-size: var(--text-2xl);
+  /* Scales down so large amounts (₪117,159.78) fit instead of overflowing
+     onto the icon, while staying prominent where there's room. */
+  font-size: clamp(1.05rem, 1.3vw, 1.5rem);
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   direction: ltr;
   text-align: right;
   line-height: 1.2;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .stat-card-compact .stat-label {
