@@ -117,6 +117,33 @@ async function main() {
     }
   }
 
+  // 5b. Uncategorized (שונות) — surface the merchants that still fall through
+  // the keyword catalog so they can be added precisely. "שונות" should be rare.
+  section('Uncategorized (שונות)')
+  const misc = txns.filter((t) => (t['קטגוריה'] || 'שונות') === 'שונות')
+  if (misc.length === 0) {
+    ok('Nothing in שונות — every transaction is categorized.')
+  } else {
+    const pct = Math.round((misc.length / txns.length) * 100)
+    const totalMisc = misc.reduce((s, t) => s + Math.abs(Number(t['סכום']) || 0), 0)
+    const msg = `${misc.length} transaction(s) in שונות (${pct}% of all, ${ils(totalMisc)} total)`
+    if (pct >= 15) fail(`${msg} — that's high; the catalog is missing common merchants.`)
+    else if (pct >= 5) warn(`${msg} — review the top merchants below.`)
+    else ok(msg)
+    // Group by merchant (strip the installment suffix so "X (תשלום 1/3)" groups with "X").
+    const byMerchant = new Map()
+    for (const t of misc) {
+      const name = String(t['תיאור'] || 'לא ידוע').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
+      const e = byMerchant.get(name) || { count: 0, total: 0 }
+      e.count += 1
+      e.total += Math.abs(Number(t['סכום']) || 0)
+      byMerchant.set(name, e)
+    }
+    const top = [...byMerchant.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 20)
+    console.log(`\n  Top uncategorized merchants (paste these to get rules added):`)
+    for (const [name, e] of top) console.log(`    • ${name} — ${e.count}× , ${ils(e.total)}`)
+  }
+
   // 6. Outliers + future dates
   section('Outliers & dates')
   const OUTLIER = Number(process.env.OUTLIER_MIN) || 15000

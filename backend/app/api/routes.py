@@ -233,19 +233,27 @@ async def restore_session(body: RestoreSessionRequest):
                 df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
             misc_mask = df['קטגוריה'] == 'שונות'
             if misc_mask.any():
+                # Scan only the shrinking "שונות" subset: each keyword check
+                # touches just the still-uncategorized rows instead of the whole
+                # column. Snapshots arrive mostly pre-categorized, so this keeps
+                # the (now ~1000-keyword) catalog cheap. First keyword in dict
+                # order still wins, preserving behaviour.
+                remaining = desc_lower[misc_mask]
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
-                    match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
-                    if match.any():
-                        df.loc[match, 'קטגוריה'] = cat
-                        misc_mask = misc_mask & ~match
+                    if remaining.empty:
+                        break
+                    hit = remaining.str.contains(kw, na=False, regex=False)
+                    if hit.any():
+                        df.loc[remaining.index[hit], 'קטגוריה'] = cat
+                        remaining = remaining[~hit]
                 for kw, cat in EXACT_WORD_KEYWORDS.items():
-                    if not misc_mask.any():
+                    if remaining.empty:
                         break
                     pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
-                    match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
-                    if match.any():
-                        df.loc[match, 'קטגוריה'] = cat
-                        misc_mask = misc_mask & ~match
+                    hit = remaining.str.contains(pattern, na=False, regex=True)
+                    if hit.any():
+                        df.loc[remaining.index[hit], 'קטגוריה'] = cat
+                        remaining = remaining[~hit]
 
             # AI categorization for remaining "שונות" transactions
             misc_mask = df['קטגוריה'] == 'שונות'

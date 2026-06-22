@@ -200,24 +200,29 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         if mask.any():
             result.loc[mask, 'קטגוריה'] = 'הוראות קבע'
 
-    # Auto-categorize "שונות" transactions by matching description keywords
+    # Auto-categorize "שונות" transactions by matching description keywords.
+    # Scan only the shrinking "שונות" subset so each keyword check touches just
+    # the still-uncategorized rows (cheap even with the ~1000-keyword catalog).
     misc_mask = result['קטגוריה'] == 'שונות'
     if misc_mask.any():
+        remaining = desc_lower[misc_mask]
         # Substring-based keywords (longer, unambiguous)
         for kw, cat in KEYWORD_TO_CATEGORY.items():
-            match = misc_mask & desc_lower.str.contains(kw, na=False, regex=False)
-            if match.any():
-                result.loc[match, 'קטגוריה'] = cat
-                misc_mask = misc_mask & ~match
+            if remaining.empty:
+                break
+            hit = remaining.str.contains(kw, na=False, regex=False)
+            if hit.any():
+                result.loc[remaining.index[hit], 'קטגוריה'] = cat
+                remaining = remaining[~hit]
         # Word-boundary keywords (short/ambiguous like "הוט", "hot", "פז")
         for kw, cat in EXACT_WORD_KEYWORDS.items():
-            if not misc_mask.any():
+            if remaining.empty:
                 break
             pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
-            match = misc_mask & desc_lower.str.contains(pattern, na=False, regex=True)
-            if match.any():
-                result.loc[match, 'קטגוריה'] = cat
-                misc_mask = misc_mask & ~match
+            hit = remaining.str.contains(pattern, na=False, regex=True)
+            if hit.any():
+                result.loc[remaining.index[hit], 'קטגוריה'] = cat
+                remaining = remaining[~hit]
 
     # AI-powered categorization for remaining "שונות" transactions
     misc_mask = result['קטגוריה'] == 'שונות'

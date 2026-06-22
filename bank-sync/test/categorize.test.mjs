@@ -50,6 +50,30 @@ test('unknown merchant → שונות', () => {
   assert.equal(categorize('qwerty zzz 12345'), 'שונות')
 })
 
+// ── Catalog: false-positive fixes & expanded coverage ───────────────────────
+test('Yes Planet at the Ayalon mall → leisure, NOT insurance', () => {
+  // "איילון" used to match Ayalon Insurance; the cinema must win.
+  assert.equal(categorize('יס פלאנט איילון'), 'פנאי, בידור וספורט')
+})
+
+test('Ayalon Insurance still → ביטוח', () => {
+  assert.equal(categorize('איילון חברה לביטוח'), 'ביטוח')
+})
+
+test('a generic store at קניון איילון is NOT forced into insurance', () => {
+  // The bare "איילון" trap is gone — an unknown Ayalon-mall shop stays שונות.
+  assert.equal(categorize('חנות מתנות קניון איילון'), 'שונות')
+})
+
+test('expanded catalog: common Israeli merchants resolve out of שונות', () => {
+  assert.equal(categorize('רב חן דיזנגוף'), 'פנאי, בידור וספורט')
+  assert.equal(categorize('דקאתלון'), 'פנאי, בידור וספורט')
+  assert.equal(categorize('מקס ברנר'), 'מסעדות, קפה וברים')
+  assert.equal(categorize('איסתא ליינס'), 'טיסות ותיירות')
+  assert.equal(categorize('אסותא מרכזים רפואיים'), 'רפואה ובתי מרקחת')
+  assert.equal(categorize('תאגיד מים מי אביבים'), 'עירייה וממשלה')
+})
+
 test('user rule overrides keyword category', () => {
   const ruleMap = new Map([['שופרסל דיל', 'מתנות']])
   const base = categorize('שופרסל דיל')
