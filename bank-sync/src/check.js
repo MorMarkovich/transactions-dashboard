@@ -119,15 +119,33 @@ async function main() {
 
   // 5b. Uncategorized (שונות) — surface the merchants that still fall through
   // the keyword catalog so they can be added precisely. "שונות" should be rare.
+  //
+  // The headline number counts only real EXPENSES. Income (salaries, refunds,
+  // transfers in) and the bank's lump-sum credit-card bill payments are also
+  // left as שונות but aren't consumer spending — the dashboard shows income
+  // separately and strips the card-bill payments — so we report them apart
+  // instead of inflating the "missing from catalog" figure.
   section('Uncategorized (שונות)')
-  const misc = txns.filter((t) => (t['קטגוריה'] || 'שונות') === 'שונות')
+  // Same keywords the dashboard uses to strip lump-sum card-bill payments.
+  const CARD_BILL = ['ישראכרט', 'isracard', 'ויזה', 'visa', 'כאל', 'כ.א.ל', 'cal',
+    'לאומי קארד', 'מסטרקארד', 'mastercard', 'דיינרס', 'diners', 'אמקס', 'amex',
+    'מקס איט', 'max it', 'מקס ']
+  const isCardBill = (t) => Number(t['סכום']) < 0 &&
+    CARD_BILL.some((k) => String(t['תיאור'] || '').toLowerCase().includes(k.toLowerCase()))
+
+  const allMisc = txns.filter((t) => (t['קטגוריה'] || 'שונות') === 'שונות')
+  const income = allMisc.filter((t) => Number(t['סכום']) > 0)
+  const cardBills = allMisc.filter((t) => isCardBill(t))
+  const misc = allMisc.filter((t) => Number(t['סכום']) < 0 && !isCardBill(t)) // real expenses
+
+  const expenseCount = txns.filter((t) => Number(t['סכום']) < 0).length || 1
   if (misc.length === 0) {
-    ok('Nothing in שונות — every transaction is categorized.')
+    ok('No real expenses left in שונות — every expense is categorized.')
   } else {
-    const pct = Math.round((misc.length / txns.length) * 100)
+    const pct = Math.round((misc.length / expenseCount) * 100)
     const totalMisc = misc.reduce((s, t) => s + Math.abs(Number(t['סכום']) || 0), 0)
-    const msg = `${misc.length} transaction(s) in שונות (${pct}% of all, ${ils(totalMisc)} total)`
-    if (pct >= 15) fail(`${msg} — that's high; the catalog is missing common merchants.`)
+    const msg = `${misc.length} EXPENSE transaction(s) in שונות (${pct}% of expenses, ${ils(totalMisc)})`
+    if (pct >= 15) fail(`${msg} — still high; paste the list below to extend the catalog.`)
     else if (pct >= 5) warn(`${msg} — review the top merchants below.`)
     else ok(msg)
     // Group by merchant (strip the installment suffix so "X (תשלום 1/3)" groups with "X").
@@ -140,9 +158,12 @@ async function main() {
       byMerchant.set(name, e)
     }
     const top = [...byMerchant.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 20)
-    console.log(`\n  Top uncategorized merchants (paste these to get rules added):`)
+    console.log(`\n  Top uncategorized EXPENSES (paste these to get rules added):`)
     for (const [name, e] of top) console.log(`    • ${name} — ${e.count}× , ${ils(e.total)}`)
   }
+  // These are uncategorized too, but handled elsewhere — not a catalog gap.
+  if (income.length) ok(`(${income.length} income row(s) in שונות — shown in income views, not expenses.)`)
+  if (cardBills.length) ok(`(${cardBills.length} card-bill payment(s) in שונות — stripped by the dashboard to avoid double counting.)`)
 
   // 6. Outliers + future dates
   section('Outliers & dates')
