@@ -130,7 +130,11 @@ async function main() {
   const CARD_BILL = ['ישראכרט', 'isracard', 'ויזה', 'visa', 'כאל', 'כ.א.ל', 'cal',
     'לאומי קארד', 'מסטרקארד', 'mastercard', 'דיינרס', 'diners', 'אמקס', 'amex',
     'מקס איט', 'max it', 'מקס ']
-  const isCardBill = (t) => Number(t['סכום']) < 0 &&
+  // A card-bill payment is the lump sum that LEAVES the bank account to pay a
+  // card company — so it only counts on a BANK-statement row (_is_bank_row),
+  // exactly like the dashboard. A "מקס איט פי" charge that sits on the MAX card
+  // itself is a real purchase (made via the wallet), NOT a bill payment.
+  const isCardBill = (t) => Boolean(t['_is_bank_row']) && Number(t['סכום']) < 0 &&
     CARD_BILL.some((k) => String(t['תיאור'] || '').toLowerCase().includes(k.toLowerCase()))
 
   const allMisc = txns.filter((t) => (t['קטגוריה'] || 'שונות') === 'שונות')
