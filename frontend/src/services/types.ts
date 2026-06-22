@@ -68,6 +68,10 @@ export interface FileUploadResponse {
   transaction_count?: number;
   duplicates_removed?: number;
   cc_payments_removed?: number;
+  /** merchant→category assignments the AI resolved this restore (incl. via web
+   *  search), returned so the client can persist them as rules — resolving each
+   *  merchant once instead of re-querying on every load. */
+  ai_categorized?: { merchant: string; category: string }[];
 }
 
 export interface SessionFileInfo {

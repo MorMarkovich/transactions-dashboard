@@ -63,10 +63,11 @@ SYSTEM_PROMPT = """אתה מערכת לסיווג עסקאות בנקאיות י
 - שונות — רק אם אי אפשר לקבוע קטגוריה אחרת
 
 כללים חשובים:
-1. החזר תמיד JSON תקין בלבד
+1. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה)
 2. אם התיאור מכיל גם עברית וגם אנגלית, התייחס לשני החלקים
 3. העדף קטגוריה ספציפית על פני "שונות"
-4. שים לב לקיצורים נפוצים בעסקאות ישראליות"""
+4. שים לב לקיצורים נפוצים בעסקאות ישראליות
+5. אם אינך מזהה את בית העסק מתוך השם, השתמש בכלי חיפוש האינטרנט כדי לברר מהו ובאיזו קטגוריה הוא — חפש את שם העסק (למשל "מה זה <שם העסק> ישראל"). השתמש בחיפוש רק עבור עסקים שאינך מכיר."""
 
 USER_PROMPT_TEMPLATE = """סווג את העסקאות הבאות לקטגוריות. החזר מערך JSON בלבד, בפורמט:
 [{{"index": 0, "category": "שם הקטגוריה"}}, ...]
@@ -130,16 +131,41 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
     tx_lines = "\n".join(f"{i}. {desc}" for i, (_, desc) in enumerate(to_query))
     user_prompt = USER_PROMPT_TEMPLATE.format(transactions=tx_lines)
 
-    try:
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
+    # Web search lets Claude look up merchants it doesn't recognise from the name
+    # alone (small local shops etc.). On by default; AI_WEB_SEARCH=0 disables it,
+    # AI_MODEL overrides the model. If the account/model can't use the tool we
+    # retry once without it so categorization still works from Claude's knowledge.
+    model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
+    use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
+    create_kwargs = {
+        'model': model,
+        'max_tokens': 4096,
+        'system': SYSTEM_PROMPT,
+        'messages': [{"role": "user", "content": user_prompt}],
+    }
+    if use_search:
+        create_kwargs['tools'] = [{
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": int(os.environ.get('AI_WEB_SEARCH_MAX', '8')),
+        }]
 
-        # Extract text from response
-        text = response.content[0].text.strip()
+    try:
+        try:
+            response = client.messages.create(**create_kwargs)
+        except Exception as tool_err:
+            if 'tools' not in create_kwargs:
+                raise
+            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
+            create_kwargs.pop('tools', None)
+            response = client.messages.create(**create_kwargs)
+
+        # The reply can contain web-search tool blocks; the JSON answer is the
+        # model's final text. Concatenate all text blocks and parse that.
+        text = "".join(
+            getattr(b, "text", "") for b in response.content
+            if getattr(b, "type", "") == "text"
+        ).strip()
 
         # Parse JSON - handle potential markdown wrapping
         if text.startswith("```"):
@@ -148,7 +174,15 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
                 text = text[:-3]
             text = text.strip()
 
-        results = json.loads(text)
+        try:
+            results = json.loads(text)
+        except json.JSONDecodeError:
+            # With web search the model may wrap the array in prose; pull out the
+            # outermost [ ... ] and parse that.
+            start, end = text.find('['), text.rfind(']')
+            if start == -1 or end == -1 or end <= start:
+                raise
+            results = json.loads(text[start:end + 1])
 
         # Local index (into to_query) → validated category
         queried: dict[int, str] = {}
