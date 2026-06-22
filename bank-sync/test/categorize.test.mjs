@@ -65,6 +65,19 @@ test('a generic store at קניון איילון is NOT forced into insurance', 
   assert.equal(categorize('חנות מתנות קניון איילון'), 'שונות')
 })
 
+test('foreign card transactions are bucketed as travel (overseas spend)', () => {
+  assert.equal(categorize('SHINSEGAE DEPARTMENT S SEOUL         KR'), 'טיסות ותיירות')
+  assert.equal(categorize('BANGKOK BANK           TRAT          TH'), 'טיסות ותיירות')
+  assert.equal(categorize('7-11 HAD SAI KHAO      TRAD          TH'), 'טיסות ותיירות') // overrides food keyword
+})
+
+test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
+  assert.equal(categorize('ASOS IL'), 'אופנה')          // IL = Israel, not foreign
+  assert.equal(categorize('NETFLIX.COM'), 'חשמל ומחשבים') // no city/country trailer
+  assert.equal(categorize('שופרסל דיל'), 'מזון וצריכה')  // Hebrew → domestic
+  assert.equal(categorize('KERMEET'), 'שונות')           // no country-code trailer
+})
+
 test('expanded catalog: common Israeli merchants resolve out of שונות', () => {
   assert.equal(categorize('רב חן דיזנגוף'), 'פנאי, בידור וספורט')
   assert.equal(categorize('דקאתלון'), 'פנאי, בידור וספורט')

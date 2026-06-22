@@ -71,8 +71,23 @@ function boundaryMatch(text, kw) {
   return re.test(text)
 }
 
+// Foreign card transactions carry a trailing 2-letter country code after the
+// city, e.g. "SHINSEGAE DEPARTMENT S SEOUL   KR". Per the user's preference,
+// all overseas spend is bucketed as travel — even a merchant we'd otherwise
+// recognise (a 7-Eleven abroad is trip spend). Israel's own code (IL) is
+// excluded, and anything containing Hebrew is treated as domestic. Online
+// services (NETFLIX.COM, AMAZON …) have no city/country trailer, so they keep
+// their keyword category.
+const FOREIGN_DESC = /(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$/
+export function isForeignDescriptor(description) {
+  const s = String(description || '').trim()
+  if (!s || /[\u0590-\u05FF]/.test(s)) return false // contains Hebrew → domestic
+  return /[A-Za-z]/.test(s) && FOREIGN_DESC.test(s)
+}
+
 /**
  * Categorize a single transaction description, mirroring the backend order:
+ *  0. foreign card descriptor → טיסות ותיירות (override)
  *  1. Psagot → investment transfer (override)
  *  2. check-withdrawal keywords → שכר דירה (override)
  *  3. standing-order keywords → הוראות קבע (override)
@@ -81,6 +96,7 @@ function boundaryMatch(text, kw) {
  *  6. else שונות
  */
 export function categorize(description) {
+  if (isForeignDescriptor(description)) return 'טיסות ותיירות'
   const d = String(description || '').toLowerCase()
   let cat = 'שונות'
 

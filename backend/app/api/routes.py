@@ -231,6 +231,17 @@ async def restore_session(body: RestoreSessionRequest):
             psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
             if psagot_mask.any():
                 df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
+            # Foreign card transactions (a trailing 2-letter country code after
+            # the city, no Hebrew, excluding Israel's own IL) → bucket as travel,
+            # overriding any merchant keyword. Mirrors the bank-sync categorizer.
+            orig_desc = df['תיאור'].astype(str)
+            foreign_mask = (
+                ~orig_desc.str.contains(r'[֐-׿]', regex=True, na=False)
+                & orig_desc.str.contains(r'[A-Za-z]', regex=True, na=False)
+                & orig_desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
+            )
+            if foreign_mask.any():
+                df.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
             misc_mask = df['קטגוריה'] == 'שונות'
             if misc_mask.any():
                 # Scan only the shrinking "שונות" subset: each keyword check
