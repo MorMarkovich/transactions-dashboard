@@ -182,6 +182,17 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
     if psagot_mask.any():
         result.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
+
+    # Foreign card transactions (trailing 2-letter country code, no Hebrew,
+    # excluding Israel's IL) → bucket as travel, overriding merchant keywords.
+    orig_desc = result['תיאור'].astype(str)
+    foreign_mask = (
+        ~orig_desc.str.contains(r'[֐-׿]', regex=True, na=False)
+        & orig_desc.str.contains(r'[A-Za-z]', regex=True, na=False)
+        & orig_desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
+    )
+    if foreign_mask.any():
+        result.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
     for keyword in CHECK_WITHDRAWAL_KEYWORDS:
         kw = keyword.lower()
         # Short keywords (≤3 chars) need word-boundary matching to avoid
