@@ -75,7 +75,7 @@ test('foreign bucketing excludes Israel (IL), online services, and domestic rows
   assert.equal(categorize('ASOS IL'), 'אופנה')          // IL = Israel, not foreign
   assert.equal(categorize('NETFLIX.COM'), 'חשמל ומחשבים') // no city/country trailer
   assert.equal(categorize('שופרסל דיל'), 'מזון וצריכה')  // Hebrew → domestic
-  assert.equal(categorize('KERMEET'), 'שונות')           // no country-code trailer
+  assert.equal(categorize('ZZQWX'), 'שונות')             // no country-code trailer, unknown
 })
 
 test('expanded catalog: common Israeli merchants resolve out of שונות', () => {

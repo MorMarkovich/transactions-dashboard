@@ -147,6 +147,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'cup o joe', 'ארקפה', 'arcaffe', 'נספרסו', 'nespresso',
         'קפה לואיז', 'ולנטינה', 'casa',
         'מקדונלדס', 'שקשוקה', 'קינוח', 'קינוחים', 'קונדטוריה', 'פטיסרי',
+        'kermeet', 'קרמיט', 'המאסטרו',
     ],
     'תחבורה ורכבים': [
         'רב קו', 'רב-קו', 'ravkav', 'אגד', 'egged',
@@ -266,6 +267,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה',
         'body shop', 'laline', 'ללין',
         'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק סנטר', 'סטוק פקטורי',
+        'booom', 'זול סטוק',
     ],
     'עיצוב הבית': [
         'איקאה', 'ikea', 'הום סנטר', 'home center',
