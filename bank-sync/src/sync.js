@@ -16,15 +16,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // The accounts to sync: the keychain registry if present, otherwise a legacy
 // fallback derived from PROVIDERS (one account per provider, owner unknown).
+// ACCOUNTS (env) narrows the run to specific account keys — e.g. pull only one
+// Isracard card without re-logging into the other (avoids rate-limit blocks).
 async function resolveAccounts() {
   const registry = await getAccounts()
-  if (registry.length) return registry
-  return config.providers.map((provider) => ({
+  const all = registry.length ? registry : config.providers.map((provider) => ({
     key: provider,
     provider,
     owner: undefined,
     label: PROVIDER_LABELS[provider] || provider,
   }))
+  if (config.accounts.length) return all.filter((a) => config.accounts.includes(a.key))
+  return all
 }
 
 /**

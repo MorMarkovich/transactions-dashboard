@@ -21,6 +21,10 @@ export const config = {
     'http://127.0.0.1:5174',
   ]),
   providers: list(process.env.PROVIDERS, SUPPORTED).filter((p) => SUPPORTED.includes(p)),
+  // Limit a sync to specific account keys (comma-separated, e.g. "isracard-2").
+  // Empty = all accounts. Lets you re-pull one card without logging into the
+  // others — avoids anti-bot rate limits when two cards share a provider.
+  accounts: list(process.env.ACCOUNTS, []),
   monthsBack: Number(process.env.MONTHS_BACK) || 3,
   showBrowser: String(process.env.SHOW_BROWSER || '').toLowerCase() === 'true',
   // Use an already-installed Chrome instead of the (often broken on Apple
