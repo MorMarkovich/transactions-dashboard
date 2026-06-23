@@ -12,6 +12,8 @@ import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 // The accounts to sync: the keychain registry if present, otherwise a legacy
 // fallback derived from PROVIDERS (one account per provider, owner unknown).
 async function resolveAccounts() {
@@ -52,12 +54,21 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
   const errors = {}
 
   const accounts = await resolveAccounts()
+  let prevProvider = null
   for (const acct of accounts) {
     const credentials = await getJSON(credKey(acct.key))
     if (!credentials) {
       log(`דילוג על ${acct.label || acct.key} (אין פרטי התחברות)`) // not set up — skip
       continue
     }
+    // Pause between accounts so logins don't fire back-to-back (helps avoid
+    // anti-bot blocks, e.g. Isracard's "Block Automation"). Wait longer when
+    // hitting the SAME provider twice in a row (e.g. two Isracard cards).
+    if (prevProvider !== null) {
+      const ms = prevProvider === acct.provider ? config.sameProviderDelayMs : config.accountDelayMs
+      if (ms > 0) { log(`ממתין ${Math.round(ms / 1000)} שניות לפני החשבון הבא…`); await sleep(ms) }
+    }
+    prevProvider = acct.provider
     try {
       log(`סורק ${acct.label || acct.key}…`)
       // Always save a screenshot of the failure screen for inspection (only
