@@ -36,6 +36,11 @@ export const config = {
   // for slow SPAs like Discount. Plus a couple of navigation retries.
   scrapeTimeout: process.env.SCRAPE_TIMEOUT !== undefined ? Number(process.env.SCRAPE_TIMEOUT) : 120000,
   navRetryCount: process.env.NAV_RETRY !== undefined ? Number(process.env.NAV_RETRY) : 2,
+  // Pause between accounts (ms) so logins don't fire back-to-back — reduces
+  // anti-bot blocks. A longer wait when two accounts share a provider (e.g.
+  // two Isracard cards), which is the most block-prone case.
+  accountDelayMs: process.env.ACCOUNT_DELAY_MS !== undefined ? Number(process.env.ACCOUNT_DELAY_MS) : 4000,
+  sameProviderDelayMs: process.env.SAME_PROVIDER_DELAY_MS !== undefined ? Number(process.env.SAME_PROVIDER_DELAY_MS) : 20000,
   // Income-month attribution for salaries near a month boundary:
   // 'next' = late-month pay counts as the following month, 'prev' = early-month
   // pay counts as the previous month, 'none' = leave as-is.
