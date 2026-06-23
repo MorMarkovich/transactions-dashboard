@@ -75,13 +75,19 @@ async function main() {
     }
   }
 
-  // Assign/confirm the owner of each existing account (credentials are kept).
+  // Assign/confirm the owner of each existing account, and optionally update
+  // its stored login (e.g. after a bank forces a password change).
   if (accounts.length) {
     console.log('Existing accounts — set who each one belongs to:')
     for (const acct of accounts) {
       console.log(`\n• ${PROVIDER_LABELS[acct.provider] || acct.provider}  [${acct.key}]`)
       acct.owner = await askOwner(rl, acct.owner)
       acct.label = labelFor(acct.provider, acct.owner)
+      if (await askYesNo(rl, '  Update the login (e.g. new password) for this account?')) {
+        const creds = await collectCreds(rl, acct.provider)
+        await setJSON(credKey(acct.key), creds)
+        console.log('  ✓ login updated.')
+      }
     }
     console.log('')
   }
