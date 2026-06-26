@@ -80,7 +80,9 @@ async function main() {
   if (accounts.length) {
     console.log('Existing accounts — set who each one belongs to:')
     for (const acct of accounts) {
-      console.log(`\n• ${PROVIDER_LABELS[acct.provider] || acct.provider}  [${acct.key}]`)
+      // Show the current label (incl. owner) so two cards of one provider
+      // (e.g. ישראכרט (מור) vs ישראכרט (שלי)) can't be confused.
+      console.log(`\n• ${acct.label || PROVIDER_LABELS[acct.provider] || acct.provider}  [${acct.key}]  — currently: ${acct.owner || JOINT}`)
       acct.owner = await askOwner(rl, acct.owner)
       acct.label = labelFor(acct.provider, acct.owner)
       if (await askYesNo(rl, '  Update the login (e.g. new password) for this account?')) {
