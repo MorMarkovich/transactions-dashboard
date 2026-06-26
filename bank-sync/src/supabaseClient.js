@@ -46,11 +46,25 @@ export async function insertSnapshot(supabase, userId, transactions) {
   return data?.id
 }
 
-// Delete the user's older snapshots, keeping `keepId`. Used by a fresh re-sync
-// to replace stale data (e.g. switching combined → split installments).
-export async function deleteOtherSnapshots(supabase, userId, keepId) {
-  let q = supabase.from('saved_transactions').delete().eq('user_id', userId)
-  if (keepId != null) q = q.neq('id', keepId)
-  const { error } = await q
+// Prune old snapshots after a fresh re-sync, but KEEP the newest `keepRecent`
+// (plus `keepId`) as backups, so a bad run (e.g. a provider blocked mid-sync)
+// can be recovered instead of being permanently overwritten. The dashboard
+// still reads only the newest row; the rest are just safety copies.
+export async function deleteOtherSnapshots(supabase, userId, keepId, keepRecent = 3) {
+  const { data, error: selErr } = await supabase
+    .from('saved_transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (selErr) throw new Error(`cleanup of old snapshots failed: ${selErr.message}`)
+  const ids = (data || []).map((r) => r.id)
+  const keep = new Set([keepId, ...ids.slice(0, Math.max(0, keepRecent))].filter((v) => v != null))
+  const toDelete = ids.filter((id) => !keep.has(id))
+  if (!toDelete.length) return
+  const { error } = await supabase
+    .from('saved_transactions')
+    .delete()
+    .eq('user_id', userId)
+    .in('id', toDelete)
   if (error) throw new Error(`cleanup of old snapshots failed: ${error.message}`)
 }

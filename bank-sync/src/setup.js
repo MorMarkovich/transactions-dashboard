@@ -128,7 +128,11 @@ async function main() {
   for (const a of accounts) console.log(`  • ${a.label}  → owner: ${a.owner || JOINT}`)
   console.log('\nYour sync token (paste it into the dashboard when prompted):\n')
   console.log('  ' + token + '\n')
-  console.log('Next: `npm run resync` (re-pull and tag everything by owner), then `npm run serve`.')
+  console.log('Next steps:')
+  console.log('  • Changed an account OWNER only? → `npm run retag` (re-tags existing data, no bank login).')
+  console.log('  • Added/updated a LOGIN, or want new transactions? → `npm run sync` (merges; never wipes).')
+  console.log('  • `npm run resync` does a full re-pull. It now keeps data for any account that fails,')
+  console.log('    but a working sync is still safer — avoid it while a provider (e.g. Isracard) is blocked.')
   console.log('(Re-running setup keeps the same token. To rotate it, run `npm run secrets:clear` first.)')
 }
 

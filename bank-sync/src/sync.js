@@ -45,9 +45,11 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
   log(fresh ? 'מתחבר ל-Supabase (רענון מלא)…' : 'מתחבר ל-Supabase…')
   const { supabase, userId } = await signIn(config.supabaseUrl, config.supabaseAnonKey, auth.email, auth.password)
 
-  // Fresh re-sync ignores the existing snapshot (it's about to be replaced).
+  // Always read the existing snapshot. A normal sync merges into it; a fresh
+  // resync uses it to PRESERVE rows from accounts that fail to scrape this run
+  // (so a temporary block — e.g. Isracard anti-bot — can't wipe good data).
   const [existing, rules] = await Promise.all([
-    fresh ? Promise.resolve([]) : getLatestSnapshot(supabase, userId),
+    getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
   ])
   const ruleMap = new Map((rules || []).map((r) => [r.merchant, r.category]))
@@ -102,7 +104,23 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     }
   }
 
-  const { merged, added, enriched } = mergeSnapshots(existing, freshTxns)
+  // On a fresh resync, start from the existing rows of accounts that FAILED
+  // this run (so they're kept), then layer the fresh data over them. Accounts
+  // that succeeded get fully replaced by their fresh scrape. A normal sync just
+  // merges into everything that already exists.
+  let baseRows = existing
+  if (fresh) {
+    const failedLabels = new Set(
+      accounts
+        .filter((a) => errors[a.key])
+        .map((a) => a.label || PROVIDER_LABELS[a.provider] || a.provider),
+    )
+    baseRows = (existing || []).filter((t) => failedLabels.has(t['_source_file']))
+    if (baseRows.length) {
+      log(`שומר ${baseRows.length} עסקאות קיימות מחשבונות שנכשלו (${[...failedLabels].join(', ')}) כדי לא למחוק אותן`)
+    }
+  }
+  const { merged, added, enriched } = mergeSnapshots(baseRows, freshTxns)
 
   // Re-attribute boundary salaries to a consistent month (applies to existing
   // rows too, so historical months get corrected).
