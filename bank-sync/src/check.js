@@ -55,6 +55,23 @@ async function main() {
   }
   if (byAccount.has('(untagged)')) warn('Some transactions have no account tag — run `npm run sync` once more to tag them.')
 
+  // 1b. Per-person split (_owner) — what the dashboard's מור/שלי filter uses.
+  section('Owners (per-person split)')
+  const byOwner = new Map()
+  for (const t of txns) {
+    const o = (t['_owner'] || '(untagged)').toString()
+    if (!byOwner.has(o)) byOwner.set(o, { count: 0, expense: 0, income: 0 })
+    const e = byOwner.get(o)
+    e.count += 1
+    const amt = Number(t['סכום']) || 0
+    if (amt < 0) e.expense += Math.abs(amt)
+    else e.income += amt
+  }
+  for (const [o, e] of [...byOwner.entries()].sort((a, b) => b[1].count - a[1].count)) {
+    ok(`${o}: ${e.count} txns — expenses ${ils(e.expense)}, income ${ils(e.income)}`)
+  }
+  if (byOwner.has('(untagged)')) warn('Some rows have no _owner tag — they won\'t appear under מור/שלי.')
+
   // 2. Exact duplicates (should be none after dedup)
   section('Duplicates')
   const seen = new Map()
