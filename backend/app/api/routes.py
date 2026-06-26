@@ -935,6 +935,40 @@ def _sanitize(val):
     return val
 
 
+def _month_series(df: pd.DataFrame, date_type: str) -> pd.Series:
+    """The MM/YYYY each row belongs to, for grouping/filtering by month.
+
+    Honors the income-month attribution that bank-sync baked into the
+    pre-computed חודש / חודש_חיוב columns (e.g. an end-of-month salary moved to
+    the following month). ALL month views must use this so they agree with each
+    other; deriving the month ad-hoc from the raw date silently throws the shift
+    away. Falls back to the raw date only for legacy rows missing those columns.
+    """
+    if date_type == 'billing':
+        if 'חודש_חיוב' in df.columns:
+            s = df['חודש_חיוב'].astype('object')
+            if 'תאריך_חיוב' in df.columns:
+                s = s.where(s.notna() & (s != ''), df['תאריך_חיוב'].dt.strftime('%m/%Y'))
+            return s
+        if 'תאריך_חיוב' in df.columns:
+            return df['תאריך_חיוב'].dt.strftime('%m/%Y')
+    if 'חודש' in df.columns:
+        s = df['חודש'].astype('object')
+        if 'תאריך' in df.columns:
+            s = s.where(s.notna() & (s != ''), df['תאריך'].dt.strftime('%m/%Y'))
+        return s
+    return df['תאריך'].dt.strftime('%m/%Y')
+
+
+def _month_key(m) -> tuple:
+    """Sort key for an MM/YYYY label (year, month)."""
+    try:
+        mm, yy = str(m).split('/')
+        return (int(yy), int(mm))
+    except Exception:
+        return (0, 0)
+
+
 def _to_json_safe(val):
     """Convert any pandas/numpy value to a JSON-serializable Python type.
 
@@ -1199,16 +1233,14 @@ async def get_category_transactions(
     # Filter by category + expenses
     filtered = df[(df['קטגוריה'] == category) & (df['סכום'] < 0)]
 
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
-
-    # Filter by single month or date range
+    # Filter by single month or date range (shift-aware month).
     if month:
         filtered = filtered.copy()
-        filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
+        filtered['_month'] = _month_series(filtered, date_type)
         filtered = filtered[filtered['_month'] == month]
     elif month_from or month_to:
         filtered = filtered.copy()
-        filtered['_month'] = filtered[date_col].dt.strftime('%m/%Y')
+        filtered['_month'] = _month_series(filtered, date_type)
         # Parse MM/YYYY into sortable YYYY-MM for comparison
         def month_sort_key(m: str) -> str:
             parts = m.split('/')
@@ -1257,8 +1289,7 @@ async def get_category_merchants(
     if df.empty:
         return {"merchants": [], "total": 0}
 
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
-    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    df['_month'] = _month_series(df, date_type)
     filtered = df[(df['_month'] == month) & (df['קטגוריה'] == category) & (df['סכום'] < 0)]
 
     if filtered.empty:
@@ -1344,20 +1375,14 @@ async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("tr
     if expenses.empty:
         return {"months": []}
 
-    # Choose date column based on date_type
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in expenses.columns) else 'תאריך'
-    expenses['month_period'] = expenses[date_col].dt.to_period('M')
-    expenses = expenses.dropna(subset=['month_period'])
-    monthly = (
-        expenses
-        .groupby('month_period')['סכום_מוחלט']
-        .sum()
-        .sort_index()
-    )
+    # Group by the shift-aware month so the month buttons match the other views.
+    expenses['_month'] = _month_series(expenses, date_type)
+    expenses = expenses[expenses['_month'].notna() & (expenses['_month'] != '')]
+    monthly = expenses.groupby('_month')['סכום_מוחלט'].sum()
 
     months = [
-        {"month": period.strftime('%m/%Y'), "amount": round(_sanitize(v), 2)}
-        for period, v in monthly.items()
+        {"month": str(m), "amount": round(_sanitize(float(monthly[m])), 2)}
+        for m in sorted(monthly.index, key=_month_key)
     ]
     return {"months": months}
 
@@ -1645,9 +1670,8 @@ async def get_month_overview(
     if df.empty:
         return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
 
-    # Choose date column
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in df.columns) else 'תאריך'
-    df['_month'] = df[date_col].dt.strftime('%m/%Y')
+    # Group by the shift-aware month (so salaries land in their attributed month).
+    df['_month'] = _month_series(df, date_type)
     month_df = df[df['_month'] == month].copy()
 
     if month_df.empty:
