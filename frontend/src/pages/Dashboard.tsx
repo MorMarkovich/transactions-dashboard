@@ -667,6 +667,11 @@ export default function Dashboard() {
         const displayIncome = hasMonthData ? monthOverview.total_income : metrics.total_income
         const displayBalance = displayIncome - displayExpenses
         const displaySavingsRate = displayIncome > 0 ? (displayBalance / displayIncome * 100) : 0
+        // When expenses dwarf income the raw rate explodes (e.g. -10151%), which
+        // is noise — show a capped "deficit" indicator instead of the number.
+        const savingsRateText = displaySavingsRate < -100
+          ? 'גירעון'
+          : `${displaySavingsRate.toFixed(1)}%`
         const periodLabel = hasMonthData ? selectedMonth : 'כל התקופה'
 
         return (
@@ -724,7 +729,7 @@ export default function Dashboard() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {displaySavingsRate.toFixed(1)}%
+                  {savingsRateText}
                 </div>
               </div>
             )}
