@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   Layers,
   Grid3X3,
+  CalendarRange,
   Tag,
   Activity,
   Clock,
@@ -31,6 +32,8 @@ import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
+import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyComparison'
+import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
@@ -57,6 +60,8 @@ import type {
   MonthOverviewData,
   IndustryMonthlyData,
   CategorySnapshotData,
+  CategoryMonthlyComparisonData,
+  CategoryCatalog,
   Transaction,
 } from '../services/types'
 
@@ -106,6 +111,14 @@ export default function Dashboard() {
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
   const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
   const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshotData | null>(null)
+  const [comparison, setComparison] = useState<CategoryMonthlyComparisonData | null>(null)
+  const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalog | null>(null)
+  const [managerOpen, setManagerOpen] = useState(false)
+  // User-created category / subcategory names (persisted in localStorage so they
+  // appear in the picker lists even before a transaction is assigned to them;
+  // an actual assignment is what persists them server-side as a rule).
+  const [customCategories, setCustomCategories] = useState<string[]>([])
+  const [customSubcategories, setCustomSubcategories] = useState<Record<string, string[]>>({})
 
   // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
@@ -189,6 +202,31 @@ export default function Dashboard() {
       } finally {
         // Close the drawer and trigger a full data refresh so all widgets
         // pick up the new classification.
+        setDrawerOpen(false)
+        setRefreshKey((k) => k + 1)
+      }
+    },
+    [sessionId, user],
+  )
+
+  // ── Manual subcategory override ──
+  // Mirrors handleCategoryChange: updates the in-memory session, then persists a
+  // merchant→{category, subcategory} rule (we send the category the backend
+  // reports so the NOT-NULL `category` column is satisfied), then refreshes.
+  const handleSubcategoryChange = useCallback(
+    async (tx: Transaction, newSubcategory: string) => {
+      if (!sessionId || tx.id == null) return
+      try {
+        const resp = await transactionsApi.updateTransactionSubcategory(sessionId, tx.id, newSubcategory)
+        if (user && resp.merchant && resp.category) {
+          await supabaseApi
+            .upsertCategorySubrule(user.id, resp.merchant, resp.category, newSubcategory)
+            .catch((e) => {
+              // eslint-disable-next-line no-console
+              console.warn('Failed to persist subcategory rule (will retry on next edit):', e)
+            })
+        }
+      } finally {
         setDrawerOpen(false)
         setRefreshKey((k) => k + 1)
       }
@@ -421,6 +459,81 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner])
 
+  // ── Fetch month-by-month category comparison (driven by date type) ──
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+      .then((sid) => transactionsApi.getCategoryMonthlyComparison(sid, dateType, controller.signal))
+      .then((data) => setComparison(data))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [sessionId, dateType, refreshKey, selectedOwner])
+
+  // ── Fetch the category/subcategory catalog once (seeded names + icons) ──
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    transactionsApi.getCategoryCatalog(controller.signal)
+      .then((data) => setCategoryCatalog(data))
+      .catch(() => {})
+    return () => controller.abort()
+  }, [sessionId])
+
+  // ── Load user-created category/subcategory names (localStorage) ──
+  useEffect(() => {
+    if (!user) return
+    try {
+      const c = localStorage.getItem(`customCats:${user.id}`)
+      const s = localStorage.getItem(`customSubs:${user.id}`)
+      setCustomCategories(c ? JSON.parse(c) : [])
+      setCustomSubcategories(s ? JSON.parse(s) : {})
+    } catch {
+      // ignore malformed localStorage
+    }
+  }, [user])
+
+  const addCustomCategory = useCallback((name: string) => {
+    const n = name.trim()
+    if (!n) return
+    setCustomCategories((prev) => {
+      if (prev.includes(n)) return prev
+      const next = [...prev, n]
+      if (user) { try { localStorage.setItem(`customCats:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
+      return next
+    })
+  }, [user])
+
+  const addCustomSubcategory = useCallback((parent: string, name: string) => {
+    const n = name.trim()
+    if (!n || !parent) return
+    setCustomSubcategories((prev) => {
+      const existing = prev[parent] ?? []
+      if (existing.includes(n)) return prev
+      const next = { ...prev, [parent]: [...existing, n] }
+      if (user) { try { localStorage.setItem(`customSubs:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
+      return next
+    })
+  }, [user])
+
+  const handleManagerRename = useCallback(async (oldCategory: string, newCategory: string) => {
+    if (!sessionId) return
+    const next = newCategory.trim()
+    if (!next || next === oldCategory) return
+    try {
+      const resp = await transactionsApi.renameCategory(sessionId, oldCategory, next)
+      if (user && resp.merchants.length > 0) {
+        await supabaseApi.upsertCategoryRules(
+          user.id,
+          resp.merchants.map((merchant) => ({ merchant, category: next })),
+        ).catch(() => {})
+      }
+      setRefreshKey((k) => k + 1)
+    } catch {
+      // ignore — rename is best-effort
+    }
+  }, [sessionId, user])
+
   // ── Filtered + sorted snapshot categories (uses extracted pure fn) ────
   const snapshotFilterOpts = useMemo(() => ({
     search: snapshotSearch,
@@ -450,9 +563,36 @@ export default function Dashboard() {
     () => Array.from(new Set([
       ...(categorySnapshot?.categories.map((cat) => cat.name) ?? []),
       ...Object.keys(CATEGORY_ICONS),
+      ...(categoryCatalog?.categories.map((c) => c.name) ?? []),
+      ...customCategories,
     ])).sort((a, b) => a.localeCompare(b, 'he')),
-    [categorySnapshot],
+    [categorySnapshot, categoryCatalog, customCategories],
   )
+
+  // Subcategory names for the category currently shown in the drawer (seeded ∪
+  // user-created). The drawer additionally merges any in-use on its rows.
+  const drawerSubcategoryOptions = useMemo(() => {
+    const seeded = categoryCatalog?.subcategories?.[drawerCategory]?.map((s) => s.name) ?? []
+    return Array.from(new Set([...seeded, ...(customSubcategories[drawerCategory] ?? [])]))
+  }, [categoryCatalog, drawerCategory, customSubcategories])
+
+  // Category list for the manager modal: every known category + its subcategories.
+  const managerCategories = useMemo<ManagerCategory[]>(() => {
+    const names = new Set<string>([
+      ...(categoryCatalog?.categories.map((c) => c.name) ?? Object.keys(CATEGORY_ICONS)),
+      ...(categorySnapshot?.categories.map((c) => c.name) ?? []),
+      ...customCategories,
+    ])
+    return Array.from(names)
+      .sort((a, b) => a.localeCompare(b, 'he'))
+      .map((name) => ({
+        name,
+        subcategories: Array.from(new Set([
+          ...(categoryCatalog?.subcategories?.[name]?.map((s) => s.name) ?? []),
+          ...(customSubcategories[name] ?? []),
+        ])).sort((a, b) => a.localeCompare(b, 'he')),
+      }))
+  }, [categoryCatalog, categorySnapshot, customCategories, customSubcategories])
 
   const clearAllSnapshotFilters = useCallback(() => {
     setSnapshotSearch('')
@@ -984,6 +1124,26 @@ export default function Dashboard() {
             <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
               לחצו על קטגוריה לפירוט עסקאות
             </span>
+            <button
+              onClick={() => setManagerOpen(true)}
+              style={{
+                marginInlineStart: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 11px',
+                borderRadius: 'var(--radius-full)',
+                border: '1px solid var(--border)',
+                background: 'var(--glass-bg)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-family)',
+              }}
+            >
+              <Tag size={12} /> נהל קטגוריות
+            </button>
           </div>
 
           {/* ─── Toolbar: Search + Sort + Actions (always visible) ─── */}
@@ -1516,6 +1676,32 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* ── Month-by-month comparison by category ──────────────────── */}
+      {comparison && comparison.months.length >= 2 && comparison.categories.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
+        >
+          <div className="section-header-v2">
+            <CalendarRange size={18} />
+            <span>השוואת חודשים לפי קטגוריה</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+              ולכמה אחוז מההוצאות החודשיות
+            </span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <CategoryMonthlyComparison
+              data={comparison}
+              dateType={dateType}
+              hasBillingDate={hasBillingDate}
+              onCategoryClick={handleCategoryCardClick}
+            />
+          </Card>
+        </motion.div>
+      )}
+
       {/* ── Industry monthly comparison ────────────────────────────── */}
       {industryMonthly && industryMonthly.months.length >= 2 && (
         <motion.div
@@ -1812,6 +1998,17 @@ export default function Dashboard() {
         loading={drawerLoading}
         availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
+        subcategoryOptions={drawerSubcategoryOptions}
+        onSubcategoryChange={handleSubcategoryChange}
+      />
+
+      <CategoryManagerModal
+        isOpen={managerOpen}
+        onClose={() => setManagerOpen(false)}
+        categories={managerCategories}
+        onRenameCategory={handleManagerRename}
+        onAddCategory={addCustomCategory}
+        onAddSubcategory={addCustomSubcategory}
       />
     </div>
   )

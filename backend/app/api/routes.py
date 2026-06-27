@@ -15,8 +15,14 @@ import numpy as np
 from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
-from ..services.data_processor import process_data, clean_dataframe
-from ..core.constants import CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from ..services.data_processor import (
+    process_data, clean_dataframe,
+    apply_unconditional_overrides, derive_subcategory,
+)
+from ..core.constants import (
+    CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
+    CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog,
+)
 from ..services.ai_categorizer import categorize_transactions
 from ..services.chart_generator import (
     create_donut_chart,
@@ -133,10 +139,11 @@ async def upload_file(file: UploadFile = File(...)):
 
 class CategoryRule(BaseModel):
     """User-defined override: any transaction whose merchant matches this
-    rule should be classified under `category` regardless of what the
-    keyword/AI categorizer produced."""
+    rule should be classified under `category` (and optionally `subcategory`)
+    regardless of what the keyword/AI categorizer produced."""
     merchant: str
     category: str
+    subcategory: Optional[str] = None
 
 
 class RestoreSessionRequest(BaseModel):
@@ -170,6 +177,12 @@ class UpdateTransactionCategoryRequest(BaseModel):
     session_id: str
     transaction_id: int
     category: str
+
+
+class UpdateTransactionSubcategoryRequest(BaseModel):
+    session_id: str
+    transaction_id: int
+    subcategory: str
 
 
 class RenameCategoryRequest(BaseModel):
@@ -227,22 +240,12 @@ async def restore_session(body: RestoreSessionRequest):
         # ── Auto-categorize "שונות" by description keywords ──────────
         ai_categorized: list[dict] = []  # merchant→category the AI resolved (returned for persistence)
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+            # Unconditional overrides (Psagot, foreign-card, AI tools) run on ALL
+            # rows. Shared helper so this path matches the upload pipeline — and
+            # so AI-tool charges that arrived already tagged 'חשמל ומחשבים'
+            # migrate to 'בינה מלאכותית' here without a bank-sync re-pull.
+            apply_unconditional_overrides(df)
             desc_lower = df['תיאור'].str.lower()
-            # Psagot investment transfers override any existing category
-            psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
-            if psagot_mask.any():
-                df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
-            # Foreign card transactions (a trailing 2-letter country code after
-            # the city, no Hebrew, excluding Israel's own IL) → bucket as travel,
-            # overriding any merchant keyword. Mirrors the bank-sync categorizer.
-            orig_desc = df['תיאור'].astype(str)
-            foreign_mask = (
-                ~orig_desc.str.contains(r'[֐-׿]', regex=True, na=False)
-                & orig_desc.str.contains(r'[A-Za-z]', regex=True, na=False)
-                & orig_desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
-            )
-            if foreign_mask.any():
-                df.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
             misc_mask = df['קטגוריה'] == 'שונות'
             if misc_mask.any():
                 # Scan only the shrinking "שונות" subset: each keyword check
@@ -273,13 +276,21 @@ async def restore_session(body: RestoreSessionRequest):
             # the AI skips them. This way each merchant is web-searched at most
             # once. Rules also win over the keyword categorizer above.
             if body.category_rules:
-                rule_map = {r.merchant: r.category for r in body.category_rules if r.merchant and r.category}
-                if rule_map:
-                    desc_str = df['תיאור'].astype(str)
-                    for merchant, category in rule_map.items():
-                        rmask = desc_str == merchant
-                        if rmask.any():
-                            df.loc[rmask, 'קטגוריה'] = category
+                desc_str = df['תיאור'].astype(str)
+                for r in body.category_rules:
+                    if not r.merchant:
+                        continue
+                    rmask = desc_str == r.merchant
+                    if not rmask.any():
+                        continue
+                    if r.category:
+                        df.loc[rmask, 'קטגוריה'] = r.category
+                    # Manual subcategory override (preserved over keyword
+                    # derivation below, same precedence as the category rule).
+                    if getattr(r, 'subcategory', None):
+                        if 'קטגוריה_משנה' not in df.columns:
+                            df['קטגוריה_משנה'] = ''
+                        df.loc[rmask, 'קטגוריה_משנה'] = r.subcategory
 
             # AI categorization for remaining "שונות" transactions (Claude, with
             # web search for merchants it can't identify from the name). The
@@ -298,6 +309,11 @@ async def restore_session(body: RestoreSessionRequest):
                                 "merchant": str(df.at[misc_idx[local_i], 'תיאור']),
                                 "category": cat,
                             })
+
+            # Derive subcategories from the finalized category (after overrides,
+            # keyword pass, user rules and AI). Rule/manual subcategories set
+            # above are preserved (derive only fills empty ones).
+            derive_subcategory(df)
 
         # (User-defined category rules are applied above, before the AI step,
         # so rule-covered merchants skip the web search — see that block.)
@@ -449,6 +465,56 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
     # save a merchant→category rule without a separate round-trip.
     merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
     return {"success": True, "merchant": merchant, "category": new_category}
+
+
+@router.post("/transactions/subcategory")
+async def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
+    """Set a single transaction's subcategory (קטגוריה_משנה) in the session.
+
+    Returns the row's merchant AND current category so the frontend can persist
+    a single merchant→{category, subcategory} rule (the rules table's `category`
+    column is NOT NULL, so we always send the category alongside)."""
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[body.session_id]
+    if 'id' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not support transaction updates")
+
+    mask = df['id'] == body.transaction_id
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    new_subcategory = (body.subcategory or '').strip()
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+    df.loc[mask, 'קטגוריה_משנה'] = new_subcategory
+    sessions[body.session_id] = df
+
+    merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
+    category = str(df.loc[mask, 'קטגוריה'].iloc[0]) if 'קטגוריה' in df.columns else None
+    return {
+        "success": True,
+        "merchant": merchant,
+        "category": category,
+        "subcategory": new_subcategory,
+    }
+
+
+@router.get("/categories/catalog")
+async def get_category_catalog():
+    """Return the seeded category + subcategory catalog so the UI's category
+    manager and subcategory selectors stay in sync with the backend without
+    hardcoding the Hebrew names in the frontend."""
+    sub_catalog = get_subcategory_catalog()
+    subcategories = {
+        parent: [{"name": name, "icon": SUBCATEGORY_ICONS.get(name, "")} for name in names]
+        for parent, names in sub_catalog.items()
+    }
+    return {
+        "categories": [{"name": name, "icon": icon} for name, icon in CATEGORY_ICONS.items()],
+        "subcategories": subcategories,
+    }
 
 
 @router.post("/categories/rename")
@@ -1266,6 +1332,11 @@ async def get_category_transactions(
             "סכום": _sanitize(round(float(row['סכום']), 2)),
             "סכום_מוחלט": _sanitize(round(float(row['סכום_מוחלט']), 2)),
             "קטגוריה": str(row['קטגוריה']),
+            "קטגוריה_משנה": (
+                str(row['קטגוריה_משנה'])
+                if 'קטגוריה_משנה' in filtered.columns and pd.notna(row.get('קטגוריה_משנה'))
+                else ""
+            ),
         }
         for _, row in filtered.iterrows()
     ]
@@ -1766,6 +1837,90 @@ async def get_industry_monthly(
         series.append({"name": "אחר", "data": [round(_sanitize(v), 2) for v in other_data]})
 
     return {"months": months, "series": series}
+
+
+@router.get("/charts/v2/category-monthly-comparison")
+async def get_category_monthly_comparison(
+    sessionId: str = Query(...),
+    date_type: str = Query("transaction"),
+):
+    """Month-by-month comparison of expenses per category.
+
+    For every (category, month) cell returns the amount, that cell's **share of
+    the month's total expenses** (pct_of_month), and the month-over-month delta
+    (₪ and %). Uses the shift-aware `_month_series` so the months agree with the
+    month-overview and other dashboard views. Driven by `date_type`
+    (transaction|billing) so the caller can compare on either basis.
+    """
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    df = sessions[sessionId]
+    expenses = df[df['סכום'] < 0].copy()
+    empty = {"months": [], "categories": [], "month_totals": {}, "grand_total": 0}
+    if expenses.empty:
+        return empty
+
+    expenses['_month'] = _month_series(expenses, date_type)
+    expenses = expenses[expenses['_month'].notna() & (expenses['_month'].astype(str) != '')]
+    if expenses.empty:
+        return empty
+
+    expenses['_month'] = expenses['_month'].astype(str)
+    months = sorted(expenses['_month'].unique(), key=_month_key)
+
+    # (category, month) → total, and month → total
+    cat_month = expenses.groupby(['קטגוריה', '_month'])['סכום_מוחלט'].sum().to_dict()
+    month_totals_series = expenses.groupby('_month')['סכום_מוחלט'].sum()
+    month_totals = {
+        m: round(_sanitize(float(month_totals_series.get(m, 0.0))), 2) for m in months
+    }
+    grand_total = round(_sanitize(float(expenses['סכום_מוחלט'].sum())), 2)
+
+    # Categories sorted by total spend (desc)
+    cat_totals = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().sort_values(ascending=False)
+
+    categories = []
+    for cat_name, cat_total_val in cat_totals.items():
+        cat_total = round(_sanitize(float(cat_total_val)), 2)
+        months_map = {}
+        prev_amount = None
+        for m in months:
+            amount = float(cat_month.get((cat_name, m), 0.0))
+            mt = float(month_totals_series.get(m, 0.0))
+            pct = round(amount / mt * 100, 1) if mt > 0 else 0.0
+            if prev_amount is None:
+                delta_abs = 0.0
+                delta_pct = 0.0
+            else:
+                delta_abs = amount - prev_amount
+                if prev_amount > 0:
+                    delta_pct = round((amount - prev_amount) / prev_amount * 100, 1)
+                elif amount > 0:
+                    delta_pct = 100.0
+                else:
+                    delta_pct = 0.0
+            months_map[m] = {
+                "amount": round(_sanitize(amount), 2),
+                "pct_of_month": pct,
+                "delta_abs": round(_sanitize(delta_abs), 2),
+                "delta_pct": delta_pct,
+            }
+            prev_amount = amount
+        pct_of_grand = round(cat_total / grand_total * 100, 1) if grand_total > 0 else 0.0
+        categories.append({
+            "name": str(cat_name),
+            "total": cat_total,
+            "pct_of_grand": pct_of_grand,
+            "months": months_map,
+        })
+
+    return {
+        "months": months,
+        "categories": categories,
+        "month_totals": month_totals,
+        "grand_total": grand_total,
+    }
 
 
 # ---------------------------------------------------------------------------

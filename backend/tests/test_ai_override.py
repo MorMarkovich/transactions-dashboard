@@ -1,0 +1,45 @@
+"""The 'בינה מלאכותית' (AI) category.
+
+AI-tool merchants (ChatGPT, Claude, Midjourney, …) get their own top-level
+category. It is applied as an UNCONDITIONAL override (like Psagot/foreign-card)
+so charges that arrived already tagged 'חשמל ומחשבים' migrate on restore — and
+so a user rule still wins over the override.
+"""
+import pandas as pd
+import pytest
+
+from app.services.data_processor import apply_unconditional_overrides
+from app.api.routes import restore_session, sessions, RestoreSessionRequest, CategoryRule
+from app.core.constants import AI_CATEGORY
+
+
+def test_ai_override_migrates_pretagged_rows():
+    df = pd.DataFrame({
+        'תיאור': ['OPENAI *CHATGPT', 'Claude.ai subscription', 'שופרסל דיל'],
+        'קטגוריה': ['חשמל ומחשבים', 'חשמל ומחשבים', 'מזון וצריכה'],
+    })
+    apply_unconditional_overrides(df)
+    assert list(df['קטגוריה']) == [AI_CATEGORY, AI_CATEGORY, 'מזון וצריכה']
+
+
+def test_ai_override_beats_foreign_card():
+    # "CHATGPT US" looks like a foreign descriptor (trailing 'US'), but the AI
+    # override runs last and must win.
+    df = pd.DataFrame({'תיאור': ['CHATGPT US'], 'קטגוריה': ['שונות']})
+    apply_unconditional_overrides(df)
+    assert df['קטגוריה'].iloc[0] == AI_CATEGORY
+
+
+@pytest.mark.asyncio
+async def test_user_rule_beats_ai_override_in_restore():
+    body = RestoreSessionRequest(
+        transactions=[
+            {'תאריך': '2026-01-05', 'סכום': -20, 'תיאור': 'OPENAI *CHATGPT',
+             'קטגוריה': 'חשמל ומחשבים'},
+        ],
+        category_rules=[CategoryRule(merchant='OPENAI *CHATGPT', category='מנויים ושירותים')],
+    )
+    resp = await restore_session(body)
+    df = sessions[resp['session_id']]
+    # The rule (applied after the override) wins.
+    assert df['קטגוריה'].iloc[0] == 'מנויים ושירותים'

@@ -9,6 +9,7 @@ CATEGORY_ICONS = {
     'רפואה ובתי מרקחת': '💊',
     'עירייה וממשלה': '🏛️',
     'חשמל ומחשבים': '💻',
+    'בינה מלאכותית': '🤖',
     'אופנה': '👔',
     'עיצוב הבית': '🏠',
     'פנאי, בידור וספורט': '🎬',
@@ -235,7 +236,10 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price',
         'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין',
         'temu', 'טמו', 'banggood', 'aliexpress',
-        'openai', 'chatgpt', 'anthropic', 'claude', 'midjourney', 'github',
+        # NOTE: AI-tool keywords (openai/chatgpt/anthropic/claude/midjourney…)
+        # were moved to the dedicated 'בינה מלאכותית' category and are applied
+        # as an unconditional override (see AI_OVERRIDE_KEYWORDS below).
+        'github',
         'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'אייקלאוד',
         'office 365', 'microsoft 365', 'אופיס 365',
         'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle',
@@ -406,5 +410,72 @@ for _cat, _keywords in _EXACT_WORD_KEYWORDS.items():
         EXACT_WORD_KEYWORDS[_kw.lower()] = _cat
 
 
+# ── AI tools → dedicated category ───────────────────────────────────
+# These merchants used to live under 'חשמל ומחשבים'. They now get their
+# own category, applied as an UNCONDITIONAL override (like Psagot / foreign
+# card) so it re-tags rows that arrived already categorized — existing
+# snapshots migrate on the next restore without a bank-sync re-pull.
+# Matched case-insensitively via substring. Keep this list curated to
+# well-known AI products to avoid false positives (e.g. avoid bare 'gemini'
+# / 'suno' which collide with non-AI merchants).
+AI_CATEGORY = 'בינה מלאכותית'
+AI_OVERRIDE_KEYWORDS: list[str] = [
+    'openai', 'chatgpt', 'gpt-4', 'gpt4', 'anthropic', 'claude.ai', 'claude',
+    'midjourney', 'perplexity', 'huggingface', 'hugging face',
+    'elevenlabs', 'eleven labs', 'stability ai', 'runwayml', 'runway ai',
+    'character.ai', 'synthesia', 'descript', 'x.ai', 'grok',
+    'github copilot', 'copilot', 'cursor ai', 'cursor.com', 'cursor.so',
+    'google gemini', 'gemini.google', 'jasper.ai', 'poe.com',
+    'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
+]
+
+# ── Subcategories (parent category → {subcategory → [keywords]}) ─────
+# Keyword-seeded subcategories, scoped to their parent category so they only
+# refine rows already in that category (no cross-category false positives).
+# Users can create/assign more in the UI; those are stored as merchant rules.
+# First subcategory (in dict order) wins on a keyword hit.
+SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
+    'מזון וצריכה': {
+        'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
+                    'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
+        'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
+        'אלכוהול ומשקאות': ['יין', 'wine', 'אלכוהול', 'משקאות', 'יקב',
+                              'בירה', 'beer'],
+        'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
+                        '10bis', 'תנביס'],
+    },
+    'פנאי, בידור וספורט': {
+        'קולנוע': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן',
+                    'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד',
+                    'סינמטק'],
+        'מופעים והופעות': ['הופעה', 'מופע', 'הצגה', 'תיאטרון', 'eventim',
+                             'כרטיסים', 'היכל התרבות', 'זאפה', 'zappa', 'ברבי',
+                             'barby', 'הבימה', 'הקאמרי', 'בית ליסין',
+                             'תיאטרון גשר', 'צוותא'],
+        'ספורט וכושר': ['חדר כושר', 'מכון כושר', 'כושר', 'הולמס פלייס',
+                          'holmes place', 'יוגה', 'yoga', 'פילאטיס', 'pilates',
+                          'בריכה', 'שחייה', 'gym', 'energym', 'ספורט', 'sport',
+                          'דקאתלון', 'decathlon'],
+        'אטרקציות': ['מוזיאון', 'museum', 'ספארי', 'safari', 'גן חיות', 'zoo',
+                       'לונה פארק', 'סופרלנד', 'משחקייה', 'גימבורי', 'gymboree',
+                       'חדר בריחה', 'אסקייפ', 'באולינג', 'bowling', 'קרטינג',
+                       'karting'],
+    },
+}
+
+# Optional emoji per seeded subcategory (UI nicety; falls back in the UI).
+SUBCATEGORY_ICONS: dict[str, str] = {
+    'מאפיות': '🥐', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
+    'שוברי מזון': '🎫',
+    'קולנוע': '🎬', 'מופעים והופעות': '🎭', 'ספורט וכושר': '🏋️',
+    'אטרקציות': '🎡',
+}
+
+
 def get_icon(category: str) -> str:
     return CATEGORY_ICONS.get(category, '📋')
+
+
+def get_subcategory_catalog() -> dict[str, list[str]]:
+    """Parent category → list of seeded subcategory names (for the UI)."""
+    return {parent: list(subs.keys()) for parent, subs in SUBCATEGORY_KEYWORDS.items()}

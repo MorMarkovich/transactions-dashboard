@@ -96,17 +96,24 @@ CREATE POLICY "Users can update own settings" ON public.user_settings FOR UPDATE
 
 -- 6. User-defined category overrides (learning from manual edits)
 -- When the dashboard misclassifies a transaction, the user can reassign
--- it. We store the merchant→category mapping so every future upload
--- with the same merchant string lands in the corrected category.
+-- it. We store the merchant→category (and optional subcategory) mapping so
+-- every future upload with the same merchant string lands in the corrected
+-- category/subcategory.
 CREATE TABLE IF NOT EXISTS public.user_category_rules (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     merchant TEXT NOT NULL,
     category TEXT NOT NULL,
+    subcategory TEXT,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE (user_id, merchant)
 );
+
+-- Migration for existing deployments: add the subcategory column if missing.
+-- Safe to re-run. REQUIRED before deploying the subcategory feature (the
+-- dashboard selects this column when loading rules).
+ALTER TABLE public.user_category_rules ADD COLUMN IF NOT EXISTS subcategory TEXT;
 
 ALTER TABLE public.user_category_rules ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own category rules" ON public.user_category_rules FOR SELECT USING (auth.uid() = user_id);

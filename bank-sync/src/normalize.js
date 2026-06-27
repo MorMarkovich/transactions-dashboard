@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules } from './categorize.js'
+import { categorize, applyRules, subcategorize } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -38,6 +38,9 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
   // Categorize on the clean merchant name (before any installment suffix).
   let category = categorize(baseDesc)
   category = applyRules(category, baseDesc, ruleMap)
+  // Subcategory (קטגוריה_משנה) derived from the finalized category. The
+  // dashboard re-derives this on restore too, so this is parity-only.
+  const subcategory = subcategorize(category, baseDesc)
 
   // When installments are split, each monthly charge shares the merchant, date
   // and amount — tag it with n/total so it stays a distinct row (survives dedup)
@@ -52,6 +55,7 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
     'תאריך': ymd(date),
     'תיאור': description,
     'קטגוריה': category,
+    'קטגוריה_משנה': subcategory,
     'סכום': amount,
     'סכום_מוחלט': Math.abs(amount),
     'חודש': mmYYYY(date),

@@ -6,6 +6,7 @@ export interface Transaction {
   תאריך: string;
   תיאור: string;
   קטגוריה: string;
+  קטגוריה_משנה?: string;
   סכום: number;
   סכום_מוחלט?: number;
   חודש?: string;
@@ -360,4 +361,49 @@ export interface IndustryMonthlySeries {
 export interface IndustryMonthlyData {
   months: string[]
   series: IndustryMonthlySeries[]
+}
+
+// Month-by-month comparison by category (with each cell's % of that month's total)
+export interface ComparisonCell {
+  amount: number
+  pct_of_month: number
+  delta_abs: number
+  delta_pct: number
+}
+
+export interface CategoryMonthlyComparisonRow {
+  name: string
+  total: number
+  pct_of_grand: number
+  months: Record<string, ComparisonCell>
+}
+
+export interface CategoryMonthlyComparisonData {
+  months: string[]
+  categories: CategoryMonthlyComparisonRow[]
+  month_totals: Record<string, number>
+  grand_total: number
+}
+
+// Category/subcategory catalog (seeded names + icons) from the backend
+export interface CatalogCategory {
+  name: string
+  icon: string
+}
+
+export interface CatalogSubcategory {
+  name: string
+  icon: string
+}
+
+export interface CategoryCatalog {
+  categories: CatalogCategory[]
+  subcategories: Record<string, CatalogSubcategory[]>
+}
+
+// User-defined merchant→category (+ optional subcategory) override rule
+export interface CategoryRule {
+  merchant: string
+  category: string
+  subcategory?: string | null
 }
