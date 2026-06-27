@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { categorize, applyRules } from '../src/categorize.js'
+import { categorize, applyRules, subcategorize } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 import { detectOwner, JOINT } from '../src/owner.js'
@@ -76,6 +76,40 @@ test('foreign bucketing excludes Israel (IL), online services, and domestic rows
   assert.equal(categorize('NETFLIX.COM'), 'חשמל ומחשבים') // no city/country trailer
   assert.equal(categorize('שופרסל דיל'), 'מזון וצריכה')  // Hebrew → domestic
   assert.equal(categorize('ZZQWX'), 'שונות')             // no country-code trailer, unknown
+})
+
+// ── AI tools → בינה מלאכותית (override) ─────────────────────────────────────
+test('AI tools get the dedicated בינה מלאכותית category', () => {
+  assert.equal(categorize('OPENAI *CHATGPT'), 'בינה מלאכותית')
+  assert.equal(categorize('Claude.ai subscription'), 'בינה מלאכותית')
+  assert.equal(categorize('MIDJOURNEY'), 'בינה מלאכותית')
+})
+
+test('AI override beats the foreign-card descriptor', () => {
+  // Trailing "US" looks foreign, but the AI override must win.
+  assert.equal(categorize('CHATGPT US'), 'בינה מלאכותית')
+})
+
+test('non-AI electronics stay in חשמל ומחשבים', () => {
+  assert.equal(categorize('NETFLIX.COM'), 'חשמל ומחשבים')
+  assert.equal(categorize('GitHub'), 'חשמל ומחשבים')
+})
+
+// ── Subcategories (קטגוריה_משנה) ────────────────────────────────────────────
+test('subcategorize: Food → מאפיות / Entertainment → קולנוע', () => {
+  assert.equal(subcategorize('מזון וצריכה', 'מאפיית לחם ארז'), 'מאפיות')
+  assert.equal(subcategorize('פנאי, בידור וספורט', 'יס פלאנט'), 'קולנוע')
+})
+
+test('subcategorize: no match / unknown parent → empty string', () => {
+  assert.equal(subcategorize('מזון וצריכה', 'חנות כלשהי'), '')
+  assert.equal(subcategorize('קטגוריה לא ידועה', 'מאפיית לחם'), '')
+})
+
+test('normalizeTxn writes the subcategory column', () => {
+  const t = normalizeTxn({ date: '2024-01-10T12:00:00', chargedAmount: -30, description: 'מאפיית לחם' }, 'max', new Map())
+  assert.equal(t['קטגוריה'], 'מזון וצריכה')
+  assert.equal(t['קטגוריה_משנה'], 'מאפיות')
 })
 
 test('expanded catalog: common Israeli merchants resolve out of שונות', () => {

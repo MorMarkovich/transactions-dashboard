@@ -1,12 +1,97 @@
 """
 Data processing and cleaning functions
 """
+import re
 import pandas as pd
 import numpy as np
 from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
-from ..core.constants import CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS
+from ..core.constants import (
+    CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
+    KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
+    AI_CATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
+)
 from .ai_categorizer import categorize_transactions
+
+# Pre-compiled AI-override pattern (substring, case-insensitive).
+_AI_OVERRIDE_PATTERN = (
+    '|'.join(re.escape(k) for k in AI_OVERRIDE_KEYWORDS) if AI_OVERRIDE_KEYWORDS else None
+)
+
+
+def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply category overrides that run on ALL rows, regardless of any
+    pre-existing category. Shared by the upload pipeline (process_data) and the
+    snapshot-restore pipeline (routes.restore_session) so the two never drift.
+
+    Priority (later wins): Psagot → foreign-card → AI-tools. Operates in place.
+
+    - 'פסגות'/'psagot'            → העברה להשקעות
+    - foreign card descriptor      → טיסות ותיירות
+      (trailing 2-letter country code, no Hebrew, not Israel's own IL)
+    - AI-tool merchants            → בינה מלאכותית
+      Applied as an override (not a keyword-pass entry) so charges that arrived
+      already tagged 'חשמל ומחשבים' migrate without a bank-sync re-pull.
+    """
+    if df.empty or 'תיאור' not in df.columns or 'קטגוריה' not in df.columns:
+        return df
+    desc = df['תיאור'].astype(str)
+    desc_lower = desc.str.lower()
+
+    psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
+    if psagot_mask.any():
+        df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
+
+    foreign_mask = (
+        ~desc.str.contains(r'[֐-׿]', regex=True, na=False)
+        & desc.str.contains(r'[A-Za-z]', regex=True, na=False)
+        & desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
+    )
+    if foreign_mask.any():
+        df.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
+
+    if _AI_OVERRIDE_PATTERN:
+        ai_mask = desc_lower.str.contains(_AI_OVERRIDE_PATTERN, na=False, regex=True)
+        if ai_mask.any():
+            df.loc[ai_mask, 'קטגוריה'] = AI_CATEGORY
+
+    return df
+
+
+def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
+    """Populate the קטגוריה_משנה (subcategory) column from SUBCATEGORY_KEYWORDS.
+
+    Scoped to each parent category (so sub-keywords never leak across
+    categories), shrinking-mask substring scan mirroring the category loop.
+    Only fills rows whose subcategory is still empty, so a manual/rule-assigned
+    subcategory is preserved. Pure — no AI. Must run AFTER the category is
+    finalized (after user rules) in both pipelines.
+    """
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+    if df.empty or 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return df
+
+    df['קטגוריה_משנה'] = df['קטגוריה_משנה'].fillna('').astype(str)
+    cat = df['קטגוריה'].astype(str)
+    desc_lower = df['תיאור'].astype(str).str.lower()
+
+    for parent, submap in SUBCATEGORY_KEYWORDS.items():
+        parent_mask = (cat == parent) & (df['קטגוריה_משנה'] == '')
+        if not parent_mask.any():
+            continue
+        remaining = desc_lower[parent_mask]
+        for sub_name, keywords in submap.items():
+            if remaining.empty:
+                break
+            for kw in keywords:
+                if remaining.empty:
+                    break
+                hit = remaining.str.contains(kw.lower(), na=False, regex=False)
+                if hit.any():
+                    df.loc[remaining.index[hit], 'קטגוריה_משנה'] = sub_name
+                    remaining = remaining[~hit]
+    return df
 
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -175,24 +260,13 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     except Exception:
         result['קטגוריה'] = 'שונות'
     
+    # Unconditional category overrides (Psagot investment transfers, foreign-card
+    # travel, AI tools) — these run on ALL rows regardless of any existing
+    # category. Shared helper so this pipeline and restore_session never drift.
+    apply_unconditional_overrides(result)
+
     # Reclassify check withdrawals as rent (שכר דירה)
     desc_lower = result['תיאור'].str.lower()
-
-    # Reclassify Psagot investment transfers as a dedicated category
-    psagot_mask = desc_lower.str.contains('פסגות', na=False) | desc_lower.str.contains('psagot', na=False)
-    if psagot_mask.any():
-        result.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
-
-    # Foreign card transactions (trailing 2-letter country code, no Hebrew,
-    # excluding Israel's IL) → bucket as travel, overriding merchant keywords.
-    orig_desc = result['תיאור'].astype(str)
-    foreign_mask = (
-        ~orig_desc.str.contains(r'[֐-׿]', regex=True, na=False)
-        & orig_desc.str.contains(r'[A-Za-z]', regex=True, na=False)
-        & orig_desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
-    )
-    if foreign_mask.any():
-        result.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
     for keyword in CHECK_WITHDRAWAL_KEYWORDS:
         kw = keyword.lower()
         # Short keywords (≤3 chars) need word-boundary matching to avoid
@@ -246,6 +320,9 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
                 if 0 <= local_idx < len(misc_indices):
                     result.at[misc_indices[local_idx], 'קטגוריה'] = category
 
+    # Derive the subcategory (קטגוריה_משנה) from the now-finalized category.
+    derive_subcategory(result)
+
     # סינון שורות לא תקינות
     result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
     
@@ -258,7 +335,7 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             result['חודש_חיוב'] = result['תאריך_חיוב'].dt.strftime('%m/%Y')
     else:
         # יצירת DataFrame ריק עם העמודות הנדרשות
-        result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])
+        result = pd.DataFrame(columns=['תאריך', 'סכום', 'תיאור', 'קטגוריה', 'קטגוריה_משנה', 'סכום_מוחלט', 'חודש', 'יום_בשבוע'])
 
     # Ensure notes column exists
     if 'הערות' not in result.columns:

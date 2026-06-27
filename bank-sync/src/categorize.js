@@ -22,7 +22,7 @@ const CATEGORY_KEYWORDS = {
   'דלק, חשמל וגז': ['דלק', 'תדלוק', 'סונול', 'sonol', 'דור אלון', 'doralon', 'delek', 'fuel', 'חברת החשמל', 'חשמל', 'ten דלק', 'paz', 'yellow', 'מנטה', 'menta', 'אלונית', 'alonit', 'תחנת דלק', 'דלקן', 'pazomat', 'פזומט', 'סופרגז', 'supergas', 'אמישראגז', 'amisragas', 'פזגז', 'דורגז', 'אמ.ש.ר.ג', 'בלוני גז', 'תאגיד החשמל'],
   'רפואה ובתי מרקחת': ['מכבי', 'כללית', 'מאוחדת', 'לאומית', 'בית מרקחת', 'pharmacy', 'רוקח', 'רופא', 'דוקטור', 'doctor', 'dr.', 'מרפאה', 'מרפאת', 'clinic', 'דנטל', 'dental', 'שיניים', 'רופא שיניים', 'אופטיקה', 'optic', 'משקפיים', 'עדשות', 'פיזיותרפיה', 'physiotherapy', 'כירופרקט', 'פסיכולוג', 'פסיכיאטר', 'therapist', 'therapy', 'בית חולים', 'hospital', 'תרופות', 'medication', 'אסותא', 'assuta', 'הרצליה מדיקל', 'איכילוב', 'תל השומר', 'שיבא', 'רמב"ם', 'סורוקה', 'הדסה', 'בלינסון', 'וולפסון', 'טרם', 'terem', 'ביקור רופא', 'מוקד רופאים', 'נטלי', 'natali', 'שח"ל', 'femi', 'פמי', 'מעבדה', 'מעבדות', 'בדיקות דם', 'אופטיקנה', 'אופטיק', 'הלפרין', 'ירדן אופטיק', 'erroca', 'ארוקה', 'אורטופד', 'אורתודונט', 'שתל שיניים', 'יישור שיניים', 'דיאטנית', 'תזונאי', 'נטורופת', 'הומאופת', 'קוסמטיקה רפואית', 'מדיקל'],
   'עירייה וממשלה': ['עירייה', 'עיריית', 'עירית', 'ארנונה', 'משרד הפנים', 'משרד הרישוי', 'רשות האוכלוסין', 'רשות המיסים', 'מס הכנסה', 'ביטוח לאומי', 'מע"מ', 'אגרת', 'קנס', 'דוח חניה', 'מועצה אזורית', 'מועצה מקומית', 'מתנ"ס', 'תאגיד מים', 'מי אביבים', 'הגיחון', 'מי שבע', 'מי רעננה', 'מי נע', 'מים וביוב', 'מי כרמל', 'מי רמת גן', 'מי לוד', 'מי ציונה', 'מי גליל', 'מי הרצליה', 'מי מודיעין', 'מי בית שמש', 'מי נתניה', 'מי אונו', 'פלגי מוצקין', 'דואר ישראל', 'דואר', 'רשות מקרקעי', 'טאבו', 'הוצאה לפועל', 'בתי המשפט', 'משטרת ישראל', 'אגף הגביה', 'היטל', 'אגרות', 'מילגם', 'מס במקור', 'ניכוי במקור', 'תשלום מס'],
-  'חשמל ומחשבים': ['באג מולטי', 'bug multi', 'ksp', 'איביי', 'ebay', 'אמזון', 'amazon', 'אלי אקספרס', 'aliexpress', 'ali express', 'apple', 'אפל', 'google', 'גוגל', 'מיקרוסופט', 'microsoft', 'נטפליקס', 'netflix', 'ספוטיפיי', 'spotify', 'steam', 'playstation', 'xbox', 'nintendo', 'אייבורי', 'ivory', 'מחשבים', 'samsung', 'סמסונג', 'dell', 'lenovo', 'app store', 'חנות אפליקציות', 'שיאומי', 'xiaomi', 'youtube', 'יוטיוב', 'disney', 'דיסני', 'hbo', 'prime video', 'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem', 'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price', 'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין', 'temu', 'טמו', 'banggood', 'aliexpress', 'openai', 'chatgpt', 'anthropic', 'claude', 'midjourney', 'github', 'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'אייקלאוד', 'office 365', 'microsoft 365', 'אופיס 365', 'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle', 'epic games', 'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'discord', 'אלקטרוניק', 'electronics', 'גיימינג', 'אודיו', 'audio'],
+  'חשמל ומחשבים': ['באג מולטי', 'bug multi', 'ksp', 'איביי', 'ebay', 'אמזון', 'amazon', 'אלי אקספרס', 'aliexpress', 'ali express', 'apple', 'אפל', 'google', 'גוגל', 'מיקרוסופט', 'microsoft', 'נטפליקס', 'netflix', 'ספוטיפיי', 'spotify', 'steam', 'playstation', 'xbox', 'nintendo', 'אייבורי', 'ivory', 'מחשבים', 'samsung', 'סמסונג', 'dell', 'lenovo', 'app store', 'חנות אפליקציות', 'שיאומי', 'xiaomi', 'youtube', 'יוטיוב', 'disney', 'דיסני', 'hbo', 'prime video', 'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem', 'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price', 'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין', 'temu', 'טמו', 'banggood', 'aliexpress', 'github', 'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'אייקלאוד', 'office 365', 'microsoft 365', 'אופיס 365', 'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle', 'epic games', 'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'discord', 'אלקטרוניק', 'electronics', 'גיימינג', 'אודיו', 'audio'],
   'אופנה': ['זארה', 'zara', 'h&m', 'פול אנד בר', 'pull&bear', 'מנגו', 'mango', 'קסטרו', 'castro', 'אמריקן איגל', 'american eagle', 'נעלי', 'shoes', 'בגדי', 'רנואר', 'renuar', 'תמנון', 'שילב', 'shilav', 'טרמינל', 'terminal x', 'אסוס', 'asos', 'נייקי', 'nike', 'אדידס', 'adidas', 'פומה', 'סטרדיווריוס', 'stradivarius', 'ברשקה', 'bershka', 'intimissimi', 'calzedonia', 'נעליים', 'פרימדונה', 'primadonna', 'קוסמטיקה', 'cosmetic', 'איפור', 'makeup', 'בשמים', 'perfume', 'לורן', 'lauren', 'טומי', 'tommy', 'נקסט', 'next', 'gap', 'old navy', 'lacoste', 'לקוסט', 'ralph', 'massimo', 'מסימו', 'oysho', 'אוישו', 'victoria', 'דלתא', 'delta', 'reebok', 'ריבוק', 'under armour', 'new balance', 'crocs', 'קרוקס', 'סקצ\'רס', 'skechers', 'timberland', 'aldo', 'אלדו', 'scoop', 'סקופ', 'גולברי', 'golbary', 'אדיקה', 'adika', 'factory 54', 'פקטורי 54', 'superdry', 'tfc', 'carter', 'תכשיט', 'jewelry', 'pandora', 'פנדורה', 'magnolia', 'מגנוליה', 'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה', 'body shop', 'laline', 'ללין', 'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק סנטר', 'סטוק פקטורי', 'booom', 'זול סטוק'],
   'עיצוב הבית': ['איקאה', 'ikea', 'הום סנטר', 'home center', 'ace hardware', 'מרכז השיפוצים', 'ריהוט', 'עצמל"ה', 'home depot', 'שיפוצים', 'כלי בית', 'מצעים', 'שטיח', 'וילון', 'פוקס הום', 'fox home', 'אלקטרה', 'electra', 'ביתילי', 'bitili', 'נעמן', 'naaman', 'ורדינון', 'vardinon', 'כספי', 'תמי 4', 'tami4', 'עמינח', 'aminach', 'הוליווד', 'רהיטי', 'furniture', 'מזרן', 'mattress', 'דורגל', 'טמבור', 'tambour', 'נירלט', 'nirlat', 'צבע', 'paint', 'כלי עבודה', 'ברזל', 'גמיש', 'urban', 'הכל לבית', 'בית וגן', 'מ. שטרן', 'דקור', 'decor', 'wishlist', 'מיאדרה'],
   'פנאי, בידור וספורט': ['סינמה', 'cinema', 'סינמה סיטי', 'yes planet', 'הופעה', 'כרטיסים', 'eventim', 'לאן', 'leaan', 'הצגה', 'מופע', 'תיאטרון', 'חדר כושר', 'הולמס פלייס', 'holmes place', 'ספורט', 'sport', 'כושר', 'חוג', 'חוגים', 'סדנה', 'workshop', 'גן חיות', 'zoo', 'בריכה', 'שחייה', 'swimming', 'יוגה', 'yoga', 'פילאטיס', 'pilates', 'יס פלאנט', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'סינמטק', 'מוזיאון', 'museum', 'ספארי', 'safari', 'לונה פארק', 'סופרלנד', 'גימבורי', 'gymboree', 'משחקייה', 'אסקייפ', 'חדר בריחה', 'באולינג', 'bowling', 'קרטינג', 'karting', 'פיינטבול', 'לייזר טאג', 'סקייט', 'דקאתלון', 'decathlon', 'מגה ספורט', 'sport5', 'אצטדיון', 'טוטו', 'winner', 'ווינר', 'מפעל הפיס', 'pais', 'זאפה', 'zappa', 'ברבי', 'barby', 'בלוק', 'האנגר', 'hangar', 'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא', 'היכל התרבות', 'ספא', 'מכון כושר', 'energym', 'בלאק בוקס', 'קולנוע', 'מובילנד'],
@@ -45,6 +45,38 @@ const EXACT_WORD_KEYWORDS = {
   'אופנה': ['גולף', 'golf', 'פוקס', 'fox'],
   'העברת כספים': ['ביט', 'bit'],
   'פנאי, בידור וספורט': ['gym', 'פארק', 'park', 'פיס'],
+}
+
+// ── AI tools → dedicated category (mirrors constants.AI_OVERRIDE_KEYWORDS) ──
+// Applied as an UNCONDITIONAL override so it wins over the foreign-card and
+// keyword passes, matching the backend (where the AI override runs last).
+const AI_CATEGORY = 'בינה מלאכותית'
+const AI_OVERRIDE_KEYWORDS = [
+  'openai', 'chatgpt', 'gpt-4', 'gpt4', 'anthropic', 'claude.ai', 'claude',
+  'midjourney', 'perplexity', 'huggingface', 'hugging face',
+  'elevenlabs', 'eleven labs', 'stability ai', 'runwayml', 'runway ai',
+  'character.ai', 'synthesia', 'descript', 'x.ai', 'grok',
+  'github copilot', 'copilot', 'cursor ai', 'cursor.com', 'cursor.so',
+  'google gemini', 'gemini.google', 'jasper.ai', 'poe.com',
+  'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
+]
+
+// ── Subcategories (parent category → {subcategory → [keywords]}) ─────
+// Mirrors constants.SUBCATEGORY_KEYWORDS. Scoped to the parent category; first
+// subcategory (in insertion order) wins on a keyword hit.
+const SUBCATEGORY_KEYWORDS = {
+  'מזון וצריכה': {
+    'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה', 'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
+    'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
+    'אלכוהול ומשקאות': ['יין', 'wine', 'אלכוהול', 'משקאות', 'יקב', 'בירה', 'beer'],
+    'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי', '10bis', 'תנביס'],
+  },
+  'פנאי, בידור וספורט': {
+    'קולנוע': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד', 'סינמטק'],
+    'מופעים והופעות': ['הופעה', 'מופע', 'הצגה', 'תיאטרון', 'eventim', 'כרטיסים', 'היכל התרבות', 'זאפה', 'zappa', 'ברבי', 'barby', 'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא'],
+    'ספורט וכושר': ['חדר כושר', 'מכון כושר', 'כושר', 'הולמס פלייס', 'holmes place', 'יוגה', 'yoga', 'פילאטיס', 'pilates', 'בריכה', 'שחייה', 'gym', 'energym', 'ספורט', 'sport', 'דקאתלון', 'decathlon'],
+    'אטרקציות': ['מוזיאון', 'museum', 'ספארי', 'safari', 'גן חיות', 'zoo', 'לונה פארק', 'סופרלנד', 'משחקייה', 'גימבורי', 'gymboree', 'חדר בריחה', 'אסקייפ', 'באולינג', 'bowling', 'קרטינג', 'karting'],
+  },
 }
 
 // Flatten in insertion order, mirroring the Python dict build (first position
@@ -87,17 +119,21 @@ export function isForeignDescriptor(description) {
 
 /**
  * Categorize a single transaction description, mirroring the backend order:
- *  0. foreign card descriptor → טיסות ותיירות (override)
- *  1. Psagot → investment transfer (override)
- *  2. check-withdrawal keywords → שכר דירה (override)
- *  3. standing-order keywords → הוראות קבע (override)
- *  4. substring keyword map (only if still שונות)
- *  5. word-boundary keyword map (only if still שונות)
- *  6. else שונות
+ *  0. AI-tool keywords → בינה מלאכותית (override, wins over foreign-card too)
+ *  1. foreign card descriptor → טיסות ותיירות (override)
+ *  2. Psagot → investment transfer (override)
+ *  3. check-withdrawal keywords → שכר דירה (override)
+ *  4. standing-order keywords → הוראות קבע (override)
+ *  5. substring keyword map (only if still שונות)
+ *  6. word-boundary keyword map (only if still שונות)
+ *  7. else שונות
  */
 export function categorize(description) {
-  if (isForeignDescriptor(description)) return 'טיסות ותיירות'
   const d = String(description || '').toLowerCase()
+  // AI-tool override runs first so it wins over the foreign-card early-return,
+  // matching the backend where the AI override is applied last (highest prio).
+  if (AI_OVERRIDE_KEYWORDS.some((kw) => d.includes(kw))) return AI_CATEGORY
+  if (isForeignDescriptor(description)) return 'טיסות ותיירות'
   let cat = 'שונות'
 
   if (d.includes('פסגות') || d.includes('psagot')) cat = 'העברה להשקעות'
@@ -123,6 +159,23 @@ export function categorize(description) {
     }
   }
   return cat
+}
+
+/**
+ * Derive the subcategory (קטגוריה_משנה) for a finalized category + description,
+ * mirroring the backend `derive_subcategory`. Returns '' when no seeded
+ * subcategory keyword matches (or the category has no subcategories).
+ */
+export function subcategorize(category, description) {
+  const submap = SUBCATEGORY_KEYWORDS[category]
+  if (!submap) return ''
+  const d = String(description || '').toLowerCase()
+  for (const [subName, keywords] of Object.entries(submap)) {
+    for (const kw of keywords) {
+      if (d.includes(kw.toLowerCase())) return subName
+    }
+  }
+  return ''
 }
 
 /**

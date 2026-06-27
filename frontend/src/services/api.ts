@@ -28,6 +28,9 @@ import type {
   CategorySnapshotData,
   CategoryTransactionsData,
   CategoryMerchantsData,
+  CategoryMonthlyComparisonData,
+  CategoryCatalog,
+  CategoryRule,
   SessionInfo,
   SessionFileInfo,
 } from './types';
@@ -72,7 +75,7 @@ export const transactionsApi = {
    */
   restoreSession: async (
     transactions: unknown[],
-    categoryRules: { merchant: string; category: string }[] = [],
+    categoryRules: CategoryRule[] = [],
   ): Promise<FileUploadResponse> => {
     const response = await api.post<FileUploadResponse>('/api/restore-session', {
       transactions,
@@ -198,6 +201,51 @@ export const transactionsApi = {
    * Rename or merge a category across the active backend session. Returns
    * affected merchant descriptions so the caller can persist category rules.
    */
+  /**
+   * Set a single transaction's subcategory. Returns the merchant + its current
+   * category so the caller can persist a merchant→{category, subcategory} rule.
+   */
+  updateTransactionSubcategory: async (
+    sessionId: string,
+    transactionId: number,
+    subcategory: string,
+  ): Promise<{ success: boolean; merchant: string | null; category: string | null; subcategory: string }> => {
+    const response = await api.post<{ success: boolean; merchant: string | null; category: string | null; subcategory: string }>(
+      '/api/transactions/subcategory',
+      {
+        session_id: sessionId,
+        transaction_id: transactionId,
+        subcategory,
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Get the seeded category + subcategory catalog (names + icons) so the UI's
+   * category manager and subcategory selectors stay in sync with the backend.
+   */
+  getCategoryCatalog: async (signal?: AbortSignal): Promise<CategoryCatalog> => {
+    const response = await api.get<CategoryCatalog>('/api/categories/catalog', { signal });
+    return response.data;
+  },
+
+  /**
+   * Month-by-month comparison of expenses by category, with each cell's share
+   * of that month's total expenses (and month-over-month deltas).
+   */
+  getCategoryMonthlyComparison: async (
+    sessionId: string,
+    dateType?: string,
+    signal?: AbortSignal,
+  ): Promise<CategoryMonthlyComparisonData> => {
+    const response = await api.get<CategoryMonthlyComparisonData>('/api/charts/v2/category-monthly-comparison', {
+      params: { sessionId, ...(dateType && { date_type: dateType }) },
+      signal,
+    });
+    return response.data;
+  },
+
   renameCategory: async (
     sessionId: string,
     oldCategory: string,

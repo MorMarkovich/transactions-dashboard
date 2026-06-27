@@ -99,16 +99,27 @@ export const supabaseApi = {
    * server-side on /restore-session so they win over the keyword/AI
    * categorizer.
    */
-  getCategoryRules: async (userId: string): Promise<{ merchant: string; category: string }[]> => {
+  getCategoryRules: async (
+    userId: string,
+  ): Promise<{ merchant: string; category: string; subcategory?: string | null }[]> => {
     const { data, error } = await supabase
       .from('user_category_rules')
-      .select('merchant, category')
+      .select('merchant, category, subcategory')
       .eq('user_id', userId);
     if (error) {
-      // Table may not exist yet on older deployments — degrade gracefully.
-      // eslint-disable-next-line no-console
-      console.warn('getCategoryRules failed:', error.message);
-      return [];
+      // The `subcategory` column may be missing on a deployment that hasn't run
+      // the migration yet. Retry without it so we never silently drop ALL rules.
+      const { data: legacy, error: legacyErr } = await supabase
+        .from('user_category_rules')
+        .select('merchant, category')
+        .eq('user_id', userId);
+      if (legacyErr) {
+        // Table may not exist yet on older deployments — degrade gracefully.
+        // eslint-disable-next-line no-console
+        console.warn('getCategoryRules failed:', legacyErr.message);
+        return [];
+      }
+      return legacy || [];
     }
     return data || [];
   },
@@ -147,6 +158,34 @@ export const supabaseApi = {
     const { error } = await supabase
       .from('user_category_rules')
       .upsert(rows, { onConflict: 'user_id,merchant' });
+    if (error) throw error;
+  },
+
+  /**
+   * Upsert a merchant→{category, subcategory} rule. Separate from
+   * upsertCategoryRule (which never touches `subcategory`) so a category-only
+   * edit can't clobber an existing subcategory, and vice-versa. We send the
+   * category alongside because the table's `category` column is NOT NULL.
+   */
+  upsertCategorySubrule: async (
+    userId: string,
+    merchant: string,
+    category: string,
+    subcategory: string,
+  ): Promise<void> => {
+    if (!merchant || !category) return;
+    const { error } = await supabase
+      .from('user_category_rules')
+      .upsert(
+        {
+          user_id: userId,
+          merchant,
+          category,
+          subcategory: subcategory || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,merchant' },
+      );
     if (error) throw error;
   },
 
