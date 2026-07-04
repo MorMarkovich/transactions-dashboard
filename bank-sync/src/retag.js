@@ -3,12 +3,15 @@
 // after changing an account's owner in `npm run setup` (e.g. switching בנק
 // דיסקונט from a person to משותף so salaries split by name), especially when a
 // provider is temporarily blocked and a full `resync` isn't possible.
+// Also re-runs the keyword catalog over rows still in שונות, so catalog
+// updates (git pull) reach already-stored rows.
 //
 // Read+write only against Supabase; no bank logins. Run: `npm run retag`.
 import { config, assertConfig } from './config.js'
 import { getJSON, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
-import { signIn, getLatestSnapshot, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 import { detectOwner } from './owner.js'
+import { refreshMiscCategories } from './normalize.js'
 
 const ils = (n) =>
   `${n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₪`
@@ -41,8 +44,12 @@ async function main() {
   for (const a of accounts) console.log(`  • ${a.label}  [${a.key}] → ${a.owner || '(unset)'}`)
 
   const { supabase, userId } = await signIn(config.supabaseUrl, config.supabaseAnonKey, auth.email, auth.password)
-  const txns = await getLatestSnapshot(supabase, userId)
+  const [txns, rules] = await Promise.all([
+    getLatestSnapshot(supabase, userId),
+    getCategoryRules(supabase, userId),
+  ])
   if (!txns.length) { console.log('\nNo transactions to retag.'); return }
+  const ruleMap = new Map((rules || []).map((r) => [r.merchant, r.category]))
 
   let changed = 0
   const before = {}
@@ -71,7 +78,10 @@ async function main() {
     console.log(`  ${o}: ${e.count} txns — expenses ${ils(e.expense)}, income ${ils(e.income)}`)
   }
 
-  if (changed === 0) { console.log('\nNothing changed — snapshot left as-is.'); return }
+  const recategorized = refreshMiscCategories(txns, ruleMap)
+  console.log(`Re-categorized ${recategorized} שונות row(s) via the current keyword catalog.`)
+
+  if (changed === 0 && recategorized === 0) { console.log('\nNothing changed — snapshot left as-is.'); return }
   console.log('\nWriting updated snapshot…')
   const newId = await insertSnapshot(supabase, userId, txns)
   await deleteOtherSnapshots(supabase, userId, newId)

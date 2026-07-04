@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { categorize, applyRules, subcategorize } from '../src/categorize.js'
-import { normalizeTxn, txnKey, mergeSnapshots } from '../src/normalize.js'
+import { normalizeTxn, txnKey, mergeSnapshots, refreshMiscCategories } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 import { detectOwner, JOINT } from '../src/owner.js'
 
@@ -90,6 +90,25 @@ test('merchants from the 2026-07 sync review are categorized', () => {
   assert.equal(categorize('ROSSO VINO'), 'מסעדות, קפה וברים')
   assert.equal(categorize('ביי-מי שוברי מתנה'), 'מתנות')
   assert.equal(categorize('L.B.Y GROUP'), 'רפואה ובתי מרקחת') // couples therapy
+})
+
+// ── refreshMiscCategories: apply catalog updates to stored snapshots ─────────
+test('refreshMiscCategories upgrades שונות rows but never touches real categories', () => {
+  const txns = [
+    { 'תיאור': 'ELAL', 'קטגוריה': 'שונות' },
+    { 'תיאור': 'AIRALO (תשלום 2/3)', 'קטגוריה': 'שונות' }, // installment suffix stripped
+    { 'תיאור': 'שופרסל דיל', 'קטגוריה': 'מזון וצריכה' },    // already set — untouched
+    { 'תיאור': 'מרצדס בנץ', 'קטגוריה': 'שונות' },           // user rule wins
+    { 'תיאור': 'ZZQWX UNKNOWN', 'קטגוריה': 'שונות' },        // stays שונות
+  ]
+  const rules = new Map([['מרצדס בנץ', 'תחבורה ורכבים']])
+  const changed = refreshMiscCategories(txns, rules)
+  assert.equal(changed, 3)
+  assert.equal(txns[0]['קטגוריה'], 'טיסות ותיירות')
+  assert.equal(txns[1]['קטגוריה'], 'טיסות ותיירות')
+  assert.equal(txns[2]['קטגוריה'], 'מזון וצריכה')
+  assert.equal(txns[3]['קטגוריה'], 'תחבורה ורכבים')
+  assert.equal(txns[4]['קטגוריה'], 'שונות')
 })
 
 test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
