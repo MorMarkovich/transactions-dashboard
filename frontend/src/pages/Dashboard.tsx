@@ -127,6 +127,15 @@ export default function Dashboard() {
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // The AI fallback runs in the background after restore (see Layout);
+  // when it resolves merchants, refetch so the widgets pick up the new
+  // categories without a manual reload.
+  useEffect(() => {
+    const onAiCategorized = () => setRefreshKey((k) => k + 1)
+    window.addEventListener('ai-categorized', onAiCategorized)
+    return () => window.removeEventListener('ai-categorized', onAiCategorized)
+  }, [])
   const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
   const [snapshotExpanded, setSnapshotExpanded] = useState(false)
   const [snapshotSearch, setSnapshotSearch] = useState('')

@@ -292,23 +292,11 @@ async def restore_session(body: RestoreSessionRequest):
                             df['קטגוריה_משנה'] = ''
                         df.loc[rmask, 'קטגוריה_משנה'] = r.subcategory
 
-            # AI categorization for remaining "שונות" transactions (Claude, with
-            # web search for merchants it can't identify from the name). The
-            # assignments are returned so the frontend can persist them as rules
-            # — then each merchant is resolved once, not re-searched every load.
-            misc_mask = df['קטגוריה'] == 'שונות'
-            if misc_mask.any():
-                misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
-                ai_map = categorize_transactions(misc_descs)
-                if ai_map:
-                    misc_idx = df.index[misc_mask].tolist()
-                    for local_i, cat in ai_map.items():
-                        if 0 <= local_i < len(misc_idx):
-                            df.at[misc_idx[local_i], 'קטגוריה'] = cat
-                            ai_categorized.append({
-                                "merchant": str(df.at[misc_idx[local_i], 'תיאור']),
-                                "category": cat,
-                            })
+            # AI categorization for remaining "שונות" rows is NOT run here —
+            # it blocks the first paint for many seconds (Claude + web search).
+            # The frontend calls POST /ai-categorize right after this restore
+            # returns; results are applied to the live session and persisted
+            # as rules client-side, so each merchant is resolved only once.
 
             # Derive subcategories from the finalized category (after overrides,
             # keyword pass, user rules and AI). Rule/manual subcategories set
@@ -859,6 +847,45 @@ async def scope_session(body: ScopeSessionRequest):
     scoped_id = f"{base}::owner={owner}"
     sessions[scoped_id] = df[df['_owner'] == owner].reset_index(drop=True)
     return {"session_id": scoped_id}
+
+
+class AICategorizeRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/ai-categorize")
+def ai_categorize(body: AICategorizeRequest):
+    """Run the AI fallback (Claude + web search) on the session's remaining
+    "שונות" rows and apply the results to the live session.
+
+    Split out of /restore-session so the dashboard renders immediately and the
+    slow AI pass happens in the background. Sync (non-async) on purpose: the
+    Anthropic call blocks, so FastAPI runs this in its threadpool instead of
+    stalling the event loop. Returns the merchant→category assignments so the
+    client can persist them as user rules (resolved once, never re-searched).
+    """
+    df = sessions.get(body.session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    ai_categorized: list[dict] = []
+    if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+        misc_mask = df['קטגוריה'] == 'שונות'
+        if misc_mask.any():
+            misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
+            ai_map = categorize_transactions(misc_descs) or {}
+            misc_idx = df.index[misc_mask].tolist()
+            for local_i, cat in ai_map.items():
+                if 0 <= local_i < len(misc_idx):
+                    df.at[misc_idx[local_i], 'קטגוריה'] = cat
+                    ai_categorized.append({
+                        "merchant": str(df.at[misc_idx[local_i], 'תיאור']),
+                        "category": cat,
+                    })
+            if ai_categorized:
+                derive_subcategory(df)
+
+    return {"success": True, "ai_categorized": ai_categorized}
 
 
 @router.get("/metrics")
