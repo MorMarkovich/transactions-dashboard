@@ -32,13 +32,13 @@ interface PayloadEntry {
 /* ------------------------------------------------------------------ */
 
 const formatShekel = (v: number): string =>
-  ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
+  ltrIsolate(`₪${v < 0 ? '-' : ''}${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
 
 const formatAxisShekel = (v: number): string => {
   const sign = v < 0 ? '-' : ''
   const a = Math.abs(v)
-  if (a >= 1000) return ltrIsolate(`${sign}₪${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
-  return ltrIsolate(`${sign}₪${a}`)
+  if (a >= 1000) return ltrIsolate(`₪${sign}${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
+  return ltrIsolate(`₪${sign}${a}`)
 }
 
 /** Format a date label to DD/MM/YYYY for Hebrew locale display. */

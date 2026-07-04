@@ -16,17 +16,20 @@ export function ltrIsolate(text: string): string {
 
 /**
  * Format a number as Israeli Shekel currency (e.g. ₪1,234.56).
- * Always places ₪ before the number; the result is bidi-isolated so the
- * sign and symbol stay glued to the digits in both RTL and LTR containers.
+ * Always places ₪ first; a sign sits between the symbol and the digits
+ * (₪-1,234.56), and the result is bidi-isolated so the token renders
+ * left-to-right in both RTL and LTR containers.
+ * Pass explicitPlus to show ₪+ on positive amounts (e.g. net balance).
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, explicitPlus = false): string {
   if (amount === 0) return '₪0'
   const abs = Math.abs(amount)
   const formatted = abs.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  return ltrIsolate(amount < 0 ? `-₪${formatted}` : `₪${formatted}`)
+  const sign = amount < 0 ? '-' : explicitPlus ? '+' : ''
+  return ltrIsolate(`₪${sign}${formatted}`)
 }
 
 /**
