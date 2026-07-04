@@ -88,6 +88,9 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'צימר', 'zimmer', 'אכסניה', 'אכסניית', 'trip.com', 'getyourguide',
         'rentalcars', 'נסיעות לחו"ל', 'חבילת נופש', 'בתי מלון',
         'קווי חופשה', 'airbaltic', 'air baltic', 'ניו ויז\'ן טורס',
+        'elal', 'אייר חיפה', 'air haifa', 'etihad', 'airalo',
+        'double tree', 'doubletree', 'hilton', 'kohchang', 'koh chang',
+        'railninja', 'rail ninja', 'rajadha', 'olive young', 'lottebaikhoajeom',
     ],
     'מזון וצריכה': [
         # ── Supermarkets & grocery ──
@@ -148,7 +151,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'cup o joe', 'ארקפה', 'arcaffe', 'נספרסו', 'nespresso',
         'קפה לואיז', 'ולנטינה', 'casa',
         'מקדונלדס', 'שקשוקה', 'קינוח', 'קינוחים', 'קונדטוריה', 'פטיסרי',
-        'kermeet', 'קרמיט', 'המאסטרו',
+        'kermeet', 'קרמיט', 'המאסטרו', 'rosso vino',
     ],
     'תחבורה ורכבים': [
         'רב קו', 'רב-קו', 'ravkav', 'אגד', 'egged',
@@ -181,6 +184,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'תחנת דלק', 'דלקן', 'pazomat', 'פזומט',
         'סופרגז', 'supergas', 'אמישראגז', 'amisragas', 'פזגז', 'דורגז',
         'אמ.ש.ר.ג', 'בלוני גז', 'תאגיד החשמל',
+        'דור-ארגמן', 'דור ארגמן', 'דור-האיצטדיון', 'דור -האיצטדיון',
     ],
     'רפואה ובתי מרקחת': [
         'מכבי', 'כללית', 'מאוחדת', 'לאומית',
@@ -271,7 +275,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה',
         'body shop', 'laline', 'ללין',
         'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק סנטר', 'סטוק פקטורי',
-        'booom', 'זול סטוק',
+        'booom', 'זול סטוק', 'קוסמטיקס', 'pedro pps',
     ],
     'עיצוב הבית': [
         'איקאה', 'ikea', 'הום סנטר', 'home center',
@@ -308,6 +312,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'זאפה', 'zappa', 'ברבי', 'barby', 'בלוק', 'האנגר', 'hangar',
         'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא', 'היכל התרבות',
         'ספא', 'מכון כושר', 'energym', 'בלאק בוקס', 'קולנוע', 'מובילנד',
+        'מאמאנט',
     ],
     'ביטוח': [
         'ביטוח', 'insurance', 'מגדל ביטוח',

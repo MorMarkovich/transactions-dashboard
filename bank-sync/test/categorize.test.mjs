@@ -71,6 +71,25 @@ test('foreign card transactions are bucketed as travel (overseas spend)', () => 
   assert.equal(categorize('7-11 HAD SAI KHAO      TRAD          TH'), 'טיסות ותיירות') // overrides food keyword
 })
 
+test('merchants from the 2026-07 sync review are categorized', () => {
+  assert.equal(categorize('ELAL'), 'טיסות ותיירות')
+  assert.equal(categorize('אייר חיפה'), 'טיסות ותיירות')
+  assert.equal(categorize('ETIHADAIR60724151216'), 'טיסות ותיירות')
+  assert.equal(categorize('AIRALO'), 'טיסות ותיירות')
+  assert.equal(categorize('DOUBLE TREE BY HILTO'), 'טיסות ותיירות')
+  assert.equal(categorize('KC GRAND KOHCHANG'), 'טיסות ותיירות')
+  assert.equal(categorize('RAILNINJA 7917'), 'טיסות ותיירות')
+  assert.equal(categorize('LEVI S BIG C RAJADHA'), 'טיסות ותיירות')
+  assert.equal(categorize('CJ OLIVE YOUNG HAEUN'), 'טיסות ותיירות')
+  assert.equal(categorize('LOTTEBAIKHOAJEOM BON'), 'טיסות ותיירות')
+  assert.equal(categorize('מאמאנט ליגת אמהות לכ'), 'פנאי, בידור וספורט')
+  assert.equal(categorize('דור-ארגמן'), 'דלק, חשמל וגז')
+  assert.equal(categorize('דור -האיצטדיון'), 'דלק, חשמל וגז') // not פנאי via 'אצטדיון'
+  assert.equal(categorize('ל ב קוסמטיקס'), 'אופנה')
+  assert.equal(categorize('PEDRO PPS'), 'אופנה')
+  assert.equal(categorize('ROSSO VINO'), 'מסעדות, קפה וברים')
+})
+
 test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
   assert.equal(categorize('ASOS IL'), 'אופנה')          // IL = Israel, not foreign
   assert.equal(categorize('NETFLIX.COM'), 'חשמל ומחשבים') // no city/country trailer
