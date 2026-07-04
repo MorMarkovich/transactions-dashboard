@@ -816,7 +816,7 @@ export default function Dashboard() {
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
               <div style={{ fontSize: '1rem', fontWeight: 700, color: displayBalance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {displayBalance >= 0 ? '+' : ''}{formatCurrency(displayBalance)}
+                {formatCurrency(displayBalance, true)}
               </div>
             </div>
             {displayIncome > 0 && (
@@ -1015,7 +1015,7 @@ export default function Dashboard() {
                       return (
                         <AnimatedNumber
                           value={Math.abs(balance)}
-                          formatter={(v) => `${balance >= 0 ? '+' : '-'}${formatCurrency(v)}`}
+                          formatter={(v) => formatCurrency(balance >= 0 ? v : -v, true)}
                           style={{
                             fontSize: '1.625rem', fontWeight: 700,
                             color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
