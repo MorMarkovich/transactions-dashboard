@@ -5,7 +5,6 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Label,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
 
@@ -121,38 +120,29 @@ function renderCustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent
 }
 
 /* ------------------------------------------------------------------ */
-/*  Center label (total)                                               */
+/*  Center label (total) — HTML overlay centered over the donut hole   */
 /* ------------------------------------------------------------------ */
 
-interface CenterProps {
-  cx: number
-  cy: number
-  total: number
-  compact?: boolean
-}
-
-function CenterLabel({ cx, cy, total, compact = false }: CenterProps) {
+function CenterLabel({ total, compact = false }: { total: number; compact?: boolean }) {
   return (
-    <g>
-      <text
-        x={cx}
-        y={cy - 10}
-        textAnchor="middle"
-        dominantBaseline="central"
-        style={{ fill: 'var(--text-secondary)', fontSize: compact ? 11 : 13, fontFamily: 'var(--font-family)' }}
-      >
-        {"סה\"כ"}
-      </text>
-      <text
-        x={cx}
-        y={cy + 14}
-        textAnchor="middle"
-        dominantBaseline="central"
-        style={{ fill: 'var(--text-primary)', fontSize: compact ? 16 : 20, fontWeight: 700, fontFamily: 'var(--font-family)' }}
-      >
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        textAlign: 'center',
+        fontFamily: 'var(--font-family)',
+      }}
+    >
+      <div style={{ color: 'var(--text-secondary)', fontSize: compact ? 11 : 13 }}>{'סה"כ'}</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: compact ? 16 : 20, fontWeight: 700, direction: 'ltr' }}>
         {formatShekel(total)}
-      </text>
-    </g>
+      </div>
+    </div>
   )
 }
 
@@ -181,36 +171,32 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={isCompact ? 260 : 340}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          cx="50%"
-          cy="50%"
-          innerRadius={isCompact ? '58%' : '60%'}
-          outerRadius={isCompact ? '78%' : '85%'}
-          paddingAngle={2}
-          animationDuration={0}
-          label={isCompact ? false : (renderCustomLabel as any)}
-          labelLine={false}
-        >
-          {data.map((_entry, idx) => (
-            <Cell key={idx} fill={COLORS[idx % COLORS.length]} stroke="none" />
-          ))}
-          <Label
-            content={({ viewBox }) => {
-              const { cx, cy } = viewBox as { cx: number; cy: number }
-              return <CenterLabel cx={cx} cy={cy} total={total} compact={isCompact} />
-            }}
-            position="center"
-          />
-        </Pie>
+    <div style={{ position: 'relative' }}>
+      <ResponsiveContainer width="100%" height={isCompact ? 260 : 340}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            innerRadius={isCompact ? '58%' : '60%'}
+            outerRadius={isCompact ? '78%' : '85%'}
+            paddingAngle={2}
+            animationDuration={0}
+            label={isCompact ? false : (renderCustomLabel as any)}
+            labelLine={false}
+          >
+            {data.map((_entry, idx) => (
+              <Cell key={idx} fill={COLORS[idx % COLORS.length]} stroke="none" />
+            ))}
+          </Pie>
 
-        <Tooltip content={tooltipContent as any} />
-      </PieChart>
-    </ResponsiveContainer>
+          <Tooltip content={tooltipContent as any} />
+        </PieChart>
+      </ResponsiveContainer>
+      <CenterLabel total={total} compact={isCompact} />
+    </div>
   )
 })
 

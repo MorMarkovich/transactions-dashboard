@@ -18,6 +18,8 @@ interface BarChartProps {
   data: { label: string; value: number }[]
   height?: number
   color?: string
+  /** Flip the x-axis so the first data point is on the right (RTL reading). */
+  reversed?: boolean
 }
 
 interface PayloadEntry {
@@ -100,6 +102,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   data,
   height = 260,
   color = '#818cf8',
+  reversed = false,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
 
@@ -136,6 +139,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
 
         <XAxis
           dataKey="label"
+          reversed={reversed}
           tick={{
             fill: 'var(--text-secondary)',
             fontSize: isCompact ? 10 : (needsRotation ? 11 : 12),

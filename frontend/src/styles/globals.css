@@ -916,7 +916,8 @@ input:focus, select:focus, textarea:focus {
   .dashboard-category-grid,
   .dashboard-premium-row,
   .dashboard-weekly-row,
-  .month-overview-grid {
+  .month-overview-grid,
+  .monthly-pie-grid {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 

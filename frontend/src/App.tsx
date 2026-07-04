@@ -12,6 +12,7 @@ const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Trends = lazy(() => import('./pages/Trends'))
+const MonthlyBreakdown = lazy(() => import('./pages/MonthlyBreakdown'))
 const Insights = lazy(() => import('./pages/Insights'))
 const Merchants = lazy(() => import('./pages/Merchants'))
 const Income = lazy(() => import('./pages/Income'))
@@ -98,6 +99,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
+        <Route path="/monthly" element={<ProtectedPage><MonthlyBreakdown /></ProtectedPage>} />
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
         <Route path="/insights" element={<ProtectedPage><Insights /></ProtectedPage>} />
         <Route path="/merchants" element={<ProtectedPage><Merchants /></ProtectedPage>} />

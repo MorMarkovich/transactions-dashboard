@@ -5,6 +5,7 @@ import {
   Search,
   LayoutDashboard,
   Receipt,
+  CalendarRange,
   TrendingUp,
   Lightbulb,
   Store,
@@ -47,6 +48,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     () => [
       { id: 'dashboard', label: 'דשבורד', icon: <LayoutDashboard size={18} />, action: () => navigate(`/${sessionQuery}`), keywords: ['dashboard', 'דשבורד', 'ראשי', 'בית'], group: 'ניווט' },
       { id: 'transactions', label: 'עסקאות', icon: <Receipt size={18} />, action: () => navigate(`/transactions${sessionQuery}`), keywords: ['transactions', 'עסקאות', 'רשימה'], group: 'ניווט' },
+      { id: 'monthly', label: 'פילוח חודשי', icon: <CalendarRange size={18} />, action: () => navigate(`/monthly${sessionQuery}`), keywords: ['monthly', 'פילוח', 'חודשי', 'חודשים', 'השוואה'], group: 'ניווט' },
       { id: 'trends', label: 'מגמות', icon: <TrendingUp size={18} />, action: () => navigate(`/trends${sessionQuery}`), keywords: ['trends', 'מגמות', 'גרפים'], group: 'ניווט' },
       { id: 'insights', label: 'תובנות', icon: <Lightbulb size={18} />, action: () => navigate(`/insights${sessionQuery}`), keywords: ['insights', 'תובנות', 'חכם'], group: 'ניווט' },
       { id: 'merchants', label: 'בתי עסק', icon: <Store size={18} />, action: () => navigate(`/merchants${sessionQuery}`), keywords: ['merchants', 'בתי עסק', 'חנויות'], group: 'ניווט' },

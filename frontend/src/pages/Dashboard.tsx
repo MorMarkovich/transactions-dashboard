@@ -14,9 +14,7 @@ import {
   ChevronLeft,
   CreditCard,
   ArrowUpDown,
-  Layers,
   Grid3X3,
-  CalendarRange,
   Tag,
   Activity,
   Clock,
@@ -31,8 +29,6 @@ import { CATEGORY_ICONS, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
-import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
-import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyComparison'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import SpendingAlerts from '../components/ui/SpendingAlerts'
@@ -58,9 +54,7 @@ import type {
   AnomalyItem,
   RecurringTransaction,
   MonthOverviewData,
-  IndustryMonthlyData,
   CategorySnapshotData,
-  CategoryMonthlyComparisonData,
   CategoryCatalog,
   Transaction,
 } from '../services/types'
@@ -109,9 +103,7 @@ export default function Dashboard() {
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
   const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
-  const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
   const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshotData | null>(null)
-  const [comparison, setComparison] = useState<CategoryMonthlyComparisonData | null>(null)
   const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalog | null>(null)
   const [managerOpen, setManagerOpen] = useState(false)
   // User-created category / subcategory names (persisted in localStorage so they
@@ -135,7 +127,6 @@ export default function Dashboard() {
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
-  const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
   const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
   const [snapshotExpanded, setSnapshotExpanded] = useState(false)
   const [snapshotSearch, setSnapshotSearch] = useState('')
@@ -331,7 +322,6 @@ export default function Dashboard() {
           transactionsApi.getSpendingVelocity(sid, signal).catch(() => null),
           transactionsApi.getAnomalies(sid, signal).catch(() => null),
           transactionsApi.getRecurring(sid, signal).catch(() => null),
-          transactionsApi.getIndustryMonthly(sid, dateType, signal).catch(() => null),
           transactionsApi.getIncomeSources(sid, signal).catch(() => null),
         ])
 
@@ -344,8 +334,7 @@ export default function Dashboard() {
         if (results[6]) setVelocity(results[6] as SpendingVelocityData)
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
         if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
-        if (results[9]) setIndustryMonthly(results[9] as IndustryMonthlyData)
-        setIncomeSources((results[10] as IncomeSourcesData) ?? null)
+        setIncomeSources((results[9] as IncomeSourcesData) ?? null)
 
         recoveryAttempts.current = 0 // healthy load — allow future recovery
         setDataLoadedAt(new Date())
@@ -411,30 +400,6 @@ export default function Dashboard() {
     return [...monthlyData.months].reverse().slice(0, 12)
   }, [monthlyData])
 
-  // Sync comparison month selection when industry data loads
-  useEffect(() => {
-    if (industryMonthly?.months.length) {
-      setSelectedComparisonMonths(new Set(industryMonthly.months))
-    }
-  }, [industryMonthly])
-
-  const filteredIndustryMonthly = useMemo<IndustryMonthlyData | null>(() => {
-    if (!industryMonthly) return null
-    if (!selectedComparisonMonths.size || selectedComparisonMonths.size === industryMonthly.months.length) {
-      return industryMonthly
-    }
-    const monthIndices = industryMonthly.months
-      .map((m, i) => (selectedComparisonMonths.has(m) ? i : -1))
-      .filter((i): i is number => i >= 0)
-    return {
-      months: monthIndices.map(i => industryMonthly.months[i]),
-      series: industryMonthly.series.map(s => ({
-        ...s,
-        data: monthIndices.map(i => s.data[i]),
-      })),
-    }
-  }, [industryMonthly, selectedComparisonMonths])
-
   const hasBillingDate = metrics?.has_billing_date ?? false
 
   // ── Sync category snapshot month with selectedMonth ──
@@ -458,17 +423,6 @@ export default function Dashboard() {
       .catch(() => {})
     return () => controller.abort()
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner])
-
-  // ── Fetch month-by-month category comparison (driven by date type) ──
-  useEffect(() => {
-    if (!sessionId) return
-    const controller = new AbortController()
-    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
-      .then((sid) => transactionsApi.getCategoryMonthlyComparison(sid, dateType, controller.signal))
-      .then((data) => setComparison(data))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [sessionId, dateType, refreshKey, selectedOwner])
 
   // ── Fetch the category/subcategory catalog once (seeded names + icons) ──
   useEffect(() => {
@@ -1676,89 +1630,31 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Month-by-month comparison by category ──────────────────── */}
-      {comparison && comparison.months.length >= 2 && comparison.categories.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
+      {/* ── Monthly breakdown moved to its own tab (פילוח חודשי) ───── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12, duration: 0.35 }}
+        style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
+      >
+        <Card
+          className="glass-card"
+          padding="md"
+          hover
+          onClick={() => navigate(`/monthly?session_id=${sessionId}`)}
         >
-          <div className="section-header-v2">
-            <CalendarRange size={18} />
-            <span>השוואת חודשים לפי קטגוריה</span>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              ולכמה אחוז מההוצאות החודשיות
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <BarChart3 size={18} style={{ color: 'var(--accent)' }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>פילוח חודשי</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                השוואת חודשים לפי קטגוריה, עוגת קטגוריות לכל חודש ומעקב קטגוריה לאורך זמן
+              </div>
+            </div>
+            <ChevronLeft size={16} style={{ color: 'var(--text-muted)' }} />
           </div>
-          <Card className="glass-card" padding="md">
-            <CategoryMonthlyComparison
-              data={comparison}
-              dateType={dateType}
-              hasBillingDate={hasBillingDate}
-              onCategoryClick={handleCategoryCardClick}
-            />
-          </Card>
-        </motion.div>
-      )}
-
-      {/* ── Industry monthly comparison ────────────────────────────── */}
-      {industryMonthly && industryMonthly.months.length >= 2 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
-        >
-          <div className="section-header-v2">
-            <Layers size={18} />
-            <span>השוואת הוצאות לפי קטגוריה</span>
-            {hasBillingDate && (
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-                {dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'}
-              </span>
-            )}
-          </div>
-          {/* Month selector pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
-            {industryMonthly.months.map((m) => {
-              const isSelected = selectedComparisonMonths.has(m)
-              return (
-                <button
-                  key={m}
-                  onClick={() => setSelectedComparisonMonths(prev => {
-                    const next = new Set(prev)
-                    if (next.has(m)) {
-                      if (next.size > 1) next.delete(m)
-                    } else {
-                      next.add(m)
-                    }
-                    return next
-                  })}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid',
-                    borderColor: isSelected ? 'var(--accent)' : 'var(--border)',
-                    background: isSelected ? 'var(--accent-muted)' : 'transparent',
-                    color: isSelected ? 'var(--accent)' : 'var(--text-muted)',
-                    fontSize: '0.75rem',
-                    fontWeight: isSelected ? 600 : 400,
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-family)',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {m}
-                </button>
-              )
-            })}
-          </div>
-          <Card className="glass-card" padding="md">
-            <IndustryMonthlyChart data={filteredIndustryMonthly!} height={320} />
-          </Card>
-        </motion.div>
-      )}
+        </Card>
+      </motion.div>
 
       {/* ── Spending Alerts ────────────────────────────────────────── */}
       {(anomalies.length > 0 || recurring.length > 0 || forecast) && (
