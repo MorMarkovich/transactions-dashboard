@@ -19,7 +19,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
-import { formatCurrency, formatDate } from '../utils/formatting'
+import { formatCurrency, formatDate, ltrIsolate } from '../utils/formatting'
 
 /* ------------------------------------------------------------------ */
 /*  Animation variants                                                 */
@@ -369,7 +369,7 @@ export default function Insights() {
                   icon={<Percent size={22} style={{ color: '#ec4899' }} />}
                   iconBg="rgba(236, 72, 153, 0.12)"
                   title="שינוי חודשי"
-                  value={changePct >= 0 ? `+${changePct}%` : `${changePct}%`}
+                  value={ltrIsolate(changePct >= 0 ? `+${changePct}%` : `${changePct}%`)}
                   subtitle="השוואה לחודש הקודם"
                   backgroundGradient={CARD_GRADIENTS[6]}
                 />

@@ -42,7 +42,7 @@ export default function MetricsGrid({ metrics, monthlyAmounts }: MetricsGridProp
     () => [
       {
         key: 'total_transactions',
-        label: 'סך עסקאות',
+        label: 'עסקאות הוצאה',
         icon: <Receipt size={22} color="#fff" />,
         iconBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         gradientBg: 'var(--gradient-stat-purple)',

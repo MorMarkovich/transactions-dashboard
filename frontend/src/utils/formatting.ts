@@ -5,9 +5,19 @@
 const numberFormatter = new Intl.NumberFormat('he-IL')
 
 /**
+ * Wrap a formatted amount in Unicode bidi isolates (LRI…PDI) so the whole
+ * token renders left-to-right even inside RTL text. Without this, a leading
+ * minus/plus detaches under the bidi algorithm and shows up on the wrong
+ * side of the digits (e.g. "-₪120" became "₪120-" in RTL table cells).
+ */
+export function ltrIsolate(text: string): string {
+  return `\u2066${text}\u2069`
+}
+
+/**
  * Format a number as Israeli Shekel currency (e.g. ₪1,234.56).
- * Always places ₪ before the number (LTR-safe, no RTL-marks) so the symbol
- * renders correctly in both RTL and LTR containers.
+ * Always places ₪ before the number; the result is bidi-isolated so the
+ * sign and symbol stay glued to the digits in both RTL and LTR containers.
  */
 export function formatCurrency(amount: number): string {
   if (amount === 0) return '₪0'
@@ -16,7 +26,7 @@ export function formatCurrency(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
-  return amount < 0 ? `-₪${formatted}` : `₪${formatted}`
+  return ltrIsolate(amount < 0 ? `-₪${formatted}` : `₪${formatted}`)
 }
 
 /**
@@ -41,7 +51,7 @@ export function formatDate(dateStr: string): string {
  */
 export function formatPercent(value: number, decimals: number = 1): string {
   if (value > 0 && value < 1) return '<1%'
-  return `${value.toFixed(decimals)}%`
+  return ltrIsolate(`${value.toFixed(decimals)}%`)
 }
 
 /**

@@ -1,3 +1,4 @@
+import { ltrIsolate } from '../../utils/formatting'
 import React, { useCallback } from 'react'
 import {
   PieChart,
@@ -44,7 +45,7 @@ const COLORS = [
 ]
 
 const formatShekel = (v: number): string =>
-  `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 
 /* ------------------------------------------------------------------ */
 /*  Custom tooltip                                                     */
