@@ -88,6 +88,8 @@ test('merchants from the 2026-07 sync review are categorized', () => {
   assert.equal(categorize('ל ב קוסמטיקס'), 'אופנה')
   assert.equal(categorize('PEDRO PPS'), 'אופנה')
   assert.equal(categorize('ROSSO VINO'), 'מסעדות, קפה וברים')
+  assert.equal(categorize('ביי-מי שוברי מתנה'), 'מתנות')
+  assert.equal(categorize('L.B.Y GROUP'), 'רפואה ובתי מרקחת') // couples therapy
 })
 
 test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
