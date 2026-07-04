@@ -31,7 +31,10 @@ def test_ai_override_beats_foreign_card():
 
 
 @pytest.mark.asyncio
-async def test_user_rule_beats_ai_override_in_restore():
+async def test_ai_override_beats_user_rules_in_restore():
+    """AI-tool spend is unconditional: stale rules (persisted before בינה
+    מלאכותית existed, or junk from early AI runs) must not pull it out.
+    apply_ai_tool_override re-runs AFTER rules in restore_session."""
     body = RestoreSessionRequest(
         transactions=[
             {'תאריך': '2026-01-05', 'סכום': -20, 'תיאור': 'OPENAI *CHATGPT',
@@ -41,5 +44,4 @@ async def test_user_rule_beats_ai_override_in_restore():
     )
     resp = await restore_session(body)
     df = sessions[resp['session_id']]
-    # The rule (applied after the override) wins.
-    assert df['קטגוריה'].iloc[0] == 'מנויים ושירותים'
+    assert df['קטגוריה'].iloc[0] == AI_CATEGORY

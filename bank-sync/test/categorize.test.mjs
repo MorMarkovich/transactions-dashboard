@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { categorize, applyRules, subcategorize } from '../src/categorize.js'
+import { categorize, applyRules, subcategorize, VALID_CATEGORIES } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots, refreshMiscCategories } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 import { detectOwner, JOINT } from '../src/owner.js'
@@ -90,6 +90,55 @@ test('merchants from the 2026-07 sync review are categorized', () => {
   assert.equal(categorize('ROSSO VINO'), 'מסעדות, קפה וברים')
   assert.equal(categorize('ביי-מי שוברי מתנה'), 'מתנות')
   assert.equal(categorize('L.B.Y GROUP'), 'רפואה ובתי מרקחת') // couples therapy
+})
+
+// ── Rule hygiene & foreign-billing exemptions (the 'אחר' junk-rules bug) ────
+test('online services billed abroad are NOT bucketed as travel', () => {
+  assert.equal(categorize('NETFLIX.COM AMSTERDAM NL'), 'חשמל ומחשבים')
+  assert.equal(categorize('PAYPAL *SPOTIFY*P40762 35314369001 GB'), 'חשמל ומחשבים')
+})
+
+test('real overseas trip spend still goes to travel', () => {
+  assert.equal(categorize('SHINSEGAE DEPARTMENT S SEOUL         KR'), 'טיסות ותיירות')
+})
+
+test('junk rules (category אחר) are ignored', () => {
+  const junk = new Map([['L.B.Y GROUP', 'אחר']])
+  assert.equal(applyRules(categorize('L.B.Y GROUP'), 'L.B.Y GROUP', junk), 'רפואה ובתי מרקחת')
+})
+
+test('rules cannot pull AI-tool spend out of בינה מלאכותית', () => {
+  const stale = new Map([['CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US', 'אחר']])
+  const cat = categorize('CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US')
+  assert.equal(cat, 'בינה מלאכותית')
+  assert.equal(applyRules(cat, 'CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US', stale), 'בינה מלאכותית')
+})
+
+test('valid user rules still win over the keyword catalog', () => {
+  const rules = new Map([['שופרסל דיל', 'מתנות']])
+  assert.equal(applyRules(categorize('שופרסל דיל'), 'שופרסל דיל', rules), 'מתנות')
+})
+
+test('L.B.Y therapy gets the טיפול זוגי subcategory', () => {
+  assert.equal(subcategorize('רפואה ובתי מרקחת', 'L.B.Y GROUP'.toLowerCase()), 'טיפול זוגי')
+})
+
+test('VALID_CATEGORIES excludes אחר', () => {
+  assert.equal(VALID_CATEGORIES.has('אחר'), false)
+  assert.equal(VALID_CATEGORIES.has('מתנות'), true)
+})
+
+test('refreshMiscCategories repairs rows stored with junk אחר', () => {
+  const txns = [
+    { 'תיאור': 'NETFLIX.COM AMSTERDAM NL', 'קטגוריה': 'אחר' },   // junk → catalog
+    { 'תיאור': 'ZZQWX UNKNOWN', 'קטגוריה': 'אחר' },              // junk → שונות
+    { 'תיאור': 'שופרסל דיל', 'קטגוריה': 'מזון וצריכה' },          // valid → untouched
+  ]
+  const changed = refreshMiscCategories(txns, new Map())
+  assert.equal(changed, 2)
+  assert.equal(txns[0]['קטגוריה'], 'חשמל ומחשבים')
+  assert.equal(txns[1]['קטגוריה'], 'שונות')
+  assert.equal(txns[2]['קטגוריה'], 'מזון וצריכה')
 })
 
 // ── refreshMiscCategories: apply catalog updates to stored snapshots ─────────

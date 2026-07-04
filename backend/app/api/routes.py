@@ -17,7 +17,7 @@ from io import BytesIO
 from ..services.data_loader import load_transaction_file
 from ..services.data_processor import (
     process_data, clean_dataframe,
-    apply_unconditional_overrides, derive_subcategory,
+    apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -240,6 +240,13 @@ async def restore_session(body: RestoreSessionRequest):
         # ── Auto-categorize "שונות" by description keywords ──────────
         ai_categorized: list[dict] = []  # merchant→category the AI resolved (returned for persistence)
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+            # Snapshot hygiene: stored categories that aren't in the catalog
+            # (e.g. 'אחר' persisted by early AI runs) are reset to שונות so the
+            # keyword pass below re-categorizes them from scratch.
+            invalid_cat = ~df['קטגוריה'].astype(str).isin(CATEGORY_ICONS)
+            if invalid_cat.any():
+                df.loc[invalid_cat, 'קטגוריה'] = 'שונות'
+
             # Unconditional overrides (Psagot, foreign-card, AI tools) run on ALL
             # rows. Shared helper so this path matches the upload pipeline — and
             # so AI-tool charges that arrived already tagged 'חשמל ומחשבים'
@@ -280,6 +287,11 @@ async def restore_session(body: RestoreSessionRequest):
                 for r in body.category_rules:
                     if not r.merchant:
                         continue
+                    # Rule hygiene: only catalog categories may be assigned.
+                    # Early AI runs persisted junk like 'אחר'; honoring those
+                    # would permanently override the real categorizer.
+                    if r.category and r.category not in CATEGORY_ICONS:
+                        continue
                     rmask = desc_str == r.merchant
                     if not rmask.any():
                         continue
@@ -291,6 +303,11 @@ async def restore_session(body: RestoreSessionRequest):
                         if 'קטגוריה_משנה' not in df.columns:
                             df['קטגוריה_משנה'] = ''
                         df.loc[rmask, 'קטגוריה_משנה'] = r.subcategory
+
+            # AI-tool spend is unconditional — re-assert it AFTER rules so a
+            # stale rule (e.g. Claude → 'חשמל ומחשבים' from before the category
+            # existed) can never pull those charges out of בינה מלאכותית.
+            apply_ai_tool_override(df)
 
             # AI categorization for remaining "שונות" rows is NOT run here —
             # it blocks the first paint for many seconds (Claude + web search).

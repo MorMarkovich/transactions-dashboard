@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowUpDown, Calendar, Check, Edit2, Tag } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
-import { get_icon, CATEGORY_ICONS, get_subcategory_icon } from '../../utils/constants'
+import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
 
 interface CategoryTransactionsDrawerProps {
@@ -75,8 +75,8 @@ export default function CategoryTransactionsDrawer({
   }, [isOpen, category])
 
   const categoryOptions = useMemo(() => {
-    return Array.from(new Set([...availableCategories, ...Object.keys(CATEGORY_ICONS), category]))
-      .filter((cat) => cat && cat.trim())
+    return Array.from(new Set([...availableCategories, ...ASSIGNABLE_CATEGORIES, category]))
+      .filter((cat) => cat && cat.trim() && cat !== 'אחר') // אחר = chart bucket, not assignable
       .sort((a, b) => a.localeCompare(b, 'he'))
   }, [availableCategories, category])
 

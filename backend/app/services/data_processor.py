@@ -10,12 +10,18 @@ from ..core.constants import (
     CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
     KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
     AI_CATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
+    FOREIGN_EXEMPT_KEYWORDS,
 )
 from .ai_categorizer import categorize_transactions
 
 # Pre-compiled AI-override pattern (substring, case-insensitive).
 _AI_OVERRIDE_PATTERN = (
     '|'.join(re.escape(k) for k in AI_OVERRIDE_KEYWORDS) if AI_OVERRIDE_KEYWORDS else None
+)
+
+# Online services that bill from abroad — exempt from the foreign→travel bucket.
+_FOREIGN_EXEMPT_PATTERN = (
+    '|'.join(re.escape(k) for k in FOREIGN_EXEMPT_KEYWORDS) if FOREIGN_EXEMPT_KEYWORDS else None
 )
 
 
@@ -47,14 +53,35 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
         & desc.str.contains(r'[A-Za-z]', regex=True, na=False)
         & desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
     )
+    if _FOREIGN_EXEMPT_PATTERN:
+        # Online services (Netflix/Spotify/PayPal…) bill from abroad year-round;
+        # they are not trip spend, so they keep falling through to the keyword
+        # catalog instead of the travel bucket.
+        foreign_mask &= ~desc_lower.str.contains(_FOREIGN_EXEMPT_PATTERN, na=False, regex=True)
     if foreign_mask.any():
         df.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
 
-    if _AI_OVERRIDE_PATTERN:
-        ai_mask = desc_lower.str.contains(_AI_OVERRIDE_PATTERN, na=False, regex=True)
-        if ai_mask.any():
-            df.loc[ai_mask, 'קטגוריה'] = AI_CATEGORY
+    apply_ai_tool_override(df, desc_lower)
 
+    return df
+
+
+def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = None) -> pd.DataFrame:
+    """Force AI-tool merchants into בינה מלאכותית, unconditionally.
+
+    Exposed separately so restore_session can re-assert it AFTER user rules:
+    early AI runs persisted junk rules (e.g. CLAUDE.AI → 'אחר') and rules win
+    over the main override pass, which let those charges escape the category.
+    """
+    if df.empty or 'תיאור' not in df.columns or 'קטגוריה' not in df.columns:
+        return df
+    if not _AI_OVERRIDE_PATTERN:
+        return df
+    if desc_lower is None:
+        desc_lower = df['תיאור'].astype(str).str.lower()
+    ai_mask = desc_lower.str.contains(_AI_OVERRIDE_PATTERN, na=False, regex=True)
+    if ai_mask.any():
+        df.loc[ai_mask, 'קטגוריה'] = AI_CATEGORY
     return df
 
 

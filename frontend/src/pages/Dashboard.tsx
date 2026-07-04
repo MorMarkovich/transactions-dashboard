@@ -25,7 +25,7 @@ import {
   Check,
 } from 'lucide-react'
 import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFilters'
-import { CATEGORY_ICONS, get_icon } from '../utils/constants'
+import { ASSIGNABLE_CATEGORIES, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
@@ -525,10 +525,12 @@ export default function Dashboard() {
   const availableCategoryNames = useMemo(
     () => Array.from(new Set([
       ...(categorySnapshot?.categories.map((cat) => cat.name) ?? []),
-      ...Object.keys(CATEGORY_ICONS),
+      ...ASSIGNABLE_CATEGORIES,
       ...(categoryCatalog?.categories.map((c) => c.name) ?? []),
       ...customCategories,
-    ])).sort((a, b) => a.localeCompare(b, 'he')),
+    ]))
+      .filter((c) => c !== 'אחר') // chart-legend bucket, not an assignable category
+      .sort((a, b) => a.localeCompare(b, 'he')),
     [categorySnapshot, categoryCatalog, customCategories],
   )
 
@@ -542,10 +544,11 @@ export default function Dashboard() {
   // Category list for the manager modal: every known category + its subcategories.
   const managerCategories = useMemo<ManagerCategory[]>(() => {
     const names = new Set<string>([
-      ...(categoryCatalog?.categories.map((c) => c.name) ?? Object.keys(CATEGORY_ICONS)),
+      ...(categoryCatalog?.categories.map((c) => c.name) ?? ASSIGNABLE_CATEGORIES),
       ...(categorySnapshot?.categories.map((c) => c.name) ?? []),
       ...customCategories,
     ])
+    names.delete('אחר') // chart-legend bucket, not a manageable category
     return Array.from(names)
       .sort((a, b) => a.localeCompare(b, 'he'))
       .map((name) => ({
