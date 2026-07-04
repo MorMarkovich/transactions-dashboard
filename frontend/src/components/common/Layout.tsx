@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import QuickActions from './QuickActions'
 import { useAuth } from '../../lib/AuthContext'
+import { isValidRuleCategory } from '../../utils/constants'
 import { supabaseApi } from '../../services/supabaseApi'
 import { transactionsApi } from '../../services/api'
 import './Layout.css'
@@ -90,7 +91,17 @@ export default function Layout({ children }: LayoutProps) {
       ])
         .then(([transactions, rules]) => {
           if (!transactions || transactions.length === 0) return
-          return transactionsApi.restoreSession(transactions, rules)
+          // Rule hygiene: early AI runs persisted junk rules (category 'אחר'),
+          // and rules override the whole categorizer. Purge them at the source
+          // so they also stop reaching bank-sync, and restore with valid ones.
+          const invalid = rules.filter((r) => !isValidRuleCategory(r.category))
+          if (invalid.length) {
+            supabaseApi
+              .deleteCategoryRules(user.id, invalid.map((r) => r.merchant))
+              .catch(() => {}) // best-effort; backend ignores them regardless
+          }
+          const validRules = rules.filter((r) => isValidRuleCategory(r.category))
+          return transactionsApi.restoreSession(transactions, validRules)
         })
         .then(response => {
           if (response?.success && response.session_id) {

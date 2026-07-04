@@ -198,6 +198,21 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  /**
+   * Delete several rules at once. Used by the login-time hygiene pass to purge
+   * junk rules (e.g. category 'אחר' persisted by early AI runs) so they stop
+   * overriding the real categorizer everywhere — including bank-sync.
+   */
+  deleteCategoryRules: async (userId: string, merchants: string[]): Promise<void> => {
+    if (!merchants.length) return;
+    const { error } = await supabase
+      .from('user_category_rules')
+      .delete()
+      .eq('user_id', userId)
+      .in('merchant', merchants);
+    if (error) throw error;
+  },
+
   // ─── Data Management ──────────────────────────────────────────────────
 
   deleteAllTransactions: async (userId: string): Promise<void> => {

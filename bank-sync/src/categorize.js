@@ -62,10 +62,25 @@ const AI_OVERRIDE_KEYWORDS = [
   'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
 ]
 
+// ── Valid categories (mirrors backend CATEGORY_ICONS keys) ──────────
+// Rules pointing anywhere else (e.g. 'אחר' persisted by early AI runs) are
+// junk and must not override the categorizer.
+export const VALID_CATEGORIES = new Set([
+  'מזון וצריכה', 'מסעדות, קפה וברים', 'תחבורה ורכבים', 'דלק, חשמל וגז',
+  'רפואה ובתי מרקחת', 'עירייה וממשלה', 'חשמל ומחשבים', 'בינה מלאכותית',
+  'אופנה', 'עיצוב הבית', 'פנאי, בידור וספורט', 'ביטוח', 'שירותי תקשורת',
+  'העברת כספים', 'העברה להשקעות', 'חיות מחמד', 'שונות', 'משיכת מזומן',
+  'שכר דירה', 'הוראות קבע', 'טיסות ותיירות', 'חינוך ולימודים', 'מתנות',
+  'מנויים ושירותים',
+])
+
 // ── Subcategories (parent category → {subcategory → [keywords]}) ─────
 // Mirrors constants.SUBCATEGORY_KEYWORDS. Scoped to the parent category; first
 // subcategory (in insertion order) wins on a keyword hit.
 const SUBCATEGORY_KEYWORDS = {
+  'רפואה ובתי מרקחת': {
+    'טיפול זוגי': ['l.b.y', 'lby group', 'טיפול זוגי', 'מטפלת זוגית'],
+  },
   'מזון וצריכה': {
     'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה', 'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
     'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
@@ -112,9 +127,21 @@ function boundaryMatch(text, kw) {
 // services (NETFLIX.COM, AMAZON …) have no city/country trailer, so they keep
 // their keyword category.
 const FOREIGN_DESC = /(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$/
+// Online services bill from abroad year-round ("NETFLIX.COM AMSTERDAM NL",
+// "PAYPAL *SPOTIFY ... GB") — not trip spend. Mirrors FOREIGN_EXEMPT_KEYWORDS.
+const FOREIGN_EXEMPT_KEYWORDS = [
+  'netflix', 'spotify', 'paypal', 'google', 'apple', 'amazon', 'microsoft',
+  'disney', 'hbo', 'youtube', 'ebay', 'aliexpress', 'temu', 'banggood',
+  'steam', 'playstation', 'xbox', 'nintendo', 'epic games',
+  'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'github', 'zoom',
+  'linkedin', 'patreon', 'substack', 'audible', 'kindle', 'twitch',
+  'discord', 'wolt', 'facebook', 'facebk', 'meta platforms',
+]
 export function isForeignDescriptor(description) {
   const s = String(description || '').trim()
   if (!s || /[\u0590-\u05FF]/.test(s)) return false // contains Hebrew → domestic
+  const d = s.toLowerCase()
+  if (FOREIGN_EXEMPT_KEYWORDS.some((kw) => d.includes(kw))) return false
   return /[A-Za-z]/.test(s) && FOREIGN_DESC.test(s)
 }
 
@@ -184,6 +211,13 @@ export function subcategorize(category, description) {
  * mirroring restore_session. `rules` is [{ merchant, category }].
  */
 export function applyRules(category, description, ruleMap) {
-  if (ruleMap && ruleMap.has(description)) return ruleMap.get(description)
-  return category
+  if (!ruleMap || !ruleMap.has(description)) return category
+  // AI-tool spend is unconditional — a stale rule (junk 'אחר' or a category
+  // from before בינה מלאכותית existed) must not pull it out. Mirrors the
+  // backend, where apply_ai_tool_override re-runs AFTER rules.
+  if (category === AI_CATEGORY) return category
+  const ruled = ruleMap.get(description)
+  // Rule hygiene: only catalog categories may be assigned (no 'אחר' junk).
+  if (!VALID_CATEGORIES.has(ruled)) return category
+  return ruled
 }

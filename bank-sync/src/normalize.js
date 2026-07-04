@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules, subcategorize } from './categorize.js'
+import { categorize, applyRules, subcategorize, VALID_CATEGORIES } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -131,13 +131,20 @@ export function mergeSnapshots(existing, fresh) {
 export function refreshMiscCategories(txns, ruleMap) {
   let changed = 0
   for (const t of txns) {
-    if ((t['קטגוריה'] || 'שונות') !== 'שונות') continue
+    const stored = t['קטגוריה'] || 'שונות'
+    // Invalid stored categories ('אחר' from early AI runs) are junk — treat
+    // them as שונות so the current catalog re-categorizes them.
+    if (stored !== 'שונות' && VALID_CATEGORIES.has(stored)) continue
     const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
     let category = categorize(baseDesc)
     category = applyRules(category, baseDesc, ruleMap)
-    if (category === 'שונות') continue
+    // An invalid stored category must not survive even when nothing matches —
+    // reset it to שונות so the dashboard/AI treat it as uncategorized.
+    if (category === stored) continue
     t['קטגוריה'] = category
-    if (!t['קטגוריה_משנה']) t['קטגוריה_משנה'] = subcategorize(category, baseDesc)
+    if (category !== 'שונות' && !t['קטגוריה_משנה']) {
+      t['קטגוריה_משנה'] = subcategorize(category, baseDesc)
+    }
     changed++
   }
   return changed

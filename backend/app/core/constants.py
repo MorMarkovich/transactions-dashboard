@@ -440,12 +440,30 @@ AI_OVERRIDE_KEYWORDS: list[str] = [
     'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
 ]
 
+# ── Foreign-card exemptions ──────────────────────────────────────────
+# The foreign-card heuristic (trailing 2-letter country code, no Hebrew) buckets
+# overseas spend as travel — but online services bill from abroad year-round
+# ("NETFLIX.COM AMSTERDAM NL", "PAYPAL *SPOTIFY ... GB") and are NOT trip spend.
+# Descriptions matching any of these skip the foreign→travel override and fall
+# through to the keyword catalog instead.
+FOREIGN_EXEMPT_KEYWORDS: list[str] = [
+    'netflix', 'spotify', 'paypal', 'google', 'apple', 'amazon', 'microsoft',
+    'disney', 'hbo', 'youtube', 'ebay', 'aliexpress', 'temu', 'banggood',
+    'steam', 'playstation', 'xbox', 'nintendo', 'epic games',
+    'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'github', 'zoom',
+    'linkedin', 'patreon', 'substack', 'audible', 'kindle', 'twitch',
+    'discord', 'wolt', 'facebook', 'facebk', 'meta platforms',
+]
+
 # ── Subcategories (parent category → {subcategory → [keywords]}) ─────
 # Keyword-seeded subcategories, scoped to their parent category so they only
 # refine rows already in that category (no cross-category false positives).
 # Users can create/assign more in the UI; those are stored as merchant rules.
 # First subcategory (in dict order) wins on a keyword hit.
 SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
+    'רפואה ובתי מרקחת': {
+        'טיפול זוגי': ['l.b.y', 'lby group', 'טיפול זוגי', 'מטפלת זוגית'],
+    },
     'מזון וצריכה': {
         'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
                     'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
@@ -480,6 +498,7 @@ SUBCATEGORY_ICONS: dict[str, str] = {
     'שוברי מזון': '🎫',
     'קולנוע': '🎬', 'מופעים והופעות': '🎭', 'ספורט וכושר': '🏋️',
     'אטרקציות': '🎡',
+    'טיפול זוגי': '💞',
 }
 
 
