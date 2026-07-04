@@ -62,21 +62,37 @@ if not os.path.isdir(STATIC_DIR):
 if not os.path.isdir(STATIC_DIR):
     STATIC_DIR = os.path.normpath(os.path.join(_base, "..", "..", "frontend", "dist"))
 
+class HashedStaticFiles(StaticFiles):
+    """Vite asset filenames carry a content hash, so they can be cached forever;
+    a new build references new filenames and old caches become irrelevant."""
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 if os.path.isdir(STATIC_DIR):
     logger.info("Serving SPA from STATIC_DIR=%s", STATIC_DIR)
 
     # Serve hashed asset files (JS/CSS bundles) with long-lived cache
     assets_dir = os.path.join(STATIC_DIR, "assets")
     if os.path.isdir(assets_dir):
-        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+        app.mount("/assets", HashedStaticFiles(directory=assets_dir), name="assets")
+
+    # index.html (and other non-hashed files) must NEVER be heuristically
+    # cached: without Cache-Control browsers reuse a stale index.html for
+    # hours after a deploy, still referencing old bundle hashes — users only
+    # see updates after a hard refresh. no-cache = revalidate via ETag (cheap
+    # 304 when unchanged, fresh HTML right after a deploy).
+    _NO_CACHE = {"Cache-Control": "no-cache"}
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         """Serve static file if it exists, otherwise return index.html for SPA routing."""
         file_path = os.path.join(STATIC_DIR, full_path)
         if full_path and os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+            return FileResponse(file_path, headers=_NO_CACHE)
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"), headers=_NO_CACHE)
 else:
     logger.warning("STATIC_DIR=%s not found — SPA catch-all disabled", STATIC_DIR)
 
