@@ -38,7 +38,7 @@ import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
-import { formatCurrency } from '../utils/formatting'
+import { formatCurrency, ltrIsolate } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
@@ -765,7 +765,7 @@ export default function Dashboard() {
         // is noise — show a capped "deficit" indicator instead of the number.
         const savingsRateText = displaySavingsRate < -100
           ? 'גירעון'
-          : `${displaySavingsRate.toFixed(1)}%`
+          : ltrIsolate(`${displaySavingsRate.toFixed(1)}%`)
         const periodLabel = hasMonthData ? selectedMonth : 'כל התקופה'
 
         return (

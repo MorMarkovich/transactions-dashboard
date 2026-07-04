@@ -1,3 +1,4 @@
+import { ltrIsolate } from '../../utils/formatting'
 import React, { useMemo } from 'react'
 import {
   BarChart,
@@ -49,11 +50,13 @@ const LABELS: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 const formatShekel = (v: number): string =>
-  `${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
 
 const formatAxisShekel = (v: number): string => {
-  if (Math.abs(v) >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
-  return `₪${v}`
+  const sign = v < 0 ? '-' : ''
+  const a = Math.abs(v)
+  if (a >= 1000) return ltrIsolate(`${sign}₪${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
+  return ltrIsolate(`${sign}₪${a}`)
 }
 
 /* ------------------------------------------------------------------ */
