@@ -166,8 +166,10 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
 
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
+        {/* reversed → months read right-to-left chronologically, matching the RTL page */}
         <XAxis
           dataKey="month"
+          reversed
           tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontFamily: 'var(--font-family)' }}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}

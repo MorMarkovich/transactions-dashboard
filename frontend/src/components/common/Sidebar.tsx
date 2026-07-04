@@ -3,6 +3,7 @@ import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard,
   Receipt,
+  CalendarRange,
   TrendingUp,
   Lightbulb,
   Store,
@@ -47,6 +48,7 @@ const NAV_SECTIONS = [
   {
     label: 'ניתוח',
     items: [
+      { to: '/monthly', label: 'פילוח חודשי', icon: CalendarRange },
       { to: '/trends', label: 'מגמות', icon: TrendingUp },
       { to: '/insights', label: 'תובנות', icon: Lightbulb },
       { to: '/merchants', label: 'בתי עסק', icon: Store },
