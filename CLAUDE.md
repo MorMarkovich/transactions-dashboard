@@ -35,7 +35,7 @@ each session so context carries over. **Never put secrets here** (it's committed
 - `npm run setup` — manage account registry + creds (keychain). Shows each account's current owner; can update a login.
 - `npm run sync` — scrape + **merge** (never wipes). `ACCOUNTS=isracard-2 npm run sync` limits to specific account keys.
 - `npm run resync` — full re-pull (`--fresh`). Now **preserves** rows for accounts that fail mid-run; keeps last 3 snapshots as backups.
-- `npm run retag` — re-attribute `_owner` on existing data using the registry, **no bank login** (use after owner changes / while a provider is blocked).
+- `npm run retag` — re-attribute `_owner` AND re-run the keyword catalog on `שונות` rows in the stored snapshot, **no bank login** (use after owner changes, catalog updates via `git pull`, or while a provider is blocked). Needed because `mergeSnapshots` never overwrites stored fields — new catalog keywords don't reach old rows via `npm run sync`.
 - `npm run check` — read-only sanity report (accounts, per-owner split, uncategorized `שונות`, sign/outlier checks).
 - Isracard anti-bot ("Block Automation" / HTTP 429): run headful (`SHOW_BROWSER=true` in `.env`), space logins out, and pull the two Isracard cards in **separate** runs (delays via `ACCOUNT_DELAY_MS` / `SAME_PROVIDER_DELAY_MS`).
 

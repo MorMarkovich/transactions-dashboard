@@ -120,3 +120,25 @@ export function mergeSnapshots(existing, fresh) {
   merged.forEach((t, i) => { t.id = i })
   return { merged, added, enriched }
 }
+
+/**
+ * Re-run the keyword catalog over snapshot rows still stuck in שונות, so newly
+ * added catalog keywords reach already-stored rows without re-scraping the
+ * banks (mergeSnapshots never overwrites existing fields). Rows that already
+ * carry a real category are left untouched — user/AI decisions win.
+ * Returns the number of rows re-categorized.
+ */
+export function refreshMiscCategories(txns, ruleMap) {
+  let changed = 0
+  for (const t of txns) {
+    if ((t['קטגוריה'] || 'שונות') !== 'שונות') continue
+    const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
+    let category = categorize(baseDesc)
+    category = applyRules(category, baseDesc, ruleMap)
+    if (category === 'שונות') continue
+    t['קטגוריה'] = category
+    if (!t['קטגוריה_משנה']) t['קטגוריה_משנה'] = subcategorize(category, baseDesc)
+    changed++
+  }
+  return changed
+}
