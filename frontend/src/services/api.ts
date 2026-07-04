@@ -85,6 +85,19 @@ export const transactionsApi = {
   },
 
   /**
+   * Run the slow AI fallback (Claude + web search) on the session's remaining
+   * "שונות" merchants. Called in the background after restoreSession so the
+   * dashboard paints immediately; returns assignments to persist as rules.
+   */
+  aiCategorize: async (sessionId: string): Promise<{ ai_categorized?: { merchant: string; category: string }[] }> => {
+    const response = await api.post<{ ai_categorized?: { merchant: string; category: string }[] }>(
+      '/api/ai-categorize',
+      { session_id: sessionId },
+    );
+    return response.data;
+  },
+
+  /**
    * List source files in the current session
    */
   getSessionFiles: async (sessionId: string): Promise<{ files: SessionFileInfo[] }> => {

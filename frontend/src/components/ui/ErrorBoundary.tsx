@@ -11,6 +11,13 @@ interface ErrorBoundaryState {
   error: Error | null
 }
 
+/** A dynamic-import failure for a chunk that was replaced by a newer deploy. */
+function isStaleChunkError(error: Error | null): boolean {
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(
+    error?.message ?? '',
+  )
+}
+
 /**
  * React Error Boundary that catches runtime errors in its child tree
  * and displays a styled Hebrew fallback UI.
@@ -30,9 +37,23 @@ export default class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('[ErrorBoundary]', error, info.componentStack)
+    // Stale-chunk error after a deploy: the old hashed chunk no longer exists,
+    // so retrying the render can never succeed — reload to get the new build.
+    // Rate-limited via sessionStorage so a genuinely broken build can't loop.
+    if (isStaleChunkError(error)) {
+      const last = Number(sessionStorage.getItem('chunk-reload-at') || 0)
+      if (Date.now() - last > 60_000) {
+        sessionStorage.setItem('chunk-reload-at', String(Date.now()))
+        window.location.reload()
+      }
+    }
   }
 
   private handleRetry = (): void => {
+    if (isStaleChunkError(this.state.error)) {
+      window.location.reload()
+      return
+    }
     this.setState({ hasError: false, error: null })
   }
 
