@@ -426,3 +426,26 @@ test('longest keyword wins across categories', () => {
   assert.equal(categorize('רמי לוי תקשורת בעמ'), 'שירותי תקשורת')
   assert.equal(categorize('רמי לוי שיווק השקמה'), 'מזון וצריכה')
 })
+
+// ── Stale foreign-exempt travel repair (retag path) ──────────────────────────
+test('refreshMiscCategories repairs pre-exemption travel rows', () => {
+  const txns = [
+    { 'תיאור': 'NETFLIX.COM 408-724-9160 NL', 'קטגוריה': 'טיסות ותיירות' },
+    { 'תיאור': 'RENDER.COM RENDER.COM US', 'קטגוריה': 'טיסות ותיירות' },
+    { 'תיאור': 'SHINSEGAE DEPARTMENT S SEOUL         KR', 'קטגוריה': 'טיסות ותיירות' }, // real trip spend
+    { 'תיאור': 'איסתא נסיעות', 'קטגוריה': 'טיסות ותיירות' }, // Hebrew — untouched
+  ]
+  const changed = refreshMiscCategories(txns, new Map())
+  assert.equal(changed, 2)
+  assert.equal(txns[0]['קטגוריה'], 'חשמל ומחשבים')
+  assert.equal(txns[1]['קטגוריה'], 'חשמל ומחשבים')
+  assert.equal(txns[2]['קטגוריה'], 'טיסות ותיירות')
+  assert.equal(txns[3]['קטגוריה'], 'טיסות ותיירות')
+})
+
+test('new dev/cloud merchants categorize as חשמל ומחשבים, not travel', () => {
+  assert.equal(categorize('RENDER.COM RENDER.COM US'), 'חשמל ומחשבים')
+  assert.equal(categorize('PAYPAL *DIGITALOCEA 4029357733 US'), 'חשמל ומחשבים')
+  assert.equal(categorize('ALLDEBRID MONTROUGE FR'), 'חשמל ומחשבים')
+  assert.equal(categorize('WSERBASE INC WWW.BROWSERBA US'), 'חשמל ומחשבים')
+})

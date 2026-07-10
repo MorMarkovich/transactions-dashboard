@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules, subcategorize, categoryFromIssuer, VALID_CATEGORIES } from './categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExempt, VALID_CATEGORIES } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -144,10 +144,15 @@ export function refreshMiscCategories(txns, ruleMap) {
   let changed = 0
   for (const t of txns) {
     const stored = t['קטגוריה'] || 'שונות'
+    const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
+    // Stale-row repair: rows the PRE-exemption foreign rule tagged as travel
+    // (NETFLIX.COM … NL etc.) carry a "real" category, so the normal skip
+    // below would keep them wrong forever. Re-categorize them like שונות.
+    const staleExemptTravel = stored === 'טיסות ותיירות'
+      && !/[֐-׿]/.test(baseDesc) && isForeignExempt(baseDesc)
     // Invalid stored categories ('אחר' from early AI runs) are junk — treat
     // them as שונות so the current catalog re-categorizes them.
-    if (stored !== 'שונות' && VALID_CATEGORIES.has(stored)) continue
-    const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
+    if (stored !== 'שונות' && VALID_CATEGORIES.has(stored) && !staleExemptTravel) continue
     let category = categorize(baseDesc)
     if (category === 'שונות') {
       // Same weak fallback as scrape time: the issuer's own sector, when the

@@ -69,6 +69,11 @@ def test_ai_audit_returns_only_disagreements(monkeypatch):
     assert p["proposed_category"] == "חשמל ומחשבים"
     assert p["confidence"] == 0.9
 
+    # Sweep support: the batch reports what it covered and what remains, so
+    # the client can advance to the next slice instead of re-auditing forever.
+    assert set(data["audited_merchants"]) == set(merchants)
+    assert data["remaining"] == 0
+
 
 def test_ai_audit_503_when_ai_unavailable(monkeypatch):
     sid = _restore(ROWS)

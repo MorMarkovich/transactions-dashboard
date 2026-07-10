@@ -70,3 +70,26 @@ def test_valid_rules_still_win_but_not_over_ai_tools():
     by_desc = _restore(rows, rules)
     assert by_desc["שופרסל דיל"]["קטגוריה"] == "מתנות"
     assert by_desc["OPENAI *CHATGPT"]["קטגוריה"] == "בינה מלאכותית"
+
+
+def test_stale_exempt_travel_rows_are_repaired():
+    """Rows tagged travel by the PRE-exemption foreign rule must migrate out:
+    only שונות rows are re-categorized downstream, so without the explicit
+    repair they'd stay in טיסות ותיירות forever."""
+    rows = [
+        {"תאריך": "2026-06-06", "תיאור": "NETFLIX.COM 408-724-9160 NL", "קטגוריה": "טיסות ותיירות", "סכום": -54.9},
+        {"תאריך": "2026-06-05", "תיאור": "RENDER.COM RENDER.COM US", "קטגוריה": "טיסות ותיירות", "סכום": -20.96},
+        {"תאריך": "2026-06-01", "תיאור": "PAYPAL *DIGITALOCEA 4029357733 US", "קטגוריה": "טיסות ותיירות", "סכום": -20.25},
+        {"תאריך": "2026-06-04", "תיאור": "ALLDEBRID MONTROUGE FR", "קטגוריה": "טיסות ותיירות", "סכום": -31.3},
+        # A genuine foreign purchase stays travel.
+        {"תאריך": "2026-06-02", "תיאור": "SHINSEGAE DEPARTMENT S SEOUL         KR", "קטגוריה": "טיסות ותיירות", "סכום": -320},
+        # A Hebrew merchant the user might have put in travel stays put.
+        {"תאריך": "2026-06-03", "תיאור": "איסתא נסיעות", "קטגוריה": "טיסות ותיירות", "סכום": -1500},
+    ]
+    by_desc = _restore(rows)
+    assert by_desc["NETFLIX.COM 408-724-9160 NL"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["RENDER.COM RENDER.COM US"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["PAYPAL *DIGITALOCEA 4029357733 US"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["ALLDEBRID MONTROUGE FR"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["SHINSEGAE DEPARTMENT S SEOUL         KR"]["קטגוריה"] == "טיסות ותיירות"
+    assert by_desc["איסתא נסיעות"]["קטגוריה"] == "טיסות ותיירות"

@@ -253,6 +253,10 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle',
         'epic games', 'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'discord',
         'אלקטרוניק', 'electronics', 'גיימינג', 'אודיו', 'audio',
+        # Dev/cloud + streaming-adjacent subscriptions ("DIGITALOCEA"/"BROWSERBA"
+        # are how the card descriptor truncates the full names).
+        'render.com', 'digitalocean', 'digitalocea', 'alldebrid',
+        'browserbase', 'browserba', 'televizo', 'iptv',
     ],
     'אופנה': [
         'זארה', 'zara', 'h&m', 'פול אנד בר', 'pull&bear',
@@ -468,6 +472,10 @@ FOREIGN_EXEMPT_KEYWORDS: list[str] = [
     'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'github', 'zoom',
     'linkedin', 'patreon', 'substack', 'audible', 'kindle', 'twitch',
     'discord', 'wolt', 'facebook', 'facebk', 'meta platforms',
+    # Dev/cloud subscriptions billed from abroad (Render/DigitalOcean bill
+    # from the US, AllDebrid from FR, …) — recurring services, not trip spend.
+    'render.com', 'digitalocean', 'digitalocea', 'alldebrid', 'browserbase',
+    'browserba', 'televizo', 'iptv',
 ]
 
 # ── Issuer category (ענף_מקור) → catalog category ───────────────────
