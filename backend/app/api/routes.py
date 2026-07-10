@@ -18,7 +18,7 @@ from ..services.data_loader import load_transaction_file
 from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
-    apply_issuer_category,
+    apply_issuer_category, normalize_merchant,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -259,8 +259,8 @@ async def restore_session(body: RestoreSessionRequest):
                 # Scan only the shrinking "שונות" subset: each keyword check
                 # touches just the still-uncategorized rows instead of the whole
                 # column. Snapshots arrive mostly pre-categorized, so this keeps
-                # the (now ~1000-keyword) catalog cheap. First keyword in dict
-                # order still wins, preserving behaviour.
+                # the (now ~1000-keyword) catalog cheap. KEYWORD_TO_CATEGORY is
+                # sorted longest-first, so the most specific keyword wins.
                 remaining = desc_lower[misc_mask]
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     if remaining.empty:
@@ -290,7 +290,11 @@ async def restore_session(body: RestoreSessionRequest):
             # the AI skips them. This way each merchant is web-searched at most
             # once. Rules also win over the keyword categorizer above.
             if body.category_rules:
-                desc_str = df['תיאור'].astype(str)
+                # Match rules on the canonical merchant key, not the raw
+                # descriptor: a rule saved from "רהיטים (תשלום 3/12)" must hit
+                # every installment, and "PAYPAL *SPOTIFY" must hit the bare
+                # variant too.
+                desc_norm = df['תיאור'].astype(str).map(normalize_merchant)
                 for r in body.category_rules:
                     if not r.merchant:
                         continue
@@ -299,7 +303,7 @@ async def restore_session(body: RestoreSessionRequest):
                     # would permanently override the real categorizer.
                     if r.category and r.category not in CATEGORY_ICONS:
                         continue
-                    rmask = desc_str == r.merchant
+                    rmask = desc_norm == normalize_merchant(r.merchant)
                     if not rmask.any():
                         continue
                     if r.category:

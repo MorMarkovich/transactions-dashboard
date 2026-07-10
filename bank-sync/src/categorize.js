@@ -192,8 +192,12 @@ function buildFlat(map) {
   return [...flat.entries()]
 }
 
-const KEYWORD_ENTRIES = buildFlat(CATEGORY_KEYWORDS)
-const EXACT_ENTRIES = buildFlat(EXACT_WORD_KEYWORDS)
+// Longest keyword wins (stable sort keeps catalog order for equal lengths) —
+// a more specific keyword must beat a shorter generic one regardless of which
+// category was declared first, e.g. 'רמי לוי תקשורת' (telecom) over 'רמי לוי'
+// (groceries). Mirrors the backend's sorted KEYWORD_TO_CATEGORY.
+const KEYWORD_ENTRIES = buildFlat(CATEGORY_KEYWORDS).sort((a, b) => b[0].length - a[0].length)
+const EXACT_ENTRIES = buildFlat(EXACT_WORD_KEYWORDS).sort((a, b) => b[0].length - a[0].length)
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -293,17 +297,44 @@ export function subcategorize(category, description) {
   return ''
 }
 
+const INSTALLMENT_SUFFIX = /\s*\(תשלום \d+\/\d+\)\s*$/
+const PROCESSOR_PREFIX = /^(?:PAYPAL|PP|GOOGLE|FACEBK|FB)\s*\*\s*/i
+
 /**
- * Apply user-defined merchant→category overrides (exact description match),
- * mirroring restore_session. `rules` is [{ merchant, category }].
+ * Canonical merchant key for rule matching — mirrors the backend's
+ * normalize_merchant, keep identical. The same purchase shows up under several
+ * descriptor variants (installment suffixes, "PAYPAL *" prefixes, ragged
+ * whitespace, case); a rule saved from one variant must hit all of them.
+ */
+export function normalizeMerchant(desc) {
+  let s = String(desc || '').trim()
+  s = s.replace(INSTALLMENT_SUFFIX, '')
+  s = s.replace(PROCESSOR_PREFIX, '')
+  s = s.replace(/\s+/g, ' ')
+  return s.toLowerCase().trim()
+}
+
+/**
+ * Build the rule lookup keyed by canonical merchant. Later rules win on a
+ * key collision (two stored variants of the same merchant).
+ */
+export function buildRuleMap(rules) {
+  return new Map((rules || []).map((r) => [normalizeMerchant(r.merchant), r.category]))
+}
+
+/**
+ * Apply user-defined merchant→category overrides (canonical-merchant match),
+ * mirroring restore_session. `ruleMap` must be built with buildRuleMap.
  */
 export function applyRules(category, description, ruleMap) {
-  if (!ruleMap || !ruleMap.has(description)) return category
+  if (!ruleMap) return category
+  const key = normalizeMerchant(description)
+  if (!ruleMap.has(key)) return category
   // AI-tool spend is unconditional — a stale rule (junk 'אחר' or a category
   // from before בינה מלאכותית existed) must not pull it out. Mirrors the
   // backend, where apply_ai_tool_override re-runs AFTER rules.
   if (category === AI_CATEGORY) return category
-  const ruled = ruleMap.get(description)
+  const ruled = ruleMap.get(key)
   // Rule hygiene: only catalog categories may be assigned (no 'אחר' junk).
   if (!VALID_CATEGORIES.has(ruled)) return category
   return ruled

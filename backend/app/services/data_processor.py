@@ -85,6 +85,26 @@ def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = N
     return df
 
 
+_INSTALLMENT_SUFFIX = re.compile(r'\s*\(תשלום \d+/\d+\)\s*$')
+_PROCESSOR_PREFIX = re.compile(r'^(?:PAYPAL|PP|GOOGLE|FACEBK|FB)\s*\*\s*', re.IGNORECASE)
+
+
+def normalize_merchant(desc) -> str:
+    """Canonical merchant key for rule matching.
+
+    The same purchase shows up under several descriptor variants — installment
+    suffixes ("... (תשלום 3/12)"), payment-processor prefixes ("PAYPAL *"),
+    ragged whitespace, case. A user rule saved from one variant must hit all of
+    them, so rules are matched on this key instead of the raw תיאור.
+    Mirrored in bank-sync categorize.js (normalizeMerchant) — keep identical.
+    """
+    s = str(desc or '').strip()
+    s = _INSTALLMENT_SUFFIX.sub('', s)
+    s = _PROCESSOR_PREFIX.sub('', s)
+    s = re.sub(r'\s+', ' ', s)
+    return s.lower().strip()
+
+
 def apply_issuer_category(df: pd.DataFrame) -> int:
     """Fill שונות rows from the card company's own classification (ענף_מקור).
 

@@ -9,6 +9,7 @@ import { getJSON, credKey, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
 import { PROVIDER_LABELS } from './providers.js'
 import { scrapeProvider } from './scrape.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
+import { buildRuleMap } from './categorize.js'
 import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 
@@ -52,7 +53,7 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
   ])
-  const ruleMap = new Map((rules || []).map((r) => [r.merchant, r.category]))
+  const ruleMap = buildRuleMap(rules)
 
   const freshTxns = []
   const byProvider = {}

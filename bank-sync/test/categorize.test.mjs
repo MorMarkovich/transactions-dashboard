@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { categorize, applyRules, subcategorize, categoryFromIssuer, VALID_CATEGORIES } from '../src/categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, normalizeMerchant, buildRuleMap, VALID_CATEGORIES } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots, refreshMiscCategories } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 import { detectOwner, JOINT } from '../src/owner.js'
@@ -398,4 +398,31 @@ test('refreshMiscCategories uses stored ענף_מקור for שונות rows', ()
   assert.equal(txns[0]['קטגוריה'], 'תחבורה ורכבים')
   assert.equal(txns[1]['קטגוריה'], 'שונות')
   assert.equal(txns[2]['קטגוריה'], 'ביטוח')
+})
+
+// ── Merchant normalization + canonical-key rules ─────────────────────────────
+test('normalizeMerchant canonicalizes descriptor variants', () => {
+  assert.equal(normalizeMerchant('רהיטי עצמל (תשלום 4/12)'), 'רהיטי עצמל')
+  assert.equal(normalizeMerchant('PAYPAL *SPOTIFY'), 'spotify')
+  assert.equal(normalizeMerchant('  ZARA   TLV  '), 'zara tlv')
+  assert.equal(normalizeMerchant('GOOGLE *YouTubePremium'), 'youtubepremium')
+  assert.equal(normalizeMerchant(''), '')
+})
+
+test('a rule saved from one installment hits every installment', () => {
+  const ruleMap = buildRuleMap([{ merchant: 'רהיטי עצמל (תשלום 1/12)', category: 'עיצוב הבית' }])
+  assert.equal(applyRules('שונות', 'רהיטי עצמל (תשלום 7/12)', ruleMap), 'עיצוב הבית')
+  assert.equal(applyRules('שונות', 'רהיטי עצמל', ruleMap), 'עיצוב הבית')
+})
+
+test('a rule matches across payment-processor prefixes and case', () => {
+  const ruleMap = buildRuleMap([{ merchant: 'PAYPAL *NINTENDO', category: 'חשמל ומחשבים' }])
+  assert.equal(applyRules('שונות', 'nintendo', ruleMap), 'חשמל ומחשבים')
+})
+
+test('longest keyword wins across categories', () => {
+  // 'רמי לוי תקשורת' (telecom) must beat the shorter 'רמי לוי' (groceries),
+  // whatever order the catalog declares the two categories in.
+  assert.equal(categorize('רמי לוי תקשורת בעמ'), 'שירותי תקשורת')
+  assert.equal(categorize('רמי לוי שיווק השקמה'), 'מזון וצריכה')
 })
