@@ -1,6 +1,8 @@
 """
 Application constants
 """
+from typing import Optional
+
 CATEGORY_ICONS = {
     'מזון וצריכה': '🛒',
     'מסעדות, קפה וברים': '☕',
@@ -454,6 +456,98 @@ FOREIGN_EXEMPT_KEYWORDS: list[str] = [
     'linkedin', 'patreon', 'substack', 'audible', 'kindle', 'twitch',
     'discord', 'wolt', 'facebook', 'facebk', 'meta platforms',
 ]
+
+# ── Issuer category (ענף_מקור) → catalog category ───────────────────
+# The card companies classify every transaction themselves (MAX sends a
+# category name with each transaction; Isracard exposes the merchant's ענף).
+# bank-sync stores it as ענף_מקור. It's a WEAK signal: applied only to rows
+# the keyword catalog left in שונות, and user rules still override it.
+# Matched by substring (first hit wins) because each issuer words its sector
+# names differently — order specific before generic (e.g. אלקטרוניקה before
+# חשמל, מזון מהיר before מזון). Mirrored in bank-sync categorize.js.
+ISSUER_CATEGORY_RULES: list[tuple[str, str]] = [
+    ('מזון מהיר', 'מסעדות, קפה וברים'),
+    ('מסעד', 'מסעדות, קפה וברים'),
+    ('בתי קפה', 'מסעדות, קפה וברים'),
+    ('בתי אוכל', 'מסעדות, קפה וברים'),
+    ('סופרמרקט', 'מזון וצריכה'),
+    ('רשתות שיווק', 'מזון וצריכה'),
+    ('מרכול', 'מזון וצריכה'),
+    ('מזון', 'מזון וצריכה'),
+    ('אלקטרוניקה', 'חשמל ומחשבים'),
+    ('מחשבים', 'חשמל ומחשבים'),
+    ('סלולר', 'שירותי תקשורת'),
+    ('תקשורת', 'שירותי תקשורת'),
+    ('דלק', 'דלק, חשמל וגז'),
+    ('תחנות תדלוק', 'דלק, חשמל וגז'),
+    ('גז', 'דלק, חשמל וגז'),
+    ('חשמל', 'דלק, חשמל וגז'),
+    ('תחבורה', 'תחבורה ורכבים'),
+    ('חניה', 'תחבורה ורכבים'),
+    ('חניונים', 'תחבורה ורכבים'),
+    ('מוניות', 'תחבורה ורכבים'),
+    ('רכב', 'תחבורה ורכבים'),
+    ('מוסך', 'תחבורה ורכבים'),
+    ('תעופה', 'טיסות ותיירות'),
+    ('טיסות', 'טיסות ותיירות'),
+    ('תיירות', 'טיסות ותיירות'),
+    ('מלונות', 'טיסות ותיירות'),
+    ('בתי מלון', 'טיסות ותיירות'),
+    ('נופש', 'טיסות ותיירות'),
+    ('ביגוד', 'אופנה'),
+    ('הלבשה', 'אופנה'),
+    ('הנעלה', 'אופנה'),
+    ('אופנה', 'אופנה'),
+    ('קוסמטיקה', 'אופנה'),
+    ('תכשיט', 'אופנה'),
+    ('ריהוט', 'עיצוב הבית'),
+    ('כלי בית', 'עיצוב הבית'),
+    ('בית וגן', 'עיצוב הבית'),
+    ('שיפוצים', 'עיצוב הבית'),
+    ('בריאות', 'רפואה ובתי מרקחת'),
+    ('רפואה', 'רפואה ובתי מרקחת'),
+    ('מרקחת', 'רפואה ובתי מרקחת'),
+    ('פארם', 'רפואה ובתי מרקחת'),
+    ('אופטיקה', 'רפואה ובתי מרקחת'),
+    ('פנאי', 'פנאי, בידור וספורט'),
+    ('בידור', 'פנאי, בידור וספורט'),
+    ('ספורט', 'פנאי, בידור וספורט'),
+    ('תרבות', 'פנאי, בידור וספורט'),
+    ('בילוי', 'פנאי, בידור וספורט'),
+    ('ביטוח', 'ביטוח'),
+    ('חינוך', 'חינוך ולימודים'),
+    ('לימודים', 'חינוך ולימודים'),
+    ('ספרים', 'חינוך ולימודים'),
+    ('צעצועים', 'חינוך ולימודים'),
+    ('חיות', 'חיות מחמד'),
+    ('עירייה', 'עירייה וממשלה'),
+    ('עיריות', 'עירייה וממשלה'),
+    ('ממשל', 'עירייה וממשלה'),
+    ('רשויות', 'עירייה וממשלה'),
+    ('מיסים', 'עירייה וממשלה'),
+    ('דואר', 'עירייה וממשלה'),
+    ('כספומט', 'משיכת מזומן'),
+    ('מזומן', 'משיכת מזומן'),
+    ('העברות', 'העברת כספים'),
+    ('העברת כספים', 'העברת כספים'),
+    ('מתנות', 'מתנות'),
+]
+
+
+def map_issuer_category(issuer_name) -> Optional[str]:
+    """Catalog category for an issuer sector name (ענף_מקור), or None.
+
+    Substring match, first rule wins. Only returns catalog categories, so the
+    result is always safe to assign.
+    """
+    s = str(issuer_name or '').strip()
+    if not s or s.lower() in ('nan', 'none', 'null'):
+        return None
+    for needle, category in ISSUER_CATEGORY_RULES:
+        if needle in s:
+            return category
+    return None
+
 
 # ── Subcategories (parent category → {subcategory → [keywords]}) ─────
 # Keyword-seeded subcategories, scoped to their parent category so they only

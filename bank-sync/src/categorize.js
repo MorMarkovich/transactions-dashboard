@@ -62,6 +62,93 @@ const AI_OVERRIDE_KEYWORDS = [
   'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
 ]
 
+// ── Issuer category (ענף_מקור) → catalog category ───────────────────
+// Mirrors constants.ISSUER_CATEGORY_RULES — keep identical. The card company's
+// own sector name for the merchant (MAX sends it with every transaction,
+// Isracard exposes it via the extra-info fetch). Weak signal: used only when
+// the keyword catalog leaves שונות; user rules still override it.
+// Substring match, first rule wins — specific before generic.
+const ISSUER_CATEGORY_RULES = [
+  ['מזון מהיר', 'מסעדות, קפה וברים'],
+  ['מסעד', 'מסעדות, קפה וברים'],
+  ['בתי קפה', 'מסעדות, קפה וברים'],
+  ['בתי אוכל', 'מסעדות, קפה וברים'],
+  ['סופרמרקט', 'מזון וצריכה'],
+  ['רשתות שיווק', 'מזון וצריכה'],
+  ['מרכול', 'מזון וצריכה'],
+  ['מזון', 'מזון וצריכה'],
+  ['אלקטרוניקה', 'חשמל ומחשבים'],
+  ['מחשבים', 'חשמל ומחשבים'],
+  ['סלולר', 'שירותי תקשורת'],
+  ['תקשורת', 'שירותי תקשורת'],
+  ['דלק', 'דלק, חשמל וגז'],
+  ['תחנות תדלוק', 'דלק, חשמל וגז'],
+  ['גז', 'דלק, חשמל וגז'],
+  ['חשמל', 'דלק, חשמל וגז'],
+  ['תחבורה', 'תחבורה ורכבים'],
+  ['חניה', 'תחבורה ורכבים'],
+  ['חניונים', 'תחבורה ורכבים'],
+  ['מוניות', 'תחבורה ורכבים'],
+  ['רכב', 'תחבורה ורכבים'],
+  ['מוסך', 'תחבורה ורכבים'],
+  ['תעופה', 'טיסות ותיירות'],
+  ['טיסות', 'טיסות ותיירות'],
+  ['תיירות', 'טיסות ותיירות'],
+  ['מלונות', 'טיסות ותיירות'],
+  ['בתי מלון', 'טיסות ותיירות'],
+  ['נופש', 'טיסות ותיירות'],
+  ['ביגוד', 'אופנה'],
+  ['הלבשה', 'אופנה'],
+  ['הנעלה', 'אופנה'],
+  ['אופנה', 'אופנה'],
+  ['קוסמטיקה', 'אופנה'],
+  ['תכשיט', 'אופנה'],
+  ['ריהוט', 'עיצוב הבית'],
+  ['כלי בית', 'עיצוב הבית'],
+  ['בית וגן', 'עיצוב הבית'],
+  ['שיפוצים', 'עיצוב הבית'],
+  ['בריאות', 'רפואה ובתי מרקחת'],
+  ['רפואה', 'רפואה ובתי מרקחת'],
+  ['מרקחת', 'רפואה ובתי מרקחת'],
+  ['פארם', 'רפואה ובתי מרקחת'],
+  ['אופטיקה', 'רפואה ובתי מרקחת'],
+  ['פנאי', 'פנאי, בידור וספורט'],
+  ['בידור', 'פנאי, בידור וספורט'],
+  ['ספורט', 'פנאי, בידור וספורט'],
+  ['תרבות', 'פנאי, בידור וספורט'],
+  ['בילוי', 'פנאי, בידור וספורט'],
+  ['ביטוח', 'ביטוח'],
+  ['חינוך', 'חינוך ולימודים'],
+  ['לימודים', 'חינוך ולימודים'],
+  ['ספרים', 'חינוך ולימודים'],
+  ['צעצועים', 'חינוך ולימודים'],
+  ['חיות', 'חיות מחמד'],
+  ['עירייה', 'עירייה וממשלה'],
+  ['עיריות', 'עירייה וממשלה'],
+  ['ממשל', 'עירייה וממשלה'],
+  ['רשויות', 'עירייה וממשלה'],
+  ['מיסים', 'עירייה וממשלה'],
+  ['דואר', 'עירייה וממשלה'],
+  ['כספומט', 'משיכת מזומן'],
+  ['מזומן', 'משיכת מזומן'],
+  ['העברות', 'העברת כספים'],
+  ['העברת כספים', 'העברת כספים'],
+  ['מתנות', 'מתנות'],
+]
+
+/**
+ * Catalog category for an issuer sector name (ענף_מקור), or null.
+ * Mirrors backend map_issuer_category. Substring match, first rule wins.
+ */
+export function categoryFromIssuer(issuerName) {
+  const s = String(issuerName || '').trim()
+  if (!s || ['nan', 'none', 'null'].includes(s.toLowerCase())) return null
+  for (const [needle, category] of ISSUER_CATEGORY_RULES) {
+    if (s.includes(needle)) return category
+  }
+  return null
+}
+
 // ── Valid categories (mirrors backend CATEGORY_ICONS keys) ──────────
 // Rules pointing anywhere else (e.g. 'אחר' persisted by early AI runs) are
 // junk and must not override the categorizer.

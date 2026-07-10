@@ -10,7 +10,7 @@ from ..core.constants import (
     CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
     KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
     AI_CATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
-    FOREIGN_EXEMPT_KEYWORDS,
+    FOREIGN_EXEMPT_KEYWORDS, map_issuer_category,
 )
 from .ai_categorizer import categorize_transactions
 
@@ -83,6 +83,28 @@ def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = N
     if ai_mask.any():
         df.loc[ai_mask, 'קטגוריה'] = AI_CATEGORY
     return df
+
+
+def apply_issuer_category(df: pd.DataFrame) -> int:
+    """Fill שונות rows from the card company's own classification (ענף_מקור).
+
+    The issuer category is a weak signal: it runs AFTER the keyword catalog
+    (only on rows still in שונות) and BEFORE user rules / the AI fallback, so
+    a curated keyword or an explicit user rule always beats it, and any row it
+    resolves is one less Claude query. Shared by process_data and
+    restore_session. Returns the number of rows filled.
+    """
+    if df.empty or 'ענף_מקור' not in df.columns or 'קטגוריה' not in df.columns:
+        return 0
+    misc_mask = df['קטגוריה'].astype(str) == 'שונות'
+    if not misc_mask.any():
+        return 0
+    mapped = df.loc[misc_mask, 'ענף_מקור'].map(map_issuer_category)
+    mapped = mapped.dropna()
+    if mapped.empty:
+        return 0
+    df.loc[mapped.index, 'קטגוריה'] = mapped
+    return int(len(mapped))
 
 
 def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
@@ -335,6 +357,19 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
             if hit.any():
                 result.loc[remaining.index[hit], 'קטגוריה'] = cat
                 remaining = remaining[~hit]
+
+    # Issuer classification (ענף_מקור) — the card company's own sector for the
+    # merchant. Fills only what the keyword catalog left in שונות, before the
+    # (much slower) AI fallback. Card exports carry it as an "ענף" column;
+    # bank-sync snapshots arrive with ענף_מקור already set.
+    if 'ענף_מקור' not in result.columns:
+        issuer_col = next(
+            (c for c in result.columns if isinstance(c, str) and 'ענף' in c),
+            None,
+        )
+        if issuer_col is not None:
+            result['ענף_מקור'] = result[issuer_col].astype(str).str.strip()
+    apply_issuer_category(result)
 
     # AI-powered categorization for remaining "שונות" transactions
     misc_mask = result['קטגוריה'] == 'שונות'

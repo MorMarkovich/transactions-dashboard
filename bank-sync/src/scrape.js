@@ -19,7 +19,7 @@ function companyId(provider) {
  * @param {{ monthsBack:number, showBrowser:boolean }} opts
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
-export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2, combineInstallments = false } = {}) {
+export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2, combineInstallments = false, additionalTransactionInformation = false } = {}) {
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
@@ -38,6 +38,10 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
     companyId: companyId(provider),
     startDate,
     combineInstallments,
+    // Isracard/Amex only: fetch each transaction's extra details (incl. the
+    // merchant's sector, exposed as txn.category). One extra request per
+    // transaction — keep off unless explicitly enabled (anti-bot risk).
+    additionalTransactionInformation,
     showBrowser,
     verbose: false,
     // Slow SPAs (Discount) need more than the 30s default; extend both the
