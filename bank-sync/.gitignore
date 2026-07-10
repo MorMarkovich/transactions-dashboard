@@ -10,3 +10,6 @@ node_modules/
 npm-debug.log*
 .DS_Store
 debug/
+
+# Golden labeled set for accuracy measurement (personal merchant names)
+golden.json
