@@ -54,6 +54,11 @@ export const config = {
   // false (default) = split installments so each monthly charge is its own line
   // on its billing date, matching the card statement. true = one combined line.
   combineInstallments: String(process.env.COMBINE_INSTALLMENTS || '').toLowerCase() === 'true',
+  // Fetch the issuer's own sector (ענף) per transaction from Isracard/Amex.
+  // MAX sends its category on every transaction for free, but Isracard needs
+  // one extra request per transaction — noticeably slower and more likely to
+  // trip the anti-bot 429, so it's opt-in: ISRACARD_EXTRA_INFO=true.
+  isracardExtraInfo: String(process.env.ISRACARD_EXTRA_INFO || '').toLowerCase() === 'true',
   // Owner name → keywords used to attribute joint-account rows to a person.
   ownerKeywords: parseOwnerKeywords(process.env.OWNER_KEYWORDS),
 }

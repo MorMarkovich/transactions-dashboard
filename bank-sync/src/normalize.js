@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules, subcategorize, VALID_CATEGORIES } from './categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, VALID_CATEGORIES } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -35,8 +35,18 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
   const baseDesc = (String(raw.description ?? '').trim()) || 'לא ידוע'
   const bankRow = isBankProvider(provider)
 
+  // The card company's own sector for the merchant (MAX sends it with every
+  // transaction; Isracard needs the opt-in extra-info fetch). Stored so the
+  // dashboard/retag can use it later, and used below as a weak fallback.
+  const issuerCategory = raw.category ? String(raw.category).trim() : ''
+
   // Categorize on the clean merchant name (before any installment suffix).
   let category = categorize(baseDesc)
+  if (category === 'שונות') {
+    // Issuer sector fills what the keyword catalog missed — weaker than the
+    // catalog and than user rules (applied next), mirroring the backend.
+    category = categoryFromIssuer(issuerCategory) || category
+  }
   category = applyRules(category, baseDesc, ruleMap)
   // Subcategory (קטגוריה_משנה) derived from the finalized category. The
   // dashboard re-derives this on restore too, so this is parity-only.
@@ -66,6 +76,8 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
     // (the existing "source" UI reads _source_file) and in `npm run verify`.
     '_source_file': acct.label || PROVIDER_LABELS[provider] || provider,
     '_provider': provider,
+    // Issuer's own sector name (may be '') — kept so retag/restore can use it.
+    'ענף_מקור': issuerCategory || null,
     // Owner attribution: personal account → its owner; joint → name-detected.
     '_owner': detectOwner(baseDesc, acct.owner, ownerKeywords),
   }
@@ -137,6 +149,11 @@ export function refreshMiscCategories(txns, ruleMap) {
     if (stored !== 'שונות' && VALID_CATEGORIES.has(stored)) continue
     const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
     let category = categorize(baseDesc)
+    if (category === 'שונות') {
+      // Same weak fallback as scrape time: the issuer's own sector, when the
+      // row carries one, beats leaving it uncategorized.
+      category = categoryFromIssuer(t['ענף_מקור']) || category
+    }
     category = applyRules(category, baseDesc, ruleMap)
     // An invalid stored category must not survive even when nothing matches —
     // reset it to שונות so the dashboard/AI treat it as uncategorized.

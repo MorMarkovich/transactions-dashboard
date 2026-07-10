@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { categorize, applyRules, subcategorize, VALID_CATEGORIES } from '../src/categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, VALID_CATEGORIES } from '../src/categorize.js'
 import { normalizeTxn, txnKey, mergeSnapshots, refreshMiscCategories } from '../src/normalize.js'
 import { applyIncomeMonthShift, isSalary } from '../src/income.js'
 import { detectOwner, JOINT } from '../src/owner.js'
@@ -339,4 +339,63 @@ test('txnKey + mergeSnapshots dedup, count, and reindex', () => {
   assert.equal(added, 2) // b once + c; bDup deduped
   assert.equal(merged.length, 3)
   assert.deepEqual(merged.map((t) => t.id), [0, 1, 2])
+})
+
+// ── Issuer category (ענף_מקור) fallback ──────────────────────────────────────
+test('categoryFromIssuer maps issuer sector names, specific before generic', () => {
+  assert.equal(categoryFromIssuer('מסעדות ובתי קפה'), 'מסעדות, קפה וברים')
+  assert.equal(categoryFromIssuer('מזון מהיר'), 'מסעדות, קפה וברים') // not מזון וצריכה
+  assert.equal(categoryFromIssuer('רשתות שיווק מזון'), 'מזון וצריכה')
+  assert.equal(categoryFromIssuer('חשמל ואלקטרוניקה'), 'חשמל ומחשבים') // not דלק/חשמל
+  assert.equal(categoryFromIssuer('תיירות ותעופה'), 'טיסות ותיירות')
+  assert.equal(categoryFromIssuer(''), null)
+  assert.equal(categoryFromIssuer(undefined), null)
+  assert.equal(categoryFromIssuer('ענף לא מוכר'), null)
+})
+
+test('normalizeTxn stores ענף_מקור and uses it only when keywords miss', () => {
+  // Unknown merchant + issuer sector → issuer category fills the gap.
+  const miss = normalizeTxn(
+    { date: '2024-01-10T12:00:00', chargedAmount: -80, description: 'העסק של יוסי', category: 'מסעדות' },
+    'max', new Map(),
+  )
+  assert.equal(miss['ענף_מקור'], 'מסעדות')
+  assert.equal(miss['קטגוריה'], 'מסעדות, קפה וברים')
+
+  // Known merchant → keyword catalog wins over the issuer sector.
+  const hit = normalizeTxn(
+    { date: '2024-01-10T12:00:00', chargedAmount: -80, description: 'שופרסל דיל', category: 'מסעדות' },
+    'max', new Map(),
+  )
+  assert.equal(hit['קטגוריה'], 'מזון וצריכה')
+
+  // No issuer data → field is null, category stays שונות.
+  const none = normalizeTxn(
+    { date: '2024-01-10T12:00:00', chargedAmount: -80, description: 'העסק של יוסי' },
+    'max', new Map(),
+  )
+  assert.equal(none['ענף_מקור'], null)
+  assert.equal(none['קטגוריה'], 'שונות')
+})
+
+test('user rule beats the issuer category', () => {
+  const rules = new Map([['העסק של יוסי', 'חינוך ולימודים']])
+  const t = normalizeTxn(
+    { date: '2024-01-10T12:00:00', chargedAmount: -80, description: 'העסק של יוסי', category: 'מסעדות' },
+    'max', rules,
+  )
+  assert.equal(t['קטגוריה'], 'חינוך ולימודים')
+})
+
+test('refreshMiscCategories uses stored ענף_מקור for שונות rows', () => {
+  const txns = [
+    { 'תיאור': 'העסק של יוסי', 'קטגוריה': 'שונות', 'ענף_מקור': 'מוסכים ורכב' },
+    { 'תיאור': 'עסק אחר', 'קטגוריה': 'שונות', 'ענף_מקור': 'ענף עלום' },
+    { 'תיאור': 'עסק שלישי', 'קטגוריה': 'ביטוח', 'ענף_מקור': 'מסעדות' }, // real category untouched
+  ]
+  const changed = refreshMiscCategories(txns, new Map())
+  assert.equal(changed, 1)
+  assert.equal(txns[0]['קטגוריה'], 'תחבורה ורכבים')
+  assert.equal(txns[1]['קטגוריה'], 'שונות')
+  assert.equal(txns[2]['קטגוריה'], 'ביטוח')
 })

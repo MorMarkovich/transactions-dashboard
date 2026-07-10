@@ -90,6 +90,7 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
         timeout: config.scrapeTimeout,
         navigationRetryCount: config.navRetryCount,
         combineInstallments: config.combineInstallments,
+        additionalTransactionInformation: config.isracardExtraInfo,
       })
       let count = 0
       for (const t of raw) {

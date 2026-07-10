@@ -18,6 +18,7 @@ from ..services.data_loader import load_transaction_file
 from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
+    apply_issuer_category,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -276,6 +277,12 @@ async def restore_session(body: RestoreSessionRequest):
                     if hit.any():
                         df.loc[remaining.index[hit], 'קטגוריה'] = cat
                         remaining = remaining[~hit]
+
+            # Issuer classification (ענף_מקור, stored by bank-sync): the card
+            # company's own sector fills whatever the keyword catalog left in
+            # שונות. Weaker than user rules (applied below, they overwrite) and
+            # cheaper than the AI fallback (fewer Claude queries).
+            apply_issuer_category(df)
 
             # Apply user-defined merchant→category rules BEFORE the AI step, so
             # rule-covered merchants — including ones the AI resolved on an
