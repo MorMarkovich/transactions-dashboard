@@ -80,6 +80,112 @@ USER_PROMPT_TEMPLATE = """סווג את העסקאות הבאות לקטגורי
 {transactions}"""
 
 
+AUDIT_PROMPT_TEMPLATE = """בדוק את הסיווג הנוכחי של בתי העסק הבאים (סיכום לכל בית עסק: שם, הסיווג הנוכחי, הענף לפי חברת האשראי אם ידוע, מספר עסקאות וסכום כולל בש"ח).
+
+לכל בית עסק: אם הסיווג הנוכחי נכון — החזר אותו כמו שהוא. אם הוא שגוי — החזר את הקטגוריה הנכונה מהרשימה. אל תמציא קטגוריות חדשות. אם אינך בטוח, החזר את הסיווג הנוכחי עם confidence נמוך.
+
+החזר מערך JSON בלבד (כבלוק הטקסט האחרון), בפורמט:
+[{{"index": 0, "category": "שם הקטגוריה", "confidence": 0.9, "reason": "הסבר קצר בעברית"}}, ...]
+
+בתי העסק:
+{merchants}"""
+
+
+def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
+    """Second-opinion pass over already-categorized merchants.
+
+    Unlike categorize_transactions (which only fills שונות), this reviews the
+    CURRENT category of each merchant and returns the category Claude believes
+    is correct, with a confidence and a short Hebrew reason. The caller decides
+    what to do with disagreements — nothing is applied here.
+
+    Args:
+        items: [{merchant, current, issuer, count, total}, ...]
+
+    Returns:
+        [{index, category, confidence, reason}, ...] or None if AI unavailable.
+    """
+    if not items:
+        return []
+    client = _get_client()
+    if client is None:
+        logger.info("AI audit skipped: ANTHROPIC_API_KEY not set")
+        return None
+
+    lines = []
+    for i, it in enumerate(items):
+        issuer = f", ענף לפי חברת האשראי: {it['issuer']}" if it.get('issuer') else ""
+        lines.append(
+            f"{i}. \"{it['merchant']}\" — סיווג נוכחי: {it['current']}{issuer}, "
+            f"{it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
+        )
+    user_prompt = AUDIT_PROMPT_TEMPLATE.format(merchants="\n".join(lines))
+
+    model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
+    use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
+    create_kwargs = {
+        'model': model,
+        'max_tokens': 8192,
+        'system': SYSTEM_PROMPT,
+        'messages': [{"role": "user", "content": user_prompt}],
+    }
+    if use_search:
+        create_kwargs['tools'] = [{
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": int(os.environ.get('AI_WEB_SEARCH_MAX', '8')),
+        }]
+
+    try:
+        try:
+            response = client.messages.create(**create_kwargs)
+        except Exception as tool_err:
+            if 'tools' not in create_kwargs:
+                raise
+            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
+            create_kwargs.pop('tools', None)
+            response = client.messages.create(**create_kwargs)
+
+        text = "".join(
+            getattr(b, "text", "") for b in response.content
+            if getattr(b, "type", "") == "text"
+        ).strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
+            text = text.strip()
+        try:
+            results = json.loads(text)
+        except json.JSONDecodeError:
+            start, end = text.find('['), text.rfind(']')
+            if start == -1 or end == -1 or end <= start:
+                raise
+            results = json.loads(text[start:end + 1])
+
+        out: list[dict] = []
+        for item in results:
+            idx = item.get("index")
+            cat = str(item.get("category", "")).strip()
+            if idx is None or cat not in VALID_CATEGORIES:
+                continue
+            try:
+                conf = min(1.0, max(0.0, float(item.get("confidence", 0.5))))
+            except (TypeError, ValueError):
+                conf = 0.5
+            out.append({
+                "index": int(idx),
+                "category": cat,
+                "confidence": conf,
+                "reason": str(item.get("reason", "")).strip(),
+            })
+        logger.info(f"AI audit returned {len(out)}/{len(items)} verdicts")
+        return out
+    except Exception as e:
+        logger.warning(f"AI audit failed: {e}")
+        return None
+
+
 def _get_client():
     """Get Anthropic client, returns None if API key not configured."""
     api_key = os.environ.get('ANTHROPIC_API_KEY')

@@ -20,6 +20,10 @@ import {
   Plus,
   Loader2,
   Receipt,
+  Sparkles,
+  Check,
+  X,
+  ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabaseApi } from '../services/supabaseApi'
@@ -29,6 +33,7 @@ import type {
   Income,
   SessionInfo,
   SessionFileInfo,
+  CategoryAuditProposal,
 } from '../services/types'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -311,6 +316,14 @@ export default function DataManagement() {
   const [filesExpanded, setFilesExpanded] = useState(true)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
 
+  // ── AI category audit (review queue) ────────────────────────────────
+  const [auditExpanded, setAuditExpanded] = useState(true)
+  const [auditing, setAuditing] = useState(false)
+  const [auditRan, setAuditRan] = useState(false)
+  const [auditedCount, setAuditedCount] = useState(0)
+  const [auditProposals, setAuditProposals] = useState<CategoryAuditProposal[]>([])
+  const [applyingMerchant, setApplyingMerchant] = useState<string | null>(null)
+
   // ── Fetch storage info ──────────────────────────────────────────────
   const fetchStorageInfo = useCallback(async () => {
     if (!user) return
@@ -373,6 +386,54 @@ export default function DataManagement() {
       setDeletingFile(null)
     }
   }, [sessionId, fetchSessionFiles, fetchSessionInfo, navigate])
+
+  // ── AI category audit handlers ──────────────────────────────────────
+  const runAudit = useCallback(async () => {
+    if (!sessionId || !user) return
+    setAuditing(true)
+    try {
+      // Merchants the user already decided (saved rules) are excluded — the
+      // audit is a second opinion on the automatic pipeline only.
+      const rules = await supabaseApi.getCategoryRules(user.id).catch(() => [])
+      const res = await transactionsApi.aiAudit(sessionId, rules.map((r) => r.merchant))
+      setAuditProposals(res.proposals)
+      setAuditedCount(res.audited_count)
+      setAuditRan(true)
+      showToast(
+        res.proposals.length
+          ? `נמצאו ${res.proposals.length} הצעות לתיקון מתוך ${res.audited_count} בתי עסק שנבדקו`
+          : `נבדקו ${res.audited_count} בתי עסק — הסיווג נראה תקין`,
+        'success',
+      )
+    } catch (err) {
+      console.error('AI audit failed:', err)
+      showToast('שגיאה בהרצת ביקורת ה-AI (ייתכן שה-AI אינו מוגדר בשרת)', 'error')
+    } finally {
+      setAuditing(false)
+    }
+  }, [sessionId, user, showToast])
+
+  const acceptProposal = useCallback(async (p: CategoryAuditProposal) => {
+    if (!sessionId || !user) return
+    setApplyingMerchant(p.merchant)
+    try {
+      const res = await transactionsApi.setMerchantCategory(sessionId, p.merchant, p.proposed_category)
+      // Persist as a merchant rule so restores and bank-sync honor it forever.
+      await supabaseApi.upsertCategoryRule(user.id, p.merchant, p.proposed_category)
+      setAuditProposals((prev) => prev.filter((x) => x.merchant !== p.merchant))
+      showToast(`עודכן: ${p.merchant} → ${p.proposed_category} (${res.affected_count} עסקאות)`, 'success')
+      fetchSessionInfo()
+    } catch (err) {
+      console.error('Accept proposal failed:', err)
+      showToast('שגיאה בהחלת ההצעה', 'error')
+    } finally {
+      setApplyingMerchant(null)
+    }
+  }, [sessionId, user, showToast, fetchSessionInfo])
+
+  const dismissProposal = useCallback((merchant: string) => {
+    setAuditProposals((prev) => prev.filter((x) => x.merchant !== merchant))
+  }, [])
 
   useEffect(() => {
     if (!user) {
@@ -647,6 +708,96 @@ export default function DataManagement() {
         </motion.div>
       )}
 
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/*  AI CATEGORY AUDIT (review queue)                              */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {sessionId && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22, duration: 0.35 }}
+          style={{ marginTop: 'var(--space-xl)' }}
+        >
+          <CollapsibleSection
+            icon={<Sparkles size={18} />}
+            iconColor="#a78bfa"
+            title="ביקורת קטגוריות (AI)"
+            badge={auditRan ? `${auditProposals.length} הצעות` : 'חוות דעת שנייה על הסיווג'}
+            expanded={auditExpanded}
+            onToggle={() => setAuditExpanded(!auditExpanded)}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0, flex: 1, minWidth: '240px' }}>
+                  Claude בודק את הסיווג של כל בתי העסק (לא רק שונות) — לפי השם, הענף של חברת האשראי
+                  והיקף ההוצאה — ומציע תיקונים. שום דבר לא משתנה בלי אישור שלך; הצעה שמאושרת נשמרת
+                  כחוק קבוע לבית העסק.
+                </p>
+                <Button variant="primary" size="sm" onClick={runAudit} disabled={auditing}>
+                  {auditing ? (<><Loader2 size={14} className="spin" /> בודק בתי עסק…</>) : (<><Sparkles size={14} /> הרץ ביקורת</>)}
+                </Button>
+              </div>
+
+              {auditRan && auditProposals.length === 0 && (
+                <div style={{ fontSize: '0.8125rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Check size={14} /> נבדקו {formatNumber(auditedCount)} בתי עסק — לא נמצאו תיקונים מוצעים.
+                </div>
+              )}
+
+              {auditProposals.map((p) => (
+                <Card key={p.merchant} variant="glass" padding="sm">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: '220px' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        {p.merchant}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '0.8125rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          {get_icon(p.current_category)} {p.current_category}
+                        </span>
+                        <ArrowLeft size={13} style={{ color: 'var(--text-muted)' }} />
+                        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                          {get_icon(p.proposed_category)} {p.proposed_category}
+                        </span>
+                        <span style={{ fontSize: '0.6875rem', padding: '1px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
+                          ביטחון {Math.round(p.confidence * 100)}%
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {formatNumber(p.count)} עסקאות · {formatCurrency(p.total)}
+                        {p.issuer_category ? ` · ענף: ${p.issuer_category}` : ''}
+                        {p.reason ? ` — ${p.reason}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => acceptProposal(p)}
+                        disabled={applyingMerchant !== null}
+                        title="אשר והחל על כל העסקאות של בית העסק"
+                      >
+                        {applyingMerchant === p.merchant ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+                        אשר
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => dismissProposal(p.merchant)}
+                        disabled={applyingMerchant !== null}
+                        title="דחה את ההצעה (הסיווג הנוכחי נשאר)"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </CollapsibleSection>
+        </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  SESSION DATA EXPLORER                                         */}

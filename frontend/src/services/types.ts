@@ -333,6 +333,18 @@ export interface MonthOverviewData {
   transaction_count: number
 }
 
+// AI category audit (second opinion over all expense merchants)
+export interface CategoryAuditProposal {
+  merchant: string
+  current_category: string
+  proposed_category: string
+  confidence: number
+  reason: string
+  count: number
+  total: number
+  issuer_category: string | null
+}
+
 // Drill-down: category transactions
 export interface CategoryTransactionsData {
   transactions: Transaction[]

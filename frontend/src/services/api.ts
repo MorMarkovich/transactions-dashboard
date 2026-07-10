@@ -24,6 +24,7 @@ import type {
   AnomalyData,
   SearchResult,
   MonthOverviewData,
+  CategoryAuditProposal,
   IndustryMonthlyData,
   CategorySnapshotData,
   CategoryTransactionsData,
@@ -93,6 +94,40 @@ export const transactionsApi = {
     const response = await api.post<{ ai_categorized?: { merchant: string; category: string }[] }>(
       '/api/ai-categorize',
       { session_id: sessionId },
+    );
+    return response.data;
+  },
+
+  /**
+   * AI audit: second opinion on ALL expense merchants (not just שונות).
+   * Returns proposals where Claude disagrees with the current category —
+   * nothing is applied until the user accepts a proposal.
+   */
+  aiAudit: async (
+    sessionId: string,
+    excludeMerchants: string[] = [],
+    limit = 60,
+  ): Promise<{ proposals: CategoryAuditProposal[]; audited_count: number }> => {
+    const response = await api.post<{ proposals: CategoryAuditProposal[]; audited_count: number }>(
+      '/api/ai-audit',
+      { session_id: sessionId, exclude_merchants: excludeMerchants, limit },
+      { timeout: 300000 }, // Claude + web search over dozens of merchants is slow
+    );
+    return response.data;
+  },
+
+  /**
+   * Reclassify every transaction of a merchant (canonical-key match) in the
+   * live session. Caller persists the same mapping as a Supabase rule.
+   */
+  setMerchantCategory: async (
+    sessionId: string,
+    merchant: string,
+    category: string,
+  ): Promise<{ success: boolean; merchant: string; category: string; affected_count: number }> => {
+    const response = await api.post<{ success: boolean; merchant: string; category: string; affected_count: number }>(
+      '/api/merchants/category',
+      { session_id: sessionId, merchant, category },
     );
     return response.data;
   },

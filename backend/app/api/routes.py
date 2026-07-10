@@ -22,9 +22,9 @@ from ..services.data_processor import (
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
-    CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog,
+    CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog, AI_CATEGORY,
 )
-from ..services.ai_categorizer import categorize_transactions
+from ..services.ai_categorizer import categorize_transactions, audit_merchants
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -914,6 +914,149 @@ def ai_categorize(body: AICategorizeRequest):
                 derive_subcategory(df)
 
     return {"success": True, "ai_categorized": ai_categorized}
+
+
+class AIAuditRequest(BaseModel):
+    session_id: str
+    limit: int = 60
+    exclude_merchants: list[str] = []
+
+
+@router.post("/ai-audit")
+def ai_audit(body: AIAuditRequest):
+    """Second-opinion audit of ALL expense merchants (not just שונות).
+
+    Groups the session's expense rows by canonical merchant, sends each
+    merchant's current category + issuer sector (ענף_מקור) + volume to Claude,
+    and returns only the DISAGREEMENTS as proposals — nothing is applied.
+    The user reviews them in the dashboard; an accepted proposal becomes a
+    merchant rule via /merchants/category + the client-side rule upsert.
+    Sync (non-async) on purpose, like /ai-categorize: the Anthropic call
+    blocks, so FastAPI runs it in its threadpool.
+    """
+    df = sessions.get(body.session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return {"success": True, "proposals": [], "audited_count": 0}
+
+    expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
+    if expenses.empty:
+        return {"success": True, "proposals": [], "audited_count": 0}
+
+    excluded = {normalize_merchant(m) for m in (body.exclude_merchants or [])}
+
+    # Group by canonical merchant: representative raw name (most frequent),
+    # current category (most frequent), volume, issuer sector when present.
+    merchants: dict[str, dict] = {}
+    has_issuer = 'ענף_מקור' in expenses.columns
+    for _, row in expenses.iterrows():
+        raw = str(row.get('תיאור', '')).strip()
+        key = normalize_merchant(raw)
+        if not key or key in excluded:
+            continue
+        cat = str(row.get('קטגוריה', 'שונות'))
+        # Unconditional overrides can't be changed by a rule — auditing them
+        # would only produce dead proposals.
+        if cat == AI_CATEGORY:
+            continue
+        m = merchants.setdefault(key, {
+            "merchant": raw, "current": cat, "count": 0, "total": 0.0,
+            "issuer": None, "_names": {}, "_cats": {},
+        })
+        m["count"] += 1
+        try:
+            m["total"] += abs(float(row.get('סכום', 0) or 0))
+        except (TypeError, ValueError):
+            pass
+        m["_names"][raw] = m["_names"].get(raw, 0) + 1
+        m["_cats"][cat] = m["_cats"].get(cat, 0) + 1
+        if has_issuer and not m["issuer"]:
+            issuer = row.get('ענף_מקור')
+            if issuer is not None and str(issuer).strip() and str(issuer).lower() not in ('nan', 'none'):
+                m["issuer"] = str(issuer).strip()
+
+    items = []
+    for m in merchants.values():
+        m["merchant"] = max(m["_names"], key=m["_names"].get)
+        m["current"] = max(m["_cats"], key=m["_cats"].get)
+        del m["_names"], m["_cats"]
+        items.append(m)
+
+    # Biggest spend first — the merchants where a wrong category distorts the
+    # charts most. `limit` caps the Claude batch; run again for the next slice.
+    items.sort(key=lambda m: m["total"], reverse=True)
+    items = items[: max(1, min(int(body.limit or 60), 200))]
+
+    verdicts = audit_merchants(items)
+    if verdicts is None:
+        raise HTTPException(status_code=503, detail="AI is not configured (ANTHROPIC_API_KEY)")
+
+    proposals = []
+    for v in verdicts:
+        i = v["index"]
+        if not (0 <= i < len(items)):
+            continue
+        it = items[i]
+        if v["category"] == it["current"] or v["category"] == 'שונות':
+            continue
+        proposals.append({
+            "merchant": it["merchant"],
+            "current_category": it["current"],
+            "proposed_category": v["category"],
+            "confidence": v["confidence"],
+            "reason": v["reason"],
+            "count": it["count"],
+            "total": round(_sanitize(float(it["total"])), 2),
+            "issuer_category": it["issuer"],
+        })
+    proposals.sort(key=lambda p: (p["confidence"], p["total"]), reverse=True)
+    return {"success": True, "proposals": proposals, "audited_count": len(items)}
+
+
+class UpdateMerchantCategoryRequest(BaseModel):
+    session_id: str
+    merchant: str
+    category: str
+
+
+@router.post("/merchants/category")
+async def update_merchant_category(body: UpdateMerchantCategoryRequest):
+    """Reclassify EVERY transaction of a merchant (canonical-key match) in the
+    live session — one decision per merchant, applied everywhere. The frontend
+    persists the same mapping as a user_category_rules row so it survives
+    restores and reaches bank-sync."""
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    new_category = (body.category or '').strip()
+    if not new_category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+    if new_category not in CATEGORY_ICONS:
+        raise HTTPException(status_code=400, detail="Unknown category")
+
+    df = sessions[body.session_id]
+    if 'תיאור' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session has no descriptions")
+
+    key = normalize_merchant(body.merchant)
+    mask = df['תיאור'].astype(str).map(normalize_merchant) == key
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Merchant not found")
+
+    df.loc[mask, 'קטגוריה'] = new_category
+    # The old subcategory belonged to the old category; re-derive from scratch.
+    if 'קטגוריה_משנה' in df.columns:
+        df.loc[mask, 'קטגוריה_משנה'] = ''
+        derive_subcategory(df)
+    sessions[body.session_id] = df
+
+    return {
+        "success": True,
+        "merchant": body.merchant,
+        "category": new_category,
+        "affected_count": int(mask.sum()),
+    }
 
 
 @router.get("/metrics")
