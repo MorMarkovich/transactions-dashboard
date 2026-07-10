@@ -417,10 +417,23 @@ for _cat, _keywords in _CATEGORY_KEYWORDS.items():
     for _kw in _keywords:
         KEYWORD_TO_CATEGORY[_kw.lower().strip()] = _cat
 
-# Build exact-word lookup
+# Longest keyword wins. Both pipelines scan this dict in order and stop at the
+# first hit, so ordering IS the matching policy: a longer (more specific)
+# keyword must beat a shorter generic one regardless of which category was
+# declared first — e.g. 'רמי לוי תקשורת' (telecom) must win over 'רמי לוי'
+# (groceries) for a "רמי לוי תקשורת בעמ" charge. The sort is stable, so
+# same-length keywords keep catalog order. Mirrored in bank-sync categorize.js.
+KEYWORD_TO_CATEGORY = dict(
+    sorted(KEYWORD_TO_CATEGORY.items(), key=lambda kv: len(kv[0]), reverse=True)
+)
+
+# Build exact-word lookup (same longest-first policy for consistency)
 for _cat, _keywords in _EXACT_WORD_KEYWORDS.items():
     for _kw in _keywords:
         EXACT_WORD_KEYWORDS[_kw.lower()] = _cat
+EXACT_WORD_KEYWORDS = dict(
+    sorted(EXACT_WORD_KEYWORDS.items(), key=lambda kv: len(kv[0]), reverse=True)
+)
 
 
 # ── AI tools → dedicated category ───────────────────────────────────

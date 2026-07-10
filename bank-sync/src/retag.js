@@ -12,6 +12,7 @@ import { getJSON, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 import { detectOwner } from './owner.js'
 import { refreshMiscCategories } from './normalize.js'
+import { buildRuleMap } from './categorize.js'
 
 const ils = (n) =>
   `${n < 0 ? '-' : ''}${Math.abs(n).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₪`
@@ -49,7 +50,7 @@ async function main() {
     getCategoryRules(supabase, userId),
   ])
   if (!txns.length) { console.log('\nNo transactions to retag.'); return }
-  const ruleMap = new Map((rules || []).map((r) => [r.merchant, r.category]))
+  const ruleMap = buildRuleMap(rules)
 
   let changed = 0
   const before = {}
