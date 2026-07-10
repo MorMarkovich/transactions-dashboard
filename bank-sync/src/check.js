@@ -7,10 +7,13 @@
 // "שונות", applies your category rules). Those don't change counts/totals
 // materially for these checks, but it's why a number here can differ slightly
 // from the dashboard.
+import { readFileSync, existsSync } from 'node:fs'
+import path from 'node:path'
 import { config, assertConfig } from './config.js'
 import { getJSON, SUPABASE_AUTH_KEY } from './secrets.js'
 import { signIn, getLatestSnapshot } from './supabaseClient.js'
 import { txnKey } from './normalize.js'
+import { categorize, categoryFromIssuer, normalizeMerchant } from './categorize.js'
 import { SALARY_KEYWORDS, isSalary } from './income.js'
 
 const ils = (n) =>
@@ -185,6 +188,58 @@ async function main() {
   // These are uncategorized too, but handled elsewhere — not a catalog gap.
   if (income.length) ok(`(${income.length} income row(s) in שונות — shown in income views, not expenses.)`)
   if (cardBills.length) ok(`(${cardBills.length} card-bill payment(s) in שונות — stripped by the dashboard to avoid double counting.)`)
+
+  // 5c. Pipeline accuracy vs the golden labeled set (if the user keeps one).
+  // golden.json (gitignored) maps merchant → the CORRECT category, curated by
+  // the user via `npm run golden`. We re-run the automatic pipeline (keyword
+  // catalog + issuer fallback — no user rules, we're measuring the automation)
+  // over each labeled merchant and report the hit rate, so catalog changes are
+  // regression-tested against real data instead of gut feeling.
+  section('Categorization accuracy (golden set)')
+  const goldenPath = path.resolve(process.cwd(), 'golden.json')
+  if (!existsSync(goldenPath)) {
+    ok('No golden.json — run `npm run golden` to create a labeled set and measure accuracy here.')
+  } else {
+    let golden = null
+    try {
+      golden = JSON.parse(readFileSync(goldenPath, 'utf8'))
+      if (!Array.isArray(golden)) throw new Error('expected a JSON array')
+    } catch (e) {
+      fail(`golden.json is not readable: ${e.message}`)
+    }
+    if (Array.isArray(golden) && golden.length) {
+      // Snapshot row per merchant, preferring one that carries the issuer
+      // sector (ענף_מקור) so the fallback is measured too.
+      const rowByKey = new Map()
+      for (const t of txns) {
+        const key = normalizeMerchant(t['תיאור'])
+        const cur = rowByKey.get(key)
+        if (!cur || (!cur['ענף_מקור'] && t['ענף_מקור'])) rowByKey.set(key, t)
+      }
+      let right = 0
+      const misses = []
+      for (const g of golden) {
+        if (!g?.merchant || !g?.category) continue
+        const row = rowByKey.get(normalizeMerchant(g.merchant))
+        let predicted = categorize(g.merchant)
+        if (predicted === 'שונות') predicted = categoryFromIssuer(row?.['ענף_מקור']) || predicted
+        if (predicted === g.category) right++
+        else misses.push({ merchant: g.merchant, expected: g.category, got: predicted })
+      }
+      const total = right + misses.length
+      const pct = total ? Math.round((right / total) * 100) : 0
+      const msg = `pipeline accuracy: ${right}/${total} (${pct}%) on your labeled merchants`
+      if (pct >= 90) ok(msg)
+      else if (pct >= 75) warn(`${msg} — see the mismatches below.`)
+      else fail(`${msg} — the catalog needs work; see below.`)
+      for (const m of misses.slice(0, 15)) {
+        console.log(`    • ${m.merchant}: expected ${m.expected}, pipeline says ${m.got}`)
+      }
+      if (misses.length > 15) console.log(`    … and ${misses.length - 15} more mismatch(es)`)
+    } else if (golden) {
+      ok('golden.json is empty — run `npm run golden` to seed it.')
+    }
+  }
 
   // 6. Outliers + future dates
   section('Outliers & dates')
