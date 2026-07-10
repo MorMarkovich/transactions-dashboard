@@ -388,21 +388,37 @@ export default function DataManagement() {
   }, [sessionId, fetchSessionFiles, fetchSessionInfo, navigate])
 
   // ── AI category audit handlers ──────────────────────────────────────
+  // Sweeps ALL merchants: keeps requesting the next slice (feeding back the
+  // already-audited names as exclusions) until the backend reports nothing
+  // remains. Proposals stream into the list as each batch lands.
   const runAudit = useCallback(async () => {
     if (!sessionId || !user) return
     setAuditing(true)
+    setAuditRan(false)
+    setAuditProposals([])
+    setAuditedCount(0)
     try {
       // Merchants the user already decided (saved rules) are excluded — the
       // audit is a second opinion on the automatic pipeline only.
       const rules = await supabaseApi.getCategoryRules(user.id).catch(() => [])
-      const res = await transactionsApi.aiAudit(sessionId, rules.map((r) => r.merchant))
-      setAuditProposals(res.proposals)
-      setAuditedCount(res.audited_count)
+      let exclude = rules.map((r) => r.merchant)
+      let audited = 0
+      const all: CategoryAuditProposal[] = []
+      // Hard ceiling on batches as a runaway guard (200 × 60 ≫ any real book).
+      for (let batch = 0; batch < 200; batch++) {
+        const res = await transactionsApi.aiAudit(sessionId, exclude)
+        all.push(...res.proposals)
+        audited += res.audited_count
+        exclude = exclude.concat(res.audited_merchants || [])
+        setAuditProposals([...all])
+        setAuditedCount(audited)
+        if (!res.audited_count || !res.remaining) break
+      }
       setAuditRan(true)
       showToast(
-        res.proposals.length
-          ? `נמצאו ${res.proposals.length} הצעות לתיקון מתוך ${res.audited_count} בתי עסק שנבדקו`
-          : `נבדקו ${res.audited_count} בתי עסק — הסיווג נראה תקין`,
+        all.length
+          ? `נבדקו כל ${audited} בתי העסק — ${all.length} הצעות לתיקון`
+          : `נבדקו כל ${audited} בתי העסק — הסיווג נראה תקין`,
         'success',
       )
     } catch (err) {
@@ -735,7 +751,9 @@ export default function DataManagement() {
                   כחוק קבוע לבית העסק.
                 </p>
                 <Button variant="primary" size="sm" onClick={runAudit} disabled={auditing}>
-                  {auditing ? (<><Loader2 size={14} className="spin" /> בודק בתי עסק…</>) : (<><Sparkles size={14} /> הרץ ביקורת</>)}
+                  {auditing
+                    ? (<><Loader2 size={14} className="spin" /> בודק את כל בתי העסק…{auditedCount > 0 ? ` (${auditedCount} נבדקו)` : ''}</>)
+                    : (<><Sparkles size={14} /> הרץ ביקורת מלאה</>)}
                 </Button>
               </div>
 

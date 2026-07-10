@@ -57,7 +57,21 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
         # Online services (Netflix/Spotify/PayPal…) bill from abroad year-round;
         # they are not trip spend, so they keep falling through to the keyword
         # catalog instead of the travel bucket.
-        foreign_mask &= ~desc_lower.str.contains(_FOREIGN_EXEMPT_PATTERN, na=False, regex=True)
+        exempt_mask = desc_lower.str.contains(_FOREIGN_EXEMPT_PATTERN, na=False, regex=True)
+        foreign_mask &= ~exempt_mask
+
+        # Stale-row repair: rows tagged travel by the PRE-exemption foreign rule
+        # (e.g. "NETFLIX.COM … NL" stored as טיסות ותיירות) stay wrong forever
+        # otherwise — only שונות rows get re-categorized downstream. Reset
+        # exempt-matching foreign-looking travel rows to שונות so the keyword
+        # pass reclaims them (user rules still apply afterwards and win).
+        stale_exempt = (
+            (df['קטגוריה'].astype(str) == 'טיסות ותיירות')
+            & exempt_mask
+            & ~desc.str.contains(r'[֐-׿]', regex=True, na=False)
+        )
+        if stale_exempt.any():
+            df.loc[stale_exempt, 'קטגוריה'] = 'שונות'
     if foreign_mask.any():
         df.loc[foreign_mask, 'קטגוריה'] = 'טיסות ותיירות'
 

@@ -107,8 +107,18 @@ export const transactionsApi = {
     sessionId: string,
     excludeMerchants: string[] = [],
     limit = 60,
-  ): Promise<{ proposals: CategoryAuditProposal[]; audited_count: number }> => {
-    const response = await api.post<{ proposals: CategoryAuditProposal[]; audited_count: number }>(
+  ): Promise<{
+    proposals: CategoryAuditProposal[];
+    audited_count: number;
+    audited_merchants: string[];
+    remaining: number;
+  }> => {
+    const response = await api.post<{
+      proposals: CategoryAuditProposal[];
+      audited_count: number;
+      audited_merchants: string[];
+      remaining: number;
+    }>(
       '/api/ai-audit',
       { session_id: sessionId, exclude_merchants: excludeMerchants, limit },
       { timeout: 300000 }, // Claude + web search over dozens of merchants is slow

@@ -938,11 +938,13 @@ def ai_audit(body: AIAuditRequest):
     if df is None:
         raise HTTPException(status_code=404, detail="Session not found")
     if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
-        return {"success": True, "proposals": [], "audited_count": 0}
+        return {"success": True, "proposals": [], "audited_count": 0,
+                "audited_merchants": [], "remaining": 0}
 
     expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
     if expenses.empty:
-        return {"success": True, "proposals": [], "audited_count": 0}
+        return {"success": True, "proposals": [], "audited_count": 0,
+                "audited_merchants": [], "remaining": 0}
 
     excluded = {normalize_merchant(m) for m in (body.exclude_merchants or [])}
 
@@ -986,6 +988,7 @@ def ai_audit(body: AIAuditRequest):
     # Biggest spend first — the merchants where a wrong category distorts the
     # charts most. `limit` caps the Claude batch; run again for the next slice.
     items.sort(key=lambda m: m["total"], reverse=True)
+    total_eligible = len(items)
     items = items[: max(1, min(int(body.limit or 60), 200))]
 
     verdicts = audit_merchants(items)
@@ -1011,7 +1014,17 @@ def ai_audit(body: AIAuditRequest):
             "issuer_category": it["issuer"],
         })
     proposals.sort(key=lambda p: (p["confidence"], p["total"]), reverse=True)
-    return {"success": True, "proposals": proposals, "audited_count": len(items)}
+    return {
+        "success": True,
+        "proposals": proposals,
+        "audited_count": len(items),
+        # Everything this batch covered — the client feeds these back as
+        # exclude_merchants to advance to the NEXT slice (without this,
+        # repeated runs re-audit the same top-spend merchants forever).
+        "audited_merchants": [it["merchant"] for it in items],
+        # How many eligible merchants remain un-audited after this batch.
+        "remaining": max(0, total_eligible - len(items)),
+    }
 
 
 class UpdateMerchantCategoryRequest(BaseModel):
