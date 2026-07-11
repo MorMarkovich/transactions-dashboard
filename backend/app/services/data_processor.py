@@ -141,6 +141,56 @@ def apply_issuer_category(df: pd.DataFrame) -> int:
     return int(len(mapped))
 
 
+def apply_trip_window_heuristic(df: pd.DataFrame) -> int:
+    """שונות rows that are almost certainly trip spend → טיסות ותיירות.
+
+    Overseas card rows normally carry a trailing 2-letter country code, but
+    some processors truncate it ("CHARM BKK", "SHAKE SHACK SENTOS"). Anchor on
+    rows that DID match the foreign rule (latin-only + country suffix) and
+    sweep: a latin-only, non-exempt שונות row within ±3 days of an anchor was
+    spent on the same trip. Deterministic, runs before user rules (which can
+    still override) and before the AI fallback (fewer Claude queries).
+    Returns the number of rows moved.
+    """
+    if df.empty or 'תאריך' not in df.columns or 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return 0
+    desc = df['תיאור'].astype(str)
+    has_hebrew = desc.str.contains(r'[֐-׿]', regex=True, na=False)
+    has_latin = desc.str.contains(r'[A-Za-z]', regex=True, na=False)
+    foreign_suffix = desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
+
+    anchors = df.loc[
+        (df['קטגוריה'].astype(str) == 'טיסות ותיירות') & ~has_hebrew & has_latin & foreign_suffix,
+        'תאריך',
+    ].dropna()
+    if anchors.empty:
+        return 0
+
+    candidates = (df['קטגוריה'].astype(str) == 'שונות') & ~has_hebrew & has_latin
+    if _FOREIGN_EXEMPT_PATTERN:
+        candidates &= ~desc.str.lower().str.contains(_FOREIGN_EXEMPT_PATTERN, na=False, regex=True)
+    if not candidates.any():
+        return 0
+
+    window = pd.Timedelta(days=3)
+    anchor_values = anchors.sort_values().to_numpy()
+    changed = 0
+    for idx in df.index[candidates]:
+        d = df.at[idx, 'תאריך']
+        if pd.isna(d):
+            continue
+        pos = anchor_values.searchsorted(pd.Timestamp(d).to_datetime64())
+        near = []
+        if pos > 0:
+            near.append(anchor_values[pos - 1])
+        if pos < len(anchor_values):
+            near.append(anchor_values[pos])
+        if any(abs(pd.Timestamp(a) - pd.Timestamp(d)) <= window for a in near):
+            df.at[idx, 'קטגוריה'] = 'טיסות ותיירות'
+            changed += 1
+    return changed
+
+
 def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
     """Populate the קטגוריה_משנה (subcategory) column from SUBCATEGORY_KEYWORDS.
 
