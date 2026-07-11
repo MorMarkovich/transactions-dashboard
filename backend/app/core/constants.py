@@ -96,6 +96,8 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'railninja', 'rail ninja', 'rajadha', 'olive young', 'lottebaikhoajeom',
     ],
     'מזון וצריכה': [
+        # Discount variety / stock stores — household consumption, not fashion.
+        'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock',
         # ── Supermarkets & grocery ──
         'שופרסל', 'רמי לוי', 'מגה', 'יוחננוף', 'אושר עד', 'חצי חינם',
         'ויקטורי', 'טיב טעם', 'פרש מרקט', 'סופר', 'מכולת', 'קרפור',
@@ -284,8 +286,8 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'תכשיט', 'jewelry', 'pandora', 'פנדורה', 'magnolia', 'מגנוליה',
         'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה',
         'body shop', 'laline', 'ללין',
-        'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק סנטר', 'סטוק פקטורי',
-        'booom', 'זול סטוק', 'קוסמטיקס', 'pedro pps',
+        'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק פקטורי',
+        'קוסמטיקס', 'pedro pps',
     ],
     'עיצוב הבית': [
         'איקאה', 'ikea', 'הום סנטר', 'home center',
@@ -591,6 +593,8 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
         # of אלכוהול ומשקאות — first subcategory wins).
         'פארם וטיפוח': ['סופר פארם', 'סופר-פארם', 'super pharm', 'superpharm',
                           'super-pharm', 'גוד פארם', 'good pharm', 'ניו פארם'],
+        'חנויות סטוק': ['סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק',
+                          'max stock', 'זול בשפע', 'כלבו חצי חינם'],
         'סופרים': ['שופרסל', 'shufersal', 'רמי לוי', 'rami levy', 'ויקטורי',
                     'victory', 'יינות ביתן', 'טיב טעם', 'tiv taam', 'אושר עד',
                     'osher ad', 'חצי חינם', 'יוחננוף', 'yochananof', 'קרפור',
@@ -631,7 +635,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
                           'מנגו', 'mango', 'ברשקה', 'bershka', 'פול אנד בר',
                           'pull&bear', 'pull and bear', 'טרמינל', 'terminal x',
                           'אורבניקה', 'urbanica', 'אמריקן איגל', 'american eagle',
-                          'ריזרבד', 'reserved', 'הודיס', 'hoodies', 'booom',
+                          'ריזרבד', 'reserved', 'הודיס', 'hoodies',
                           'טוונטי פור סבן', 'twentyfourseven', 'delta', 'דלתא',
                           'intima', 'אינטימה'],
         'נעליים': ['נעלי', 'shoes', 'סקצ', 'skechers', 'nike', 'נייק',
@@ -692,7 +696,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
 
 # Optional emoji per seeded subcategory (UI nicety; falls back in the UI).
 SUBCATEGORY_ICONS: dict[str, str] = {
-    'סופרים': '🛒', 'מאפיות': '🥐', 'פארם וטיפוח': '🧴',
+    'סופרים': '🛒', 'מאפיות': '🥐', 'פארם וטיפוח': '🧴', 'חנויות סטוק': '🧺',
     'קופות חולים': '🏥', 'בתי מרקחת': '💊',
     'רשתות אופנה': '👕', 'נעליים': '👟', 'קוסמטיקה': '💄', 'תכשיטים ואקססוריז': '💍',
     'כבישי אגרה': '🛣️', 'חניונים': '🅿️', 'תחבורה ציבורית': '🚌', 'מוניות ונסיעות': '🚕', 'מוסכים וטיפולים': '🔧',
