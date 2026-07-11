@@ -30,6 +30,13 @@ def test_ai_override_beats_foreign_card():
     assert df['קטגוריה'].iloc[0] == AI_CATEGORY
 
 
+def test_grammarly_is_an_ai_tool():
+    # Real descriptor from the 2026-07 sync review ("GRAMMARLY CO ELTR6V9").
+    df = pd.DataFrame({'תיאור': ['GRAMMARLY CO ELTR6V9'], 'קטגוריה': ['שונות']})
+    apply_unconditional_overrides(df)
+    assert df['קטגוריה'].iloc[0] == AI_CATEGORY
+
+
 @pytest.mark.asyncio
 async def test_ai_override_beats_user_rules_in_restore():
     """AI-tool spend is unconditional: stale rules (persisted before בינה
