@@ -352,5 +352,10 @@ export function applyRules(category, description, ruleMap) {
   const ruled = ruleMap.get(key)
   // Rule hygiene: only catalog categories may be assigned (no 'אחר' junk).
   if (!VALID_CATEGORIES.has(ruled)) return category
+  // The keyword catalog is the source of truth: when it has an opinion
+  // (category !== שונות), a conflicting rule is stale (an old AI guess
+  // persisted as a rule) and is ignored. Rules decide only merchants the
+  // catalog doesn't know. Mirrors the backend restore.
+  if (category !== 'שונות' && category !== ruled) return category
   return ruled
 }

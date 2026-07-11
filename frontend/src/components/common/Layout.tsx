@@ -26,6 +26,9 @@ export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const hasTriedRestore = useRef(false)
+  // Background-AI progress pill: null = hidden.
+  const [aiStatus, setAiStatus] = useState<{ label: string; done?: boolean } | null>(null)
+  const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Block rendering children until a stale session_id is verified/restored
   const [sessionValidating, setSessionValidating] = useState(() => {
     const params = new URLSearchParams(window.location.search)
@@ -112,38 +115,7 @@ export default function Layout({ children }: LayoutProps) {
             // background — restore no longer waits for it, so the app paints
             // immediately. Resolved merchants are persisted as rules so each
             // is identified once, and open pages are told to refetch.
-            transactionsApi
-              .aiCategorize(response.session_id)
-              .then(ai => {
-                if (ai.ai_categorized?.length) {
-                  supabaseApi
-                    .upsertCategoryRules(user.id, ai.ai_categorized)
-                    .catch(() => {}) // best-effort; categories already applied this session
-                  window.dispatchEvent(new CustomEvent('ai-categorized'))
-                }
-              })
-              .catch(() => {}) // AI is an enhancement — never block the app on it
-              .then(() => {
-                // Automatic subcategory sweep — runs after the category pass
-                // (so newly categorized merchants get subcategorized too).
-                // Per-merchant server caching + the rules persisted here keep
-                // repeat loads cheap: each merchant is resolved once, ever.
-                if (!response.session_id) return
-                return transactionsApi
-                  .aiSubcategorizeAll(response.session_id)
-                  .then(async res => {
-                    const assignments = res.assignments ?? []
-                    for (const a of assignments) {
-                      await supabaseApi
-                        .upsertCategorySubrule(user.id, a.merchant, a.category, a.subcategory)
-                        .catch(() => {}) // best-effort; already applied this session
-                    }
-                    if (assignments.length) {
-                      window.dispatchEvent(new CustomEvent('ai-categorized'))
-                    }
-                  })
-              })
-              .catch(() => {}) // never block the app on the AI chain
+            runAiChain(response.session_id, user.id)
           }
         })
         .catch(() => {}) // Silent fail — user can upload a new file
@@ -173,6 +145,76 @@ export default function Layout({ children }: LayoutProps) {
         }
       })
   }, [user, searchParams, navigate])
+
+  // ── Fully automatic background AI chain ──────────────────────────────
+  // categorize (שונות → web-verified categories) → subcategorize everything →
+  // audit (second opinion, auto-applied only where the keyword catalog is
+  // silent and confidence is high). A floating pill shows live progress from
+  // GET /ai-progress so it's visible that cataloging is running / finished.
+  const runAiChain = useCallback(async (sessionId: string, userId: string) => {
+    const poll = async () => {
+      try {
+        const p = await transactionsApi.aiProgress(sessionId)
+        if (p.stage === 'categorizing') {
+          setAiStatus({ label: p.total ? `מסווג עסקים… ${p.done}/${p.total}` : 'מסווג עסקים…' })
+        } else if (p.stage === 'subcategorizing') {
+          setAiStatus({ label: `מפלח תתי-קטגוריות… ${p.done + 1}/${p.total}${p.detail ? ` · ${p.detail}` : ''}` })
+        }
+      } catch { /* progress is cosmetic */ }
+    }
+    setAiStatus({ label: 'מסווג עסקים…' })
+    aiPollRef.current = setInterval(poll, 2000)
+    try {
+      // 1) categories for whatever is still שונות (unknowns web-verified)
+      try {
+        const ai = await transactionsApi.aiCategorize(sessionId)
+        if (ai.ai_categorized?.length) {
+          supabaseApi.upsertCategoryRules(userId, ai.ai_categorized).catch(() => {})
+          window.dispatchEvent(new CustomEvent('ai-categorized'))
+        }
+      } catch { /* AI is an enhancement — never block the app on it */ }
+
+      // 2) subcategories for every category, automatically
+      try {
+        const res = await transactionsApi.aiSubcategorizeAll(sessionId)
+        const assignments = res.assignments ?? []
+        for (const a of assignments) {
+          await supabaseApi
+            .upsertCategorySubrule(userId, a.merchant, a.category, a.subcategory)
+            .catch(() => {})
+        }
+        if (assignments.length) window.dispatchEvent(new CustomEvent('ai-categorized'))
+      } catch { /* ignore */ }
+
+      // 3) automatic accuracy audit: second opinion on stored categories the
+      // keyword catalog can't govern; only high-confidence verdicts applied.
+      setAiStatus({ label: 'בודק דיוק סיווגים…' })
+      try {
+        const audit = await transactionsApi.aiAudit(sessionId)
+        const applicable = (audit.proposals ?? []).filter(
+          (pr) => !pr.catalog_hit && pr.confidence >= 0.85,
+        )
+        for (const pr of applicable) {
+          try {
+            await transactionsApi.setMerchantCategory(sessionId, pr.merchant, pr.proposed_category)
+            await supabaseApi
+              .upsertCategoryRule(userId, pr.merchant, pr.proposed_category)
+              .catch(() => {})
+          } catch { /* per-merchant best effort */ }
+        }
+        if (applicable.length) window.dispatchEvent(new CustomEvent('ai-categorized'))
+      } catch { /* ignore */ }
+    } finally {
+      if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null }
+      setAiStatus({ label: 'הקיטלוג הסתיים ✓', done: true })
+      setTimeout(() => setAiStatus(null), 6000)
+    }
+  }, [])
+
+  // Clear the poller on unmount.
+  useEffect(() => () => {
+    if (aiPollRef.current) clearInterval(aiPollRef.current)
+  }, [])
 
   const toggleSidebar = useCallback(() => {
     setSidebarOpen((prev) => !prev)
@@ -258,6 +300,53 @@ export default function Layout({ children }: LayoutProps) {
         onClose={() => setCommandPaletteOpen(false)}
       />
       <QuickActions />
+
+      {/* Background-AI progress pill — visible while the automatic
+          categorize → subcategorize → audit chain runs, then "done". */}
+      <AnimatePresence>
+        {aiStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            style={{
+              position: 'fixed',
+              bottom: 16,
+              right: 16,
+              zIndex: 9999,
+              direction: 'rtl',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-full, 999px)',
+              border: '1px solid var(--glass-border, var(--border))',
+              background: 'var(--glass-bg-hover, var(--glass-bg))',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              boxShadow: 'var(--elevation-2, 0 4px 12px rgba(0,0,0,0.25))',
+              color: 'var(--text-primary)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+            }}
+          >
+            {!aiStatus.done && (
+              <span
+                style={{
+                  width: 12,
+                  height: 12,
+                  border: '2px solid var(--border)',
+                  borderTopColor: 'var(--accent)',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            <span>{aiStatus.label}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

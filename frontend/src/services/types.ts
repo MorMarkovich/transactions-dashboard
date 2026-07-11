@@ -343,6 +343,9 @@ export interface CategoryAuditProposal {
   count: number
   total: number
   issuer_category: string | null
+  /** The keyword catalog has an opinion on this merchant — the automatic
+   *  background audit must not fight it (the catalog governs on restore). */
+  catalog_hit?: boolean
 }
 
 // Drill-down: category transactions

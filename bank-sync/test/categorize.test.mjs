@@ -114,9 +114,12 @@ test('rules cannot pull AI-tool spend out of בינה מלאכותית', () => {
   assert.equal(applyRules(cat, 'CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US', stale), 'בינה מלאכותית')
 })
 
-test('valid user rules still win over the keyword catalog', () => {
-  const rules = new Map([['שופרסל דיל', 'מתנות']])
-  assert.equal(applyRules(categorize('שופרסל דיל'), 'שופרסל דיל', rules), 'מתנות')
+test('the catalog beats a conflicting rule; rules decide catalog-unknowns', () => {
+  // A rule contradicting a keyword hit is stale (old AI guess) — ignored.
+  const rules = new Map([['שופרסל דיל', 'מתנות'], ['מרצדס בנץ', 'תחבורה ורכבים']])
+  assert.equal(applyRules(categorize('שופרסל דיל'), 'שופרסל דיל', rules), 'מזון וצריכה')
+  // The catalog has no opinion on this merchant — the rule decides.
+  assert.equal(applyRules(categorize('מרצדס בנץ'), 'מרצדס בנץ', rules), 'תחבורה ורכבים')
 })
 
 test('L.B.Y therapy gets the טיפול זוגי subcategory', () => {
@@ -170,16 +173,16 @@ test('refreshMiscCategories: the catalog repairs a stale stored category on expe
     { 'תיאור': 'סיטי מרקט רמת גן', 'קטגוריה': 'משיכת מזומן', 'קטגוריה_משנה': 'ישן', 'סכום': -13.9 },
     // Income row (refund) with the same descriptor — never second-guessed.
     { 'תיאור': 'סיטי מרקט רמת גן', 'קטגוריה': 'העברת כספים', 'סכום': 100 },
-    // A user rule still beats the catalog repair.
+    // A stale rule pinning a catalog-known merchant loses to the catalog too.
     { 'תיאור': 'רמי לוי שיווק', 'קטגוריה': 'משיכת מזומן', 'סכום': -80 },
   ]
   const rules = new Map([['רמי לוי שיווק', 'משיכת מזומן']])
   const changed = refreshMiscCategories(txns, rules)
-  assert.equal(changed, 1)
+  assert.equal(changed, 2)
   assert.equal(txns[0]['קטגוריה'], 'מזון וצריכה')
   assert.notEqual(txns[0]['קטגוריה_משנה'], 'ישן')
   assert.equal(txns[1]['קטגוריה'], 'העברת כספים')
-  assert.equal(txns[2]['קטגוריה'], 'משיכת מזומן')
+  assert.equal(txns[2]['קטגוריה'], 'מזון וצריכה')
 })
 
 test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
@@ -234,11 +237,11 @@ test('expanded catalog: common Israeli merchants resolve out of שונות', () 
   assert.equal(categorize('תאגיד מים מי אביבים'), 'עירייה וממשלה')
 })
 
-test('user rule overrides keyword category', () => {
-  const ruleMap = new Map([['שופרסל דיל', 'מתנות']])
+test('a rule agreeing with the catalog is a no-op; a conflicting one loses', () => {
   const base = categorize('שופרסל דיל')
   assert.equal(base, 'מזון וצריכה')
-  assert.equal(applyRules(base, 'שופרסל דיל', ruleMap), 'מתנות')
+  assert.equal(applyRules(base, 'שופרסל דיל', new Map([['שופרסל דיל', 'מזון וצריכה']])), 'מזון וצריכה')
+  assert.equal(applyRules(base, 'שופרסל דיל', new Map([['שופרסל דיל', 'מתנות']])), 'מזון וצריכה')
 })
 
 // ── Owner attribution ──────────────────────────────────────────────────────

@@ -59,10 +59,34 @@ def test_income_rows_never_second_guessed():
     assert _cats(sid)[1]["קטגוריה"] == "העברת כספים"
 
 
-def test_user_rule_beats_catalog_repair():
+def test_stale_rule_cannot_fight_the_catalog():
+    # The old AI persisted its wrong guess as a RULE too — the catalog now
+    # wins over conflicting rules, so the merchant still heals.
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": "סיטי מרקט רמת גן",
           "קטגוריה": "משיכת מזומן", "סכום": -13.9}],
         rules=[{"merchant": "סיטי מרקט רמת גן", "category": "משיכת מזומן"}],
     )
-    assert _cats(sid)[1]["קטגוריה"] == "משיכת מזומן"
+    assert _cats(sid)[1]["קטגוריה"] == "מזון וצריכה"
+
+
+def test_rule_still_decides_catalog_unknown_merchant():
+    sid = _restore(
+        [{"id": 1, "תאריך": "2026-07-05", "תיאור": "ZZQWX UNKNOWN CO",
+          "קטגוריה": "שונות", "סכום": -50.0}],
+        rules=[{"merchant": "ZZQWX UNKNOWN CO", "category": "מתנות"}],
+    )
+    assert _cats(sid)[1]["קטגוריה"] == "מתנות"
+
+
+def test_rule_subcategory_still_applies_on_catalog_known_merchant():
+    # Only the CATEGORY part of a conflicting rule is ignored — a manual
+    # subcategory refinement on a catalog-known merchant must stick.
+    sid = _restore(
+        [{"id": 1, "תאריך": "2026-07-05", "תיאור": "שופרסל דיל",
+          "קטגוריה": "מזון וצריכה", "סכום": -120.0}],
+        rules=[{"merchant": "שופרסל דיל", "category": "מזון וצריכה", "subcategory": "קניות שבת"}],
+    )
+    row = _cats(sid)[1]
+    assert row["קטגוריה"] == "מזון וצריכה"
+    assert row["קטגוריה_משנה"] == "קניות שבת"
