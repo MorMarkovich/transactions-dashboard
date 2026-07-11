@@ -484,3 +484,11 @@ test('subcategorize: Food → סופרים; chain with יין substring stays a 
   // parent's submap, so the chain must win.
   assert.equal(subcategorize('מזון וצריכה', 'יינות ביתן בע"מ'), 'סופרים')
 })
+
+test('delivery descriptors are food orders, not transport', () => {
+  assert.equal(categorize('מפגש גרונר משלוחים'), 'מסעדות, קפה וברים')
+  assert.equal(categorize('משלוחה הזמנת אוכל או'), 'מסעדות, קפה וברים')
+  // Real toll/road rows stay transport.
+  assert.equal(categorize('כביש 6 חוצה צפון בע"מ'), 'תחבורה ורכבים')
+  assert.equal(categorize('מ.תחבורה ? רב-פס'), 'תחבורה ורכבים')
+})

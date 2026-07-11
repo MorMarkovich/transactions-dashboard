@@ -90,3 +90,31 @@ def test_rule_subcategory_still_applies_on_catalog_known_merchant():
     row = _cats(sid)[1]
     assert row["קטגוריה"] == "מזון וצריכה"
     assert row["קטגוריה_משנה"] == "קניות שבת"
+
+
+def test_delivery_descriptors_are_food_not_transport():
+    # 'משלוח' used to sit in תחבורה ורכבים and dragged food deliveries there.
+    sid = _restore([
+        {"id": 1, "תאריך": "2026-07-01", "תיאור": "מפגש גרונר משלוחים",
+         "קטגוריה": "תחבורה ורכבים", "סכום": -59.0},
+        {"id": 2, "תאריך": "2026-06-29", "תיאור": "משלוחה הזמנת אוכל או",
+         "קטגוריה": "תחבורה ורכבים", "סכום": -91.43},
+        {"id": 3, "תאריך": "2026-06-21", "תיאור": "כביש 6", "קטגוריה": "שונות", "סכום": -37.35},
+    ])
+    cats = _cats(sid)
+    assert cats[1]["קטגוריה"] == "מסעדות, קפה וברים"
+    assert cats[2]["קטגוריה"] == "מסעדות, קפה וברים"
+    assert cats[3]["קטגוריה"] == "תחבורה ורכבים"
+
+
+def test_rule_subcategory_is_scoped_to_its_parent_category():
+    # The rule was saved when the merchant sat in מזון וצריכה; after the
+    # catalog moves it to מסעדות, the food-voucher subcategory must NOT leak.
+    sid = _restore(
+        [{"id": 1, "תאריך": "2026-07-01", "תיאור": "מפגש גרונר משלוחים",
+          "קטגוריה": "שונות", "סכום": -59.0}],
+        rules=[{"merchant": "מפגש גרונר משלוחים", "category": "מזון וצריכה", "subcategory": "שוברי מזון"}],
+    )
+    row = _cats(sid)[1]
+    assert row["קטגוריה"] == "מסעדות, קפה וברים"
+    assert (row.get("קטגוריה_משנה") or "") != "שוברי מזון"

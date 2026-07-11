@@ -349,11 +349,17 @@ async def restore_session(body: RestoreSessionRequest):
                     if r.category:
                         df.loc[rmask & ~catalog_known_mask, 'קטגוריה'] = r.category
                     # Manual subcategory override (preserved over keyword
-                    # derivation below, same precedence as the category rule).
+                    # derivation below). Scoped to the rule's parent category:
+                    # if the row ended up in a DIFFERENT category (catalog
+                    # repair, override), the old subcategory no longer belongs
+                    # ("שוברי מזון" must not appear under תחבורה ורכבים).
                     if getattr(r, 'subcategory', None):
                         if 'קטגוריה_משנה' not in df.columns:
                             df['קטגוריה_משנה'] = ''
-                        df.loc[rmask, 'קטגוריה_משנה'] = r.subcategory
+                        sub_mask = rmask
+                        if r.category:
+                            sub_mask = rmask & (df['קטגוריה'].astype(str) == r.category)
+                        df.loc[sub_mask, 'קטגוריה_משנה'] = r.subcategory
 
             # AI-tool spend is unconditional — re-assert it AFTER rules so a
             # stale rule (e.g. Claude → 'חשמל ומחשבים' from before the category
