@@ -178,6 +178,12 @@ const SUBCATEGORY_KEYWORDS = {
     'אלכוהול ומשקאות': ['יין', 'wine', 'אלכוהול', 'משקאות', 'יקב', 'בירה', 'beer'],
     'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי', '10bis', 'תנביס'],
   },
+  'חשמל ומחשבים': {
+    'סטרימינג': ['netflix', 'נטפליקס', 'disney', 'דיסני', 'hbo', 'youtube', 'יוטיוב', 'spotify', 'ספוטיפיי', 'apple tv', 'prime video', 'אמזון פריים', 'apple.com/bill', 'crunchyroll', 'twitch'],
+    'שירותי ענן': ['digitalocean', 'render.com', 'scrapingbee', 'aws', 'amazon web', 'google cloud', 'azure', 'github', 'gitlab', 'vercel', 'netlify', 'heroku', 'cloudflare', 'google one', 'icloud', 'dropbox', 'onedrive', 'microsoft', 'office 365', 'גוגל אחסון', 'wix', 'godaddy', 'namecheap', 'alldebrid'],
+    'חנויות חשמל': ['שקם אלקטריק', 'מחסני חשמל', 'באג', 'bug', 'ksp', 'אייבורי', 'ivory', 'אלקטרה', 'זאפ', 'שיא החשמל', 'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price', 'לאסט פרייס'],
+    'קניות אונליין': ['aliexpress', 'עלי אקספרס', 'amazon', 'אמזון', 'ebay', 'איביי', 'temu', 'טמו', 'banggood', 'gearbest', 'shein'],
+  },
   'פנאי, בידור וספורט': {
     'קולנוע': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד', 'סינמטק'],
     'מופעים והופעות': ['הופעה', 'מופע', 'הצגה', 'תיאטרון', 'eventim', 'כרטיסים', 'היכל התרבות', 'זאפה', 'zappa', 'ברבי', 'barby', 'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא'],

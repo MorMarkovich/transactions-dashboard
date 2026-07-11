@@ -600,6 +600,25 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
         'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
                         '10bis', 'תנביס'],
     },
+    'חשמל ומחשבים': {
+        'סטרימינג': ['netflix', 'נטפליקס', 'disney', 'דיסני', 'hbo',
+                      'youtube', 'יוטיוב', 'spotify', 'ספוטיפיי', 'apple tv',
+                      'prime video', 'אמזון פריים', 'apple.com/bill',
+                      'crunchyroll', 'twitch'],
+        'שירותי ענן': ['digitalocean', 'render.com', 'scrapingbee', 'aws',
+                        'amazon web', 'google cloud', 'azure', 'github',
+                        'gitlab', 'vercel', 'netlify', 'heroku', 'cloudflare',
+                        'google one', 'icloud', 'dropbox', 'onedrive',
+                        'microsoft', 'office 365', 'גוגל אחסון', 'wix',
+                        'godaddy', 'namecheap', 'alldebrid'],
+        'חנויות חשמל': ['שקם אלקטריק', 'מחסני חשמל', 'באג', 'bug', 'ksp',
+                         'אייבורי', 'ivory', 'אלקטרה', 'זאפ', 'שיא החשמל',
+                         'idigital', 'איי דיגיטל', 'istore', 'מקסטור',
+                         'last price', 'לאסט פרייס'],
+        'קניות אונליין': ['aliexpress', 'עלי אקספרס', 'amazon', 'אמזון',
+                           'ebay', 'איביי', 'temu', 'טמו', 'banggood',
+                           'gearbest', 'shein'],
+    },
     'פנאי, בידור וספורט': {
         'קולנוע': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן',
                     'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד',
@@ -621,7 +640,8 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
 
 # Optional emoji per seeded subcategory (UI nicety; falls back in the UI).
 SUBCATEGORY_ICONS: dict[str, str] = {
-    'סופרים': '🛒', 'מאפיות': '🥐', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
+    'סופרים': '🛒', 'מאפיות': '🥐',
+    'סטרימינג': '📺', 'שירותי ענן': '☁️', 'חנויות חשמל': '🔌', 'קניות אונליין': '📦', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
     'שוברי מזון': '🎫',
     'קולנוע': '🎬', 'מופעים והופעות': '🎭', 'ספורט וכושר': '🏋️',
     'אטרקציות': '🎡',
