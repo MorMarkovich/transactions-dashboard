@@ -457,6 +457,7 @@ AI_OVERRIDE_KEYWORDS: list[str] = [
     'github copilot', 'copilot', 'cursor ai', 'cursor.com', 'cursor.so',
     'google gemini', 'gemini.google', 'jasper.ai', 'poe.com',
     'replicate.com', 'leonardo.ai', 'lovable.dev', 'suno.ai', 'suno.com',
+    'grammarly',
 ]
 
 # ── Foreign-card exemptions ──────────────────────────────────────────

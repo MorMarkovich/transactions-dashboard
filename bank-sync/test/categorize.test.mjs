@@ -172,6 +172,8 @@ test('AI tools get the dedicated בינה מלאכותית category', () => {
   assert.equal(categorize('OPENAI *CHATGPT'), 'בינה מלאכותית')
   assert.equal(categorize('Claude.ai subscription'), 'בינה מלאכותית')
   assert.equal(categorize('MIDJOURNEY'), 'בינה מלאכותית')
+  // Real descriptor from the 2026-07 sync review.
+  assert.equal(categorize('GRAMMARLY CO ELTR6V9'), 'בינה מלאכותית')
 })
 
 test('AI override beats the foreign-card descriptor', () => {
