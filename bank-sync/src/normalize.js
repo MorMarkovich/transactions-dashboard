@@ -134,11 +134,14 @@ export function mergeSnapshots(existing, fresh) {
 }
 
 /**
- * Re-run the keyword catalog over snapshot rows still stuck in שונות, so newly
- * added catalog keywords reach already-stored rows without re-scraping the
- * banks (mergeSnapshots never overwrites existing fields). Rows that already
- * carry a real category are left untouched — user/AI decisions win.
- * Returns the number of rows re-categorized.
+ * Re-run the keyword catalog over the stored snapshot (no bank login).
+ * שונות / invalid rows are re-categorized as before; additionally, for
+ * EXPENSE rows the catalog is the source of truth — a stored category that
+ * contradicts a current keyword hit is stale (an old catalog version or an
+ * old AI guess; mergeSnapshots never overwrites stored fields) and is
+ * repaired. Rows the catalog has no opinion on keep their stored category,
+ * income rows are never second-guessed, and user rules still win over
+ * everything. Returns the number of rows re-categorized.
  */
 export function refreshMiscCategories(txns, ruleMap) {
   let changed = 0
@@ -146,27 +149,34 @@ export function refreshMiscCategories(txns, ruleMap) {
     const stored = t['קטגוריה'] || 'שונות'
     const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
     // Stale-row repair: rows the PRE-exemption foreign rule tagged as travel
-    // (NETFLIX.COM … NL etc.) carry a "real" category, so the normal skip
-    // below would keep them wrong forever. Re-categorize them like שונות.
+    // (NETFLIX.COM … NL etc.) carry a "real" category, so keeping the stored
+    // value would leave them wrong forever. Re-categorize them like שונות.
     const staleExemptTravel = stored === 'טיסות ותיירות'
       && !/[֐-׿]/.test(baseDesc) && isForeignExempt(baseDesc)
     // Invalid stored categories ('אחר' from early AI runs) are junk — treat
     // them as שונות so the current catalog re-categorizes them.
-    if (stored !== 'שונות' && VALID_CATEGORIES.has(stored) && !staleExemptTravel) continue
+    const isMisc = stored === 'שונות' || !VALID_CATEGORIES.has(stored) || staleExemptTravel
+    const isExpense = Number(t['סכום']) < 0
+    if (!isMisc && !isExpense) continue
     let category = categorize(baseDesc)
-    if (category === 'שונות') {
-      // Same weak fallback as scrape time: the issuer's own sector, when the
-      // row carries one, beats leaving it uncategorized.
-      category = categoryFromIssuer(t['ענף_מקור']) || category
+    if (isMisc) {
+      if (category === 'שונות') {
+        // Same weak fallback as scrape time: the issuer's own sector, when the
+        // row carries one, beats leaving it uncategorized.
+        category = categoryFromIssuer(t['ענף_מקור']) || category
+      }
+    } else if (category === 'שונות') {
+      // The catalog has no opinion on this stored expense — keep it (a user
+      // rule below may still override).
+      category = stored
     }
     category = applyRules(category, baseDesc, ruleMap)
     // An invalid stored category must not survive even when nothing matches —
     // reset it to שונות so the dashboard/AI treat it as uncategorized.
     if (category === stored) continue
     t['קטגוריה'] = category
-    if (category !== 'שונות' && !t['קטגוריה_משנה']) {
-      t['קטגוריה_משנה'] = subcategorize(category, baseDesc)
-    }
+    // The old subcategory belonged to the old category — re-derive.
+    t['קטגוריה_משנה'] = category !== 'שונות' ? subcategorize(category, baseDesc) : ''
     changed++
   }
   return changed

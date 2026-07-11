@@ -255,19 +255,34 @@ async def restore_session(body: RestoreSessionRequest):
             apply_unconditional_overrides(df)
             desc_lower = df['תיאור'].str.lower()
             misc_mask = df['קטגוריה'] == 'שונות'
-            if misc_mask.any():
-                # Scan only the shrinking "שונות" subset: each keyword check
-                # touches just the still-uncategorized rows instead of the whole
-                # column. Snapshots arrive mostly pre-categorized, so this keeps
-                # the (now ~1000-keyword) catalog cheap. KEYWORD_TO_CATEGORY is
-                # sorted longest-first, so the most specific keyword wins.
-                remaining = desc_lower[misc_mask]
+            # The catalog is the source of truth for EXPENSE rows, not just
+            # שונות: a stored category that contradicts a current keyword hit
+            # is stale (an old catalog version or an old AI guess baked into
+            # the snapshot — mergeSnapshots never overwrites stored fields, so
+            # e.g. "סיטי מרקט" pinned to משיכת מזומן would stay wrong forever).
+            # Rows the catalog has no opinion on keep their stored category,
+            # income rows are never touched, and user rules — applied below —
+            # still win over everything.
+            expense_mask = (
+                df['סכום'] < 0 if 'סכום' in df.columns
+                else pd.Series(False, index=df.index)
+            )
+            eligible = misc_mask | expense_mask
+            if eligible.any():
+                # Shrinking scan: each row stops at its first (= longest,
+                # KEYWORD_TO_CATEGORY is sorted longest-first) keyword hit.
+                remaining = desc_lower[eligible]
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     if remaining.empty:
                         break
                     hit = remaining.str.contains(kw, na=False, regex=False)
                     if hit.any():
-                        df.loc[remaining.index[hit], 'קטגוריה'] = cat
+                        hit_idx = remaining.index[hit]
+                        changed_idx = hit_idx[df.loc[hit_idx, 'קטגוריה'] != cat]
+                        df.loc[changed_idx, 'קטגוריה'] = cat
+                        # A stale subcategory belonged to the old category.
+                        if 'קטגוריה_משנה' in df.columns and len(changed_idx):
+                            df.loc[changed_idx, 'קטגוריה_משנה'] = ''
                         remaining = remaining[~hit]
                 for kw, cat in EXACT_WORD_KEYWORDS.items():
                     if remaining.empty:
@@ -275,7 +290,11 @@ async def restore_session(body: RestoreSessionRequest):
                     pattern = r'(?:^|[\s\-/])' + kw + r'(?:$|[\s\-/])'
                     hit = remaining.str.contains(pattern, na=False, regex=True)
                     if hit.any():
-                        df.loc[remaining.index[hit], 'קטגוריה'] = cat
+                        hit_idx = remaining.index[hit]
+                        changed_idx = hit_idx[df.loc[hit_idx, 'קטגוריה'] != cat]
+                        df.loc[changed_idx, 'קטגוריה'] = cat
+                        if 'קטגוריה_משנה' in df.columns and len(changed_idx):
+                            df.loc[changed_idx, 'קטגוריה_משנה'] = ''
                         remaining = remaining[~hit]
 
             # Issuer classification (ענף_מקור, stored by bank-sync): the card
