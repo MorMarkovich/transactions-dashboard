@@ -423,3 +423,102 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
         if cat and cat != 'שונות':
             mapping[i] = cat
     return mapping
+
+
+# ── AI subcategory creation ─────────────────────────────────────────────
+
+SUBCAT_SYSTEM = """אתה מערכת לפילוח בתי עסק לתתי-קטגוריות בדשבורד פיננסי ישראלי. אתה מקבל קטגוריית-אב אחת, רשימת תתי-קטגוריות קיימות, ורשימת בתי עסק ששייכים לקטגוריית-האב אך עדיין ללא תת-קטגוריה.
+
+כללים מחייבים:
+1. לכל בית עסק בחר תת-קטגוריה קיימת מהרשימה, או צור חדשה: שם עברי קצר (עד 3 מילים), בלשון רבים כשמתאים (למשל "סופרים", "מאפיות"), שמתאר סוג עסק — לא עסק בודד ולא מותג.
+2. עקביות מוחלטת: השתמש באותו שם בדיוק לכל בתי העסק מאותו סוג. אל תיצור שמות נרדפים (לא גם "סופרים" וגם "סופרמרקטים"), ואם קיימת תת-קטגוריה מתאימה ברשימה — השתמש בה ואל תמציא חדשה.
+3. אם אינך מזהה את בית העסק בוודאות — חפש אותו באינטרנט לפני השיוך (למשל "<שם העסק> ישראל"). אסור לשייך לפי צליל השם.
+4. אם גם אחרי חיפוש לא ברור מהו העסק, או שאינו מתאים לאף קבוצה משמעותית — החזר עבורו "" (ריק). עדיף ריק משיוך שגוי.
+5. אל תיצור תת-קטגוריה חדשה סביב בית עסק בודד, אלא אם סוג העסק מובהק מהשם (למשל "מספרה").
+6. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה), מערך עם רשומה לכל אינדקס:
+   [{"index": 0, "subcategory": "שם התת-קטגוריה או ריק"}, ...]"""
+
+SUBCAT_USER_TEMPLATE = """קטגוריית-האב: {category}
+
+תתי-קטגוריות קיימות (העדף אותן כשמתאים): {existing}
+
+בתי העסק (שם — מספר עסקאות, סכום כולל בש"ח):
+{merchants}"""
+
+
+def suggest_subcategories(category: str, items: list[dict], existing: list[str]) -> Optional[list[dict]]:
+    """Group a category's unsubcategorized merchants into subcategories.
+
+    Claude may reuse an existing subcategory or CREATE a new one (a short
+    Hebrew type-of-business name like "סופרים"). Same no-guessing policy as
+    categorization: merchants it can't identify must be web-searched, and when
+    still unclear they come back empty and stay unsubcategorized.
+
+    Args:
+        category: the parent category (all merchants already belong to it).
+        items: [{merchant, count, total}, ...]
+        existing: subcategory names already available for this parent.
+
+    Returns:
+        [{index, subcategory}, ...] (subcategory may be ''), or None if AI is
+        unavailable.
+    """
+    if not items:
+        return []
+    client = _get_client()
+    if client is None:
+        logger.info("AI subcategorization skipped: ANTHROPIC_API_KEY not set")
+        return None
+
+    lines = [
+        f"{i}. \"{it['merchant']}\" — {it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
+        for i, it in enumerate(items)
+    ]
+    user_prompt = SUBCAT_USER_TEMPLATE.format(
+        category=category,
+        existing=", ".join(existing) if existing else "(אין עדיין)",
+        merchants="\n".join(lines),
+    )
+
+    model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
+    use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
+    create_kwargs = {
+        'model': model,
+        'max_tokens': 8192,
+        'system': SUBCAT_SYSTEM,
+        'messages': [{"role": "user", "content": user_prompt}],
+    }
+    if use_search:
+        create_kwargs['tools'] = [{
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "max_uses": max(4, min(len(items) * 2, int(os.environ.get('AI_SUBCAT_SEARCH_MAX', '20')))),
+        }]
+
+    try:
+        try:
+            response = client.messages.create(**create_kwargs)
+        except Exception as tool_err:
+            if 'tools' not in create_kwargs:
+                raise
+            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
+            create_kwargs.pop('tools', None)
+            response = client.messages.create(**create_kwargs)
+
+        results = _parse_json_array(_response_text(response))
+        out: list[dict] = []
+        for item in results:
+            idx = item.get("index")
+            if idx is None:
+                continue
+            sub = str(item.get("subcategory", "")).strip()
+            # A subcategory is a refinement label, not a category: reject the
+            # parent's own name, the legend bucket 'אחר', and runaway strings.
+            if sub in ('אחר', category) or len(sub) > 40:
+                sub = ''
+            out.append({"index": int(idx), "subcategory": sub})
+        logger.info(f"AI subcategorized {sum(1 for o in out if o['subcategory'])}/{len(items)} merchants in {category}")
+        return out
+    except Exception as e:
+        logger.warning(f"AI subcategorization failed: {e}")
+        return None

@@ -99,6 +99,23 @@ export const transactionsApi = {
   },
 
   /**
+   * AI subcategory split: groups one category's unsubcategorized merchants
+   * into subcategories — reusing existing names or creating new ones (e.g.
+   * מזון וצריכה → סופרים). Applied to the live session server-side; the
+   * returned assignments must be persisted as merchant rules by the caller.
+   */
+  aiSubcategorize: async (
+    sessionId: string,
+    category: string,
+  ): Promise<{ assignments: { merchant: string; category: string; subcategory: string; count: number; total: number }[]; remaining: number }> => {
+    const response = await api.post<{ assignments: { merchant: string; category: string; subcategory: string; count: number; total: number }[]; remaining: number }>(
+      '/api/ai-subcategorize',
+      { session_id: sessionId, category },
+    );
+    return response.data;
+  },
+
+  /**
    * AI audit: second opinion on ALL expense merchants (not just שונות).
    * Returns proposals where Claude disagrees with the current category —
    * nothing is applied until the user accepts a proposal.

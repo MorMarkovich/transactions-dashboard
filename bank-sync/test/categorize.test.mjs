@@ -449,3 +449,11 @@ test('new dev/cloud merchants categorize as חשמל ומחשבים, not travel'
   assert.equal(categorize('ALLDEBRID MONTROUGE FR'), 'חשמל ומחשבים')
   assert.equal(categorize('WSERBASE INC WWW.BROWSERBA US'), 'חשמל ומחשבים')
 })
+
+test('subcategorize: Food → סופרים; chain with יין substring stays a supermarket', () => {
+  assert.equal(subcategorize('מזון וצריכה', 'שופרסל דיל רמת גן'), 'סופרים')
+  assert.equal(subcategorize('מזון וצריכה', 'רמי לוי שיווק השקמה'), 'סופרים')
+  // 'יינות ביתן' contains the אלכוהול keyword 'יין' — סופרים is first in the
+  // parent's submap, so the chain must win.
+  assert.equal(subcategorize('מזון וצריכה', 'יינות ביתן בע"מ'), 'סופרים')
+})

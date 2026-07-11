@@ -580,6 +580,15 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
         'טיפול זוגי': ['l.b.y', 'lby group', 'טיפול זוגי', 'מטפלת זוגית'],
     },
     'מזון וצריכה': {
+        # סופרים first: chains like 'יינות ביתן' must not fall to the 'יין'
+        # keyword of אלכוהול ומשקאות (first subcategory wins).
+        'סופרים': ['שופרסל', 'shufersal', 'רמי לוי', 'rami levy', 'ויקטורי',
+                    'victory', 'יינות ביתן', 'טיב טעם', 'tiv taam', 'אושר עד',
+                    'osher ad', 'חצי חינם', 'יוחננוף', 'yochananof', 'קרפור',
+                    'carrefour', 'מגה בעיר', 'זול ובגדול', 'נתיב החסד', 'ברכל',
+                    'שוק העיר', 'סופרמרקט', 'supermarket', 'מינימרקט',
+                    'מיני מרקט', 'מכולת', 'am:pm', 'אי אם פי אם', 'פרשמרקט',
+                    'freshmarket', 'fresh market'],
         'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
                     'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
         'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
@@ -609,7 +618,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
 
 # Optional emoji per seeded subcategory (UI nicety; falls back in the UI).
 SUBCATEGORY_ICONS: dict[str, str] = {
-    'מאפיות': '🥐', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
+    'סופרים': '🛒', 'מאפיות': '🥐', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
     'שוברי מזון': '🎫',
     'קולנוע': '🎬', 'מופעים והופעות': '🎭', 'ספורט וכושר': '🏋️',
     'אטרקציות': '🎡',

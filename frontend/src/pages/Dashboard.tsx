@@ -234,6 +234,41 @@ export default function Dashboard() {
     [sessionId, user],
   )
 
+  // ── AI subcategory split ──
+  // Sends the open category's unsubcategorized merchants to the AI, which
+  // reuses existing subcategories or creates new ones (e.g. סופרים). The
+  // backend applies them to the session; here we persist each assignment as a
+  // merchant→{category, subcategory} rule and reload the drawer in place.
+  const handleAutoSubcategorize = useCallback(async (): Promise<number> => {
+    if (!sessionId || !drawerCategory) return 0
+    const resp = await transactionsApi.aiSubcategorize(sessionId, drawerCategory)
+    const assignments = resp.assignments ?? []
+    if (user) {
+      for (const a of assignments) {
+        await supabaseApi
+          .upsertCategorySubrule(user.id, a.merchant, a.category, a.subcategory)
+          .catch((e) => {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to persist subcategory rule (will retry on next edit):', e)
+          })
+      }
+    }
+    if (assignments.length > 0) {
+      // Reload the drawer's transactions (keeps it open) + refresh widgets.
+      try {
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner)
+        const data = await transactionsApi.getCategoryTransactions(
+          sid, '', drawerCategory, dateType, undefined, undefined,
+          snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
+        )
+        setDrawerTransactions(data.transactions)
+        setDrawerTotal(data.total)
+      } catch { /* keep the stale list; the refreshKey below still updates widgets */ }
+      setRefreshKey((k) => k + 1)
+    }
+    return assignments.length
+  }, [sessionId, drawerCategory, user, selectedOwner, dateType, snapshotMonthFrom, snapshotMonthTo])
+
   // ── Push notifications to header notification center ──
   useEffect(() => {
     if (!metrics) return
@@ -1908,6 +1943,7 @@ export default function Dashboard() {
         onCategoryChange={handleCategoryChange}
         subcategoryOptions={drawerSubcategoryOptions}
         onSubcategoryChange={handleSubcategoryChange}
+        onAutoSubcategorize={handleAutoSubcategorize}
       />
 
       <CategoryManagerModal
