@@ -143,7 +143,30 @@ export function mergeSnapshots(existing, fresh) {
  * income rows are never second-guessed, and user rules still win over
  * everything. Returns the number of rows re-categorized.
  */
+const FOREIGN_SUFFIX_RE = /(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$/
+const HEBREW_RE = /[֐-׿]/
+const TRIP_WINDOW_MS = 3 * 24 * 60 * 60 * 1000
+
 export function refreshMiscCategories(txns, ruleMap) {
+  // Trip anchors: rows the foreign rule confirmed as overseas spend (latin
+  // only + trailing country code). A latin-only, non-exempt שונות row within
+  // ±3 days of an anchor is the same trip with a truncated suffix — mirrors
+  // the backend's apply_trip_window_heuristic.
+  const anchorTimes = txns
+    .filter((t) => {
+      const d = String(t['תיאור'] || '')
+      return t['קטגוריה'] === 'טיסות ותיירות' && !HEBREW_RE.test(d)
+        && /[A-Za-z]/.test(d) && FOREIGN_SUFFIX_RE.test(d)
+    })
+    .map((t) => new Date(t['תאריך']).getTime())
+    .filter((ms) => !isNaN(ms))
+
+  const nearTrip = (t) => {
+    const ms = new Date(t['תאריך']).getTime()
+    if (isNaN(ms) || !anchorTimes.length) return false
+    return anchorTimes.some((a) => Math.abs(a - ms) <= TRIP_WINDOW_MS)
+  }
+
   let changed = 0
   for (const t of txns) {
     const stored = t['קטגוריה'] || 'שונות'
@@ -165,6 +188,10 @@ export function refreshMiscCategories(txns, ruleMap) {
         // Same weak fallback as scrape time: the issuer's own sector, when the
         // row carries one, beats leaving it uncategorized.
         category = categoryFromIssuer(t['ענף_מקור']) || category
+        if (category === 'שונות' && !HEBREW_RE.test(baseDesc) && /[A-Za-z]/.test(baseDesc)
+            && !isForeignExempt(baseDesc) && nearTrip(t)) {
+          category = 'טיסות ותיירות'
+        }
       } else {
         // The catalog and the rules have no opinion on this stored expense —
         // keep what's stored.

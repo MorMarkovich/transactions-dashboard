@@ -500,3 +500,17 @@ test('stock/variety stores are consumption with the חנויות סטוק subcat
   // Real fashion chains stay fashion.
   assert.equal(categorize('גולף קניון רמת גן-גמ'), 'אופנה')
 })
+
+test('retag trip-window: latin misc rows near confirmed overseas spend → travel', () => {
+  const txns = [
+    { 'תאריך': '2026-06-20', 'תיאור': 'SHINSEGAE DEPARTMENT S SEOUL         KR', 'קטגוריה': 'טיסות ותיירות' },
+    { 'תאריך': '2026-06-22', 'תיאור': 'CHARM BKK', 'קטגוריה': 'שונות' },
+    { 'תאריך': '2026-06-22', 'תיאור': 'שוקי מגי', 'קטגוריה': 'שונות' },   // Hebrew → stays
+    { 'תאריך': '2026-07-25', 'תיאור': 'NATIVE', 'קטגוריה': 'שונות' },     // far away → stays
+  ]
+  const changed = refreshMiscCategories(txns, new Map())
+  assert.equal(changed, 1)
+  assert.equal(txns[1]['קטגוריה'], 'טיסות ותיירות')
+  assert.equal(txns[2]['קטגוריה'], 'שונות')
+  assert.equal(txns[3]['קטגוריה'], 'שונות')
+})
