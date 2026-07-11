@@ -1,10 +1,22 @@
 """
 AI-powered transaction categorization using Claude API.
 
-Uses Claude Haiku to categorize transactions that remain in "שונות" (miscellaneous)
-after keyword-based matching. Sends batches of descriptions for efficient processing.
+Categorizes transactions that remain in "שונות" (miscellaneous) after
+keyword-based matching, in two phases:
+
+  Phase 1 (no web search): Claude assigns a category ONLY to merchants it
+      recognizes with certainty (known chains/brands, or descriptions that
+      state the business type). Everything else must be marked unknown —
+      guessing from the sound of a name is explicitly forbidden.
+
+  Phase 2 (web search REQUIRED): the unknown merchants are sent in small
+      batches where Claude must run a web search per business BEFORE
+      classifying. If a response shows no evidence of searching, its answers
+      are discarded and those rows stay שונות — an unverified guess is worse
+      than no category.
 """
 import os
+import re
 import json
 import logging
 from typing import Optional
@@ -39,9 +51,7 @@ VALID_CATEGORIES = [
     'שונות',
 ]
 
-SYSTEM_PROMPT = """אתה מערכת לסיווג עסקאות בנקאיות ישראליות. תפקידך לסווג כל עסקה לקטגוריה המתאימה ביותר.
-
-הקטגוריות האפשריות:
+_CATEGORY_MENU = """הקטגוריות האפשריות:
 - מזון וצריכה — סופרמרקטים, מכולות, חנויות מזון, בתי מרקחת
 - מסעדות, קפה וברים — מסעדות, בתי קפה, ברים, משלוחי אוכל
 - תחבורה ורכבים — תחבורה ציבורית, מוניות, חניה, דלק, רכב
@@ -64,21 +74,59 @@ SYSTEM_PROMPT = """אתה מערכת לסיווג עסקאות בנקאיות י
 - חינוך ולימודים — בתי ספר, אוניברסיטה, קורסים, ספרים
 - מתנות — שוברי מתנה (BuyMe וכד'), מתנות
 - מנויים ושירותים — מנויים, דמי ניהול, עמלות
-- שונות — רק אם אי אפשר לקבוע קטגוריה אחרת
+- שונות — רק אם אי אפשר לקבוע קטגוריה אחרת"""
 
-כללים חשובים:
-1. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה)
-2. אם התיאור מכיל גם עברית וגם אנגלית, התייחס לשני החלקים
-3. העדף קטגוריה ספציפית על פני "שונות"
-4. שים לב לקיצורים נפוצים בעסקאות ישראליות
-5. אם אינך מזהה את בית העסק מתוך השם, השתמש בכלי חיפוש האינטרנט כדי לברר מהו ובאיזו קטגוריה הוא — חפש את שם העסק (למשל "מה זה <שם העסק> ישראל"). השתמש בחיפוש רק עבור עסקים שאינך מכיר."""
+PHASE1_SYSTEM = f"""אתה מערכת לסיווג עסקאות בנקאיות ישראליות.
 
-USER_PROMPT_TEMPLATE = """סווג את העסקאות הבאות לקטגוריות. החזר מערך JSON בלבד, בפורמט:
-[{{"index": 0, "category": "שם הקטגוריה"}}, ...]
+{_CATEGORY_MENU}
 
-העסקאות:
+כללים מחייבים:
+1. סווג עסק רק אם אתה מזהה אותו בוודאות — רשת/מותג מוכר, או שהתיאור עצמו אומר מה סוג העסק (למשל מכיל "מסעדת", "פיצה", "מוסך", "בית מרקחת").
+2. אסור לנחש לפי צליל השם. אם אינך בטוח מהו העסק — החזר עבורו {{"index": N, "unknown": true}} ואל תסווג אותו.
+3. עדיף לסמן unknown מאשר לסווג לא נכון. סימון unknown אינו כישלון — עסקים כאלה ייבדקו באינטרנט בשלב נפרד.
+4. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה), מערך עם רשומה לכל אינדקס:
+   [{{"index": 0, "category": "שם קטגוריה"}}, {{"index": 1, "unknown": true}}, ...]"""
+
+PHASE2_SYSTEM = f"""אתה מערכת לסיווג עסקאות בנקאיות ישראליות. העסקים ברשימה כבר זוהו כלא-מוכרים — אסור לסווג אותם מהשם בלבד.
+
+{_CATEGORY_MENU}
+
+כללים מחייבים:
+1. עבור כל עסק ברשימה אתה חייב לבצע חיפוש אינטרנט לפני הסיווג (למשל: "<שם העסק> ישראל" או "מה זה <שם העסק>"). ללא חיפוש — אין סיווג.
+2. סווג רק לפי מה שמצאת בחיפוש. אם תוצאות החיפוש לא מבהירות מהו העסק — החזר "שונות" עבורו.
+3. שים לב לקיצורים נפוצים בעסקאות ישראליות; אפשר לנקות קידומות טכניות מהשם לפני החיפוש.
+4. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה), בפורמט:
+   [{{"index": 0, "category": "שם הקטגוריה"}}, ...]"""
+
+PHASE1_USER_TEMPLATE = """סווג את העסקים הבאים. סווג רק את אלה שאתה מזהה בוודאות; את כל השאר סמן unknown. החזר מערך JSON בלבד.
+
+העסקים:
 {transactions}"""
 
+PHASE2_USER_TEMPLATE = """סווג את העסקים הבאים. חובה לחפש כל אחד מהם באינטרנט לפני הסיווג. החזר מערך JSON בלבד.
+
+העסקים:
+{transactions}"""
+
+# Installment suffix bank-sync appends to split charges ("X (תשלום 3/12)").
+# Stripped before querying so all installments of a purchase resolve together
+# and the cache/web-search budget isn't wasted on duplicates.
+_INSTALLMENT_RE = re.compile(r'\s*\(תשלום \d+/\d+\)\s*$')
+
+
+def _base_desc(desc: str) -> str:
+    return _INSTALLMENT_RE.sub('', str(desc)).strip()
+
+
+AUDIT_SYSTEM = f"""אתה מערכת לביקורת סיווג עסקאות בנקאיות ישראליות. אתה מקבל בתי עסק עם הסיווג הנוכחי שלהם ובודק אם הוא נכון.
+
+{_CATEGORY_MENU}
+
+כללים מחייבים:
+1. אל תפסול סיווג קיים לפי צליל השם בלבד. אם אינך מזהה את בית העסק בוודאות — חפש אותו באינטרנט לפני שאתה קובע (למשל: "<שם העסק> ישראל").
+2. אם גם אחרי חיפוש אינך בטוח — החזר את הסיווג הנוכחי עם confidence נמוך. אל תמציא קטגוריות חדשות.
+3. הענף לפי חברת האשראי (אם צוין) הוא רמז, לא הכרעה.
+4. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה)."""
 
 AUDIT_PROMPT_TEMPLATE = """בדוק את הסיווג הנוכחי של בתי העסק הבאים (סיכום לכל בית עסק: שם, הסיווג הנוכחי, הענף לפי חברת האשראי אם ידוע, מספר עסקאות וסכום כולל בש"ח).
 
@@ -126,7 +174,7 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
     create_kwargs = {
         'model': model,
         'max_tokens': 8192,
-        'system': SYSTEM_PROMPT,
+        'system': AUDIT_SYSTEM,
         'messages': [{"role": "user", "content": user_prompt}],
     }
     if use_search:
@@ -146,22 +194,7 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
             create_kwargs.pop('tools', None)
             response = client.messages.create(**create_kwargs)
 
-        text = "".join(
-            getattr(b, "text", "") for b in response.content
-            if getattr(b, "type", "") == "text"
-        ).strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-        try:
-            results = json.loads(text)
-        except json.JSONDecodeError:
-            start, end = text.find('['), text.rfind(']')
-            if start == -1 or end == -1 or end <= start:
-                raise
-            results = json.loads(text[start:end + 1])
+        results = _parse_json_array(_response_text(response))
 
         out: list[dict] = []
         for item in results:
@@ -199,22 +232,150 @@ def _get_client():
         return None
 
 
-# Per-process cache: description → resolved category (or 'שונות' for a miss).
-# The dashboard re-runs restore-session on every cold-start recovery, always over
-# the same leftover "שונות" rows. Caching means a warm backend asks Claude about
-# each distinct description at most once, instead of on every page load.
+# Per-process cache: base description → resolved category (or 'שונות' for a
+# miss). The dashboard re-runs restore-session on every cold-start recovery,
+# always over the same leftover "שונות" rows. Caching means a warm backend asks
+# Claude about each distinct merchant at most once, instead of on every load.
 _CACHE: dict[str, str] = {}
+
+
+def _parse_json_array(text: str) -> list:
+    """Parse the model's JSON array, tolerating markdown fences and prose."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # With web search the model may wrap the array in prose; pull out the
+        # outermost [ ... ] and parse that.
+        start, end = text.find('['), text.rfind(']')
+        if start == -1 or end == -1 or end <= start:
+            raise
+        return json.loads(text[start:end + 1])
+
+
+def _response_text(response) -> str:
+    return "".join(
+        getattr(b, "text", "") for b in response.content
+        if getattr(b, "type", "") == "text"
+    ).strip()
+
+
+def _response_searched(response) -> bool:
+    """Did the model actually use web search in this response?"""
+    return any(
+        getattr(b, "type", "") in ("server_tool_use", "web_search_tool_result")
+        for b in response.content
+    )
+
+
+def _classify_known(client, model: str, merchants: list[str]) -> tuple[dict[str, str], list[str]]:
+    """Phase 1: no web search. Returns (resolved base→category, unknown bases).
+
+    Merchants the model cannot identify with certainty come back as unknown —
+    the prompt forbids guessing from the name.
+    """
+    resolved: dict[str, str] = {}
+    unknown: list[str] = []
+    chunk_size = 100
+    for start in range(0, len(merchants), chunk_size):
+        chunk = merchants[start:start + chunk_size]
+        tx_lines = "\n".join(f"{i}. {m}" for i, m in enumerate(chunk))
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=PHASE1_SYSTEM,
+                messages=[{"role": "user", "content": PHASE1_USER_TEMPLATE.format(transactions=tx_lines)}],
+            )
+            results = _parse_json_array(_response_text(response))
+        except Exception as e:
+            logger.warning(f"AI phase-1 (known merchants) failed: {e}")
+            unknown.extend(chunk)
+            continue
+
+        answered: dict[int, str] = {}
+        for item in results:
+            idx = item.get("index")
+            if idx is None or item.get("unknown"):
+                continue
+            cat = str(item.get("category", "")).strip()
+            if cat in VALID_CATEGORIES and cat != 'שונות':
+                answered[int(idx)] = cat
+        for i, m in enumerate(chunk):
+            if i in answered:
+                resolved[m] = answered[i]
+            else:
+                unknown.append(m)
+    return resolved, unknown
+
+
+def _classify_via_search(client, model: str, merchants: list[str]) -> dict[str, str]:
+    """Phase 2: web search is mandatory. Returns resolved base→category.
+
+    Small batches so every merchant gets search budget. A response with no
+    search activity is discarded — those merchants stay unresolved rather than
+    receiving a name-based guess.
+    """
+    resolved: dict[str, str] = {}
+    batch_size = max(1, int(os.environ.get('AI_SEARCH_BATCH', '5')))
+    per_merchant = max(1, int(os.environ.get('AI_WEB_SEARCH_MAX', '2')))
+    for start in range(0, len(merchants), batch_size):
+        batch = merchants[start:start + batch_size]
+        tx_lines = "\n".join(f"{i}. {m}" for i, m in enumerate(batch))
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=PHASE2_SYSTEM,
+                messages=[{"role": "user", "content": PHASE2_USER_TEMPLATE.format(transactions=tx_lines)}],
+                tools=[{
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": per_merchant * len(batch) + 1,
+                }],
+            )
+        except Exception as e:
+            # Web search unavailable (account/model restriction) or API error.
+            # Do NOT fall back to searchless guessing — these merchants were
+            # already established as unknown; a guess would be fabricated.
+            logger.warning(f"AI phase-2 (web search) failed, leaving batch uncategorized: {e}")
+            continue
+
+        if not _response_searched(response):
+            logger.warning(
+                "AI phase-2 answered without searching; discarding %d answers", len(batch)
+            )
+            continue
+
+        try:
+            results = _parse_json_array(_response_text(response))
+        except Exception as e:
+            logger.warning(f"AI phase-2 JSON parse error: {e}")
+            continue
+
+        for item in results:
+            idx = item.get("index")
+            cat = str(item.get("category", "")).strip()
+            if idx is None:
+                continue
+            idx = int(idx)
+            if 0 <= idx < len(batch) and cat in VALID_CATEGORIES and cat != 'שונות':
+                resolved[batch[idx]] = cat
+    return resolved
 
 
 def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]:
     """
-    Categorize a list of transaction descriptions using Claude AI.
+    Categorize transaction descriptions using Claude AI.
 
-    Args:
-        descriptions: List of transaction description strings.
-
-    Returns:
-        Dict mapping index → category name, or None if AI is unavailable.
+    Merchants Claude recognizes with certainty are classified directly; the
+    rest are looked up online before being classified (never guessed). Returns
+    a dict mapping index → category name, or None if AI is unavailable.
     """
     if not descriptions:
         return {}
@@ -224,103 +385,41 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
         logger.info("AI categorization skipped: ANTHROPIC_API_KEY not set")
         return None
 
-    # Serve from cache first; only query Claude for descriptions we've never seen.
-    mapping: dict[int, str] = {}
-    to_query: list[tuple[int, str]] = []  # (original index, description)
-    for i, desc in enumerate(descriptions):
-        cached = _CACHE.get(desc)
-        if cached is None:
-            to_query.append((i, desc))
-        elif cached != 'שונות':
-            mapping[i] = cached
+    # Collapse to unique base merchants (installment suffix stripped), serving
+    # cached resolutions first.
+    bases = [_base_desc(d) for d in descriptions]
+    to_query: list[str] = []
+    seen: set[str] = set()
+    for b in bases:
+        if b and b not in _CACHE and b not in seen:
+            seen.add(b)
+            to_query.append(b)
 
-    if not to_query:
-        return mapping
-
-    # Format only the uncached transactions for the prompt
-    tx_lines = "\n".join(f"{i}. {desc}" for i, (_, desc) in enumerate(to_query))
-    user_prompt = USER_PROMPT_TEMPLATE.format(transactions=tx_lines)
-
-    # Web search lets Claude look up merchants it doesn't recognise from the name
-    # alone (small local shops etc.). On by default; AI_WEB_SEARCH=0 disables it,
-    # AI_MODEL overrides the model. If the account/model can't use the tool we
-    # retry once without it so categorization still works from Claude's knowledge.
     model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
     use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
-    create_kwargs = {
-        'model': model,
-        'max_tokens': 4096,
-        'system': SYSTEM_PROMPT,
-        'messages': [{"role": "user", "content": user_prompt}],
-    }
-    if use_search:
-        create_kwargs['tools'] = [{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": int(os.environ.get('AI_WEB_SEARCH_MAX', '8')),
-        }]
 
-    try:
-        try:
-            response = client.messages.create(**create_kwargs)
-        except Exception as tool_err:
-            if 'tools' not in create_kwargs:
-                raise
-            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
-            create_kwargs.pop('tools', None)
-            response = client.messages.create(**create_kwargs)
-
-        # The reply can contain web-search tool blocks; the JSON answer is the
-        # model's final text. Concatenate all text blocks and parse that.
-        text = "".join(
-            getattr(b, "text", "") for b in response.content
-            if getattr(b, "type", "") == "text"
-        ).strip()
-
-        # Parse JSON - handle potential markdown wrapping
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-            if text.endswith("```"):
-                text = text[:-3]
-            text = text.strip()
-
-        try:
-            results = json.loads(text)
-        except json.JSONDecodeError:
-            # With web search the model may wrap the array in prose; pull out the
-            # outermost [ ... ] and parse that.
-            start, end = text.find('['), text.rfind(']')
-            if start == -1 or end == -1 or end <= start:
-                raise
-            results = json.loads(text[start:end + 1])
-
-        # Local index (into to_query) → validated category
-        queried: dict[int, str] = {}
-        for item in results:
-            idx = item.get("index")
-            cat = item.get("category", "").strip()
-            if idx is not None and cat in VALID_CATEGORIES and cat != 'שונות':
-                queried[int(idx)] = cat
-
-        # Apply to the original indices and remember every result (hits AND
-        # misses) so we never re-query the same description.
-        for local_idx, (orig_idx, desc) in enumerate(to_query):
-            cat = queried.get(local_idx)
-            if cat:
-                mapping[orig_idx] = cat
-                _CACHE[desc] = cat
+    if to_query:
+        resolved, unknown = _classify_known(client, model, to_query)
+        if unknown:
+            if use_search:
+                resolved.update(_classify_via_search(client, model, unknown))
             else:
-                _CACHE[desc] = 'שונות'
-
+                logger.info(
+                    "AI web search disabled; %d unrecognized merchants stay שונות", len(unknown)
+                )
+        # Remember hits AND misses so we never re-query the same merchant.
+        for b in to_query:
+            _CACHE[b] = resolved.get(b, 'שונות')
         logger.info(
-            f"AI categorized {len(mapping)}/{len(descriptions)} "
-            f"({len(to_query)} queried, {len(descriptions) - len(to_query)} from cache)"
+            "AI categorized %d/%d unique merchants (%d known directly, %d via web search)",
+            len(resolved), len(to_query),
+            len(resolved) - sum(1 for m in unknown if m in resolved),
+            sum(1 for m in unknown if m in resolved),
         )
-        return mapping
 
-    except json.JSONDecodeError as e:
-        logger.warning(f"AI categorization JSON parse error: {e}")
-        return mapping or None
-    except Exception as e:
-        logger.warning(f"AI categorization failed: {e}")
-        return mapping or None
+    mapping: dict[int, str] = {}
+    for i, b in enumerate(bases):
+        cat = _CACHE.get(b)
+        if cat and cat != 'שונות':
+            mapping[i] = cat
+    return mapping
