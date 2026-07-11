@@ -116,6 +116,22 @@ export const transactionsApi = {
   },
 
   /**
+   * Fully automatic subcategory sweep: every category with unsubcategorized
+   * rows (except שונות). Fired in the background after restore, chained after
+   * aiCategorize — no user action needed. Returned assignments must be
+   * persisted as merchant rules by the caller.
+   */
+  aiSubcategorizeAll: async (
+    sessionId: string,
+  ): Promise<{ assignments: { merchant: string; category: string; subcategory: string; count: number; total: number }[]; remaining: number }> => {
+    const response = await api.post<{ assignments: { merchant: string; category: string; subcategory: string; count: number; total: number }[]; remaining: number }>(
+      '/api/ai-subcategorize-all',
+      { session_id: sessionId },
+    );
+    return response.data;
+  },
+
+  /**
    * AI audit: second opinion on ALL expense merchants (not just שונות).
    * Returns proposals where Claude disagrees with the current category —
    * nothing is applied until the user accepts a proposal.

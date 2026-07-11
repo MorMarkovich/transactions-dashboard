@@ -53,6 +53,7 @@ class _FakeClient:
 @pytest.fixture(autouse=True)
 def _fresh_state(monkeypatch):
     monkeypatch.setattr(ai_categorizer, "_CACHE", {})
+    monkeypatch.setattr(ai_categorizer, "_SUBCAT_CACHE", {})
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
 
@@ -163,15 +164,24 @@ def test_audit_merchants_runs_end_to_end(monkeypatch):
     ]
 
 
-def test_suggest_subcategories_validates_names(monkeypatch):
+def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):
     def handler(kwargs):
         assert "סופרים" in kwargs["messages"][0]["content"]  # existing names offered
+        if "tools" not in kwargs:
+            # phase 1: certain merchants only; junk names must be rejected
+            return _text_response([
+                {"index": 0, "subcategory": "מעדניות"},
+                {"index": 1, "subcategory": "אחר"},              # legend bucket → rejected → phase 2
+                {"index": 2, "subcategory": "מזון וצריכה"},      # parent name → rejected → phase 2
+                {"index": 3, "unknown": True},
+            ])
+        # phase 2: mandatory search over the unresolved merchants
+        assert kwargs["tools"][0]["type"] == "web_search_20250305"
         return _text_response([
-            {"index": 0, "subcategory": "מעדניות"},
-            {"index": 1, "subcategory": "אחר"},              # legend bucket → rejected
-            {"index": 2, "subcategory": "מזון וצריכה"},      # parent name → rejected
-            {"index": 3, "subcategory": ""},                 # explicit "leave empty"
-        ])
+            {"index": 0, "subcategory": ""},
+            {"index": 1, "subcategory": ""},
+            {"index": 2, "subcategory": "שוקי אוכל"},
+        ], searched=True)
 
     _install(monkeypatch, handler)
     out = ai_categorizer.suggest_subcategories(
@@ -188,8 +198,36 @@ def test_suggest_subcategories_validates_names(monkeypatch):
         {"index": 0, "subcategory": "מעדניות"},
         {"index": 1, "subcategory": ""},
         {"index": 2, "subcategory": ""},
-        {"index": 3, "subcategory": ""},
+        {"index": 3, "subcategory": "שוקי אוכל"},
     ]
+
+
+def test_suggest_subcategories_unsearched_answers_discarded_and_cached(monkeypatch):
+    def handler(kwargs):
+        if "tools" not in kwargs:
+            return _text_response([{"index": 0, "unknown": True}])
+        # phase 2 answers WITHOUT searching → must be thrown away
+        return _text_response([{"index": 0, "subcategory": "בוטיקים"}], searched=False)
+
+    client = _install(monkeypatch, handler)
+    items = [{"merchant": "בוטיק עלום", "count": 1, "total": 100.0}]
+    out = ai_categorizer.suggest_subcategories("אופנה", items, [])
+    assert out == [{"index": 0, "subcategory": ""}]
+    # The miss is cached: a second run makes NO further API calls.
+    calls_before = len(client.messages.calls)
+    out2 = ai_categorizer.suggest_subcategories("אופנה", items, [])
+    assert out2 == [{"index": 0, "subcategory": ""}]
+    assert len(client.messages.calls) == calls_before
+
+
+def test_categorize_passes_issuer_hint(monkeypatch):
+    def handler(kwargs):
+        assert "ענף לפי חברת האשראי: מזון" in kwargs["messages"][0]["content"]
+        return _text_response([{"index": 0, "category": "מזון וצריכה"}])
+
+    _install(monkeypatch, handler)
+    result = categorize_transactions(["מכולת השכונה"], ["מזון"])
+    assert result == {0: "מזון וצריכה"}
 
 
 def test_phase2_api_error_keeps_merchant_uncategorized(monkeypatch):

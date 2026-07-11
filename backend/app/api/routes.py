@@ -901,7 +901,16 @@ def ai_categorize(body: AICategorizeRequest):
         misc_mask = df['קטגוריה'] == 'שונות'
         if misc_mask.any():
             misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
-            ai_map = categorize_transactions(misc_descs) or {}
+            # Card-company sector (ענף_מקור) is a useful hint for the AI —
+            # pass it alongside each description when the column exists.
+            misc_issuers = None
+            if 'ענף_מקור' in df.columns:
+                misc_issuers = [
+                    None if (v is None or str(v).strip() == '' or str(v).lower() in ('nan', 'none'))
+                    else str(v).strip()
+                    for v in df.loc[misc_mask, 'ענף_מקור'].tolist()
+                ]
+            ai_map = categorize_transactions(misc_descs, misc_issuers) or {}
             misc_idx = df.index[misc_mask].tolist()
             for local_i, cat in ai_map.items():
                 if 0 <= local_i < len(misc_idx):
@@ -1078,35 +1087,25 @@ class AISubcategorizeRequest(BaseModel):
     limit: int = 80
 
 
-@router.post("/ai-subcategorize")
-def ai_subcategorize(body: AISubcategorizeRequest):
-    """Have the AI split one category's merchants into subcategories — reusing
-    the seeded/in-use names or CREATING new ones (e.g. מזון וצריכה → סופרים).
+class AISubcategorizeAllRequest(BaseModel):
+    session_id: str
+    limit_per_category: int = 80
+
+
+def _ai_subcategorize_category(df, category: str, limit: int) -> tuple[list[dict], int]:
+    """AI subcategory split for one category, applied to df in place.
 
     Groups the category's rows that still have no קטגוריה_משנה by canonical
-    merchant, sends them to Claude (unknown merchants are web-searched, never
-    guessed), applies the returned subcategories to the live session (only
-    where the subcategory was empty — manual assignments are never clobbered),
-    and returns the assignments so the frontend persists them as
-    merchant→{category, subcategory} rules. Sync (non-async) on purpose, like
-    /ai-categorize: the Anthropic call blocks, so FastAPI uses its threadpool.
+    merchant, asks the AI (existing names reused, new ones created, unknown
+    merchants web-searched — never guessed), fills ONLY empty subcategories so
+    manual assignments survive. Returns (assignments, remaining_merchants).
+    Raises HTTPException(503) when AI isn't configured.
     """
-    df = sessions.get(body.session_id)
-    if df is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    category = (body.category or '').strip()
-    if not category:
-        raise HTTPException(status_code=400, detail="Category cannot be empty")
-    if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
-        return {"success": True, "assignments": [], "remaining": 0}
-
-    if 'קטגוריה_משנה' not in df.columns:
-        df['קטגוריה_משנה'] = ''
     sub_series = df['קטגוריה_משנה'].fillna('').astype(str).str.strip()
     cat_mask = df['קטגוריה'].astype(str) == category
     target = cat_mask & (sub_series == '')
     if not target.any():
-        return {"success": True, "assignments": [], "remaining": 0}
+        return [], 0
 
     # Group by canonical merchant: representative raw name (most frequent) + volume.
     merchants: dict[str, dict] = {}
@@ -1131,7 +1130,7 @@ def ai_subcategorize(body: AISubcategorizeRequest):
         items.append(m)
     items.sort(key=lambda m: m["total"], reverse=True)
     total_eligible = len(items)
-    items = items[: max(1, min(int(body.limit or 80), 200))]
+    items = items[: max(1, min(int(limit or 80), 200))]
 
     # Existing names for consistency: the seeded catalog for this parent plus
     # whatever is already in use on the category's rows.
@@ -1163,13 +1162,61 @@ def ai_subcategorize(body: AISubcategorizeRequest):
             "count": it["count"],
             "total": round(_sanitize(float(it["total"])), 2),
         })
-    sessions[body.session_id] = df
+    return assignments, max(0, total_eligible - len(items))
 
-    return {
-        "success": True,
-        "assignments": assignments,
-        "remaining": max(0, total_eligible - len(items)),
-    }
+
+@router.post("/ai-subcategorize")
+def ai_subcategorize(body: AISubcategorizeRequest):
+    """AI subcategory split for ONE category (the drawer's re-run button).
+
+    Sync (non-async) on purpose, like /ai-categorize: the Anthropic call
+    blocks, so FastAPI uses its threadpool.
+    """
+    df = sessions.get(body.session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    category = (body.category or '').strip()
+    if not category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+    if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return {"success": True, "assignments": [], "remaining": 0}
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+
+    assignments, remaining = _ai_subcategorize_category(df, category, body.limit)
+    sessions[body.session_id] = df
+    return {"success": True, "assignments": assignments, "remaining": remaining}
+
+
+@router.post("/ai-subcategorize-all")
+def ai_subcategorize_all(body: AISubcategorizeAllRequest):
+    """Fully automatic subcategory pass: sweep EVERY category that still has
+    unsubcategorized rows (except שונות — no parent to refine). Fired by the
+    frontend in the background after restore (chained after /ai-categorize),
+    so subcategories appear without the user pressing anything; results are
+    persisted client-side as merchant rules, and per-merchant caching keeps
+    repeat loads cheap. Sync (non-async) on purpose — threadpool."""
+    df = sessions.get(body.session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return {"success": True, "assignments": [], "remaining": 0}
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+
+    sub_series = df['קטגוריה_משנה'].fillna('').astype(str).str.strip()
+    pending = df.loc[sub_series == '', 'קטגוריה'].astype(str)
+    categories = sorted({c for c in pending if c and c != 'שונות'})
+
+    all_assignments: list[dict] = []
+    remaining_total = 0
+    for category in categories:
+        assignments, remaining = _ai_subcategorize_category(df, category, body.limit_per_category)
+        all_assignments.extend(assignments)
+        remaining_total += remaining
+
+    sessions[body.session_id] = df
+    return {"success": True, "assignments": all_assignments, "remaining": remaining_total}
 
 
 @router.get("/metrics")

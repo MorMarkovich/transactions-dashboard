@@ -123,6 +123,27 @@ export default function Layout({ children }: LayoutProps) {
                 }
               })
               .catch(() => {}) // AI is an enhancement — never block the app on it
+              .then(() => {
+                // Automatic subcategory sweep — runs after the category pass
+                // (so newly categorized merchants get subcategorized too).
+                // Per-merchant server caching + the rules persisted here keep
+                // repeat loads cheap: each merchant is resolved once, ever.
+                if (!response.session_id) return
+                return transactionsApi
+                  .aiSubcategorizeAll(response.session_id)
+                  .then(async res => {
+                    const assignments = res.assignments ?? []
+                    for (const a of assignments) {
+                      await supabaseApi
+                        .upsertCategorySubrule(user.id, a.merchant, a.category, a.subcategory)
+                        .catch(() => {}) // best-effort; already applied this session
+                    }
+                    if (assignments.length) {
+                      window.dispatchEvent(new CustomEvent('ai-categorized'))
+                    }
+                  })
+              })
+              .catch(() => {}) // never block the app on the AI chain
           }
         })
         .catch(() => {}) // Silent fail — user can upload a new file

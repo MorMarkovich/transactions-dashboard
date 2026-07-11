@@ -273,7 +273,13 @@ def _response_searched(response) -> bool:
     )
 
 
-def _classify_known(client, model: str, merchants: list[str]) -> tuple[dict[str, str], list[str]]:
+def _merchant_line(i: int, m: dict) -> str:
+    """One numbered prompt line: merchant name + issuer-sector hint if known."""
+    hint = f" (ענף לפי חברת האשראי: {m['issuer']})" if m.get('issuer') else ""
+    return f"{i}. {m['base']}{hint}"
+
+
+def _classify_known(client, model: str, merchants: list[dict]) -> tuple[dict[str, str], list[dict]]:
     """Phase 1: no web search. Returns (resolved base→category, unknown bases).
 
     Merchants the model cannot identify with certainty come back as unknown —
@@ -284,7 +290,7 @@ def _classify_known(client, model: str, merchants: list[str]) -> tuple[dict[str,
     chunk_size = 100
     for start in range(0, len(merchants), chunk_size):
         chunk = merchants[start:start + chunk_size]
-        tx_lines = "\n".join(f"{i}. {m}" for i, m in enumerate(chunk))
+        tx_lines = "\n".join(_merchant_line(i, m) for i, m in enumerate(chunk))
         try:
             response = client.messages.create(
                 model=model,
@@ -308,13 +314,13 @@ def _classify_known(client, model: str, merchants: list[str]) -> tuple[dict[str,
                 answered[int(idx)] = cat
         for i, m in enumerate(chunk):
             if i in answered:
-                resolved[m] = answered[i]
+                resolved[m["base"]] = answered[i]
             else:
                 unknown.append(m)
     return resolved, unknown
 
 
-def _classify_via_search(client, model: str, merchants: list[str]) -> dict[str, str]:
+def _classify_via_search(client, model: str, merchants: list[dict]) -> dict[str, str]:
     """Phase 2: web search is mandatory. Returns resolved base→category.
 
     Small batches so every merchant gets search budget. A response with no
@@ -326,7 +332,7 @@ def _classify_via_search(client, model: str, merchants: list[str]) -> dict[str, 
     per_merchant = max(1, int(os.environ.get('AI_WEB_SEARCH_MAX', '2')))
     for start in range(0, len(merchants), batch_size):
         batch = merchants[start:start + batch_size]
-        tx_lines = "\n".join(f"{i}. {m}" for i, m in enumerate(batch))
+        tx_lines = "\n".join(_merchant_line(i, m) for i, m in enumerate(batch))
         try:
             response = client.messages.create(
                 model=model,
@@ -365,17 +371,19 @@ def _classify_via_search(client, model: str, merchants: list[str]) -> dict[str, 
                 continue
             idx = int(idx)
             if 0 <= idx < len(batch) and cat in VALID_CATEGORIES and cat != 'שונות':
-                resolved[batch[idx]] = cat
+                resolved[batch[idx]["base"]] = cat
     return resolved
 
 
-def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]:
+def categorize_transactions(descriptions: list[str], issuers: Optional[list] = None) -> Optional[dict[int, str]]:
     """
     Categorize transaction descriptions using Claude AI.
 
     Merchants Claude recognizes with certainty are classified directly; the
-    rest are looked up online before being classified (never guessed). Returns
-    a dict mapping index → category name, or None if AI is unavailable.
+    rest are looked up online before being classified (never guessed). When
+    `issuers` is given (parallel to `descriptions`), each merchant's
+    card-company sector (ענף_מקור) is passed to Claude as a hint. Returns a
+    dict mapping index → category name, or None if AI is unavailable.
     """
     if not descriptions:
         return {}
@@ -388,12 +396,15 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
     # Collapse to unique base merchants (installment suffix stripped), serving
     # cached resolutions first.
     bases = [_base_desc(d) for d in descriptions]
-    to_query: list[str] = []
+    to_query: list[dict] = []
     seen: set[str] = set()
-    for b in bases:
+    for i, b in enumerate(bases):
         if b and b not in _CACHE and b not in seen:
             seen.add(b)
-            to_query.append(b)
+            issuer = None
+            if issuers and i < len(issuers) and issuers[i]:
+                issuer = str(issuers[i]).strip() or None
+            to_query.append({"base": b, "issuer": issuer})
 
     model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
     use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
@@ -408,13 +419,12 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
                     "AI web search disabled; %d unrecognized merchants stay שונות", len(unknown)
                 )
         # Remember hits AND misses so we never re-query the same merchant.
-        for b in to_query:
-            _CACHE[b] = resolved.get(b, 'שונות')
+        for m in to_query:
+            _CACHE[m["base"]] = resolved.get(m["base"], 'שונות')
+        via_search = sum(1 for m in unknown if m["base"] in resolved)
         logger.info(
             "AI categorized %d/%d unique merchants (%d known directly, %d via web search)",
-            len(resolved), len(to_query),
-            len(resolved) - sum(1 for m in unknown if m in resolved),
-            sum(1 for m in unknown if m in resolved),
+            len(resolved), len(to_query), len(resolved) - via_search, via_search,
         )
 
     mapping: dict[int, str] = {}
@@ -426,17 +436,31 @@ def categorize_transactions(descriptions: list[str]) -> Optional[dict[int, str]]
 
 
 # ── AI subcategory creation ─────────────────────────────────────────────
+#
+# Same two-phase discipline as categorization: merchants Claude recognizes
+# with certainty are grouped directly; the rest MUST be web-searched before
+# getting a subcategory, and answers produced without searching are discarded.
+# Runs automatically after every restore (/ai-subcategorize-all), so results
+# are cached per (category, merchant) — including "resolved empty" — to keep a
+# warm backend from re-querying the same merchants on every page load.
 
-SUBCAT_SYSTEM = """אתה מערכת לפילוח בתי עסק לתתי-קטגוריות בדשבורד פיננסי ישראלי. אתה מקבל קטגוריית-אב אחת, רשימת תתי-קטגוריות קיימות, ורשימת בתי עסק ששייכים לקטגוריית-האב אך עדיין ללא תת-קטגוריה.
+SUBCAT_RULES_COMMON = """1. שם תת-קטגוריה: עברית, קצר (עד 3 מילים), בלשון רבים כשמתאים (למשל "סופרים", "מאפיות"), מתאר סוג עסק — לא עסק בודד ולא מותג.
+2. עקביות מוחלטת: אותו שם בדיוק לכל בתי העסק מאותו סוג. אל תיצור שמות נרדפים (לא גם "סופרים" וגם "סופרמרקטים"), ואם קיימת תת-קטגוריה מתאימה ברשימה — השתמש בה ואל תמציא חדשה.
+3. אל תיצור תת-קטגוריה חדשה סביב בית עסק בודד, אלא אם סוג העסק מובהק מהשם (למשל "מספרה")."""
 
-כללים מחייבים:
-1. לכל בית עסק בחר תת-קטגוריה קיימת מהרשימה, או צור חדשה: שם עברי קצר (עד 3 מילים), בלשון רבים כשמתאים (למשל "סופרים", "מאפיות"), שמתאר סוג עסק — לא עסק בודד ולא מותג.
-2. עקביות מוחלטת: השתמש באותו שם בדיוק לכל בתי העסק מאותו סוג. אל תיצור שמות נרדפים (לא גם "סופרים" וגם "סופרמרקטים"), ואם קיימת תת-קטגוריה מתאימה ברשימה — השתמש בה ואל תמציא חדשה.
-3. אם אינך מזהה את בית העסק בוודאות — חפש אותו באינטרנט לפני השיוך (למשל "<שם העסק> ישראל"). אסור לשייך לפי צליל השם.
-4. אם גם אחרי חיפוש לא ברור מהו העסק, או שאינו מתאים לאף קבוצה משמעותית — החזר עבורו "" (ריק). עדיף ריק משיוך שגוי.
-5. אל תיצור תת-קטגוריה חדשה סביב בית עסק בודד, אלא אם סוג העסק מובהק מהשם (למשל "מספרה").
-6. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה), מערך עם רשומה לכל אינדקס:
-   [{"index": 0, "subcategory": "שם התת-קטגוריה או ריק"}, ...]"""
+SUBCAT_KNOWN_SYSTEM = f"""אתה מערכת לפילוח בתי עסק לתתי-קטגוריות בדשבורד פיננסי ישראלי. אתה מקבל קטגוריית-אב, רשימת תתי-קטגוריות קיימות ורשימת בתי עסק ששייכים לקטגוריית-האב אך ללא תת-קטגוריה.
+
+{SUBCAT_RULES_COMMON}
+4. שייך בית עסק רק אם אתה מזהה אותו בוודאות — רשת/מותג מוכר, או שהתיאור עצמו אומר מה סוג העסק. אסור לשייך לפי צליל השם: אם אינך בטוח מהו העסק — החזר {{"index": N, "unknown": true}} והוא ייבדק באינטרנט בשלב נפרד.
+5. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה):
+   [{{"index": 0, "subcategory": "שם"}}, {{"index": 1, "unknown": true}}, ...]"""
+
+SUBCAT_SEARCH_SYSTEM = f"""אתה מערכת לפילוח בתי עסק לתתי-קטגוריות בדשבורד פיננסי ישראלי. בתי העסק ברשימה כבר זוהו כלא-מוכרים — אסור לשייך אותם מהשם בלבד.
+
+{SUBCAT_RULES_COMMON}
+4. עבור כל בית עסק אתה חייב לבצע חיפוש אינטרנט לפני השיוך (למשל: "<שם העסק> ישראל"). שייך רק לפי מה שמצאת. אם החיפוש לא מבהיר מהו העסק — החזר "" (ריק) עבורו; עדיף ריק משיוך שגוי.
+5. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה):
+   [{{"index": 0, "subcategory": "שם או ריק"}}, ...]"""
 
 SUBCAT_USER_TEMPLATE = """קטגוריית-האב: {category}
 
@@ -445,14 +469,34 @@ SUBCAT_USER_TEMPLATE = """קטגוריית-האב: {category}
 בתי העסק (שם — מספר עסקאות, סכום כולל בש"ח):
 {merchants}"""
 
+# (category, base merchant) → subcategory ('' = resolved to "leave empty").
+_SUBCAT_CACHE: dict[tuple[str, str], str] = {}
+
+
+def _valid_subcategory(sub: str, category: str) -> str:
+    """Sanitize a model-proposed subcategory name; '' when unusable."""
+    sub = str(sub or '').strip()
+    if sub in ('אחר', category) or len(sub) > 40:
+        return ''
+    return sub
+
+
+def _subcat_lines(items: list[dict]) -> str:
+    return "\n".join(
+        f"{i}. \"{it['merchant']}\" — {it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
+        for i, it in enumerate(items)
+    )
+
 
 def suggest_subcategories(category: str, items: list[dict], existing: list[str]) -> Optional[list[dict]]:
     """Group a category's unsubcategorized merchants into subcategories.
 
     Claude may reuse an existing subcategory or CREATE a new one (a short
-    Hebrew type-of-business name like "סופרים"). Same no-guessing policy as
-    categorization: merchants it can't identify must be web-searched, and when
-    still unclear they come back empty and stay unsubcategorized.
+    Hebrew type-of-business name like "סופרים"). Two phases, same no-guessing
+    policy as categorization: phase 1 groups only merchants recognized with
+    certainty; the rest go to phase 2 where a web search per merchant is
+    mandatory and unsearched answers are discarded. Merchants that stay
+    unclear come back empty and remain unsubcategorized.
 
     Args:
         category: the parent category (all merchants already belong to it).
@@ -470,55 +514,116 @@ def suggest_subcategories(category: str, items: list[dict], existing: list[str])
         logger.info("AI subcategorization skipped: ANTHROPIC_API_KEY not set")
         return None
 
-    lines = [
-        f"{i}. \"{it['merchant']}\" — {it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
-        for i, it in enumerate(items)
-    ]
-    user_prompt = SUBCAT_USER_TEMPLATE.format(
-        category=category,
-        existing=", ".join(existing) if existing else "(אין עדיין)",
-        merchants="\n".join(lines),
-    )
-
     model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
     use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
-    create_kwargs = {
-        'model': model,
-        'max_tokens': 8192,
-        'system': SUBCAT_SYSTEM,
-        'messages': [{"role": "user", "content": user_prompt}],
-    }
-    if use_search:
-        create_kwargs['tools'] = [{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": max(4, min(len(items) * 2, int(os.environ.get('AI_SUBCAT_SEARCH_MAX', '20')))),
-        }]
 
-    try:
+    resolved: dict[int, str] = {}      # item index → subcategory
+    to_query: list[int] = []
+    for i, it in enumerate(items):
+        cached = _SUBCAT_CACHE.get((category, it['merchant']))
+        if cached is None:
+            to_query.append(i)
+        else:
+            resolved[i] = cached
+
+    # Names created in earlier batches are offered to later ones, so one run
+    # can't mint synonyms for the same type of business.
+    known_names: list[str] = list(dict.fromkeys(existing))
+
+    def _existing_str() -> str:
+        return ", ".join(known_names) if known_names else "(אין עדיין)"
+
+    # ── Phase 1: no web search, certain merchants only ──
+    unknown: list[int] = []
+    chunk_size = 100
+    for start in range(0, len(to_query), chunk_size):
+        chunk = to_query[start:start + chunk_size]
+        chunk_items = [items[i] for i in chunk]
         try:
-            response = client.messages.create(**create_kwargs)
-        except Exception as tool_err:
-            if 'tools' not in create_kwargs:
-                raise
-            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
-            create_kwargs.pop('tools', None)
-            response = client.messages.create(**create_kwargs)
+            response = client.messages.create(
+                model=model,
+                max_tokens=8192,
+                system=SUBCAT_KNOWN_SYSTEM,
+                messages=[{"role": "user", "content": SUBCAT_USER_TEMPLATE.format(
+                    category=category, existing=_existing_str(), merchants=_subcat_lines(chunk_items))}],
+            )
+            results = _parse_json_array(_response_text(response))
+        except Exception as e:
+            logger.warning(f"AI subcategory phase-1 failed: {e}")
+            unknown.extend(chunk)
+            continue
 
-        results = _parse_json_array(_response_text(response))
-        out: list[dict] = []
+        answered: dict[int, str] = {}
         for item in results:
             idx = item.get("index")
-            if idx is None:
+            if idx is None or item.get("unknown"):
                 continue
-            sub = str(item.get("subcategory", "")).strip()
-            # A subcategory is a refinement label, not a category: reject the
-            # parent's own name, the legend bucket 'אחר', and runaway strings.
-            if sub in ('אחר', category) or len(sub) > 40:
-                sub = ''
-            out.append({"index": int(idx), "subcategory": sub})
-        logger.info(f"AI subcategorized {sum(1 for o in out if o['subcategory'])}/{len(items)} merchants in {category}")
-        return out
-    except Exception as e:
-        logger.warning(f"AI subcategorization failed: {e}")
-        return None
+            sub = _valid_subcategory(item.get("subcategory", ""), category)
+            if sub:
+                answered[int(idx)] = sub
+        for local_i, orig_i in enumerate(chunk):
+            if local_i in answered:
+                resolved[orig_i] = answered[local_i]
+                if answered[local_i] not in known_names:
+                    known_names.append(answered[local_i])
+            else:
+                unknown.append(orig_i)
+
+    # ── Phase 2: web search mandatory for the unrecognized merchants ──
+    if unknown and use_search:
+        batch_size = max(1, int(os.environ.get('AI_SEARCH_BATCH', '5')))
+        per_merchant = max(1, int(os.environ.get('AI_WEB_SEARCH_MAX', '2')))
+        for start in range(0, len(unknown), batch_size):
+            batch = unknown[start:start + batch_size]
+            batch_items = [items[i] for i in batch]
+            try:
+                response = client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    system=SUBCAT_SEARCH_SYSTEM,
+                    messages=[{"role": "user", "content": SUBCAT_USER_TEMPLATE.format(
+                        category=category, existing=_existing_str(), merchants=_subcat_lines(batch_items))}],
+                    tools=[{
+                        "type": "web_search_20250305",
+                        "name": "web_search",
+                        "max_uses": per_merchant * len(batch) + 1,
+                    }],
+                )
+            except Exception as e:
+                # No searchless fallback — these merchants were already
+                # established as unknown; a guess would be fabricated.
+                logger.warning(f"AI subcategory phase-2 failed, leaving batch unassigned: {e}")
+                continue
+            if not _response_searched(response):
+                logger.warning("AI subcategory phase-2 answered without searching; discarding %d answers", len(batch))
+                continue
+            try:
+                results = _parse_json_array(_response_text(response))
+            except Exception as e:
+                logger.warning(f"AI subcategory phase-2 JSON parse error: {e}")
+                continue
+            for item in results:
+                idx = item.get("index")
+                if idx is None:
+                    continue
+                idx = int(idx)
+                if not (0 <= idx < len(batch)):
+                    continue
+                sub = _valid_subcategory(item.get("subcategory", ""), category)
+                if sub:
+                    resolved[batch[idx]] = sub
+                    if sub not in known_names:
+                        known_names.append(sub)
+    elif unknown:
+        logger.info("AI web search disabled; %d unrecognized merchants stay unsubcategorized", len(unknown))
+
+    # Remember hits AND misses (queried merchants only) so a warm backend
+    # never re-queries the same merchant for the same category.
+    for i in to_query:
+        _SUBCAT_CACHE[(category, items[i]['merchant'])] = resolved.get(i, '')
+
+    out = [{"index": i, "subcategory": resolved.get(i, '')} for i in range(len(items))]
+    logger.info(
+        f"AI subcategorized {sum(1 for o in out if o['subcategory'])}/{len(items)} merchants in {category}"
+    )
+    return out
