@@ -1024,6 +1024,10 @@ def ai_audit(body: AIAuditRequest):
         # would only produce dead proposals.
         if cat == AI_CATEGORY:
             continue
+        # The keyword catalog governs these merchants on every restore; a rule
+        # can't move them, so verifying them would waste web searches.
+        if any(kw in raw.lower() for kw in KEYWORD_TO_CATEGORY):
+            continue
         m = merchants.setdefault(key, {
             "merchant": raw, "current": cat, "count": 0, "total": 0.0,
             "issuer": None, "_names": {}, "_cats": {},
@@ -1053,17 +1057,27 @@ def ai_audit(body: AIAuditRequest):
     total_eligible = len(items)
     items = items[: max(1, min(int(body.limit or 60), 200))]
 
-    verdicts = audit_merchants(items)
+    sid = body.session_id
+
+    def _audit_progress(done, total):
+        AI_PROGRESS[sid] = {"stage": "auditing", "done": done, "total": total, "detail": ""}
+
+    verdicts = audit_merchants(items, on_progress=_audit_progress)
     if verdicts is None:
         raise HTTPException(status_code=503, detail="AI is not configured (ANTHROPIC_API_KEY)")
 
     proposals = []
+    # Merchants whose current category the web check CONFIRMED — the client
+    # pins these as rules so each merchant is verified once, ever.
+    verified = []
     for v in verdicts:
         i = v["index"]
         if not (0 <= i < len(items)):
             continue
         it = items[i]
         if v["category"] == it["current"] or v["category"] == 'שונות':
+            if v["category"] == it["current"] and it["current"] != 'שונות':
+                verified.append({"merchant": it["merchant"], "category": it["current"]})
             continue
         merchant_lower = str(it["merchant"]).lower()
         catalog_hit = any(kw in merchant_lower for kw in KEYWORD_TO_CATEGORY)
@@ -1085,6 +1099,7 @@ def ai_audit(body: AIAuditRequest):
     return {
         "success": True,
         "proposals": proposals,
+        "verified": verified,
         "audited_count": len(items),
         # Everything this batch covered — the client feeds these back as
         # exclude_merchants to advance to the NEXT slice (without this,

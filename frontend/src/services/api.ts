@@ -156,12 +156,14 @@ export const transactionsApi = {
     limit = 60,
   ): Promise<{
     proposals: CategoryAuditProposal[];
+    verified: { merchant: string; category: string }[];
     audited_count: number;
     audited_merchants: string[];
     remaining: number;
   }> => {
     const response = await api.post<{
       proposals: CategoryAuditProposal[];
+      verified: { merchant: string; category: string }[];
       audited_count: number;
       audited_merchants: string[];
       remaining: number;

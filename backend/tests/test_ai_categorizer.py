@@ -54,6 +54,7 @@ class _FakeClient:
 def _fresh_state(monkeypatch):
     monkeypatch.setattr(ai_categorizer, "_CACHE", {})
     monkeypatch.setattr(ai_categorizer, "_SUBCAT_CACHE", {})
+    monkeypatch.setattr(ai_categorizer, "_AUDIT_CACHE", {})
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
 
@@ -146,22 +147,45 @@ def test_invalid_category_rejected(monkeypatch):
     assert categorize_transactions(["עסק כלשהו"]) == {}
 
 
-def test_audit_merchants_runs_end_to_end(monkeypatch):
+def test_audit_merchants_requires_search_and_caches(monkeypatch):
     # Executes the real audit_merchants (not mocked at the route level like
-    # test_ai_audit.py) so a broken prompt constant or parse path fails here.
+    # test_ai_audit.py). A verdict is only accepted when the model actually
+    # searched; verdicts are cached per (merchant, current).
+    calls = {"n": 0}
+
     def handler(kwargs):
+        calls["n"] += 1
         assert kwargs["system"]  # audit must carry its own system prompt
+        assert kwargs["tools"][0]["type"] == "web_search_20250305"  # mandatory
         return _text_response([
             {"index": 0, "category": "מזון וצריכה", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
-        ])
+        ], searched=True)
 
     _install(monkeypatch, handler)
-    out = ai_categorizer.audit_merchants([
-        {"merchant": "שופרסל דיל", "current": "אופנה", "issuer": "מזון", "count": 4, "total": 512.0},
-    ])
+    items = [{"merchant": "שופרסל דיל", "current": "אופנה", "issuer": "מזון", "count": 4, "total": 512.0}]
+    out = ai_categorizer.audit_merchants(items)
     assert out == [
         {"index": 0, "category": "מזון וצריכה", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
     ]
+    # cached — the second run makes no API call
+    out2 = ai_categorizer.audit_merchants(items)
+    assert out2 == out
+    assert calls["n"] == 1
+
+
+def test_audit_unsearched_verdicts_discarded(monkeypatch):
+    def handler(kwargs):
+        return _text_response([
+            {"index": 0, "category": "אופנה", "confidence": 0.95, "reason": "ניחוש"},
+        ], searched=False)
+
+    _install(monkeypatch, handler)
+    out = ai_categorizer.audit_merchants([
+        {"merchant": "עסק עלום", "current": "שונות", "count": 1, "total": 100.0},
+    ])
+    assert out == []  # unverified opinion never lands
+    # and NOT cached — a later sweep retries
+    assert ("עסק עלום", "שונות") not in ai_categorizer._AUDIT_CACHE
 
 
 def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):

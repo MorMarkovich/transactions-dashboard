@@ -159,6 +159,8 @@ export default function Layout({ children }: LayoutProps) {
           setAiStatus({ label: p.total ? `מסווג עסקים… ${p.done}/${p.total}` : 'מסווג עסקים…' })
         } else if (p.stage === 'subcategorizing') {
           setAiStatus({ label: `מפלח תתי-קטגוריות… ${p.done + 1}/${p.total}${p.detail ? ` · ${p.detail}` : ''}` })
+        } else if (p.stage === 'auditing') {
+          setAiStatus({ label: p.total ? `מאמת סיווגים מול האינטרנט… ${p.done}/${p.total}` : 'מאמת סיווגים מול האינטרנט…' })
         }
       } catch { /* progress is cosmetic */ }
     }
@@ -186,23 +188,39 @@ export default function Layout({ children }: LayoutProps) {
         if (assignments.length) window.dispatchEvent(new CustomEvent('ai-categorized'))
       } catch { /* ignore */ }
 
-      // 3) automatic accuracy audit: second opinion on stored categories the
-      // keyword catalog can't govern; only high-confidence verdicts applied.
-      setAiStatus({ label: 'בודק דיוק סיווגים…' })
+      // 3) exhaustive web verification: every merchant the keyword catalog
+      // doesn't govern gets a mandatory web-searched verdict, batch after
+      // batch until nothing remains. High-confidence corrections are applied;
+      // confirmed merchants are pinned as rules so each one is verified ONCE,
+      // ever — the sweep costs nothing on later loads.
+      setAiStatus({ label: 'מאמת סיווגים מול האינטרנט…' })
       try {
-        const audit = await transactionsApi.aiAudit(sessionId)
-        const applicable = (audit.proposals ?? []).filter(
-          (pr) => !pr.catalog_hit && pr.confidence >= 0.85,
-        )
-        for (const pr of applicable) {
-          try {
-            await transactionsApi.setMerchantCategory(sessionId, pr.merchant, pr.proposed_category)
-            await supabaseApi
-              .upsertCategoryRule(userId, pr.merchant, pr.proposed_category)
-              .catch(() => {})
-          } catch { /* per-merchant best effort */ }
+        // Rule-covered merchants were already decided (by the user, the AI
+        // fallback, or a previous sweep) — start from them as exclusions.
+        const rules = await supabaseApi.getCategoryRules(userId).catch(() => [])
+        let exclude = rules.map((r) => r.merchant)
+        for (let batch = 0; batch < 100; batch++) {
+          const res = await transactionsApi.aiAudit(sessionId, exclude)
+          const applicable = (res.proposals ?? []).filter((pr) => pr.confidence >= 0.85)
+          for (const pr of applicable) {
+            try {
+              await transactionsApi.setMerchantCategory(sessionId, pr.merchant, pr.proposed_category)
+              await supabaseApi
+                .upsertCategoryRule(userId, pr.merchant, pr.proposed_category)
+                .catch(() => {})
+            } catch { /* per-merchant best effort */ }
+          }
+          // Pin web-confirmed merchants so they are never re-verified.
+          const verified = res.verified ?? []
+          if (verified.length) {
+            await supabaseApi.upsertCategoryRules(userId, verified).catch(() => {})
+          }
+          if (applicable.length || verified.length) {
+            window.dispatchEvent(new CustomEvent('ai-categorized'))
+          }
+          exclude = exclude.concat(res.audited_merchants || [])
+          if (!res.audited_count || !res.remaining) break
         }
-        if (applicable.length) window.dispatchEvent(new CustomEvent('ai-categorized'))
       } catch { /* ignore */ }
     } finally {
       if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null }
