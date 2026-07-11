@@ -131,3 +131,21 @@ def test_rule_subcategory_is_scoped_to_its_parent_category():
     row = _cats(sid)[1]
     assert row["קטגוריה"] == "מסעדות, קפה וברים"
     assert (row.get("קטגוריה_משנה") or "") != "שוברי מזון"
+
+
+def test_stock_stores_are_consumption_not_fashion():
+    # BOOOM / סטוק סנטר are discount variety stores ("הכל בזול"), not fashion —
+    # the old keyword list pinned them to אופנה next to אאוטלט.
+    sid = _restore([
+        {"id": 1, "תאריך": "2026-06-11", "תיאור": "BOOOM", "קטגוריה": "אופנה", "סכום": -134.4},
+        {"id": 2, "תאריך": "2026-06-17", "תיאור": 'ב"ב BOOOM', "קטגוריה": "אופנה", "סכום": -15.9},
+        {"id": 3, "תאריך": "2026-06-29", "תיאור": "סטוק סנטר איריס בע\"מ", "קטגוריה": "אופנה", "סכום": -15.9},
+        # A real fashion chain stays fashion.
+        {"id": 4, "תאריך": "2026-06-24", "תיאור": "גולף קניון רמת גן-גמ", "קטגוריה": "אופנה", "סכום": -15.12},
+    ])
+    cats = _cats(sid)
+    for i in (1, 2, 3):
+        assert cats[i]["קטגוריה"] == "מזון וצריכה"
+        assert cats[i]["קטגוריה_משנה"] == "חנויות סטוק"
+    assert cats[4]["קטגוריה"] == "אופנה"
+    assert cats[4]["קטגוריה_משנה"] == "רשתות אופנה"

@@ -492,3 +492,11 @@ test('delivery descriptors are food orders, not transport', () => {
   assert.equal(categorize('כביש 6 חוצה צפון בע"מ'), 'תחבורה ורכבים')
   assert.equal(categorize('מ.תחבורה ? רב-פס'), 'תחבורה ורכבים')
 })
+
+test('stock/variety stores are consumption with the חנויות סטוק subcategory', () => {
+  assert.equal(categorize('BOOOM'.toLowerCase()), 'מזון וצריכה')
+  assert.equal(categorize('סטוק סנטר איריס בע"מ'), 'מזון וצריכה')
+  assert.equal(subcategorize('מזון וצריכה', 'סטוק סנטר איריס בע"מ'), 'חנויות סטוק')
+  // Real fashion chains stay fashion.
+  assert.equal(categorize('גולף קניון רמת גן-גמ'), 'אופנה')
+})
