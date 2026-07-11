@@ -134,6 +134,9 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'גרג', 'greg', 'אספרסו', 'espresso',
         'wolt', 'וולט',
         '10bis', 'תנביס',
+        # Delivery descriptors on Israeli cards are food orders, not couriers
+        # ("מפגש גרונר משלוחים", the משלוחה ordering app, "הזמנת אוכל").
+        'משלוחה', 'משלוחים', 'משלוח', 'הזמנת אוכל', 'delivery',
         'japanika', 'ג\'פניקה',
         'שיפודי', 'shipudei', 'restaurant',
         'starbucks', 'סטארבקס', 'מושלי',
@@ -167,7 +170,6 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'מוסך', 'מוסכים', 'מוסכי', 'garage', 'צמיגים', 'tires',
         'ביטוח רכב', 'רישוי', 'רישיון רכב', 'אגרה',
         'כביש 6', 'כביש אגרה', 'מנהרות', 'מנהרת', 'tunnel',
-        'משלוח', 'שליח', 'delivery',
         # ── More transport, parking, car services ──
         'רכבת קלה', 'הרכבת הקלה', 'מטרונית', 'דן באב',
         'autotel', 'אוטוטל', 'car2go', 'sharenow', 'באבל דן',
