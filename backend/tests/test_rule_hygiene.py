@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app  # noqa: E402
+from app.core.constants import AI_CATEGORY  # noqa: E402
 
 client = TestClient(app)
 
@@ -58,19 +59,25 @@ def test_real_foreign_spend_still_goes_to_travel():
     assert by_desc["SHINSEGAE DEPARTMENT S SEOUL         KR"]["קטגוריה"] == "טיסות ותיירות"
 
 
-def test_valid_rules_still_win_but_not_over_ai_tools():
+def test_catalog_beats_conflicting_rules_and_rules_decide_unknowns():
     rows = [
         {"תאריך": "2026-06-01", "תיאור": "שופרסל דיל", "קטגוריה": "שונות", "סכום": -100},
         {"תאריך": "2026-06-02", "תיאור": "OPENAI *CHATGPT", "קטגוריה": "שונות", "סכום": -80},
+        {"תאריך": "2026-06-03", "תיאור": "ZZQWX UNKNOWN CO", "קטגוריה": "שונות", "סכום": -50},
     ]
     rules = [
-        {"merchant": "שופרסל דיל", "category": "מתנות"},          # valid manual override
+        # Conflicts with a catalog hit (שופרסל → מזון וצריכה) — a stale AI
+        # guess persisted as a rule; the catalog is the source of truth.
+        {"merchant": "שופרסל דיל", "category": "מתנות"},
         {"merchant": "OPENAI *CHATGPT", "category": "חשמל ומחשבים"},  # stale pre-AI-category rule
+        # The catalog has no opinion here — the rule decides.
+        {"merchant": "ZZQWX UNKNOWN CO", "category": "מתנות"},
     ]
     by_desc = _restore(rows, rules)
-    assert by_desc["שופרסל דיל"]["קטגוריה"] == "מתנות"
-    assert by_desc["OPENAI *CHATGPT"]["קטגוריה"] == "בינה מלאכותית"
-
+    assert by_desc["שופרסל דיל"]["קטגוריה"] == "מזון וצריכה"
+    # The AI-tool override still beats the stale rule.
+    assert by_desc["OPENAI *CHATGPT"]["קטגוריה"] == AI_CATEGORY
+    assert by_desc["ZZQWX UNKNOWN CO"]["קטגוריה"] == "מתנות"
 
 def test_stale_exempt_travel_rows_are_repaired():
     """Rows tagged travel by the PRE-exemption foreign rule must migrate out:

@@ -41,13 +41,13 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
   const issuerCategory = raw.category ? String(raw.category).trim() : ''
 
   // Categorize on the clean merchant name (before any installment suffix).
-  let category = categorize(baseDesc)
+  // Precedence: catalog > user rules > issuer sector, so a rule can decide a
+  // catalog-unknown merchant but never fight the catalog, and the issuer
+  // only fills what both left uncategorized. Mirrors the backend restore.
+  let category = applyRules(categorize(baseDesc), baseDesc, ruleMap)
   if (category === 'שונות') {
-    // Issuer sector fills what the keyword catalog missed — weaker than the
-    // catalog and than user rules (applied next), mirroring the backend.
     category = categoryFromIssuer(issuerCategory) || category
   }
-  category = applyRules(category, baseDesc, ruleMap)
   // Subcategory (קטגוריה_משנה) derived from the finalized category. The
   // dashboard re-derives this on restore too, so this is parity-only.
   const subcategory = subcategorize(category, baseDesc)
@@ -158,19 +158,19 @@ export function refreshMiscCategories(txns, ruleMap) {
     const isMisc = stored === 'שונות' || !VALID_CATEGORIES.has(stored) || staleExemptTravel
     const isExpense = Number(t['סכום']) < 0
     if (!isMisc && !isExpense) continue
-    let category = categorize(baseDesc)
-    if (isMisc) {
-      if (category === 'שונות') {
+    // Precedence: catalog > user rules > issuer sector > stored category.
+    let category = applyRules(categorize(baseDesc), baseDesc, ruleMap)
+    if (category === 'שונות') {
+      if (isMisc) {
         // Same weak fallback as scrape time: the issuer's own sector, when the
         // row carries one, beats leaving it uncategorized.
         category = categoryFromIssuer(t['ענף_מקור']) || category
+      } else {
+        // The catalog and the rules have no opinion on this stored expense —
+        // keep what's stored.
+        category = stored
       }
-    } else if (category === 'שונות') {
-      // The catalog has no opinion on this stored expense — keep it (a user
-      // rule below may still override).
-      category = stored
     }
-    category = applyRules(category, baseDesc, ruleMap)
     // An invalid stored category must not survive even when nothing matches —
     // reset it to שונות so the dashboard/AI treat it as uncategorized.
     if (category === stored) continue

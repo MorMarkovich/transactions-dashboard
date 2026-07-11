@@ -36,6 +36,21 @@ from ..utils.validators import detect_amount_column, find_column
 
 router = APIRouter()
 
+# Background-AI progress per session, read by GET /ai-progress so the UI can
+# show a live "categorizing… n/m" meter. In-memory like `sessions` (wiped on
+# cold start — the meter simply restarts with the next background run).
+AI_PROGRESS: dict[str, dict] = {}
+
+
+@router.get("/ai-progress")
+async def get_ai_progress(sessionId: str = Query(...)):
+    """Live progress of the background AI chain (categorize → subcategorize).
+
+    Stages: idle | categorizing | categorized | subcategorizing | done.
+    done/total count merchants (categorize) or categories (subcategorize)."""
+    return AI_PROGRESS.get(sessionId) or {"stage": "idle", "done": 0, "total": 0, "detail": ""}
+
+
 @router.get("/test")
 async def test():
     return {"status": "ok"}
@@ -268,6 +283,7 @@ async def restore_session(body: RestoreSessionRequest):
                 else pd.Series(False, index=df.index)
             )
             eligible = misc_mask | expense_mask
+            catalog_known_mask = pd.Series(False, index=df.index)
             if eligible.any():
                 # Shrinking scan: each row stops at its first (= longest,
                 # KEYWORD_TO_CATEGORY is sorted longest-first) keyword hit.
@@ -296,6 +312,8 @@ async def restore_session(body: RestoreSessionRequest):
                         if 'קטגוריה_משנה' in df.columns and len(changed_idx):
                             df.loc[changed_idx, 'קטגוריה_משנה'] = ''
                         remaining = remaining[~hit]
+                # Rows the scan resolved: the catalog KNOWS these merchants.
+                catalog_known_mask = eligible & ~df.index.isin(remaining.index)
 
             # Issuer classification (ענף_מקור, stored by bank-sync): the card
             # company's own sector fills whatever the keyword catalog left in
@@ -306,8 +324,11 @@ async def restore_session(body: RestoreSessionRequest):
             # Apply user-defined merchant→category rules BEFORE the AI step, so
             # rule-covered merchants — including ones the AI resolved on an
             # earlier load and we persisted as rules — are no longer "שונות" and
-            # the AI skips them. This way each merchant is web-searched at most
-            # once. Rules also win over the keyword categorizer above.
+            # the AI skips them. The CATEGORY part of a rule applies only where
+            # the keyword catalog is silent: a rule contradicting a catalog hit
+            # is stale (an old AI guess persisted as a rule — e.g. a minimarket
+            # pinned to משיכת מזומן) and must not resurrect the wrong category.
+            # The SUBCATEGORY part always applies (manual refinements).
             if body.category_rules:
                 # Match rules on the canonical merchant key, not the raw
                 # descriptor: a rule saved from "רהיטים (תשלום 3/12)" must hit
@@ -326,7 +347,7 @@ async def restore_session(body: RestoreSessionRequest):
                     if not rmask.any():
                         continue
                     if r.category:
-                        df.loc[rmask, 'קטגוריה'] = r.category
+                        df.loc[rmask & ~catalog_known_mask, 'קטגוריה'] = r.category
                     # Manual subcategory override (preserved over keyword
                     # derivation below, same precedence as the category rule).
                     if getattr(r, 'subcategory', None):
@@ -929,7 +950,13 @@ def ai_categorize(body: AICategorizeRequest):
                     else str(v).strip()
                     for v in df.loc[misc_mask, 'ענף_מקור'].tolist()
                 ]
-            ai_map = categorize_transactions(misc_descs, misc_issuers) or {}
+            sid = body.session_id
+
+            def _progress(done, total):
+                AI_PROGRESS[sid] = {"stage": "categorizing", "done": done, "total": total, "detail": ""}
+
+            AI_PROGRESS[sid] = {"stage": "categorizing", "done": 0, "total": 0, "detail": ""}
+            ai_map = categorize_transactions(misc_descs, misc_issuers, on_progress=_progress) or {}
             misc_idx = df.index[misc_mask].tolist()
             for local_i, cat in ai_map.items():
                 if 0 <= local_i < len(misc_idx):
@@ -941,6 +968,7 @@ def ai_categorize(body: AICategorizeRequest):
             if ai_categorized:
                 derive_subcategory(df)
 
+    AI_PROGRESS[body.session_id] = {"stage": "categorized", "done": 0, "total": 0, "detail": ""}
     return {"success": True, "ai_categorized": ai_categorized}
 
 
@@ -1031,6 +1059,8 @@ def ai_audit(body: AIAuditRequest):
         it = items[i]
         if v["category"] == it["current"] or v["category"] == 'שונות':
             continue
+        merchant_lower = str(it["merchant"]).lower()
+        catalog_hit = any(kw in merchant_lower for kw in KEYWORD_TO_CATEGORY)
         proposals.append({
             "merchant": it["merchant"],
             "current_category": it["current"],
@@ -1040,6 +1070,10 @@ def ai_audit(body: AIAuditRequest):
             "count": it["count"],
             "total": round(_sanitize(float(it["total"])), 2),
             "issuer_category": it["issuer"],
+            # True when the keyword catalog has an opinion on this merchant —
+            # the catalog governs those on every restore, so the automatic
+            # background audit must not fight it.
+            "catalog_hit": catalog_hit,
         })
     proposals.sort(key=lambda p: (p["confidence"], p["total"]), reverse=True)
     return {
@@ -1229,12 +1263,18 @@ def ai_subcategorize_all(body: AISubcategorizeAllRequest):
 
     all_assignments: list[dict] = []
     remaining_total = 0
-    for category in categories:
+    for i, category in enumerate(categories):
+        AI_PROGRESS[body.session_id] = {
+            "stage": "subcategorizing", "done": i, "total": len(categories), "detail": category,
+        }
         assignments, remaining = _ai_subcategorize_category(df, category, body.limit_per_category)
         all_assignments.extend(assignments)
         remaining_total += remaining
 
     sessions[body.session_id] = df
+    AI_PROGRESS[body.session_id] = {
+        "stage": "done", "done": len(categories), "total": len(categories), "detail": "",
+    }
     return {"success": True, "assignments": all_assignments, "remaining": remaining_total}
 
 

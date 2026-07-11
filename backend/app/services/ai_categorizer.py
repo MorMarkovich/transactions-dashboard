@@ -139,6 +139,11 @@ AUDIT_PROMPT_TEMPLATE = """בדוק את הסיווג הנוכחי של בתי �
 {merchants}"""
 
 
+# (merchant, current category) → verdict dict. The automatic background audit
+# re-runs on every restore; caching verdicts keeps warm-backend reloads free.
+_AUDIT_CACHE: dict[tuple[str, str], dict] = {}
+
+
 def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
     """Second-opinion pass over already-categorized merchants.
 
@@ -155,11 +160,25 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
     """
     if not items:
         return []
+
+    cached_out: list[dict] = []
+    fresh: list[tuple[int, dict]] = []  # (original index, item)
+    for i, it in enumerate(items):
+        v = _AUDIT_CACHE.get((it['merchant'], it['current']))
+        if v is not None:
+            cached_out.append({**v, "index": i})
+        else:
+            fresh.append((i, it))
+    if not fresh:
+        return cached_out
+
     client = _get_client()
     if client is None:
         logger.info("AI audit skipped: ANTHROPIC_API_KEY not set")
         return None
 
+    items_idx = [i for i, _ in fresh]
+    items = [it for _, it in fresh]
     lines = []
     for i, it in enumerate(items):
         issuer = f", ענף לפי חברת האשראי: {it['issuer']}" if it.get('issuer') else ""
@@ -206,17 +225,21 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
                 conf = min(1.0, max(0.0, float(item.get("confidence", 0.5))))
             except (TypeError, ValueError):
                 conf = 0.5
-            out.append({
-                "index": int(idx),
+            idx = int(idx)
+            if not (0 <= idx < len(items)):
+                continue
+            verdict = {
                 "category": cat,
                 "confidence": conf,
                 "reason": str(item.get("reason", "")).strip(),
-            })
-        logger.info(f"AI audit returned {len(out)}/{len(items)} verdicts")
-        return out
+            }
+            _AUDIT_CACHE[(items[idx]['merchant'], items[idx]['current'])] = verdict
+            out.append({**verdict, "index": items_idx[idx]})
+        logger.info(f"AI audit returned {len(out)}/{len(items)} fresh verdicts (+{len(cached_out)} cached)")
+        return cached_out + out
     except Exception as e:
         logger.warning(f"AI audit failed: {e}")
-        return None
+        return (cached_out + [])  if cached_out else None
 
 
 def _get_client():
@@ -279,7 +302,7 @@ def _merchant_line(i: int, m: dict) -> str:
     return f"{i}. {m['base']}{hint}"
 
 
-def _classify_known(client, model: str, merchants: list[dict]) -> tuple[dict[str, str], list[dict]]:
+def _classify_known(client, model: str, merchants: list[dict], progress=None) -> tuple[dict[str, str], list[dict]]:
     """Phase 1: no web search. Returns (resolved base→category, unknown bases).
 
     Merchants the model cannot identify with certainty come back as unknown —
@@ -317,10 +340,12 @@ def _classify_known(client, model: str, merchants: list[dict]) -> tuple[dict[str
                 resolved[m["base"]] = answered[i]
             else:
                 unknown.append(m)
+        if progress:
+            progress(len(resolved))
     return resolved, unknown
 
 
-def _classify_via_search(client, model: str, merchants: list[dict]) -> dict[str, str]:
+def _classify_via_search(client, model: str, merchants: list[dict], progress=None) -> dict[str, str]:
     """Phase 2: web search is mandatory. Returns resolved base→category.
 
     Small batches so every merchant gets search budget. A response with no
@@ -350,18 +375,24 @@ def _classify_via_search(client, model: str, merchants: list[dict]) -> dict[str,
             # Do NOT fall back to searchless guessing — these merchants were
             # already established as unknown; a guess would be fabricated.
             logger.warning(f"AI phase-2 (web search) failed, leaving batch uncategorized: {e}")
+            if progress:
+                progress(len(batch))
             continue
 
         if not _response_searched(response):
             logger.warning(
                 "AI phase-2 answered without searching; discarding %d answers", len(batch)
             )
+            if progress:
+                progress(len(batch))
             continue
 
         try:
             results = _parse_json_array(_response_text(response))
         except Exception as e:
             logger.warning(f"AI phase-2 JSON parse error: {e}")
+            if progress:
+                progress(len(batch))
             continue
 
         for item in results:
@@ -372,10 +403,12 @@ def _classify_via_search(client, model: str, merchants: list[dict]) -> dict[str,
             idx = int(idx)
             if 0 <= idx < len(batch) and cat in VALID_CATEGORIES and cat != 'שונות':
                 resolved[batch[idx]["base"]] = cat
+        if progress:
+            progress(len(batch))
     return resolved
 
 
-def categorize_transactions(descriptions: list[str], issuers: Optional[list] = None) -> Optional[dict[int, str]]:
+def categorize_transactions(descriptions: list[str], issuers: Optional[list] = None, on_progress=None) -> Optional[dict[int, str]]:
     """
     Categorize transaction descriptions using Claude AI.
 
@@ -410,14 +443,30 @@ def categorize_transactions(descriptions: list[str], issuers: Optional[list] = N
     use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
 
     if to_query:
-        resolved, unknown = _classify_known(client, model, to_query)
+        total = len(to_query)
+        finalized = {"n": 0}
+
+        def _emit(done_n):
+            if on_progress:
+                on_progress(min(done_n, total), total)
+
+        _emit(0)
+        resolved, unknown = _classify_known(
+            client, model, to_query,
+            progress=lambda resolved_n: _emit(resolved_n),
+        )
+        finalized["n"] = len(resolved)
         if unknown:
             if use_search:
-                resolved.update(_classify_via_search(client, model, unknown))
+                def _batch_done(batch_n):
+                    finalized["n"] += batch_n
+                    _emit(finalized["n"])
+                resolved.update(_classify_via_search(client, model, unknown, progress=_batch_done))
             else:
                 logger.info(
                     "AI web search disabled; %d unrecognized merchants stay שונות", len(unknown)
                 )
+        _emit(total)
         # Remember hits AND misses so we never re-query the same merchant.
         for m in to_query:
             _CACHE[m["base"]] = resolved.get(m["base"], 'שונות')

@@ -132,6 +132,20 @@ export const transactionsApi = {
   },
 
   /**
+   * Live progress of the background AI chain, for the UI meter.
+   * stage: idle | categorizing | categorized | subcategorizing | done.
+   */
+  aiProgress: async (
+    sessionId: string,
+  ): Promise<{ stage: string; done: number; total: number; detail: string }> => {
+    const response = await api.get<{ stage: string; done: number; total: number; detail: string }>(
+      '/api/ai-progress',
+      { params: { sessionId } },
+    );
+    return response.data;
+  },
+
+  /**
    * AI audit: second opinion on ALL expense merchants (not just שונות).
    * Returns proposals where Claude disagrees with the current category —
    * nothing is applied until the user accepts a proposal.
