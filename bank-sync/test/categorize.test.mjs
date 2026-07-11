@@ -142,13 +142,15 @@ test('refreshMiscCategories repairs rows stored with junk אחר', () => {
 })
 
 // ── refreshMiscCategories: apply catalog updates to stored snapshots ─────────
-test('refreshMiscCategories upgrades שונות rows but never touches real categories', () => {
+test('refreshMiscCategories upgrades שונות rows and keeps catalog-unknown stored ones', () => {
   const txns = [
     { 'תיאור': 'ELAL', 'קטגוריה': 'שונות' },
     { 'תיאור': 'AIRALO (תשלום 2/3)', 'קטגוריה': 'שונות' }, // installment suffix stripped
-    { 'תיאור': 'שופרסל דיל', 'קטגוריה': 'מזון וצריכה' },    // already set — untouched
+    { 'תיאור': 'שופרסל דיל', 'קטגוריה': 'מזון וצריכה', 'סכום': -50 },  // catalog agrees — untouched
     { 'תיאור': 'מרצדס בנץ', 'קטגוריה': 'שונות' },           // user rule wins
     { 'תיאור': 'ZZQWX UNKNOWN', 'קטגוריה': 'שונות' },        // stays שונות
+    // Catalog has NO opinion → the stored category survives.
+    { 'תיאור': 'ZZQWX SERVICES', 'קטגוריה': 'מנויים ושירותים', 'סכום': -30 },
   ]
   const rules = new Map([['מרצדס בנץ', 'תחבורה ורכבים']])
   const changed = refreshMiscCategories(txns, rules)
@@ -158,6 +160,26 @@ test('refreshMiscCategories upgrades שונות rows but never touches real cate
   assert.equal(txns[2]['קטגוריה'], 'מזון וצריכה')
   assert.equal(txns[3]['קטגוריה'], 'תחבורה ורכבים')
   assert.equal(txns[4]['קטגוריה'], 'שונות')
+  assert.equal(txns[5]['קטגוריה'], 'מנויים ושירותים')
+})
+
+test('refreshMiscCategories: the catalog repairs a stale stored category on expenses', () => {
+  const txns = [
+    // Old AI guess baked into the snapshot: a minimarket pinned to משיכת מזומן.
+    // The catalog KNOWS it ('מרקט') → repaired, stale subcategory re-derived.
+    { 'תיאור': 'סיטי מרקט רמת גן', 'קטגוריה': 'משיכת מזומן', 'קטגוריה_משנה': 'ישן', 'סכום': -13.9 },
+    // Income row (refund) with the same descriptor — never second-guessed.
+    { 'תיאור': 'סיטי מרקט רמת גן', 'קטגוריה': 'העברת כספים', 'סכום': 100 },
+    // A user rule still beats the catalog repair.
+    { 'תיאור': 'רמי לוי שיווק', 'קטגוריה': 'משיכת מזומן', 'סכום': -80 },
+  ]
+  const rules = new Map([['רמי לוי שיווק', 'משיכת מזומן']])
+  const changed = refreshMiscCategories(txns, rules)
+  assert.equal(changed, 1)
+  assert.equal(txns[0]['קטגוריה'], 'מזון וצריכה')
+  assert.notEqual(txns[0]['קטגוריה_משנה'], 'ישן')
+  assert.equal(txns[1]['קטגוריה'], 'העברת כספים')
+  assert.equal(txns[2]['קטגוריה'], 'משיכת מזומן')
 })
 
 test('foreign bucketing excludes Israel (IL), online services, and domestic rows', () => {
