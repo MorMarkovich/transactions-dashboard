@@ -146,9 +146,12 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
 
     Scoped to each parent category (so sub-keywords never leak across
     categories), shrinking-mask substring scan mirroring the category loop.
-    Only fills rows whose subcategory is still empty, so a manual/rule-assigned
-    subcategory is preserved. Pure — no AI. Must run AFTER the category is
-    finalized (after user rules) in both pipelines.
+    Like the category catalog, the seeded subcategory catalog WINS when it has
+    an opinion — a keyword hit replaces an AI-created/stale name (e.g. שקם
+    אלקטריק pinned to "חשמלאים" becomes "חנויות חשמל"). Where the seeds are
+    silent, existing (manual/AI) subcategories are preserved and empties stay
+    empty. Pure — no AI. Must run AFTER the category is finalized (after user
+    rules) in both pipelines.
     """
     if 'קטגוריה_משנה' not in df.columns:
         df['קטגוריה_משנה'] = ''
@@ -160,7 +163,9 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
     desc_lower = df['תיאור'].astype(str).str.lower()
 
     for parent, submap in SUBCATEGORY_KEYWORDS.items():
-        parent_mask = (cat == parent) & (df['קטגוריה_משנה'] == '')
+        # ALL parent rows, not just empty ones: a seeded keyword hit overrides
+        # whatever subcategory is there; rows with no hit are left untouched.
+        parent_mask = cat == parent
         if not parent_mask.any():
             continue
         remaining = desc_lower[parent_mask]

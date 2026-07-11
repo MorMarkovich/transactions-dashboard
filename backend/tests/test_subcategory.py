@@ -28,14 +28,26 @@ def test_renamed_category_has_no_subcategory():
     assert df['קטגוריה_משנה'].iloc[0] == ''
 
 
-def test_manual_subcategory_is_preserved():
+def test_manual_subcategory_preserved_when_seeds_are_silent():
     df = pd.DataFrame({
-        'תיאור': ['מאפיית לחם'],
+        'תיאור': ['חנות מיוחדת'],
         'קטגוריה': ['מזון וצריכה'],
         'קטגוריה_משנה': ['בחירה ידנית'],
     })
     derive_subcategory(df)
     assert df['קטגוריה_משנה'].iloc[0] == 'בחירה ידנית'
+
+
+def test_seeded_subcategory_overrides_stale_name():
+    # Like the category catalog, seeded subcategories win when they have an
+    # opinion — an AI-created "חשמלאים" on an appliance store gets repaired.
+    df = pd.DataFrame({
+        'תיאור': ['שקם אלקטריק-צמרת', 'NETFLIX.COM 408-724-9160 NL', 'ALIEXPRESS', 'GOOGLE MICROSOFT ONE'],
+        'קטגוריה': ['חשמל ומחשבים'] * 4,
+        'קטגוריה_משנה': ['חשמלאים', '', '', ''],
+    })
+    derive_subcategory(df)
+    assert list(df['קטגוריה_משנה']) == ['חנויות חשמל', 'סטרימינג', 'קניות אונליין', 'שירותי ענן']
 
 
 def test_no_keyword_match_is_empty():

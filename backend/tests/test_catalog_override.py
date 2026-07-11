@@ -79,9 +79,22 @@ def test_rule_still_decides_catalog_unknown_merchant():
     assert _cats(sid)[1]["קטגוריה"] == "מתנות"
 
 
-def test_rule_subcategory_still_applies_on_catalog_known_merchant():
+def test_rule_subcategory_applies_where_subcategory_seeds_are_silent():
     # Only the CATEGORY part of a conflicting rule is ignored — a manual
-    # subcategory refinement on a catalog-known merchant must stick.
+    # subcategory refinement sticks as long as no seeded subcategory keyword
+    # claims the merchant (seeded subcategories, like the category catalog,
+    # win when they have an opinion).
+    sid = _restore(
+        [{"id": 1, "תאריך": "2026-07-05", "תיאור": "מעדניית הגליל",
+          "קטגוריה": "מזון וצריכה", "סכום": -120.0}],
+        rules=[{"merchant": "מעדניית הגליל", "category": "מזון וצריכה", "subcategory": "קניות שבת"}],
+    )
+    row = _cats(sid)[1]
+    assert row["קטגוריה"] == "מזון וצריכה"
+    assert row["קטגוריה_משנה"] == "קניות שבת"
+
+
+def test_seeded_subcategory_beats_rule_subcategory():
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": "שופרסל דיל",
           "קטגוריה": "מזון וצריכה", "סכום": -120.0}],
@@ -89,7 +102,7 @@ def test_rule_subcategory_still_applies_on_catalog_known_merchant():
     )
     row = _cats(sid)[1]
     assert row["קטגוריה"] == "מזון וצריכה"
-    assert row["קטגוריה_משנה"] == "קניות שבת"
+    assert row["קטגוריה_משנה"] == "סופרים"
 
 
 def test_delivery_descriptors_are_food_not_transport():
