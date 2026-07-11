@@ -48,3 +48,17 @@ def test_empty_frame_gets_column():
     df = pd.DataFrame({'תיאור': [], 'קטגוריה': []})
     derive_subcategory(df)
     assert 'קטגוריה_משנה' in df.columns
+
+
+def test_food_supermarket_keyword():
+    df = pd.DataFrame({'תיאור': ['שופרסל דיל רמת גן'], 'קטגוריה': ['מזון וצריכה']})
+    derive_subcategory(df)
+    assert df['קטגוריה_משנה'].iloc[0] == 'סופרים'
+
+
+def test_supermarket_chain_beats_wine_keyword():
+    # 'יינות ביתן' contains the אלכוהול keyword 'יין' — the סופרים entry comes
+    # first in the parent's submap, so the chain must win.
+    df = pd.DataFrame({'תיאור': ['יינות ביתן בע"מ'], 'קטגוריה': ['מזון וצריכה']})
+    derive_subcategory(df)
+    assert df['קטגוריה_משנה'].iloc[0] == 'סופרים'

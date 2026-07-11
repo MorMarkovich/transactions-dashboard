@@ -24,7 +24,7 @@ from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
     CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog, AI_CATEGORY,
 )
-from ..services.ai_categorizer import categorize_transactions, audit_merchants
+from ..services.ai_categorizer import categorize_transactions, audit_merchants, suggest_subcategories
 from ..services.chart_generator import (
     create_donut_chart,
     create_monthly_bars,
@@ -1069,6 +1069,106 @@ async def update_merchant_category(body: UpdateMerchantCategoryRequest):
         "merchant": body.merchant,
         "category": new_category,
         "affected_count": int(mask.sum()),
+    }
+
+
+class AISubcategorizeRequest(BaseModel):
+    session_id: str
+    category: str
+    limit: int = 80
+
+
+@router.post("/ai-subcategorize")
+def ai_subcategorize(body: AISubcategorizeRequest):
+    """Have the AI split one category's merchants into subcategories — reusing
+    the seeded/in-use names or CREATING new ones (e.g. מזון וצריכה → סופרים).
+
+    Groups the category's rows that still have no קטגוריה_משנה by canonical
+    merchant, sends them to Claude (unknown merchants are web-searched, never
+    guessed), applies the returned subcategories to the live session (only
+    where the subcategory was empty — manual assignments are never clobbered),
+    and returns the assignments so the frontend persists them as
+    merchant→{category, subcategory} rules. Sync (non-async) on purpose, like
+    /ai-categorize: the Anthropic call blocks, so FastAPI uses its threadpool.
+    """
+    df = sessions.get(body.session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    category = (body.category or '').strip()
+    if not category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+    if 'קטגוריה' not in df.columns or 'תיאור' not in df.columns:
+        return {"success": True, "assignments": [], "remaining": 0}
+
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+    sub_series = df['קטגוריה_משנה'].fillna('').astype(str).str.strip()
+    cat_mask = df['קטגוריה'].astype(str) == category
+    target = cat_mask & (sub_series == '')
+    if not target.any():
+        return {"success": True, "assignments": [], "remaining": 0}
+
+    # Group by canonical merchant: representative raw name (most frequent) + volume.
+    merchants: dict[str, dict] = {}
+    for _, row in df[target].iterrows():
+        raw = str(row.get('תיאור', '')).strip()
+        key = normalize_merchant(raw)
+        if not key:
+            continue
+        m = merchants.setdefault(key, {"merchant": raw, "count": 0, "total": 0.0, "_names": {}})
+        m["count"] += 1
+        try:
+            m["total"] += abs(float(row.get('סכום', 0) or 0))
+        except (TypeError, ValueError):
+            pass
+        m["_names"][raw] = m["_names"].get(raw, 0) + 1
+
+    items = []
+    for key, m in merchants.items():
+        m["merchant"] = max(m["_names"], key=m["_names"].get)
+        del m["_names"]
+        m["_key"] = key
+        items.append(m)
+    items.sort(key=lambda m: m["total"], reverse=True)
+    total_eligible = len(items)
+    items = items[: max(1, min(int(body.limit or 80), 200))]
+
+    # Existing names for consistency: the seeded catalog for this parent plus
+    # whatever is already in use on the category's rows.
+    existing = list(dict.fromkeys(
+        get_subcategory_catalog().get(category, [])
+        + sorted({s for s in sub_series[cat_mask] if s})
+    ))
+
+    suggestions = suggest_subcategories(category, items, existing)
+    if suggestions is None:
+        raise HTTPException(status_code=503, detail="AI is not configured (ANTHROPIC_API_KEY)")
+
+    desc_norm = df['תיאור'].astype(str).map(normalize_merchant)
+    assignments = []
+    for s in suggestions:
+        i = s["index"]
+        sub = s["subcategory"]
+        if not sub or not (0 <= i < len(items)):
+            continue
+        it = items[i]
+        # Fill only rows still empty, so a manual assignment made while the AI
+        # call was in flight survives.
+        apply_mask = target & (desc_norm == it["_key"])
+        df.loc[apply_mask, 'קטגוריה_משנה'] = sub
+        assignments.append({
+            "merchant": it["merchant"],
+            "category": category,
+            "subcategory": sub,
+            "count": it["count"],
+            "total": round(_sanitize(float(it["total"])), 2),
+        })
+    sessions[body.session_id] = df
+
+    return {
+        "success": True,
+        "assignments": assignments,
+        "remaining": max(0, total_eligible - len(items)),
     }
 
 

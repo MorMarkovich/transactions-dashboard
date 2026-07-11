@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Check, Edit2, Tag } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Sparkles } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
@@ -31,6 +31,14 @@ interface CategoryTransactionsDrawerProps {
    * subcategory edit UI is hidden.
    */
   onSubcategoryChange?: (tx: Transaction, newSubcategory: string) => Promise<void>
+  /**
+   * AI subcategory split for the whole category: the parent sends the
+   * unsubcategorized merchants to the AI (existing subcategories are reused,
+   * new ones created), persists the returned rules, and reloads the drawer.
+   * Resolves to the number of merchants assigned. If undefined, the button is
+   * hidden.
+   */
+  onAutoSubcategorize?: () => Promise<number>
 }
 
 export default function CategoryTransactionsDrawer({
@@ -45,12 +53,15 @@ export default function CategoryTransactionsDrawer({
   onCategoryChange,
   subcategoryOptions = [],
   onSubcategoryChange,
+  onAutoSubcategorize,
 }: CategoryTransactionsDrawerProps) {
   const [sortAsc, setSortAsc] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [savingId, setSavingId] = useState<number | null>(null)
   const [customCategory, setCustomCategory] = useState('')
   const [customSubcategory, setCustomSubcategory] = useState('')
+  const [autoSubRunning, setAutoSubRunning] = useState(false)
+  const [autoSubResult, setAutoSubResult] = useState<string | null>(null)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -72,7 +83,27 @@ export default function CategoryTransactionsDrawer({
     setSavingId(null)
     setCustomCategory('')
     setCustomSubcategory('')
+    setAutoSubRunning(false)
+    setAutoSubResult(null)
   }, [isOpen, category])
+
+  const handleAutoSub = useCallback(async () => {
+    if (!onAutoSubcategorize || autoSubRunning) return
+    setAutoSubRunning(true)
+    setAutoSubResult(null)
+    try {
+      const assigned = await onAutoSubcategorize()
+      setAutoSubResult(
+        assigned > 0
+          ? (assigned === 1 ? 'בית עסק אחד פולח' : `${assigned} בתי עסק פולחו`)
+          : 'לא נמצא מה לפלח',
+      )
+    } catch {
+      setAutoSubResult('הפילוח נכשל, נסו שוב')
+    } finally {
+      setAutoSubRunning(false)
+    }
+  }, [onAutoSubcategorize, autoSubRunning])
 
   const categoryOptions = useMemo(() => {
     return Array.from(new Set([...availableCategories, ...ASSIGNABLE_CATEGORIES, category]))
@@ -268,6 +299,36 @@ export default function CategoryTransactionsDrawer({
                   {formatCurrency(total)}
                 </p>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {onAutoSubcategorize && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                  <button
+                    onClick={handleAutoSub}
+                    disabled={autoSubRunning}
+                    title="פילוח אוטומטי של הקטגוריה לתתי-קטגוריות (בתי עסק לא מוכרים נבדקים באינטרנט)"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-full)',
+                      border: '1px solid var(--border)',
+                      background: autoSubRunning ? 'var(--glass-bg)' : 'var(--accent)',
+                      color: autoSubRunning ? 'var(--text-muted)' : '#fff',
+                      cursor: autoSubRunning ? 'wait' : 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-family)',
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    {autoSubRunning ? 'מפלח…' : 'פילוח AI'}
+                  </button>
+                  {autoSubResult && (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{autoSubResult}</span>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => setSortAsc((p) => !p)}
                 style={{
@@ -288,6 +349,7 @@ export default function CategoryTransactionsDrawer({
                 <ArrowUpDown size={12} />
                 {sortAsc ? 'מהנמוך לגבוה' : 'מהגבוה לנמוך'}
               </button>
+              </div>
             </div>
 
             {/* Transaction list */}

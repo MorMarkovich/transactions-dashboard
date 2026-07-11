@@ -163,6 +163,35 @@ def test_audit_merchants_runs_end_to_end(monkeypatch):
     ]
 
 
+def test_suggest_subcategories_validates_names(monkeypatch):
+    def handler(kwargs):
+        assert "סופרים" in kwargs["messages"][0]["content"]  # existing names offered
+        return _text_response([
+            {"index": 0, "subcategory": "מעדניות"},
+            {"index": 1, "subcategory": "אחר"},              # legend bucket → rejected
+            {"index": 2, "subcategory": "מזון וצריכה"},      # parent name → rejected
+            {"index": 3, "subcategory": ""},                 # explicit "leave empty"
+        ])
+
+    _install(monkeypatch, handler)
+    out = ai_categorizer.suggest_subcategories(
+        "מזון וצריכה",
+        [
+            {"merchant": "מעדניית הגליל", "count": 2, "total": 400.0},
+            {"merchant": "עסק א", "count": 1, "total": 50.0},
+            {"merchant": "עסק ב", "count": 1, "total": 60.0},
+            {"merchant": "עסק ג", "count": 1, "total": 70.0},
+        ],
+        ["סופרים", "מאפיות"],
+    )
+    assert out == [
+        {"index": 0, "subcategory": "מעדניות"},
+        {"index": 1, "subcategory": ""},
+        {"index": 2, "subcategory": ""},
+        {"index": 3, "subcategory": ""},
+    ]
+
+
 def test_phase2_api_error_keeps_merchant_uncategorized(monkeypatch):
     def handler(kwargs):
         if "tools" not in kwargs:
