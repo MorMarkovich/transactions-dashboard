@@ -23,7 +23,7 @@ def _restore(rows):
 
 
 ROWS = [
-    {"id": 1, "תאריך": "2026-06-01", "תיאור": "GRAMMARLY CO", "קטגוריה": "שונות", "סכום": -178.0},
+    {"id": 1, "תאריך": "2026-06-01", "תיאור": "WRITEO TOOLS CO", "קטגוריה": "שונות", "סכום": -178.0},
     {"id": 2, "תאריך": "2026-06-05", "תיאור": "רהיטי עצמל (תשלום 1/3)", "קטגוריה": "שונות", "סכום": -300.0},
     {"id": 3, "תאריך": "2026-07-05", "תיאור": "רהיטי עצמל (תשלום 2/3)", "קטגוריה": "שונות", "סכום": -300.0},
     {"id": 4, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "שונות", "סכום": -120.0},
@@ -39,10 +39,10 @@ def test_ai_audit_returns_only_disagreements(monkeypatch):
 
     def fake_audit(items):
         captured["items"] = items
-        # Agree with everything except GRAMMARLY (index unknown → find it).
+        # Agree with everything except WRITEO (index unknown → find it).
         out = []
         for i, it in enumerate(items):
-            if "GRAMMARLY" in it["merchant"]:
+            if "WRITEO" in it["merchant"]:
                 out.append({"index": i, "category": "חשמל ומחשבים",
                             "confidence": 0.9, "reason": "כלי כתיבה מקוון"})
             else:
@@ -65,7 +65,7 @@ def test_ai_audit_returns_only_disagreements(monkeypatch):
     # Only the disagreement comes back as a proposal.
     assert len(data["proposals"]) == 1
     p = data["proposals"][0]
-    assert p["merchant"] == "GRAMMARLY CO"
+    assert p["merchant"] == "WRITEO TOOLS CO"
     assert p["proposed_category"] == "חשמל ומחשבים"
     assert p["confidence"] == 0.9
 

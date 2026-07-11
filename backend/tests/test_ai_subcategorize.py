@@ -94,3 +94,28 @@ def test_ai_subcategorize_nothing_to_do():
     resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "מזון וצריכה"})
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "assignments": [], "remaining": 0}
+
+
+def test_ai_subcategorize_all_sweeps_every_category(monkeypatch):
+    sid = _restore(ROWS)
+    calls = []
+
+    def fake_suggest(category, items, existing):
+        calls.append((category, [it["merchant"] for it in items]))
+        return [{"index": 0, "subcategory": "תת אוטומטית"}]
+
+    monkeypatch.setattr(routes, "suggest_subcategories", fake_suggest)
+    resp = client.post("/api/ai-subcategorize-all", json={"session_id": sid})
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    # Both categories with unsubcategorized rows are swept; שונות never is.
+    swept = {c for c, _ in calls}
+    assert swept == {"מזון וצריכה", "מסעדות, קפה וברים"}
+    assert {a["category"] for a in data["assignments"]} == swept
+
+    txns = client.get("/api/transactions", params={"sessionId": sid, "page_size": 100}).json()["transactions"]
+    by_id = {t["id"]: t for t in txns}
+    assert by_id[1]["קטגוריה_משנה"] == "תת אוטומטית"   # food merchant
+    assert by_id[5]["קטגוריה_משנה"] == "תת אוטומטית"   # restaurant merchant
+    assert by_id[4]["קטגוריה_משנה"] == "בחירה ידנית"    # manual pick untouched
