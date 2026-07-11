@@ -118,13 +118,13 @@ def _base_desc(desc: str) -> str:
     return _INSTALLMENT_RE.sub('', str(desc)).strip()
 
 
-AUDIT_SYSTEM = f"""אתה מערכת לביקורת סיווג עסקאות בנקאיות ישראליות. אתה מקבל בתי עסק עם הסיווג הנוכחי שלהם ובודק אם הוא נכון.
+AUDIT_SYSTEM = f"""אתה מערכת לאימות סיווג עסקאות בנקאיות ישראליות. אתה מקבל בתי עסק עם הסיווג הנוכחי שלהם ובודק אם הוא נכון — בית עסק אחרי בית עסק.
 
 {_CATEGORY_MENU}
 
 כללים מחייבים:
-1. אל תפסול סיווג קיים לפי צליל השם בלבד. אם אינך מזהה את בית העסק בוודאות — חפש אותו באינטרנט לפני שאתה קובע (למשל: "<שם העסק> ישראל").
-2. אם גם אחרי חיפוש אינך בטוח — החזר את הסיווג הנוכחי עם confidence נמוך. אל תמציא קטגוריות חדשות.
+1. עבור כל בית עסק אתה חייב לבצע חיפוש אינטרנט לפני שאתה קובע (למשל: "<שם העסק> ישראל"). אסור לאשר או לפסול סיווג לפי צליל השם בלבד.
+2. קבע לפי מה שמצאת בחיפוש. אם גם אחרי חיפוש אינך בטוח — החזר את הסיווג הנוכחי עם confidence נמוך. אל תמציא קטגוריות חדשות.
 3. הענף לפי חברת האשראי (אם צוין) הוא רמז, לא הכרעה.
 4. החזר תמיד JSON תקין בלבד (כבלוק הטקסט האחרון בתשובה)."""
 
@@ -144,16 +144,18 @@ AUDIT_PROMPT_TEMPLATE = """בדוק את הסיווג הנוכחי של בתי �
 _AUDIT_CACHE: dict[tuple[str, str], dict] = {}
 
 
-def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
-    """Second-opinion pass over already-categorized merchants.
+def audit_merchants(items: list[dict], on_progress=None) -> Optional[list[dict]]:
+    """Web-verified audit of already-categorized merchants, one by one.
 
-    Unlike categorize_transactions (which only fills שונות), this reviews the
-    CURRENT category of each merchant and returns the category Claude believes
-    is correct, with a confidence and a short Hebrew reason. The caller decides
-    what to do with disagreements — nothing is applied here.
+    Same discipline as the categorizer's phase 2: small batches, a web search
+    per merchant is MANDATORY, and a response with no search activity is
+    discarded (those merchants get no verdict and will be retried later, so
+    an unverified opinion never lands). Verdicts are cached per
+    (merchant, current category) — the sweep converges to zero cost.
 
     Args:
         items: [{merchant, current, issuer, count, total}, ...]
+        on_progress: optional callback(done, total) — merchants processed.
 
     Returns:
         [{index, category, confidence, reason}, ...] or None if AI unavailable.
@@ -170,6 +172,8 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
         else:
             fresh.append((i, it))
     if not fresh:
+        if on_progress:
+            on_progress(len(items), len(items))
         return cached_out
 
     client = _get_client()
@@ -177,69 +181,93 @@ def audit_merchants(items: list[dict]) -> Optional[list[dict]]:
         logger.info("AI audit skipped: ANTHROPIC_API_KEY not set")
         return None
 
-    items_idx = [i for i, _ in fresh]
-    items = [it for _, it in fresh]
-    lines = []
-    for i, it in enumerate(items):
-        issuer = f", ענף לפי חברת האשראי: {it['issuer']}" if it.get('issuer') else ""
-        lines.append(
-            f"{i}. \"{it['merchant']}\" — סיווג נוכחי: {it['current']}{issuer}, "
-            f"{it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
-        )
-    user_prompt = AUDIT_PROMPT_TEMPLATE.format(merchants="\n".join(lines))
-
     model = os.environ.get('AI_MODEL', 'claude-haiku-4-5-20251001')
     use_search = os.environ.get('AI_WEB_SEARCH', '1') != '0'
-    create_kwargs = {
-        'model': model,
-        'max_tokens': 8192,
-        'system': AUDIT_SYSTEM,
-        'messages': [{"role": "user", "content": user_prompt}],
-    }
-    if use_search:
-        create_kwargs['tools'] = [{
-            "type": "web_search_20250305",
-            "name": "web_search",
-            "max_uses": int(os.environ.get('AI_WEB_SEARCH_MAX', '8')),
-        }]
+    if not use_search:
+        # No search — no verdicts. An audit that can't verify must not guess.
+        logger.info("AI audit skipped: web search disabled")
+        return cached_out
 
-    try:
+    batch_size = max(1, int(os.environ.get('AI_SEARCH_BATCH', '5')))
+    per_merchant = max(1, int(os.environ.get('AI_WEB_SEARCH_MAX', '2')))
+    out: list[dict] = []
+    done = len(cached_out)
+    total = len(items)
+    if on_progress:
+        on_progress(done, total)
+
+    for b_start in range(0, len(fresh), batch_size):
+        batch = fresh[b_start:b_start + batch_size]
+        lines = []
+        for j, (_, it) in enumerate(batch):
+            issuer = f", ענף לפי חברת האשראי: {it['issuer']}" if it.get('issuer') else ""
+            lines.append(
+                f"{j}. \"{it['merchant']}\" — סיווג נוכחי: {it['current']}{issuer}, "
+                f"{it.get('count', 1)} עסקאות, {round(float(it.get('total', 0)))} ₪"
+            )
+        user_prompt = AUDIT_PROMPT_TEMPLATE.format(merchants="\n".join(lines))
         try:
-            response = client.messages.create(**create_kwargs)
-        except Exception as tool_err:
-            if 'tools' not in create_kwargs:
-                raise
-            logger.warning(f"Web search unavailable ({tool_err}); retrying without it")
-            create_kwargs.pop('tools', None)
-            response = client.messages.create(**create_kwargs)
+            response = client.messages.create(
+                model=model,
+                max_tokens=4096,
+                system=AUDIT_SYSTEM,
+                messages=[{"role": "user", "content": user_prompt}],
+                tools=[{
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": per_merchant * len(batch) + 1,
+                }],
+            )
+        except Exception as e:
+            # No searchless fallback — an unverified verdict is worse than none.
+            logger.warning(f"AI audit batch failed, skipping: {e}")
+            done += len(batch)
+            if on_progress:
+                on_progress(done, total)
+            continue
 
-        results = _parse_json_array(_response_text(response))
+        if not _response_searched(response):
+            logger.warning("AI audit answered without searching; discarding %d verdicts", len(batch))
+            done += len(batch)
+            if on_progress:
+                on_progress(done, total)
+            continue
 
-        out: list[dict] = []
+        try:
+            results = _parse_json_array(_response_text(response))
+        except Exception as e:
+            logger.warning(f"AI audit JSON parse error: {e}")
+            done += len(batch)
+            if on_progress:
+                on_progress(done, total)
+            continue
+
         for item in results:
             idx = item.get("index")
             cat = str(item.get("category", "")).strip()
             if idx is None or cat not in VALID_CATEGORIES:
                 continue
+            idx = int(idx)
+            if not (0 <= idx < len(batch)):
+                continue
             try:
                 conf = min(1.0, max(0.0, float(item.get("confidence", 0.5))))
             except (TypeError, ValueError):
                 conf = 0.5
-            idx = int(idx)
-            if not (0 <= idx < len(items)):
-                continue
+            orig_i, it = batch[idx]
             verdict = {
                 "category": cat,
                 "confidence": conf,
                 "reason": str(item.get("reason", "")).strip(),
             }
-            _AUDIT_CACHE[(items[idx]['merchant'], items[idx]['current'])] = verdict
-            out.append({**verdict, "index": items_idx[idx]})
-        logger.info(f"AI audit returned {len(out)}/{len(items)} fresh verdicts (+{len(cached_out)} cached)")
-        return cached_out + out
-    except Exception as e:
-        logger.warning(f"AI audit failed: {e}")
-        return (cached_out + [])  if cached_out else None
+            _AUDIT_CACHE[(it['merchant'], it['current'])] = verdict
+            out.append({**verdict, "index": orig_i})
+        done += len(batch)
+        if on_progress:
+            on_progress(done, total)
+
+    logger.info(f"AI audit: {len(out)} fresh web-verified verdicts (+{len(cached_out)} cached)")
+    return cached_out + out
 
 
 def _get_client():
