@@ -98,6 +98,9 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     'מזון וצריכה': [
         # Discount variety / stock stores — household consumption, not fashion.
         'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock',
+        # פרימדונה = the Ramat Gan fresh supermarket (the Italian lingerie
+        # brand bills as latin 'primadonna', kept under אופנה).
+        'פרימדונה',
         # ── Supermarkets & grocery ──
         'שופרסל', 'רמי לוי', 'מגה', 'יוחננוף', 'אושר עד', 'חצי חינם',
         'ויקטורי', 'טיב טעם', 'פרש מרקט', 'סופר', 'מכולת', 'קרפור',
@@ -273,7 +276,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'סטרדיווריוס', 'stradivarius',
         'ברשקה', 'bershka', 'intimissimi', 'calzedonia',
         'נעליים',
-        'פרימדונה', 'primadonna', 'קוסמטיקה', 'cosmetic',
+        'primadonna', 'קוסמטיקה', 'cosmetic',
         'איפור', 'makeup', 'בשמים', 'perfume',
         'לורן', 'lauren', 'טומי', 'tommy',
         # ── More fashion, footwear, beauty & jewelry ──
@@ -599,7 +602,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
                     'victory', 'יינות ביתן', 'טיב טעם', 'tiv taam', 'אושר עד',
                     'osher ad', 'חצי חינם', 'יוחננוף', 'yochananof', 'קרפור',
                     'carrefour', 'מגה בעיר', 'זול ובגדול', 'נתיב החסד', 'ברכל',
-                    'שוק העיר', 'סופרמרקט', 'supermarket', 'מינימרקט',
+                    'שוק העיר', 'סופרמרקט', 'supermarket', 'מינימרקט', 'פרימדונה',
                     'מיני מרקט', 'מכולת', 'am:pm', 'אי אם פי אם', 'פרשמרקט',
                     'freshmarket', 'fresh market'],
         'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
