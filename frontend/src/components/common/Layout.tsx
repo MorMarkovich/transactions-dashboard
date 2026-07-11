@@ -195,10 +195,14 @@ export default function Layout({ children }: LayoutProps) {
       // ever — the sweep costs nothing on later loads.
       setAiStatus({ label: 'מאמת סיווגים מול האינטרנט…' })
       try {
-        // Rule-covered merchants were already decided (by the user, the AI
-        // fallback, or a previous sweep) — start from them as exclusions.
-        const rules = await supabaseApi.getCategoryRules(userId).catch(() => [])
-        let exclude = rules.map((r) => r.merchant)
+        // Exclude ONLY merchants a previous sweep actually web-verified (a
+        // persistent per-user ledger). Rules are NOT exclusions — most were
+        // machine-created (old AI guesses, subcategory splits), i.e. exactly
+        // the merchants that need verification.
+        const LEDGER_KEY = `verified-merchants:${userId}`
+        let ledger: string[] = []
+        try { ledger = JSON.parse(localStorage.getItem(LEDGER_KEY) || '[]') } catch { /* fresh */ }
+        let exclude = [...ledger]
         for (let batch = 0; batch < 100; batch++) {
           const res = await transactionsApi.aiAudit(sessionId, exclude)
           const applicable = (res.proposals ?? []).filter((pr) => pr.confidence >= 0.85)
@@ -218,6 +222,18 @@ export default function Layout({ children }: LayoutProps) {
           if (applicable.length || verified.length) {
             window.dispatchEvent(new CustomEvent('ai-categorized'))
           }
+          // Ledger: only merchants that actually got a web verdict (confirmed
+          // or proposed). Verdict-less merchants (discarded/unsearched
+          // batches) are retried on the next sweep.
+          const gotVerdict = [
+            ...verified.map((v) => v.merchant),
+            ...(res.proposals ?? []).map((pr) => pr.merchant),
+          ]
+          if (gotVerdict.length) {
+            ledger = Array.from(new Set([...ledger, ...gotVerdict]))
+            try { localStorage.setItem(LEDGER_KEY, JSON.stringify(ledger)) } catch { /* full */ }
+          }
+          // Within this run, advance past everything already looked at.
           exclude = exclude.concat(res.audited_merchants || [])
           if (!res.audited_count || !res.remaining) break
         }
