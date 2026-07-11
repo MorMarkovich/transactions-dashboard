@@ -90,3 +90,15 @@ def test_expanded_seeds_cover_common_chains():
         'פארם וטיפוח', 'רשתות אופנה', 'חנויות סטוק',
         'כבישי אגרה', 'חניונים', 'משלוחי אוכל',
     ]
+
+
+def test_lottery_rows_unify_under_seeded_name():
+    # One row got an AI-created 'מפעל הפיס' name, two stayed empty — the
+    # seeded name repairs and unifies all of them.
+    df = pd.DataFrame({
+        'תיאור': ['מפעל הפיס', 'פיס מרכז -לשם המזל', 'מפעל הפיס אשראי'],
+        'קטגוריה': ['פנאי, בידור וספורט'] * 3,
+        'קטגוריה_משנה': ['מפעל הפיס', '', ''],
+    })
+    derive_subcategory(df)
+    assert list(df['קטגוריה_משנה']) == ['פיס והימורים'] * 3
