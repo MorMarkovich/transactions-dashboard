@@ -33,10 +33,10 @@ def _restore(rows, rules=None):
 
 
 def test_map_issuer_category_specific_before_generic():
-    assert map_issuer_category("מסעדות ובתי קפה") == "מסעדות, קפה וברים"
-    assert map_issuer_category("מזון מהיר") == "מסעדות, קפה וברים"  # not מזון וצריכה
-    assert map_issuer_category("רשתות שיווק מזון") == "מזון וצריכה"
-    assert map_issuer_category("חשמל ואלקטרוניקה") == "חשמל ומחשבים"  # not דלק/חשמל
+    assert map_issuer_category("מסעדות ובתי קפה") == "בילויים"
+    assert map_issuer_category("מזון מהיר") == "בילויים"  # not אוכל
+    assert map_issuer_category("רשתות שיווק מזון") == "אוכל"
+    assert map_issuer_category("חשמל ואלקטרוניקה") == "קניות"  # not דלק/חשמל
     assert map_issuer_category("תיירות ותעופה") == "טיסות ותיירות"
     assert map_issuer_category("") is None
     assert map_issuer_category(None) is None
@@ -48,14 +48,14 @@ def test_apply_issuer_category_fills_only_misc_rows():
     df = pd.DataFrame([
         {"תיאור": "העסק של יוסי", "קטגוריה": "שונות", "ענף_מקור": "מוסכים ורכב"},
         {"תיאור": "עסק עלום", "קטגוריה": "שונות", "ענף_מקור": "ענף עלום"},
-        {"תיאור": "עסק מסווג", "קטגוריה": "ביטוח", "ענף_מקור": "מסעדות"},
+        {"תיאור": "עסק מסווג", "קטגוריה": "טיפוח", "ענף_מקור": "מסעדות"},
         {"תיאור": "בלי ענף", "קטגוריה": "שונות", "ענף_מקור": None},
     ])
     filled = apply_issuer_category(df)
     assert filled == 1
-    assert df.loc[0, "קטגוריה"] == "תחבורה ורכבים"
+    assert df.loc[0, "קטגוריה"] == "הוצאות משתנות"
     assert df.loc[1, "קטגוריה"] == "שונות"
-    assert df.loc[2, "קטגוריה"] == "ביטוח"  # existing category untouched
+    assert df.loc[2, "קטגוריה"] == "טיפוח"  # existing category untouched
     assert df.loc[3, "קטגוריה"] == "שונות"
 
 
@@ -74,8 +74,8 @@ def test_restore_uses_issuer_category_for_misc_rows():
          "סכום": -200, "ענף_מקור": "מסעדות"},
     ]
     by_desc = _restore(rows)
-    assert by_desc["העסק של יוסי"]["קטגוריה"] == "מסעדות, קפה וברים"
-    assert by_desc["שופרסל דיל"]["קטגוריה"] == "מזון וצריכה"
+    assert by_desc["העסק של יוסי"]["קטגוריה"] == "בילויים"
+    assert by_desc["שופרסל דיל"]["קטגוריה"] == "אוכל"
 
 
 def test_user_rule_beats_issuer_category():
@@ -83,6 +83,6 @@ def test_user_rule_beats_issuer_category():
         {"תאריך": "2026-06-01", "תיאור": "העסק של יוסי", "קטגוריה": "שונות",
          "סכום": -100, "ענף_מקור": "מסעדות"},
     ]
-    rules = [{"merchant": "העסק של יוסי", "category": "חינוך ולימודים"}]
+    rules = [{"merchant": "העסק של יוסי", "category": "חוגים וספורט"}]
     by_desc = _restore(rows, rules)
-    assert by_desc["העסק של יוסי"]["קטגוריה"] == "חינוך ולימודים"
+    assert by_desc["העסק של יוסי"]["קטגוריה"] == "חוגים וספורט"

@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExempt, VALID_CATEGORIES } from './categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExempt, VALID_CATEGORIES, migrateCategory } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -169,8 +169,18 @@ export function refreshMiscCategories(txns, ruleMap) {
 
   let changed = 0
   for (const t of txns) {
-    const stored = t['קטגוריה'] || 'שונות'
     const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
+    // Old-taxonomy names in the stored snapshot are migrated in place first —
+    // otherwise the validity check below would nuke them all to שונות.
+    const [migCat, migSub] = migrateCategory(t['קטגוריה'], t['קטגוריה_משנה'])
+    if (migCat !== (t['קטגוריה'] || '')) {
+      t['קטגוריה'] = migCat
+      if (migSub !== null) t['קטגוריה_משנה'] = migSub
+      // Seed a subcategory under the new parent when the old one was dropped.
+      if (!t['קטגוריה_משנה']) t['קטגוריה_משנה'] = subcategorize(migCat, baseDesc)
+      changed++
+    }
+    const stored = t['קטגוריה'] || 'שונות'
     // Stale-row repair: rows the PRE-exemption foreign rule tagged as travel
     // (NETFLIX.COM … NL etc.) carry a "real" category, so keeping the stored
     // value would leave them wrong forever. Re-categorize them like שונות.

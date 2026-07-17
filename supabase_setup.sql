@@ -145,3 +145,26 @@ CREATE POLICY "Users can view own txn overrides" ON public.transaction_overrides
 CREATE POLICY "Users can insert own txn overrides" ON public.transaction_overrides FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own txn overrides" ON public.transaction_overrides FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own txn overrides" ON public.transaction_overrides FOR DELETE USING (auth.uid() = user_id);
+
+-- 8. User-created categories (the dynamic taxonomy)
+-- Categories the user adds beyond the built-in tree (typed into the category
+-- editor). Loaded at login and passed to /restore-session so restores treat
+-- them as valid instead of resetting their rows to שונות.
+-- This whole section is idempotent — safe to re-run.
+CREATE TABLE IF NOT EXISTS public.user_categories (
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    icon TEXT,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, name)
+);
+
+ALTER TABLE public.user_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own categories" ON public.user_categories;
+DROP POLICY IF EXISTS "Users can insert own categories" ON public.user_categories;
+DROP POLICY IF EXISTS "Users can update own categories" ON public.user_categories;
+DROP POLICY IF EXISTS "Users can delete own categories" ON public.user_categories;
+CREATE POLICY "Users can view own categories" ON public.user_categories FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own categories" ON public.user_categories FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own categories" ON public.user_categories FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own categories" ON public.user_categories FOR DELETE USING (auth.uid() = user_id);

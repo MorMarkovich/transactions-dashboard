@@ -156,7 +156,9 @@ export default function Sidebar({
         // them up immediately (no need to wait for a page reload).
         const rules = user ? await supabaseApi.getCategoryRules(user.id).catch(() => []) : []
         const overrides = user ? await supabaseApi.getTransactionOverrides(user.id).catch(() => []) : []
-        const merged = await transactionsApi.restoreSession(allTransactions, rules, overrides)
+        const customCats = user ? await supabaseApi.getUserCategories(user.id).catch(() => []) : []
+        const merged = await transactionsApi.restoreSession(
+          allTransactions, rules, overrides, customCats.map((c) => c.name))
         if (merged.success && merged.session_id) {
           const removedParts: string[] = []
           if (merged.duplicates_removed && merged.duplicates_removed > 0) {
@@ -192,13 +194,15 @@ export default function Sidebar({
   const handleBankSynced = async () => {
     if (!user) return
     try {
-      const [transactions, rules, overrides] = await Promise.all([
+      const [transactions, rules, overrides, customCats] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+        supabaseApi.getUserCategories(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
+      const merged = await transactionsApi.restoreSession(
+        transactions as unknown[], rules, overrides, customCats.map((c) => c.name))
       if (merged.success && merged.session_id) {
         onFileUploaded?.(merged.session_id)
       }

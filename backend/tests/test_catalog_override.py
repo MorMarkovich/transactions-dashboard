@@ -38,7 +38,7 @@ def test_stale_stored_category_repaired_by_catalog():
          "קטגוריה": "משיכת מזומן", "קטגוריה_משנה": "ישן", "סכום": -13.9},
     ])
     row = _cats(sid)[1]
-    assert row["קטגוריה"] == "מזון וצריכה"
+    assert row["קטגוריה"] == "אוכל"
     # The stale subcategory belonged to the old category — re-derived/cleared.
     assert (row.get("קטגוריה_משנה") or "") != "ישן"
 
@@ -46,9 +46,9 @@ def test_stale_stored_category_repaired_by_catalog():
 def test_catalog_unknown_keeps_stored_category():
     sid = _restore([
         {"id": 1, "תאריך": "2026-07-05", "תיאור": "ZZQWX SERVICES",
-         "קטגוריה": "מנויים ושירותים", "סכום": -30.0},
+         "קטגוריה": "טכנולוגיה", "סכום": -30.0},
     ])
-    assert _cats(sid)[1]["קטגוריה"] == "מנויים ושירותים"
+    assert _cats(sid)[1]["קטגוריה"] == "טכנולוגיה"
 
 
 def test_income_rows_never_second_guessed():
@@ -67,16 +67,16 @@ def test_stale_rule_cannot_fight_the_catalog():
           "קטגוריה": "משיכת מזומן", "סכום": -13.9}],
         rules=[{"merchant": "סיטי מרקט רמת גן", "category": "משיכת מזומן"}],
     )
-    assert _cats(sid)[1]["קטגוריה"] == "מזון וצריכה"
+    assert _cats(sid)[1]["קטגוריה"] == "אוכל"
 
 
 def test_rule_still_decides_catalog_unknown_merchant():
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": "ZZQWX UNKNOWN CO",
           "קטגוריה": "שונות", "סכום": -50.0}],
-        rules=[{"merchant": "ZZQWX UNKNOWN CO", "category": "מתנות"}],
+        rules=[{"merchant": "ZZQWX UNKNOWN CO", "category": "אירועים ומתנות"}],
     )
-    assert _cats(sid)[1]["קטגוריה"] == "מתנות"
+    assert _cats(sid)[1]["קטגוריה"] == "אירועים ומתנות"
 
 
 def test_rule_subcategory_applies_where_subcategory_seeds_are_silent():
@@ -86,66 +86,66 @@ def test_rule_subcategory_applies_where_subcategory_seeds_are_silent():
     # win when they have an opinion).
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": "מעדניית הגליל",
-          "קטגוריה": "מזון וצריכה", "סכום": -120.0}],
-        rules=[{"merchant": "מעדניית הגליל", "category": "מזון וצריכה", "subcategory": "קניות שבת"}],
+          "קטגוריה": "אוכל", "סכום": -120.0}],
+        rules=[{"merchant": "מעדניית הגליל", "category": "אוכל", "subcategory": "קניות שבת"}],
     )
     row = _cats(sid)[1]
-    assert row["קטגוריה"] == "מזון וצריכה"
+    assert row["קטגוריה"] == "אוכל"
     assert row["קטגוריה_משנה"] == "קניות שבת"
 
 
 def test_seeded_subcategory_beats_rule_subcategory():
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": "שופרסל דיל",
-          "קטגוריה": "מזון וצריכה", "סכום": -120.0}],
-        rules=[{"merchant": "שופרסל דיל", "category": "מזון וצריכה", "subcategory": "קניות שבת"}],
+          "קטגוריה": "אוכל", "סכום": -120.0}],
+        rules=[{"merchant": "שופרסל דיל", "category": "אוכל", "subcategory": "קניות שבת"}],
     )
     row = _cats(sid)[1]
-    assert row["קטגוריה"] == "מזון וצריכה"
-    assert row["קטגוריה_משנה"] == "סופרים"
+    assert row["קטגוריה"] == "אוכל"
+    assert row["קטגוריה_משנה"] == "קניות גדולות"
 
 
 def test_delivery_descriptors_are_food_not_transport():
     # 'משלוח' used to sit in תחבורה ורכבים and dragged food deliveries there.
     sid = _restore([
         {"id": 1, "תאריך": "2026-07-01", "תיאור": "מפגש גרונר משלוחים",
-         "קטגוריה": "תחבורה ורכבים", "סכום": -59.0},
+         "קטגוריה": "הוצאות משתנות", "סכום": -59.0},
         {"id": 2, "תאריך": "2026-06-29", "תיאור": "משלוחה הזמנת אוכל או",
-         "קטגוריה": "תחבורה ורכבים", "סכום": -91.43},
+         "קטגוריה": "הוצאות משתנות", "סכום": -91.43},
         {"id": 3, "תאריך": "2026-06-21", "תיאור": "כביש 6", "קטגוריה": "שונות", "סכום": -37.35},
     ])
     cats = _cats(sid)
-    assert cats[1]["קטגוריה"] == "מסעדות, קפה וברים"
-    assert cats[2]["קטגוריה"] == "מסעדות, קפה וברים"
-    assert cats[3]["קטגוריה"] == "תחבורה ורכבים"
+    assert cats[1]["קטגוריה"] == "אוכל"
+    assert cats[2]["קטגוריה"] == "אוכל"
+    assert cats[3]["קטגוריה"] == "הוצאות משתנות"
 
 
 def test_rule_subcategory_is_scoped_to_its_parent_category():
-    # The rule was saved when the merchant sat in מזון וצריכה; after the
-    # catalog moves it to מסעדות, the food-voucher subcategory must NOT leak.
+    # The rule was saved when the merchant sat in a different category; after
+    # the catalog moves it to אוכל, the cafe subcategory must NOT leak.
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-01", "תיאור": "מפגש גרונר משלוחים",
           "קטגוריה": "שונות", "סכום": -59.0}],
-        rules=[{"merchant": "מפגש גרונר משלוחים", "category": "מזון וצריכה", "subcategory": "שוברי מזון"}],
+        rules=[{"merchant": "מפגש גרונר משלוחים", "category": "בילויים", "subcategory": "בתי קפה"}],
     )
     row = _cats(sid)[1]
-    assert row["קטגוריה"] == "מסעדות, קפה וברים"
-    assert (row.get("קטגוריה_משנה") or "") != "שוברי מזון"
+    assert row["קטגוריה"] == "אוכל"
+    assert (row.get("קטגוריה_משנה") or "") != "בתי קפה"
 
 
 def test_stock_stores_are_consumption_not_fashion():
     # BOOOM / סטוק סנטר are discount variety stores ("הכל בזול"), not fashion —
     # the old keyword list pinned them to אופנה next to אאוטלט.
     sid = _restore([
-        {"id": 1, "תאריך": "2026-06-11", "תיאור": "BOOOM", "קטגוריה": "אופנה", "סכום": -134.4},
-        {"id": 2, "תאריך": "2026-06-17", "תיאור": 'ב"ב BOOOM', "קטגוריה": "אופנה", "סכום": -15.9},
-        {"id": 3, "תאריך": "2026-06-29", "תיאור": "סטוק סנטר איריס בע\"מ", "קטגוריה": "אופנה", "סכום": -15.9},
+        {"id": 1, "תאריך": "2026-06-11", "תיאור": "BOOOM", "קטגוריה": "קניות", "סכום": -134.4},
+        {"id": 2, "תאריך": "2026-06-17", "תיאור": 'ב"ב BOOOM', "קטגוריה": "קניות", "סכום": -15.9},
+        {"id": 3, "תאריך": "2026-06-29", "תיאור": "סטוק סנטר איריס בע\"מ", "קטגוריה": "קניות", "סכום": -15.9},
         # A real fashion chain stays fashion.
-        {"id": 4, "תאריך": "2026-06-24", "תיאור": "גולף קניון רמת גן-גמ", "קטגוריה": "אופנה", "סכום": -15.12},
+        {"id": 4, "תאריך": "2026-06-24", "תיאור": "גולף קניון רמת גן-גמ", "קטגוריה": "קניות", "סכום": -15.12},
     ])
     cats = _cats(sid)
     for i in (1, 2, 3):
-        assert cats[i]["קטגוריה"] == "מזון וצריכה"
-        assert cats[i]["קטגוריה_משנה"] == "חנויות סטוק"
-    assert cats[4]["קטגוריה"] == "אופנה"
-    assert cats[4]["קטגוריה_משנה"] == "רשתות אופנה"
+        assert cats[i]["קטגוריה"] == "קניות"
+        assert cats[i]["קטגוריה_משנה"] == "דברים לבית"
+    assert cats[4]["קטגוריה"] == "קניות"
+    assert cats[4]["קטגוריה_משנה"] == "אופנה"

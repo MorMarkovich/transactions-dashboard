@@ -73,11 +73,11 @@ def test_installment_suffix_stripped():
 def test_known_merchant_classified_without_search(monkeypatch):
     def handler(kwargs):
         assert "tools" not in kwargs  # phase 1 must not search
-        return _text_response([{"index": 0, "category": "מזון וצריכה"}])
+        return _text_response([{"index": 0, "category": "אוכל"}])
 
     client = _install(monkeypatch, handler)
     result = categorize_transactions(["שופרסל אקספרס"])
-    assert result == {0: "מזון וצריכה"}
+    assert result == {0: "אוכל"}
     assert len(client.messages.calls) == 1
 
 
@@ -87,11 +87,11 @@ def test_unknown_merchant_goes_to_web_search(monkeypatch):
             return _text_response([{"index": 0, "unknown": True}])
         # phase 2: must carry the web search tool, and searches
         assert kwargs["tools"][0]["type"] == "web_search_20250305"
-        return _text_response([{"index": 0, "category": "חיות מחמד"}], searched=True)
+        return _text_response([{"index": 0, "category": "סושי"}], searched=True)
 
     client = _install(monkeypatch, handler)
     result = categorize_transactions(["פטשופ הכפר"])
-    assert result == {0: "חיות מחמד"}
+    assert result == {0: "סושי"}
     assert len(client.messages.calls) == 2
 
 
@@ -123,19 +123,19 @@ def test_search_disabled_leaves_unknowns_uncategorized(monkeypatch):
 
 def test_installments_resolve_together_and_cache(monkeypatch):
     def handler(kwargs):
-        return _text_response([{"index": 0, "category": "עיצוב הבית"}])
+        return _text_response([{"index": 0, "category": "קניות"}])
 
     client = _install(monkeypatch, handler)
     result = categorize_transactions([
         "איקאה (תשלום 1/3)", "איקאה (תשלום 2/3)", "איקאה (תשלום 3/3)",
     ])
     # one API call for one unique base merchant, all three rows categorized
-    assert result == {0: "עיצוב הבית", 1: "עיצוב הבית", 2: "עיצוב הבית"}
+    assert result == {0: "קניות", 1: "קניות", 2: "קניות"}
     assert len(client.messages.calls) == 1
 
     # second run: served entirely from cache
     result2 = categorize_transactions(["איקאה (תשלום 3/3)"])
-    assert result2 == {0: "עיצוב הבית"}
+    assert result2 == {0: "קניות"}
     assert len(client.messages.calls) == 1
 
 
@@ -158,14 +158,14 @@ def test_audit_merchants_requires_search_and_caches(monkeypatch):
         assert kwargs["system"]  # audit must carry its own system prompt
         assert kwargs["tools"][0]["type"] == "web_search_20250305"  # mandatory
         return _text_response([
-            {"index": 0, "category": "מזון וצריכה", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
+            {"index": 0, "category": "אוכל", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
         ], searched=True)
 
     _install(monkeypatch, handler)
     items = [{"merchant": "שופרסל דיל", "current": "אופנה", "issuer": "מזון", "count": 4, "total": 512.0}]
     out = ai_categorizer.audit_merchants(items)
     assert out == [
-        {"index": 0, "category": "מזון וצריכה", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
+        {"index": 0, "category": "אוכל", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
     ]
     # cached — the second run makes no API call
     out2 = ai_categorizer.audit_merchants(items)
@@ -196,7 +196,7 @@ def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):
             return _text_response([
                 {"index": 0, "subcategory": "מעדניות"},
                 {"index": 1, "subcategory": "אחר"},              # legend bucket → rejected → phase 2
-                {"index": 2, "subcategory": "מזון וצריכה"},      # parent name → rejected → phase 2
+                {"index": 2, "subcategory": "אוכל"},      # parent name → rejected → phase 2
                 {"index": 3, "unknown": True},
             ])
         # phase 2: mandatory search over the unresolved merchants
@@ -209,7 +209,7 @@ def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):
 
     _install(monkeypatch, handler)
     out = ai_categorizer.suggest_subcategories(
-        "מזון וצריכה",
+        "אוכל",
         [
             {"merchant": "מעדניית הגליל", "count": 2, "total": 400.0},
             {"merchant": "עסק א", "count": 1, "total": 50.0},
@@ -247,11 +247,11 @@ def test_suggest_subcategories_unsearched_answers_discarded_and_cached(monkeypat
 def test_categorize_passes_issuer_hint(monkeypatch):
     def handler(kwargs):
         assert "ענף לפי חברת האשראי: מזון" in kwargs["messages"][0]["content"]
-        return _text_response([{"index": 0, "category": "מזון וצריכה"}])
+        return _text_response([{"index": 0, "category": "אוכל"}])
 
     _install(monkeypatch, handler)
     result = categorize_transactions(["מכולת השכונה"], ["מזון"])
-    assert result == {0: "מזון וצריכה"}
+    assert result == {0: "אוכל"}
 
 
 def test_phase2_api_error_keeps_merchant_uncategorized(monkeypatch):

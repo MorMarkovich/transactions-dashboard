@@ -87,15 +87,15 @@ def test_merchant_category_applies_to_all_variants():
     resp = client.post("/api/merchants/category", json={
         "session_id": sid,
         "merchant": "עצמל סטודיו (תשלום 1/3)",
-        "category": "עיצוב הבית",
+        "category": "קניות",
     })
     assert resp.status_code == 200, resp.text
     assert resp.json()["affected_count"] == 2
 
     tx = client.get("/api/transactions", params={"sessionId": sid, "page_size": 100}).json()["transactions"]
     cats = {t["תיאור"]: t["קטגוריה"] for t in tx}
-    assert cats["עצמל סטודיו (תשלום 1/3)"] == "עיצוב הבית"
-    assert cats["עצמל סטודיו (תשלום 2/3)"] == "עיצוב הבית"
+    assert cats["עצמל סטודיו (תשלום 1/3)"] == "קניות"
+    assert cats["עצמל סטודיו (תשלום 2/3)"] == "קניות"
 
 
 def test_merchant_category_rejects_junk_category():

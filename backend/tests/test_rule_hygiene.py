@@ -43,12 +43,12 @@ def test_junk_rules_and_stored_junk_categories_are_repaired():
     ]
     by_desc = _restore(rows, junk_rules)
 
-    assert by_desc["L.B.Y GROUP"]["קטגוריה"] == "רפואה ובתי מרקחת"
-    assert by_desc["L.B.Y GROUP"].get("קטגוריה_משנה") == "טיפול זוגי"
-    assert by_desc["CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US"]["קטגוריה"] == "בינה מלאכותית"
+    assert by_desc["L.B.Y GROUP"]["קטגוריה"] == "תרופות וטיפולים"
+    assert by_desc["L.B.Y GROUP"].get("קטגוריה_משנה") == "טיפולים"
+    assert by_desc["CLAUDE.AI SUBSCRIPTION ANTHROPIC.COM US"]["קטגוריה"] == "טכנולוגיה"
     # Online services billed from abroad are NOT trip spend
-    assert by_desc["NETFLIX.COM AMSTERDAM NL"]["קטגוריה"] == "חשמל ומחשבים"
-    assert by_desc["PAYPAL *SPOTIFY*P40762 35314369001 GB"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["NETFLIX.COM AMSTERDAM NL"]["קטגוריה"] == "הוצאות שוטפות"
+    assert by_desc["PAYPAL *SPOTIFY*P40762 35314369001 GB"]["קטגוריה"] == "הוצאות שוטפות"
 
 
 def test_real_foreign_spend_still_goes_to_travel():
@@ -66,18 +66,18 @@ def test_catalog_beats_conflicting_rules_and_rules_decide_unknowns():
         {"תאריך": "2026-06-03", "תיאור": "ZZQWX UNKNOWN CO", "קטגוריה": "שונות", "סכום": -50},
     ]
     rules = [
-        # Conflicts with a catalog hit (שופרסל → מזון וצריכה) — a stale AI
+        # Conflicts with a catalog hit (שופרסל → אוכל) — a stale AI
         # guess persisted as a rule; the catalog is the source of truth.
-        {"merchant": "שופרסל דיל", "category": "מתנות"},
+        {"merchant": "שופרסל דיל", "category": "אירועים ומתנות"},
         {"merchant": "OPENAI *CHATGPT", "category": "חשמל ומחשבים"},  # stale pre-AI-category rule
         # The catalog has no opinion here — the rule decides.
-        {"merchant": "ZZQWX UNKNOWN CO", "category": "מתנות"},
+        {"merchant": "ZZQWX UNKNOWN CO", "category": "אירועים ומתנות"},
     ]
     by_desc = _restore(rows, rules)
-    assert by_desc["שופרסל דיל"]["קטגוריה"] == "מזון וצריכה"
+    assert by_desc["שופרסל דיל"]["קטגוריה"] == "אוכל"
     # The AI-tool override still beats the stale rule.
     assert by_desc["OPENAI *CHATGPT"]["קטגוריה"] == AI_CATEGORY
-    assert by_desc["ZZQWX UNKNOWN CO"]["קטגוריה"] == "מתנות"
+    assert by_desc["ZZQWX UNKNOWN CO"]["קטגוריה"] == "אירועים ומתנות"
 
 def test_stale_exempt_travel_rows_are_repaired():
     """Rows tagged travel by the PRE-exemption foreign rule must migrate out:
@@ -94,9 +94,9 @@ def test_stale_exempt_travel_rows_are_repaired():
         {"תאריך": "2026-06-03", "תיאור": "איסתא נסיעות", "קטגוריה": "טיסות ותיירות", "סכום": -1500},
     ]
     by_desc = _restore(rows)
-    assert by_desc["NETFLIX.COM 408-724-9160 NL"]["קטגוריה"] == "חשמל ומחשבים"
-    assert by_desc["RENDER.COM RENDER.COM US"]["קטגוריה"] == "חשמל ומחשבים"
-    assert by_desc["PAYPAL *DIGITALOCEA 4029357733 US"]["קטגוריה"] == "חשמל ומחשבים"
-    assert by_desc["ALLDEBRID MONTROUGE FR"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["NETFLIX.COM 408-724-9160 NL"]["קטגוריה"] == "הוצאות שוטפות"
+    assert by_desc["RENDER.COM RENDER.COM US"]["קטגוריה"] == "טכנולוגיה"
+    assert by_desc["PAYPAL *DIGITALOCEA 4029357733 US"]["קטגוריה"] == "טכנולוגיה"
+    assert by_desc["ALLDEBRID MONTROUGE FR"]["קטגוריה"] == "טכנולוגיה"
     assert by_desc["SHINSEGAE DEPARTMENT S SEOUL         KR"]["קטגוריה"] == "טיסות ותיירות"
     assert by_desc["איסתא נסיעות"]["קטגוריה"] == "טיסות ותיירות"

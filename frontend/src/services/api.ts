@@ -78,11 +78,13 @@ export const transactionsApi = {
     transactions: unknown[],
     categoryRules: CategoryRule[] = [],
     transactionOverrides: { txn_key: string; category: string; subcategory?: string | null }[] = [],
+    customCategories: string[] = [],
   ): Promise<FileUploadResponse> => {
     const response = await api.post<FileUploadResponse>('/api/restore-session', {
       transactions,
       category_rules: categoryRules,
       transaction_overrides: transactionOverrides,
+      custom_categories: customCategories,
     });
     return response.data;
   },

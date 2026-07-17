@@ -6,7 +6,7 @@ import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import QuickActions from './QuickActions'
 import { useAuth } from '../../lib/AuthContext'
-import { isValidRuleCategory } from '../../utils/constants'
+import { isValidRuleCategory, migrateRule } from '../../utils/constants'
 import { supabaseApi } from '../../services/supabaseApi'
 import { transactionsApi } from '../../services/api'
 import './Layout.css'
@@ -92,20 +92,36 @@ export default function Layout({ children }: LayoutProps) {
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+        supabaseApi.getUserCategories(user.id).catch(() => []),
       ])
-        .then(([transactions, rules, overrides]) => {
+        .then(([transactions, rules, overrides, customCats]) => {
           if (!transactions || transactions.length === 0) return
+          // Taxonomy migration: rules saved under the OLD category tree are
+          // rewritten to the new one — in memory for this restore, and
+          // best-effort in Supabase so bank-sync sees new names too.
+          const rewrites = rules
+            .map((r) => migrateRule(r))
+            .filter((r): r is NonNullable<typeof r> => !!r)
+          if (rewrites.length) {
+            Promise.allSettled(
+              rewrites.map((r) =>
+                supabaseApi.upsertCategorySubrule(user.id, r.merchant, r.category, r.subcategory || ''),
+              ),
+            ).catch(() => {})
+          }
+          const effectiveRules = rules.map((r) => migrateRule(r) ?? r)
+          const customNames = customCats.map((c) => c.name)
           // Rule hygiene: early AI runs persisted junk rules (category 'אחר'),
           // and rules override the whole categorizer. Purge them at the source
           // so they also stop reaching bank-sync, and restore with valid ones.
-          const invalid = rules.filter((r) => !isValidRuleCategory(r.category))
+          const invalid = effectiveRules.filter((r) => !isValidRuleCategory(r.category, customNames))
           if (invalid.length) {
             supabaseApi
               .deleteCategoryRules(user.id, invalid.map((r) => r.merchant))
               .catch(() => {}) // best-effort; backend ignores them regardless
           }
-          const validRules = rules.filter((r) => isValidRuleCategory(r.category))
-          return transactionsApi.restoreSession(transactions, validRules, overrides)
+          const validRules = effectiveRules.filter((r) => isValidRuleCategory(r.category, customNames))
+          return transactionsApi.restoreSession(transactions, validRules, overrides, customNames)
         })
         .then(response => {
           if (response?.success && response.session_id) {

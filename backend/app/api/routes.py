@@ -19,11 +19,12 @@ from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
     apply_issuer_category, normalize_merchant, apply_trip_window_heuristic,
-    compute_txn_keys, txn_fingerprint, locked_mask,
+    compute_txn_keys, txn_fingerprint, locked_mask, apply_category_migration,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
-    CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog, AI_CATEGORY,
+    CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog,
+    AI_CATEGORY, AI_SUBCATEGORY, AI_SUBCATEGORIZE_SKIP, migrate_category,
 )
 from ..services.ai_categorizer import categorize_transactions, audit_merchants, suggest_subcategories
 from ..services.chart_generator import (
@@ -41,6 +42,19 @@ router = APIRouter()
 # show a live "categorizing… n/m" meter. In-memory like `sessions` (wiped on
 # cold start — the meter simply restarts with the next background run).
 AI_PROGRESS: dict[str, dict] = {}
+
+# User-created categories per session (the dynamic part of the taxonomy).
+# Passed into /restore-session by the frontend (from Supabase user_categories)
+# and honored everywhere a category is validated. In-memory like `sessions`.
+SESSION_CUSTOM_CATS: dict[str, set] = {}
+
+
+def _valid_categories(session_id: Optional[str] = None) -> set:
+    """Catalog categories ∪ the session's user-created categories."""
+    valid = set(CATEGORY_ICONS)
+    if session_id:
+        valid |= SESSION_CUSTOM_CATS.get(session_id, set())
+    return valid
 
 
 @router.get("/ai-progress")
@@ -179,6 +193,9 @@ class RestoreSessionRequest(BaseModel):
     category_rules: list[CategoryRule] = []
     # Optional single-transaction overrides, applied last (they beat rules).
     transaction_overrides: list[TransactionOverride] = []
+    # User-created categories (Supabase user_categories) — the dynamic part
+    # of the taxonomy. Treated as valid alongside CATEGORY_ICONS everywhere.
+    custom_categories: list[str] = []
 
     @field_validator('transactions', mode='before')
     @classmethod
@@ -197,6 +214,13 @@ class RestoreSessionRequest(BaseModel):
     @field_validator('transaction_overrides', mode='before')
     @classmethod
     def parse_overrides_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v or []
+
+    @field_validator('custom_categories', mode='before')
+    @classmethod
+    def parse_custom_if_string(cls, v: Any) -> Any:
         if isinstance(v, str):
             return _json.loads(v)
         return v or []
@@ -278,11 +302,21 @@ async def restore_session(body: RestoreSessionRequest):
 
         # ── Auto-categorize "שונות" by description keywords ──────────
         ai_categorized: list[dict] = []  # merchant→category the AI resolved (returned for persistence)
+        custom_cats = {
+            str(c).strip() for c in (body.custom_categories or []) if str(c).strip()
+        }
+        valid_cats = set(CATEGORY_ICONS) | custom_cats
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+            # Old-taxonomy snapshots (pre-2026-07 category names) are migrated
+            # in place FIRST — otherwise the hygiene pass below would wipe them
+            # all to שונות.
+            apply_category_migration(df)
+
             # Snapshot hygiene: stored categories that aren't in the catalog
-            # (e.g. 'אחר' persisted by early AI runs) are reset to שונות so the
-            # keyword pass below re-categorizes them from scratch.
-            invalid_cat = ~df['קטגוריה'].astype(str).isin(CATEGORY_ICONS)
+            # or the user's own custom list (e.g. 'אחר' persisted by early AI
+            # runs) are reset to שונות so the keyword pass below
+            # re-categorizes them from scratch.
+            invalid_cat = ~df['קטגוריה'].astype(str).isin(valid_cats)
             if invalid_cat.any():
                 df.loc[invalid_cat, 'קטגוריה'] = 'שונות'
 
@@ -366,28 +400,37 @@ async def restore_session(body: RestoreSessionRequest):
                 for r in body.category_rules:
                     if not r.merchant:
                         continue
-                    # Rule hygiene: only catalog categories may be assigned.
-                    # Early AI runs persisted junk like 'אחר'; honoring those
-                    # would permanently override the real categorizer.
-                    if r.category and r.category not in CATEGORY_ICONS:
+                    # Rules saved under the OLD taxonomy are translated on the
+                    # fly (the frontend also migrates them in Supabase, this is
+                    # the safety net for un-migrated callers).
+                    rule_cat, migrated_sub = migrate_category(
+                        r.category, getattr(r, 'subcategory', None))
+                    rule_sub = getattr(r, 'subcategory', None)
+                    if migrated_sub is not None:
+                        rule_sub = migrated_sub or None
+                    # Rule hygiene: only catalog/custom categories may be
+                    # assigned. Early AI runs persisted junk like 'אחר';
+                    # honoring those would permanently override the real
+                    # categorizer.
+                    if rule_cat and rule_cat not in valid_cats:
                         continue
                     rmask = desc_norm == normalize_merchant(r.merchant)
                     if not rmask.any():
                         continue
-                    if r.category:
-                        df.loc[rmask & ~catalog_known_mask, 'קטגוריה'] = r.category
+                    if rule_cat:
+                        df.loc[rmask & ~catalog_known_mask, 'קטגוריה'] = rule_cat
                     # Manual subcategory override (preserved over keyword
                     # derivation below). Scoped to the rule's parent category:
                     # if the row ended up in a DIFFERENT category (catalog
                     # repair, override), the old subcategory no longer belongs
-                    # ("שוברי מזון" must not appear under תחבורה ורכבים).
-                    if getattr(r, 'subcategory', None):
+                    # ("שוברי מזון" must not appear under הוצאות משתנות).
+                    if rule_sub:
                         if 'קטגוריה_משנה' not in df.columns:
                             df['קטגוריה_משנה'] = ''
                         sub_mask = rmask
-                        if r.category:
-                            sub_mask = rmask & (df['קטגוריה'].astype(str) == r.category)
-                        df.loc[sub_mask, 'קטגוריה_משנה'] = r.subcategory
+                        if rule_cat:
+                            sub_mask = rmask & (df['קטגוריה'].astype(str) == rule_cat)
+                        df.loc[sub_mask, 'קטגוריה_משנה'] = rule_sub
 
             # AI-tool spend is unconditional — re-assert it AFTER rules so a
             # stale rule (e.g. Claude → 'חשמל ומחשבים' from before the category
@@ -484,22 +527,32 @@ async def restore_session(body: RestoreSessionRequest):
         if body.transaction_overrides:
             if 'קטגוריה_משנה' not in df.columns:
                 df['קטגוריה_משנה'] = ''
-            overrides_by_key = {
-                o.txn_key: o for o in body.transaction_overrides
-                if o.txn_key and o.category and o.category in CATEGORY_ICONS
-            }
+            overrides_by_key = {}
+            for o in body.transaction_overrides:
+                if not (o.txn_key and o.category):
+                    continue
+                # Pins saved under the old taxonomy are translated too.
+                pin_cat, migrated_sub = migrate_category(o.category, o.subcategory)
+                pin_sub = o.subcategory
+                if migrated_sub is not None:
+                    pin_sub = migrated_sub or None
+                if pin_cat not in valid_cats:
+                    continue
+                overrides_by_key[o.txn_key] = (pin_cat, pin_sub)
             if overrides_by_key:
                 keys = compute_txn_keys(df)
                 for idx in df.index[keys.isin(overrides_by_key)]:
-                    o = overrides_by_key[keys.at[idx]]
-                    df.at[idx, 'קטגוריה'] = o.category
+                    pin_cat, pin_sub = overrides_by_key[keys.at[idx]]
+                    df.at[idx, 'קטגוריה'] = pin_cat
                     # The pipeline-derived subcategory belonged to the
                     # pipeline's category; keep only the pinned one.
-                    df.at[idx, 'קטגוריה_משנה'] = o.subcategory or ''
+                    df.at[idx, 'קטגוריה_משנה'] = pin_sub or ''
                     df.at[idx, '_locked'] = True
 
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
+        if custom_cats:
+            SESSION_CUSTOM_CATS[session_id] = custom_cats
 
         msg = f"Restored {len(df)} transactions"
         removed_parts = []
@@ -569,6 +622,12 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
     new_category = (body.category or '').strip()
     if not new_category:
         raise HTTPException(status_code=400, detail="Category cannot be empty")
+    # A name outside the catalog is a user-created category (the dynamic
+    # taxonomy): remember it for this session so rules/merchant edits and the
+    # next hygiene pass treat it as valid. The frontend persists it to
+    # Supabase user_categories so it survives restores.
+    if new_category not in CATEGORY_ICONS:
+        SESSION_CUSTOM_CATS.setdefault(body.session_id, set()).add(new_category)
 
     mask = df['id'] == body.transaction_id
     if not mask.any():
@@ -996,6 +1055,9 @@ async def scope_session(body: ScopeSessionRequest):
         return {"session_id": base}
     scoped_id = f"{base}::owner={owner}"
     sessions[scoped_id] = df[df['_owner'] == owner].reset_index(drop=True)
+    # The scoped view keeps the base session's custom categories valid.
+    if base in SESSION_CUSTOM_CATS:
+        SESSION_CUSTOM_CATS[scoped_id] = SESSION_CUSTOM_CATS[base]
     return {"session_id": scoped_id}
 
 
@@ -1101,8 +1163,9 @@ def ai_audit(body: AIAuditRequest):
             continue
         cat = str(row.get('קטגוריה', 'שונות'))
         # Unconditional overrides can't be changed by a rule — auditing them
-        # would only produce dead proposals.
-        if cat == AI_CATEGORY:
+        # would only produce dead proposals. AI tools are pinned to
+        # טכנולוגיה/AI by apply_ai_tool_override, so skip AI-subcategory rows.
+        if cat == AI_CATEGORY and str(row.get('קטגוריה_משנה', '')).strip() == AI_SUBCATEGORY:
             continue
         # The keyword catalog governs these merchants on every restore; a rule
         # can't move them, so verifying them would waste web searches.
@@ -1208,7 +1271,7 @@ async def update_merchant_category(body: UpdateMerchantCategoryRequest):
     new_category = (body.category or '').strip()
     if not new_category:
         raise HTTPException(status_code=400, detail="Category cannot be empty")
-    if new_category not in CATEGORY_ICONS:
+    if new_category not in _valid_categories(body.session_id):
         raise HTTPException(status_code=400, detail="Unknown category")
 
     df = sessions[body.session_id]
@@ -1370,7 +1433,9 @@ def ai_subcategorize_all(body: AISubcategorizeAllRequest):
 
     sub_series = df['קטגוריה_משנה'].fillna('').astype(str).str.strip()
     pending = df.loc[sub_series == '', 'קטגוריה'].astype(str)
-    categories = sorted({c for c in pending if c and c != 'שונות'})
+    # שונות has no parent to refine; פארם is split per-transaction (the
+    # תרופות/טיפוח distinction depends on the basket, not the merchant).
+    categories = sorted({c for c in pending if c and c not in AI_SUBCATEGORIZE_SKIP})
 
     all_assignments: list[dict] = []
     remaining_total = 0
