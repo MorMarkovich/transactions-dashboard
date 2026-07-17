@@ -549,14 +549,20 @@ async def test_rename_category_updates_session_and_returns_merchants(client):
 
 
 @pytest.mark.asyncio
-async def test_category_rules_override_keyword_categorization(client):
-    """User-defined category rules must win over the keyword/AI categorizer."""
-    # 'אל על' falls into 'טיסות ותיירות' via keyword match. The user has
-    # overridden it to 'שונות' via the dashboard's edit-category UI.
+async def test_category_rules_win_where_catalog_is_silent(client):
+    """User rules win over stored categories — but only where the keyword
+    catalog has no opinion (catalog-known merchants are governed by the
+    catalog; a contradicting rule is a stale AI guess and is ignored)."""
     transactions = [
-        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "אל על נתיבי אויר", "קטגוריה": "טיסות ותיירות", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+        # Catalog-unknown merchant: the rule applies.
+        {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -300, "סכום_מוחלט": 300, "תיאור": "ZZQWX SERVICES", "קטגוריה": "מנויים ושירותים", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
+        # Catalog-known merchant ('אל על' → טיסות ותיירות): the rule is ignored.
+        {"תאריך": "2026-04-11", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "אל על נתיבי אויר", "קטגוריה": "טיסות ותיירות", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
     ]
-    rules = [{"merchant": "אל על נתיבי אויר", "category": "שונות"}]
+    rules = [
+        {"merchant": "ZZQWX SERVICES", "category": "מתנות"},
+        {"merchant": "אל על נתיבי אויר", "category": "שונות"},
+    ]
     resp = await client.post(
         "/api/restore-session",
         json={"transactions": transactions, "category_rules": rules},
@@ -569,8 +575,9 @@ async def test_category_rules_override_keyword_categorization(client):
     )
     body = snap.json()
     cats = {c["name"] for c in body["categories"]}
-    assert "שונות" in cats, f"expected user rule to win, got {cats}"
-    assert "טיסות ותיירות" not in cats, f"keyword category should have been overridden, got {cats}"
+    assert "מתנות" in cats, f"expected user rule to win on catalog-unknown merchant, got {cats}"
+    assert "טיסות ותיירות" in cats, f"catalog must keep governing אל על, got {cats}"
+    assert "שונות" not in cats, f"stale rule on a catalog-known merchant must be ignored, got {cats}"
 
 
 @pytest.mark.asyncio

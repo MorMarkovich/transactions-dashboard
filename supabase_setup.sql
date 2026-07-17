@@ -120,3 +120,28 @@ CREATE POLICY "Users can view own category rules" ON public.user_category_rules 
 CREATE POLICY "Users can insert own category rules" ON public.user_category_rules FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own category rules" ON public.user_category_rules FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own category rules" ON public.user_category_rules FOR DELETE USING (auth.uid() = user_id);
+
+-- 7. Single-transaction category pins ("אל תשנה סיווג של עסקאות דומות")
+-- Unlike user_category_rules (merchant-wide), each row here pins EXACTLY ONE
+-- transaction — matched by a stable fingerprint (date|amount|description,
+-- computed server-side) — to a category/subcategory. Lets e.g. every ביט
+-- transfer carry a different category. Highest precedence in the pipeline.
+-- This whole section is idempotent — safe to re-run.
+CREATE TABLE IF NOT EXISTS public.transaction_overrides (
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    txn_key TEXT NOT NULL,
+    category TEXT NOT NULL,
+    subcategory TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, txn_key)
+);
+
+ALTER TABLE public.transaction_overrides ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own txn overrides" ON public.transaction_overrides;
+DROP POLICY IF EXISTS "Users can insert own txn overrides" ON public.transaction_overrides;
+DROP POLICY IF EXISTS "Users can update own txn overrides" ON public.transaction_overrides;
+DROP POLICY IF EXISTS "Users can delete own txn overrides" ON public.transaction_overrides;
+CREATE POLICY "Users can view own txn overrides" ON public.transaction_overrides FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own txn overrides" ON public.transaction_overrides FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own txn overrides" ON public.transaction_overrides FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own txn overrides" ON public.transaction_overrides FOR DELETE USING (auth.uid() = user_id);

@@ -189,15 +189,31 @@ export default function Dashboard() {
   // merchant→category rule in Supabase, so every future upload with the
   // same merchant string gets the corrected category automatically.
   const handleCategoryChange = useCallback(
-    async (tx: Transaction, newCategory: string) => {
+    async (tx: Transaction, newCategory: string, onlyThis: boolean = false) => {
       if (!sessionId || tx.id == null) return
       try {
-        const resp = await transactionsApi.updateTransactionCategory(sessionId, tx.id, newCategory)
-        if (user && resp.merchant) {
-          await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory).catch((e) => {
-            // eslint-disable-next-line no-console
-            console.warn('Failed to persist category rule (will retry on next edit):', e)
-          })
+        const resp = await transactionsApi.updateTransactionCategory(sessionId, tx.id, newCategory, onlyThis)
+        if (user && onlyThis && resp.txn_key) {
+          // "אל תשנה עסקאות דומות": pin ONLY this transaction — no merchant
+          // rule, so similar transactions (e.g. other ביט transfers) keep
+          // their own categories, now and on every future restore.
+          await supabaseApi
+            .upsertTransactionOverride(user.id, resp.txn_key, newCategory, null)
+            .catch((e) => {
+              // eslint-disable-next-line no-console
+              console.warn('Failed to persist transaction override:', e)
+            })
+        } else if (user && !onlyThis) {
+          if (resp.merchant) {
+            await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory).catch((e) => {
+              // eslint-disable-next-line no-console
+              console.warn('Failed to persist category rule (will retry on next edit):', e)
+            })
+          }
+          // A normal edit explicitly unpins the row (back to merchant-rule mode).
+          if (resp.txn_key) {
+            supabaseApi.deleteTransactionOverride(user.id, resp.txn_key).catch(() => {})
+          }
         }
       } finally {
         // Close the drawer and trigger a full data refresh so all widgets
@@ -214,11 +230,20 @@ export default function Dashboard() {
   // merchant→{category, subcategory} rule (we send the category the backend
   // reports so the NOT-NULL `category` column is satisfied), then refreshes.
   const handleSubcategoryChange = useCallback(
-    async (tx: Transaction, newSubcategory: string) => {
+    async (tx: Transaction, newSubcategory: string, onlyThis: boolean = false) => {
       if (!sessionId || tx.id == null) return
       try {
-        const resp = await transactionsApi.updateTransactionSubcategory(sessionId, tx.id, newSubcategory)
-        if (user && resp.merchant && resp.category) {
+        const resp = await transactionsApi.updateTransactionSubcategory(sessionId, tx.id, newSubcategory, onlyThis)
+        if (user && onlyThis && resp.txn_key && resp.category) {
+          // Pin this transaction's {category, subcategory} without creating a
+          // merchant-wide rule.
+          await supabaseApi
+            .upsertTransactionOverride(user.id, resp.txn_key, resp.category, newSubcategory || null)
+            .catch((e) => {
+              // eslint-disable-next-line no-console
+              console.warn('Failed to persist transaction override:', e)
+            })
+        } else if (user && !onlyThis && resp.merchant && resp.category) {
           await supabaseApi
             .upsertCategorySubrule(user.id, resp.merchant, resp.category, newSubcategory)
             .catch((e) => {
@@ -292,12 +317,13 @@ export default function Dashboard() {
     if (!user || recoveryAttempts.current >= 2) return false
     recoveryAttempts.current += 1
     try {
-      const [transactions, rules] = await Promise.all([
+      const [transactions, rules, overrides] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return false
-      const restored = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      const restored = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
       if (restored.success && restored.session_id) {
         navigate(`/?session_id=${restored.session_id}`, { replace: true })
         return true
@@ -649,12 +675,13 @@ export default function Dashboard() {
   const handleBankSynced = async () => {
     if (!user) return
     try {
-      const [transactions, rules] = await Promise.all([
+      const [transactions, rules, overrides] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
       if (merged.success && merged.session_id) {
         navigate(`/?session_id=${merged.session_id}`)
       }

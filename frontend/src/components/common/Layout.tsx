@@ -91,8 +91,9 @@ export default function Layout({ children }: LayoutProps) {
       Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
       ])
-        .then(([transactions, rules]) => {
+        .then(([transactions, rules, overrides]) => {
           if (!transactions || transactions.length === 0) return
           // Rule hygiene: early AI runs persisted junk rules (category 'אחר'),
           // and rules override the whole categorizer. Purge them at the source
@@ -104,7 +105,7 @@ export default function Layout({ children }: LayoutProps) {
               .catch(() => {}) // best-effort; backend ignores them regardless
           }
           const validRules = rules.filter((r) => isValidRuleCategory(r.category))
-          return transactionsApi.restoreSession(transactions, validRules)
+          return transactionsApi.restoreSession(transactions, validRules, overrides)
         })
         .then(response => {
           if (response?.success && response.session_id) {

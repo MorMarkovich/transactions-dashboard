@@ -155,7 +155,8 @@ export default function Sidebar({
         // Load user-defined category rules so freshly merged data picks
         // them up immediately (no need to wait for a page reload).
         const rules = user ? await supabaseApi.getCategoryRules(user.id).catch(() => []) : []
-        const merged = await transactionsApi.restoreSession(allTransactions, rules)
+        const overrides = user ? await supabaseApi.getTransactionOverrides(user.id).catch(() => []) : []
+        const merged = await transactionsApi.restoreSession(allTransactions, rules, overrides)
         if (merged.success && merged.session_id) {
           const removedParts: string[] = []
           if (merged.duplicates_removed && merged.duplicates_removed > 0) {
@@ -191,12 +192,13 @@ export default function Sidebar({
   const handleBankSynced = async () => {
     if (!user) return
     try {
-      const [transactions, rules] = await Promise.all([
+      const [transactions, rules, overrides] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules)
+      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
       if (merged.success && merged.session_id) {
         onFileUploaded?.(merged.session_id)
       }
