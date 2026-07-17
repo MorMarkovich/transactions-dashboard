@@ -116,12 +116,33 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
-  const [dateType, setDateType] = useState<'transaction' | 'billing'>('billing')
+  // View state (selected month / date-type / person) survives data refreshes,
+  // page switches and session rebuilds — an edit must never bounce the user
+  // from the month they were looking at back to the latest one.
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(
+    () => sessionStorage.getItem('dash-month'),
+  )
+  const [dateType, setDateType] = useState<'transaction' | 'billing'>(
+    () => (sessionStorage.getItem('dash-date-type') === 'transaction' ? 'transaction' : 'billing'),
+  )
   // Per-person filter: list of owners in the data + the currently selected one
   // (null = everyone). The selection re-scopes every chart/metric below.
   const [owners, setOwners] = useState<string[]>([])
-  const [selectedOwner, setSelectedOwner] = useState<string | null>(null)
+  const [selectedOwner, setSelectedOwner] = useState<string | null>(
+    () => sessionStorage.getItem('dash-owner'),
+  )
+
+  // Persist the view state for the rest of the browser session.
+  useEffect(() => {
+    if (selectedMonth) sessionStorage.setItem('dash-month', selectedMonth)
+  }, [selectedMonth])
+  useEffect(() => {
+    sessionStorage.setItem('dash-date-type', dateType)
+  }, [dateType])
+  useEffect(() => {
+    if (selectedOwner) sessionStorage.setItem('dash-owner', selectedOwner)
+    else sessionStorage.removeItem('dash-owner')
+  }, [selectedOwner])
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   // Bumping this forces every data-fetch effect to re-run; used after a
@@ -157,13 +178,12 @@ export default function Dashboard() {
   const [drawerTotal, setDrawerTotal] = useState(0)
   const [drawerLoading, setDrawerLoading] = useState(false)
 
-  const handleCategoryCardClick = useCallback(async (categoryName: string) => {
+  // Load (or reload) the drawer's transaction list for a category, using the
+  // snapshot date-range filters so it matches what the card displays.
+  const loadDrawerTransactions = useCallback(async (categoryName: string) => {
     if (!sessionId) return
-    setDrawerCategory(categoryName)
-    setDrawerOpen(true)
     setDrawerLoading(true)
     try {
-      // Use snapshot date range filters to match what the card displays
       const sid = await transactionsApi.scopeSession(sessionId, selectedOwner)
       const data = await transactionsApi.getCategoryTransactions(
         sid, '', categoryName, dateType, undefined, undefined,
@@ -178,6 +198,13 @@ export default function Dashboard() {
       setDrawerLoading(false)
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner])
+
+  const handleCategoryCardClick = useCallback(async (categoryName: string) => {
+    if (!sessionId) return
+    setDrawerCategory(categoryName)
+    setDrawerOpen(true)
+    await loadDrawerTransactions(categoryName)
+  }, [sessionId, loadDrawerTransactions])
 
   const handleDismissAlert = useCallback((id: string) => {
     setDismissedAlerts((prev) => new Set(prev).add(id))
@@ -221,13 +248,13 @@ export default function Dashboard() {
           }
         }
       } finally {
-        // Close the drawer and trigger a full data refresh so all widgets
-        // pick up the new classification.
-        setDrawerOpen(false)
+        // Refresh every widget, but KEEP the drawer open on the same list —
+        // an edit must not bounce the user back to the dashboard.
         setRefreshKey((k) => k + 1)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
     },
-    [sessionId, user],
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
   )
 
   // ── Manual subcategory override ──
@@ -257,11 +284,12 @@ export default function Dashboard() {
             })
         }
       } finally {
-        setDrawerOpen(false)
+        // Same as handleCategoryChange: refresh in place, don't close.
         setRefreshKey((k) => k + 1)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
     },
-    [sessionId, user],
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
   )
 
   // ── Push notifications to header notification center ──
@@ -381,14 +409,21 @@ export default function Dashboard() {
         recoveryAttempts.current = 0 // healthy load — allow future recovery
         setDataLoadedAt(new Date())
 
-        // Auto-select most recent month
+        // Auto-select the most recent month ONLY when nothing is selected yet
+        // (or the remembered month no longer exists in the data). A refresh
+        // after an edit must keep the user on the month they were viewing.
         const monthly = results[2] as RawMonthlyData
         if (monthly?.months?.length) {
-          const latest = monthly.months[monthly.months.length - 1].month
-          setSelectedMonth(latest)
-          // Default snapshot to last month so user sees recent monthly breakdown
-          setSnapshotMonthFrom(latest)
-          setSnapshotMonthTo(latest)
+          const months = monthly.months.map((m) => m.month)
+          const latest = months[months.length - 1]
+          setSelectedMonth((prev) => {
+            const next = prev && months.includes(prev) ? prev : latest
+            // Keep the snapshot range in step on first load / invalid month;
+            // the selectedMonth sync effect handles user-driven changes.
+            setSnapshotMonthFrom((f) => (f && months.includes(f) ? f : next))
+            setSnapshotMonthTo((t) => (t && months.includes(t) ? t : next))
+            return next
+          })
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
