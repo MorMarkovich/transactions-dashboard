@@ -1,6 +1,7 @@
 """
 Data processing and cleaning functions
 """
+import hashlib
 import re
 import pandas as pd
 import numpy as np
@@ -119,6 +120,48 @@ def normalize_merchant(desc) -> str:
     return s.lower().strip()
 
 
+def txn_fingerprint(date, amount, desc) -> str:
+    """Stable per-transaction key for single-transaction overrides.
+
+    Built from date + amount + description — the exact triple /restore-session
+    deduplicates on, so within a restored session the key is unique. Rows keep
+    the same key across restores (unlike the positional `id` column), which is
+    what lets a "רק העסקה הזו" reclassification survive cold starts.
+    """
+    try:
+        date_part = pd.Timestamp(date).strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        date_part = str(date or '')
+    try:
+        amount_part = f"{float(amount):.2f}"
+    except (ValueError, TypeError):
+        amount_part = str(amount or '')
+    desc_part = re.sub(r'\s+', ' ', str(desc or '').strip())
+    raw = f"{date_part}|{amount_part}|{desc_part}"
+    return hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]
+
+
+def compute_txn_keys(df: pd.DataFrame) -> pd.Series:
+    """txn_fingerprint for every row, aligned with df.index."""
+    if df.empty:
+        return pd.Series([], dtype=str)
+    dates = df['תאריך'] if 'תאריך' in df.columns else pd.Series('', index=df.index)
+    amounts = df['סכום'] if 'סכום' in df.columns else pd.Series('', index=df.index)
+    descs = df['תיאור'] if 'תיאור' in df.columns else pd.Series('', index=df.index)
+    return pd.Series(
+        [txn_fingerprint(d, a, s) for d, a, s in zip(dates, amounts, descs)],
+        index=df.index,
+    )
+
+
+def locked_mask(df: pd.DataFrame) -> pd.Series:
+    """Rows pinned by a single-transaction override (_locked). The catalog,
+    rules, merchant-wide edits and every AI pass must leave them alone."""
+    if '_locked' in df.columns:
+        return df['_locked'].fillna(False).astype(bool)
+    return pd.Series(False, index=df.index)
+
+
 def apply_issuer_category(df: pd.DataFrame) -> int:
     """Fill שונות rows from the card company's own classification (ענף_מקור).
 
@@ -211,11 +254,14 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
     df['קטגוריה_משנה'] = df['קטגוריה_משנה'].fillna('').astype(str)
     cat = df['קטגוריה'].astype(str)
     desc_lower = df['תיאור'].astype(str).str.lower()
+    unlocked = ~locked_mask(df)
 
     for parent, submap in SUBCATEGORY_KEYWORDS.items():
         # ALL parent rows, not just empty ones: a seeded keyword hit overrides
         # whatever subcategory is there; rows with no hit are left untouched.
-        parent_mask = cat == parent
+        # Except pinned rows ("אל תשנה עסקאות דומות") — their subcategory is
+        # the user's explicit choice.
+        parent_mask = (cat == parent) & unlocked
         if not parent_mask.any():
             continue
         remaining = desc_lower[parent_mask]

@@ -213,6 +213,61 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  // ─── Single-Transaction Overrides ("אל תשנה עסקאות דומות") ────────────
+
+  /**
+   * Load every single-transaction pin. Passed to /restore-session where they
+   * are applied LAST — beating the catalog, merchant rules and the AI — so a
+   * transaction pinned to a category stays there forever, alone.
+   */
+  getTransactionOverrides: async (
+    userId: string,
+  ): Promise<{ txn_key: string; category: string; subcategory?: string | null }[]> => {
+    const { data, error } = await supabase
+      .from('transaction_overrides')
+      .select('txn_key, category, subcategory')
+      .eq('user_id', userId);
+    if (error) {
+      // Table may not exist yet (migration not run) — degrade gracefully.
+      // eslint-disable-next-line no-console
+      console.warn('getTransactionOverrides failed:', error.message);
+      return [];
+    }
+    return data || [];
+  },
+
+  upsertTransactionOverride: async (
+    userId: string,
+    txnKey: string,
+    category: string,
+    subcategory: string | null,
+  ): Promise<void> => {
+    if (!txnKey || !category) return;
+    const { error } = await supabase
+      .from('transaction_overrides')
+      .upsert(
+        {
+          user_id: userId,
+          txn_key: txnKey,
+          category,
+          subcategory: subcategory || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,txn_key' },
+      );
+    if (error) throw error;
+  },
+
+  deleteTransactionOverride: async (userId: string, txnKey: string): Promise<void> => {
+    if (!txnKey) return;
+    const { error } = await supabase
+      .from('transaction_overrides')
+      .delete()
+      .eq('user_id', userId)
+      .eq('txn_key', txnKey);
+    if (error) throw error;
+  },
+
   // ─── Data Management ──────────────────────────────────────────────────
 
   deleteAllTransactions: async (userId: string): Promise<void> => {

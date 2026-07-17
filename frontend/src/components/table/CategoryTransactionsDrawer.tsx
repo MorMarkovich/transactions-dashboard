@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Check, Edit2, Tag } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
@@ -21,7 +21,7 @@ interface CategoryTransactionsDrawerProps {
    * rule to Supabase, and (3) refreshing dashboard data.
    * If undefined, the edit UI is hidden.
    */
-  onCategoryChange?: (tx: Transaction, newCategory: string) => Promise<void>
+  onCategoryChange?: (tx: Transaction, newCategory: string, onlyThis?: boolean) => Promise<void>
   /** Subcategory names available for the current category (seeded ∪ in-use). */
   subcategoryOptions?: string[]
   /**
@@ -30,7 +30,7 @@ interface CategoryTransactionsDrawerProps {
    * merchant→{category, subcategory} rule, and refreshes. If undefined, the
    * subcategory edit UI is hidden.
    */
-  onSubcategoryChange?: (tx: Transaction, newSubcategory: string) => Promise<void>
+  onSubcategoryChange?: (tx: Transaction, newSubcategory: string, onlyThis?: boolean) => Promise<void>
 }
 
 export default function CategoryTransactionsDrawer({
@@ -51,6 +51,9 @@ export default function CategoryTransactionsDrawer({
   const [savingId, setSavingId] = useState<number | null>(null)
   const [customCategory, setCustomCategory] = useState('')
   const [customSubcategory, setCustomSubcategory] = useState('')
+  // "אל תשנה סיווג של עסקאות דומות": when checked, the edit applies to THIS
+  // transaction only (a pinned override) — no merchant-wide rule is created.
+  const [onlyThis, setOnlyThis] = useState(false)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -72,7 +75,15 @@ export default function CategoryTransactionsDrawer({
     setSavingId(null)
     setCustomCategory('')
     setCustomSubcategory('')
+    setOnlyThis(false)
   }, [isOpen, category])
+
+  // Fresh toggle per row: default to the row's current pinned state.
+  useEffect(() => {
+    if (editingId == null) { setOnlyThis(false); return }
+    const tx = transactions.find((t) => t.id === editingId)
+    setOnlyThis(!!tx?._locked)
+  }, [editingId, transactions])
 
   const categoryOptions = useMemo(() => {
     return Array.from(new Set([...availableCategories, ...ASSIGNABLE_CATEGORIES, category]))
@@ -127,14 +138,14 @@ export default function CategoryTransactionsDrawer({
       }
       setSavingId(tx.id)
       try {
-        await onCategoryChange(tx, trimmed)
+        await onCategoryChange(tx, trimmed, onlyThis)
       } finally {
         setSavingId(null)
         setEditingId(null)
         setCustomCategory('')
       }
     },
-    [onCategoryChange, category],
+    [onCategoryChange, category, onlyThis],
   )
 
   const handlePickSub = useCallback(
@@ -145,14 +156,14 @@ export default function CategoryTransactionsDrawer({
       if (trimmed === current) return
       setSavingId(tx.id)
       try {
-        await onSubcategoryChange(tx, trimmed)
+        await onSubcategoryChange(tx, trimmed, onlyThis)
       } finally {
         setSavingId(null)
         setEditingId(null)
         setCustomSubcategory('')
       }
     },
-    [onSubcategoryChange],
+    [onSubcategoryChange, onlyThis],
   )
 
   return (
@@ -376,6 +387,25 @@ export default function CategoryTransactionsDrawer({
                               <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                                 {formatDate(tx.תאריך)}
                               </span>
+                              {tx._locked && (
+                                <span
+                                  title="עסקה נעולה — הסיווג ידני ולא ישתנה אוטומטית"
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '0.625rem',
+                                    padding: '1px 7px',
+                                    borderRadius: 'var(--radius-full)',
+                                    background: 'var(--accent-muted)',
+                                    border: '1px solid var(--accent)',
+                                    color: 'var(--accent)',
+                                  }}
+                                >
+                                  <Lock size={9} />
+                                  נעול
+                                </span>
+                              )}
                               {(tx.קטגוריה_משנה ?? '').trim() && (
                                 <span
                                   style={{
@@ -448,6 +478,36 @@ export default function CategoryTransactionsDrawer({
                               borderTop: '1px solid var(--glass-border)',
                             }}
                           >
+                            <label
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '7px',
+                                width: '100%',
+                                marginBottom: '6px',
+                                padding: '7px 10px',
+                                borderRadius: 'var(--radius-md, 8px)',
+                                border: onlyThis ? '1px solid var(--accent)' : '1px dashed var(--glass-border)',
+                                background: onlyThis ? 'var(--accent-muted)' : 'transparent',
+                                cursor: 'pointer',
+                                fontSize: '0.6875rem',
+                                fontWeight: 600,
+                                color: onlyThis ? 'var(--accent)' : 'var(--text-secondary)',
+                                fontFamily: 'var(--font-family)',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={onlyThis}
+                                onChange={(e) => setOnlyThis(e.target.checked)}
+                                disabled={isSaving}
+                                style={{ accentColor: 'var(--accent)', margin: 0, flexShrink: 0 }}
+                              />
+                              <Lock size={11} style={{ flexShrink: 0 }} />
+                              <span>
+                                אל תשנה סיווג של עסקאות דומות — השינוי יחול רק על העסקה הזו
+                              </span>
+                            </label>
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault()

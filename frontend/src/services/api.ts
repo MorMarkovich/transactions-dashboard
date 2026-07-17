@@ -77,10 +77,12 @@ export const transactionsApi = {
   restoreSession: async (
     transactions: unknown[],
     categoryRules: CategoryRule[] = [],
+    transactionOverrides: { txn_key: string; category: string; subcategory?: string | null }[] = [],
   ): Promise<FileUploadResponse> => {
     const response = await api.post<FileUploadResponse>('/api/restore-session', {
       transactions,
       category_rules: categoryRules,
+      transaction_overrides: transactionOverrides,
     });
     return response.data;
   },
@@ -292,13 +294,15 @@ export const transactionsApi = {
     sessionId: string,
     transactionId: number,
     category: string,
-  ): Promise<{ success: boolean; merchant: string | null; category: string }> => {
-    const response = await api.post<{ success: boolean; merchant: string | null; category: string }>(
+    onlyThis: boolean = false,
+  ): Promise<{ success: boolean; merchant: string | null; category: string; txn_key: string | null; locked: boolean }> => {
+    const response = await api.post<{ success: boolean; merchant: string | null; category: string; txn_key: string | null; locked: boolean }>(
       '/api/transactions/category',
       {
         session_id: sessionId,
         transaction_id: transactionId,
         category,
+        only_this: onlyThis,
       },
     );
     return response.data;
@@ -316,13 +320,15 @@ export const transactionsApi = {
     sessionId: string,
     transactionId: number,
     subcategory: string,
-  ): Promise<{ success: boolean; merchant: string | null; category: string | null; subcategory: string }> => {
-    const response = await api.post<{ success: boolean; merchant: string | null; category: string | null; subcategory: string }>(
+    onlyThis: boolean = false,
+  ): Promise<{ success: boolean; merchant: string | null; category: string | null; subcategory: string; txn_key: string | null; locked: boolean }> => {
+    const response = await api.post<{ success: boolean; merchant: string | null; category: string | null; subcategory: string; txn_key: string | null; locked: boolean }>(
       '/api/transactions/subcategory',
       {
         session_id: sessionId,
         transaction_id: transactionId,
         subcategory,
+        only_this: onlyThis,
       },
     );
     return response.data;

@@ -19,6 +19,7 @@ from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
     apply_issuer_category, normalize_merchant, apply_trip_window_heuristic,
+    compute_txn_keys, txn_fingerprint, locked_mask,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -162,11 +163,22 @@ class CategoryRule(BaseModel):
     subcategory: Optional[str] = None
 
 
+class TransactionOverride(BaseModel):
+    """Single-transaction pin ("אל תשנה עסקאות דומות"): applies to exactly one
+    row, matched by its stable fingerprint, and outranks everything —
+    unconditional overrides, the keyword catalog, merchant rules and the AI."""
+    txn_key: str
+    category: str
+    subcategory: Optional[str] = None
+
+
 class RestoreSessionRequest(BaseModel):
     transactions: list[Any]
     # Optional user-defined merchant→category overrides. Applied AFTER
     # the keyword/AI categorizer runs so they always win.
     category_rules: list[CategoryRule] = []
+    # Optional single-transaction overrides, applied last (they beat rules).
+    transaction_overrides: list[TransactionOverride] = []
 
     @field_validator('transactions', mode='before')
     @classmethod
@@ -182,6 +194,13 @@ class RestoreSessionRequest(BaseModel):
             return _json.loads(v)
         return v or []
 
+    @field_validator('transaction_overrides', mode='before')
+    @classmethod
+    def parse_overrides_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v or []
+
 
 class UpdateTransactionNoteRequest(BaseModel):
     session_id: str
@@ -193,12 +212,16 @@ class UpdateTransactionCategoryRequest(BaseModel):
     session_id: str
     transaction_id: int
     category: str
+    # "אל תשנה סיווג של עסקאות דומות": apply to this row only and pin it, so
+    # no merchant rule / catalog pass / AI can retag it — now or on restore.
+    only_this: bool = False
 
 
 class UpdateTransactionSubcategoryRequest(BaseModel):
     session_id: str
     transaction_id: int
     subcategory: str
+    only_this: bool = False
 
 
 class RenameCategoryRequest(BaseModel):
@@ -449,6 +472,32 @@ async def restore_session(body: RestoreSessionRequest):
                 df.loc[missing_mask, 'id'] = df.index[missing_mask]
             df['id'] = df['id'].astype('int64')
 
+        # ── Single-transaction overrides (highest precedence) ──────────
+        # "אל תשנה סיווג של עסקאות דומות": pins saved per fingerprint in
+        # Supabase (transaction_overrides) and passed in by the frontend.
+        # Applied dead last so they beat unconditional overrides, the
+        # catalog, merchant rules AND the AI — and the _locked flag keeps
+        # every later pass (rules, audit, subcategorizer) off these rows.
+        # A snapshot may carry a stale baked _locked column; reset it —
+        # the overrides list is the only source of truth.
+        df['_locked'] = False
+        if body.transaction_overrides:
+            if 'קטגוריה_משנה' not in df.columns:
+                df['קטגוריה_משנה'] = ''
+            overrides_by_key = {
+                o.txn_key: o for o in body.transaction_overrides
+                if o.txn_key and o.category and o.category in CATEGORY_ICONS
+            }
+            if overrides_by_key:
+                keys = compute_txn_keys(df)
+                for idx in df.index[keys.isin(overrides_by_key)]:
+                    o = overrides_by_key[keys.at[idx]]
+                    df.at[idx, 'קטגוריה'] = o.category
+                    # The pipeline-derived subcategory belonged to the
+                    # pipeline's category; keep only the pinned one.
+                    df.at[idx, 'קטגוריה_משנה'] = o.subcategory or ''
+                    df.at[idx, '_locked'] = True
+
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
 
@@ -526,12 +575,26 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     df.loc[mask, 'קטגוריה'] = new_category
+    # "אל תשנה עסקאות דומות": pin/unpin the row. A pinned row is skipped by
+    # rules, merchant-wide edits and the AI; a normal edit explicitly unpins
+    # (the user reverted to merchant-rule behavior for this transaction).
+    if '_locked' not in df.columns:
+        df['_locked'] = False
+    df.loc[mask, '_locked'] = bool(body.only_this)
+    if body.only_this and 'קטגוריה_משנה' in df.columns:
+        # The old subcategory belonged to the old category (restore clears it
+        # the same way for pinned rows).
+        df.loc[mask, 'קטגוריה_משנה'] = ''
     sessions[body.session_id] = df
 
     # Tell the caller what the row's description is, so the frontend can
-    # save a merchant→category rule without a separate round-trip.
-    merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
-    return {"success": True, "merchant": merchant, "category": new_category}
+    # save a merchant→category rule without a separate round-trip — and the
+    # row's stable fingerprint for persisting a single-transaction override.
+    row = df.loc[mask].iloc[0]
+    merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
+    txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
+    return {"success": True, "merchant": merchant, "category": new_category,
+            "txn_key": txn_key, "locked": bool(body.only_this)}
 
 
 @router.post("/transactions/subcategory")
@@ -556,15 +619,23 @@ async def update_transaction_subcategory(body: UpdateTransactionSubcategoryReque
     if 'קטגוריה_משנה' not in df.columns:
         df['קטגוריה_משנה'] = ''
     df.loc[mask, 'קטגוריה_משנה'] = new_subcategory
+    if body.only_this:
+        if '_locked' not in df.columns:
+            df['_locked'] = False
+        df.loc[mask, '_locked'] = True
     sessions[body.session_id] = df
 
-    merchant = str(df.loc[mask, 'תיאור'].iloc[0]) if 'תיאור' in df.columns else None
-    category = str(df.loc[mask, 'קטגוריה'].iloc[0]) if 'קטגוריה' in df.columns else None
+    row = df.loc[mask].iloc[0]
+    merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
+    category = str(row['קטגוריה']) if 'קטגוריה' in df.columns else None
+    txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
     return {
         "success": True,
         "merchant": merchant,
         "category": category,
         "subcategory": new_subcategory,
+        "txn_key": txn_key,
+        "locked": bool(body.only_this or (locked_mask(df).loc[mask]).any()),
     }
 
 
@@ -949,7 +1020,8 @@ def ai_categorize(body: AICategorizeRequest):
 
     ai_categorized: list[dict] = []
     if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
-        misc_mask = df['קטגוריה'] == 'שונות'
+        # Pinned rows ("אל תשנה עסקאות דומות") are never sent to the AI.
+        misc_mask = (df['קטגוריה'] == 'שונות') & ~locked_mask(df)
         if misc_mask.any():
             misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
             # Card-company sector (ענף_מקור) is a useful hint for the AI —
@@ -1009,6 +1081,9 @@ def ai_audit(body: AIAuditRequest):
                 "audited_merchants": [], "remaining": 0}
 
     expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
+    # Pinned rows ("אל תשנה עסקאות דומות") are the user's explicit word —
+    # auditing them would only produce proposals that can't be applied.
+    expenses = expenses[~locked_mask(expenses)]
     if expenses.empty:
         return {"success": True, "proposals": [], "audited_count": 0,
                 "audited_merchants": [], "remaining": 0}
@@ -1145,6 +1220,14 @@ async def update_merchant_category(body: UpdateMerchantCategoryRequest):
     if not mask.any():
         raise HTTPException(status_code=404, detail="Merchant not found")
 
+    # A merchant-wide edit never touches rows pinned by "אל תשנה עסקאות
+    # דומות" — that's the entire point of the pin (e.g. ביט transfers,
+    # each classified differently).
+    mask = mask & ~locked_mask(df)
+    if not mask.any():
+        return {"success": True, "merchant": body.merchant,
+                "category": new_category, "affected_count": 0}
+
     df.loc[mask, 'קטגוריה'] = new_category
     # The old subcategory belonged to the old category; re-derive from scratch.
     if 'קטגוריה_משנה' in df.columns:
@@ -1182,7 +1265,9 @@ def _ai_subcategorize_category(df, category: str, limit: int) -> tuple[list[dict
     """
     sub_series = df['קטגוריה_משנה'].fillna('').astype(str).str.strip()
     cat_mask = df['קטגוריה'].astype(str) == category
-    target = cat_mask & (sub_series == '')
+    # Pinned rows ("אל תשנה עסקאות דומות") keep whatever the user chose,
+    # including an intentionally empty subcategory.
+    target = cat_mask & (sub_series == '') & ~locked_mask(df)
     if not target.any():
         return [], 0
 
@@ -1780,6 +1865,12 @@ async def get_category_transactions(
                 if 'קטגוריה_משנה' in filtered.columns and pd.notna(row.get('קטגוריה_משנה'))
                 else ""
             ),
+            "הערות": (
+                str(row['הערות'])
+                if 'הערות' in filtered.columns and pd.notna(row.get('הערות')) and str(row.get('הערות')).strip()
+                else None
+            ),
+            "_locked": bool(row.get('_locked')) if '_locked' in filtered.columns and pd.notna(row.get('_locked')) else False,
         }
         for _, row in filtered.iterrows()
     ]

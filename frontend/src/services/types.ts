@@ -15,6 +15,8 @@ export interface Transaction {
   חודש_חיוב?: string;
   הערות?: string;
   id?: number;
+  /** Pinned by "אל תשנה סיווג של עסקאות דומות" — rules/AI never touch it. */
+  _locked?: boolean;
 }
 
 export interface TransactionResponse {
