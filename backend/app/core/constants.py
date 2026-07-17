@@ -1,34 +1,101 @@
 """
-Application constants
+Application constants — the category taxonomy.
+
+The tree below is Shelly's curated taxonomy (2026-07): 13 real-life categories
+plus a handful of technical ones the pipeline itself needs. The OLD taxonomy
+(24 categories) is still spoken by existing Supabase snapshots and rules —
+CATEGORY_MIGRATION / CATEGORY_PAIR_MIGRATION translate old names on the fly
+(restore + rule loading), so nothing stored ever breaks.
 """
 from typing import Optional
 
 CATEGORY_ICONS = {
-    'מזון וצריכה': '🛒',
-    'מסעדות, קפה וברים': '☕',
-    'תחבורה ורכבים': '🚗',
-    'דלק, חשמל וגז': '⛽',
-    'רפואה ובתי מרקחת': '💊',
-    'עירייה וממשלה': '🏛️',
-    'חשמל ומחשבים': '💻',
-    'בינה מלאכותית': '🤖',
-    'אופנה': '👔',
-    'עיצוב הבית': '🏠',
-    'פנאי, בידור וספורט': '🎬',
-    'ביטוח': '🛡️',
-    'שירותי תקשורת': '📱',
+    # ── Shelly's tree ──
+    'טיסות ותיירות': '✈️',
+    'הוצאות שוטפות': '🏠',
+    'תרופות וטיפולים': '💊',
+    'פארם': '🧴',
+    'בילויים': '🎉',
+    'אוכל': '🛒',
+    'קניות': '🛍️',
+    'טיפוח': '💅',
+    'חוגים וספורט': '🏋️',
+    'אירועים ומתנות': '🎁',
+    'טכנולוגיה': '💻',
+    'הוצאות משתנות': '🚗',
+    'סושי': '🐾',  # the pet — vet, food & treats
+    # ── Technical categories the pipeline needs ──
     'העברת כספים': '💸',
     'העברה להשקעות': '📈',
-    'חיות מחמד': '🐕',
-    'שונות': '📦',
     'משיכת מזומן': '🏧',
-    'שכר דירה': '🔑',
     'הוראות קבע': '🔄',
-    'טיסות ותיירות': '✈️',
-    'חינוך ולימודים': '📚',
-    'מתנות': '🎁',
-    'מנויים ושירותים': '🔁',
+    'שונות': '📦',
 }
+
+# ── Old taxonomy → new taxonomy ─────────────────────────────────────
+# Existing Supabase snapshots, user rules and transaction pins still carry the
+# pre-2026-07 category names. These maps are applied BEFORE hygiene/catalog in
+# restore (and by the frontend to the stored rules themselves), so old data
+# flows seamlessly into the new tree and nothing is reset to שונות or deleted.
+#
+# Pair rules — (old_category, old_subcategory) — run FIRST (most specific):
+# they route rows whose old subcategory moves to a different new parent.
+CATEGORY_PAIR_MIGRATION: dict[tuple[str, str], tuple[str, str]] = {
+    ('מזון וצריכה', 'פארם וטיפוח'): ('פארם', ''),
+    ('מזון וצריכה', 'חנויות סטוק'): ('קניות', 'דברים לבית'),
+    ('מזון וצריכה', 'סופרים'): ('אוכל', ''),  # re-seeded into גדולות/קטנים
+    ('מסעדות, קפה וברים', 'משלוחי אוכל'): ('אוכל', 'משלוחים'),
+    ('חשמל ומחשבים', 'סטרימינג'): ('הוצאות שוטפות', 'סטרימינג'),
+    ('חשמל ומחשבים', 'חנויות חשמל'): ('קניות', 'אלקטרוניקה'),
+    ('חשמל ומחשבים', 'קניות אונליין'): ('קניות', 'קניות אונליין'),
+    ('חשמל ומחשבים', 'שירותי ענן'): ('טכנולוגיה', 'שירותי ענן'),
+    ('אופנה', 'קוסמטיקה'): ('טיפוח', ''),
+    ('אופנה', 'רשתות אופנה'): ('קניות', 'אופנה'),
+    ('אופנה', 'נעליים'): ('קניות', 'אופנה'),
+    ('אופנה', 'תכשיטים ואקססוריז'): ('קניות', 'תכשיטים ואקססוריז'),
+    ('פנאי, בידור וספורט', 'ספורט וכושר'): ('חוגים וספורט', 'ספורט וכושר'),
+    ('פנאי, בידור וספורט', 'קולנוע'): ('בילויים', 'סרטים'),
+    ('תחבורה ורכבים', 'מוסכים וטיפולים'): ('הוצאות משתנות', 'טיפולים רכב'),
+    ('רפואה ובתי מרקחת', 'טיפול זוגי'): ('תרופות וטיפולים', 'טיפולים'),
+}
+# Plain renames. Subcategory value: None = keep the row's existing subcategory
+# (its name survives under the new parent, e.g. מאפיות); a string = set it.
+CATEGORY_MIGRATION: dict[str, tuple[str, Optional[str]]] = {
+    'מזון וצריכה': ('אוכל', None),
+    'מסעדות, קפה וברים': ('בילויים', None),
+    'תחבורה ורכבים': ('הוצאות משתנות', None),
+    'דלק, חשמל וגז': ('הוצאות שוטפות', None),
+    'רפואה ובתי מרקחת': ('תרופות וטיפולים', None),
+    'עירייה וממשלה': ('הוצאות שוטפות', 'ארנונה ועירייה'),
+    'חשמל ומחשבים': ('טכנולוגיה', None),
+    'בינה מלאכותית': ('טכנולוגיה', 'AI'),
+    'אופנה': ('קניות', 'אופנה'),
+    'עיצוב הבית': ('קניות', 'דברים לבית'),
+    'פנאי, בידור וספורט': ('בילויים', None),
+    'ביטוח': ('הוצאות שוטפות', 'ביטוח'),
+    'שירותי תקשורת': ('הוצאות שוטפות', None),
+    'שכר דירה': ('הוצאות שוטפות', 'שכר דירה'),
+    'חינוך ולימודים': ('חוגים וספורט', None),
+    'מתנות': ('אירועים ומתנות', None),
+    'מנויים ושירותים': ('הוצאות שוטפות', 'מנויים ושירותים'),
+    'חיות מחמד': ('סושי', None),
+}
+
+
+def migrate_category(category, subcategory=None) -> tuple[str, Optional[str]]:
+    """Translate an old-taxonomy (category, subcategory) to the new tree.
+
+    Returns (new_category, new_subcategory) where new_subcategory None means
+    "leave the row's subcategory as it is". Current-taxonomy names pass
+    through unchanged.
+    """
+    cat = str(category or '').strip()
+    sub = str(subcategory or '').strip()
+    if (cat, sub) in CATEGORY_PAIR_MIGRATION:
+        return CATEGORY_PAIR_MIGRATION[(cat, sub)]
+    if cat in CATEGORY_MIGRATION:
+        return CATEGORY_MIGRATION[cat]
+    return cat, None
 
 # Keywords in transaction descriptions that indicate check withdrawals (rent)
 CHECK_WITHDRAWAL_KEYWORDS = [
@@ -58,7 +125,6 @@ CREDIT_CARD_PAYMENT_KEYWORDS = [
 
 # ── Auto-categorization: keyword → category ─────────────────────────
 # Applied to transactions in "שונות" whose description matches a keyword.
-# Order matters within a category; first match wins across categories.
 # Keywords are matched case-insensitively via substring (str.contains).
 #
 # IMPORTANT: Short/ambiguous keywords are stored separately in
@@ -69,7 +135,7 @@ KEYWORD_TO_CATEGORY: dict[str, str] = {}
 EXACT_WORD_KEYWORDS: dict[str, str] = {}
 
 _CATEGORY_KEYWORDS: dict[str, list[str]] = {
-    # ── Travel & Tourism (checked BEFORE telecom to catch "booking hotel") ──
+    # ── Travel & Tourism ──
     'טיסות ותיירות': [
         'booking', 'airbnb', 'hotels.com', 'expedia', 'tripadvisor',
         'hostel', 'hotel', 'אירביאנבי', 'בוקינג',
@@ -85,7 +151,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         # ── Israeli travel agencies & airlines ──
         'איסתא', 'issta', 'אופיר טורס', 'ophir tours', 'דיזנהויז', 'גוליבר',
         'ארקיע', 'arkia', 'ישראייר', 'israir', 'wizzair', 'pegasus',
-        'ארקיע', 'דקה 90', 'eldan', 'אלדן', 'lastminute',
+        'דקה 90', 'eldan', 'אלדן', 'lastminute',
         'fattal', 'פתאל', 'isrotel', 'ישרוטל', 'דן פנורמה', 'לאונרדו',
         'leonardo', 'club hotel', 'קלאב הוטל', 'הרברט סמואל', 'רימונים',
         'צימר', 'zimmer', 'אכסניה', 'אכסניית', 'trip.com', 'getyourguide',
@@ -95,53 +161,48 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'double tree', 'doubletree', 'hilton', 'kohchang', 'koh chang',
         'railninja', 'rail ninja', 'rajadha', 'olive young', 'lottebaikhoajeom',
     ],
-    'מזון וצריכה': [
-        # Discount variety / stock stores — household consumption, not fashion.
-        'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock',
+    # ── Groceries & food shopping (was מזון וצריכה; delivery moved in) ──
+    'אוכל': [
         # פרימדונה = the Ramat Gan fresh supermarket (the Italian lingerie
-        # brand bills as latin 'primadonna', kept under אופנה).
+        # brand bills as latin 'primadonna', kept under קניות).
         'פרימדונה',
         # ── Supermarkets & grocery ──
         'שופרסל', 'רמי לוי', 'מגה', 'יוחננוף', 'אושר עד', 'חצי חינם',
         'ויקטורי', 'טיב טעם', 'פרש מרקט', 'סופר', 'מכולת', 'קרפור',
         'מינימרקט', 'am:pm',
         'קואופ', 'נתיב החסד', 'סטופ מרקט', 'זול ובגדול',
-        'cofix', 'קופיקס', 'סופר פארם', 'super-pharm', 'super pharm',
-        'good pharm', 'גוד פארם', 'ניו פארם', 'new pharm',
         'שפע שוק', 'מחסני השוק', 'פרשמרקט',
         'כלבו', 'מרקט',
         # ── Fruit, vegetable, food shops ──
         'פרי', 'ירק', 'ירקות', 'פירות', 'בית הפרי',
         'ממתק', 'ממתקי', 'מתוק', 'שוקולד', 'חלבי', 'מאפה',
         'בשר', 'עוף', 'דגים', 'קצביה', 'אטליז',
-        'מכולת', 'מינימרקט', 'grocery',
+        'grocery',
         'יין', 'wine', 'אלכוהול', 'משקאות',
         # ── Meal vouchers ──
         'סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
-        # ── Pharmacy/health stores ──
-        'פארם', 'pharm',
+        # ── Food delivery (Shelly: משלוחים are groceries-side, not dining) ──
+        'wolt', 'וולט', '10bis', 'תנביס',
+        'משלוחה', 'משלוחים', 'משלוח', 'הזמנת אוכל', 'delivery',
         # ── More Israeli supermarket / grocery chains ──
         'shufersal', 'rami levy', 'osher ad', 'יינות ביתן',
         'סופרמרקט', 'מרכול', 'יש חסד', 'יש בשכונה', 'ברכל', 'קינג סטור',
         'מחסני מזון', 'סופר יהודה', 'סופר דוש', 'מעדניה', 'מאפיית', 'מאפיה',
         'קצביית', 'דברי מאפה', 'יקב', 'גבינות',
+        'בייקרי', 'bakery', 'מאפייה', 'קונדיטוריה',
         'שוק העיר', 'שוק מהדרין', 'תנובה', 'שטראוס', 'יטבתה',
         'ביכורי השדה', 'סלסלת', '7-eleven', '7 eleven', '7-11',
         'פיצוצי', 'פיצוצייה', 'פיצוציה', 'קיוסק',
     ],
-    'מסעדות, קפה וברים': [
+    # ── Dining, cafes, bars + entertainment (was מסעדות + most of פנאי) ──
+    'בילויים': [
         'מסעדה', 'מסעדת', 'קפה ', 'בית קפה', 'פיצה', 'פיצריה',
         'סושי', 'בורגר', 'שווארמה', 'פלאפל', 'חומוס',
         'מקדונלד', "mcdonald", 'דומינו', "domino",
         'פאפא ג\'ונס', 'papa john',
-        'ארומה', 'aroma',
+        'ארומה', 'aroma', 'cofix', 'קופיקס',
         'קפה קפה', 'cafe cafe', 'לנדוור', 'landwer', 'רולדין', 'roladin',
         'גרג', 'greg', 'אספרסו', 'espresso',
-        'wolt', 'וולט',
-        '10bis', 'תנביס',
-        # Delivery descriptors on Israeli cards are food orders, not couriers
-        # ("מפגש גרונר משלוחים", the משלוחה ordering app, "הזמנת אוכל").
-        'משלוחה', 'משלוחים', 'משלוח', 'הזמנת אוכל', 'delivery',
         'japanika', 'ג\'פניקה',
         'שיפודי', 'shipudei', 'restaurant',
         'starbucks', 'סטארבקס', 'מושלי',
@@ -149,22 +210,36 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'קייטרינג', 'catering',
         'טאקו', 'taco', 'kfc', 'burger king', 'בורגר קינג',
         'subway', 'סאבוויי',
-        'שניצל', 'גלידה', 'ice cream', 'בייקרי', 'bakery', 'מאפייה',
+        'שניצל', 'גלידה', 'ice cream',
         'cafe', 'rest.',
-        # ── More restaurants, cafes, bars & delivery ──
+        # ── More restaurants, cafes, bars ──
         'מזנון', 'ביסטרו', 'bistro', 'בראסרי', 'גריל', 'grill', 'טאבון',
         'pub', 'פאב', 'בירה', 'beer',
         'פיצה האט', 'pizza hut', 'בנדיקט', 'benedict', 'מוזס', 'moses',
         'אגאדיר', 'agadir', 'הומבורגר', 'גולדה', 'goldas', 'אניטה', 'anita',
         'מקס ברנר', 'max brenner', 'גירף', 'giraffe', 'טוני וספה',
         'בורגרים', 'הבורגר', 'שייקסבורגר', 'black bar',
-        'קונדיטוריה', 'בייגל', 'bagel', 'דונאטס', 'donut', 'קרואסון',
+        'בייגל', 'bagel', 'דונאטס', 'donut', 'קרואסון',
         'cup o joe', 'ארקפה', 'arcaffe', 'נספרסו', 'nespresso',
         'קפה לואיז', 'ולנטינה', 'casa',
         'מקדונלדס', 'שקשוקה', 'קינוח', 'קינוחים', 'קונדטוריה', 'פטיסרי',
         'kermeet', 'קרמיט', 'המאסטרו', 'rosso vino',
+        # ── Cinema, shows, attractions, gambling (from old פנאי) ──
+        'סינמה', 'cinema', 'סינמה סיטי', 'yes planet',
+        'הופעה', 'כרטיסים',
+        'eventim', 'לאן', 'leaan', 'הצגה', 'מופע', 'תיאטרון',
+        'גן חיות', 'zoo',
+        'יס פלאנט', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'סינמטק',
+        'מוזיאון', 'museum', 'ספארי', 'safari', 'לונה פארק', 'סופרלנד',
+        'גימבורי', 'gymboree', 'משחקייה', 'אסקייפ', 'חדר בריחה', 'באולינג',
+        'bowling', 'קרטינג', 'karting', 'פיינטבול', 'לייזר טאג', 'סקייט',
+        'טוטו', 'winner', 'ווינר', 'מפעל הפיס', 'pais',
+        'זאפה', 'zappa', 'ברבי', 'barby', 'בלוק', 'האנגר', 'hangar',
+        'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא', 'היכל התרבות',
+        'בלאק בוקס', 'קולנוע', 'מובילנד',
     ],
-    'תחבורה ורכבים': [
+    # ── Recurring transport spend (was תחבורה ורכבים) ──
+    'הוצאות משתנות': [
         'רב קו', 'רב-קו', 'ravkav', 'אגד', 'egged',
         'מטרופולין', 'metropoline', 'קווים', 'kavim',
         'רכבת ישראל', 'israel railways',
@@ -173,7 +248,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'סלופארק', 'cellopark', 'cello park',
         'אי וויי', 'iway',
         'מוסך', 'מוסכים', 'מוסכי', 'garage', 'צמיגים', 'tires',
-        'ביטוח רכב', 'רישוי', 'רישיון רכב', 'אגרה',
+        'רישוי', 'רישיון רכב', 'אגרה',
         'כביש 6', 'כביש אגרה', 'מנהרות', 'מנהרת', 'tunnel',
         # ── More transport, parking, car services ──
         'רכבת קלה', 'הרכבת הקלה', 'מטרונית', 'דן באב',
@@ -185,18 +260,68 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'אלדן רכב', 'ניו קופל', 'קרית הרכב', 'קריית הרכב', 'מרכז הרכב',
         'תחבורה', 'רב-פס', 'רב פס', 'ווואש', 'woosh',
     ],
-    'דלק, חשמל וגז': [
+    # ── Household running costs: utilities, rent, telecom, insurance,
+    #    streaming, fuel, subscriptions (merges 6 old categories) ──
+    'הוצאות שוטפות': [
+        # fuel & utilities (was דלק, חשמל וגז)
         'דלק', 'תדלוק', 'סונול', 'sonol', 'דור אלון', 'doralon',
         'delek', 'fuel', 'חברת החשמל', 'חשמל',
         'ten דלק',
-        # ── More fuel stations & utility (gas/electric) ──
         'paz', 'yellow', 'מנטה', 'menta', 'אלונית', 'alonit',
         'תחנת דלק', 'דלקן', 'pazomat', 'פזומט',
         'סופרגז', 'supergas', 'אמישראגז', 'amisragas', 'פזגז', 'דורגז',
         'אמ.ש.ר.ג', 'בלוני גז', 'תאגיד החשמל',
         'דור-ארגמן', 'דור ארגמן', 'דור-האיצטדיון', 'דור -האיצטדיון',
+        # municipal & government (was עירייה וממשלה)
+        'עירייה', 'עיריית', 'עירית', 'ארנונה',
+        'משרד הפנים', 'משרד הרישוי',
+        'רשות האוכלוסין', 'רשות המיסים',
+        'מס הכנסה', 'ביטוח לאומי', 'מע"מ',
+        'אגרת', 'קנס', 'דוח חניה',
+        'מועצה אזורית', 'מועצה מקומית', 'תאגיד מים', 'מי אביבים',
+        'הגיחון', 'מי שבע', 'מי רעננה', 'מי נע', 'מים וביוב', 'מי כרמל',
+        'מי רמת גן', 'מי לוד', 'מי ציונה', 'מי גליל', 'מי הרצליה',
+        'מי מודיעין', 'מי בית שמש', 'מי נתניה', 'מי אונו', 'פלגי מוצקין',
+        'דואר ישראל', 'דואר', 'רשות מקרקעי', 'טאבו', 'הוצאה לפועל',
+        'בתי המשפט', 'משטרת ישראל', 'אגף הגביה', 'היטל', 'אגרות', 'מילגם',
+        'מס במקור', 'ניכוי במקור', 'תשלום מס',
+        # insurance & pension (was ביטוח)
+        'ביטוח', 'insurance', 'מגדל ביטוח', 'ביטוח רכב',
+        'כלל ביטוח', 'הפניקס', 'פוליסה', 'policy',
+        'איילון חב', 'איילון ביטוח', 'ביטוח איילון', 'איילון פנסיה',
+        'הראל ביטוח', 'הראל פנסיה', 'הראל השקעות', 'מנורה מבטחים',
+        'הכשרה ביטוח', 'ביטוח ישיר', 'ביטוח חקלאי', 'שירביט', 'shirbit',
+        'ליברה', 'libra', 'wobi', 'וובי', '9 מיליון', 'aig', 'איי איי ג\'י',
+        'פספורטכרד', 'passportcard', 'דייויד שילד', 'davidshield',
+        'קצין הביטוח', 'דמי ביטוח', 'גמל', 'פנסיה', 'השתלמות',
+        # telecom & internet (was שירותי תקשורת)
+        'סלקום', 'cellcom', 'פרטנר', 'partner',
+        'הוט מובייל', 'hot mobile', 'הוט נט', 'hot net',
+        'בזק', 'bezeq', 'פלאפון', 'pelephone',
+        'גולן טלקום', 'golan telecom',
+        'we4g',
+        'סלולר', 'cellular',
+        'רמי לוי תקשורת',
+        '012', '013', '014', '019', 'נטוויז\'ן', 'netvision',
+        'triple c', 'אינטרנט רימון', 'fiber', 'סיבים', 'פרי tv',
+        'free telecom', 'הוט טלקום', 'partner tv', 'yes tv',
+        # rent
+        'שכר דירה', 'שכירות',
+        # streaming (was under חשמל ומחשבים)
+        'נטפליקס', 'netflix', 'ספוטיפיי', 'spotify',
+        'youtube', 'יוטיוב', 'disney', 'דיסני',
+        'hbo', 'prime video', 'paramount', 'פרמאונט', 'apple tv',
+        'audible', 'kindle', 'televizo', 'iptv',
+        # subscriptions & service fees (was מנויים ושירותים)
+        'מנוי', 'subscription',
+        'membership', 'annual fee',
+        'דמי ניהול', 'עמלת',
+        'דמי כרטיס', 'דמי חבר', 'דמי שירות', 'דמי טיפול', 'patreon',
+        'פטראון', 'substack', 'linkedin', 'לינקדאין', 'zoom', 'amazon prime',
+        'דמי מנוי', 'חידוש מנוי',
     ],
-    'רפואה ובתי מרקחת': [
+    # ── Medicine & treatments (was רפואה ובתי מרקחת; pharm chains → פארם) ──
+    'תרופות וטיפולים': [
         'מכבי', 'כללית', 'מאוחדת', 'לאומית',
         'בית מרקחת', 'pharmacy', 'רוקח',
         'רופא', 'דוקטור', 'doctor', 'dr.',
@@ -207,7 +332,6 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'פסיכולוג', 'פסיכיאטר', 'therapist', 'therapy',
         'בית חולים', 'hospital',
         'תרופות', 'medication',
-        # ── More clinics, hospitals, labs, optics ──
         'אסותא', 'assuta', 'הרצליה מדיקל', 'איכילוב', 'תל השומר', 'שיבא',
         'רמב"ם', 'סורוקה', 'הדסה', 'בלינסון', 'וולפסון',
         'טרם', 'terem', 'ביקור רופא', 'מוקד רופאים', 'נטלי', 'natali',
@@ -217,55 +341,46 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'דיאטנית', 'תזונאי', 'נטורופת', 'הומאופת', 'קוסמטיקה רפואית', 'מדיקל',
         'l.b.y', 'lby group',
     ],
-    'עירייה וממשלה': [
-        'עירייה', 'עיריית', 'עירית', 'ארנונה',
-        'משרד הפנים', 'משרד הרישוי',
-        'רשות האוכלוסין', 'רשות המיסים',
-        'מס הכנסה', 'ביטוח לאומי', 'מע"מ',
-        'אגרת', 'קנס', 'דוח חניה',
-        # ── More municipal / government / water ──
-        'מועצה אזורית', 'מועצה מקומית', 'מתנ"ס', 'תאגיד מים', 'מי אביבים',
-        'הגיחון', 'מי שבע', 'מי רעננה', 'מי נע', 'מים וביוב', 'מי כרמל',
-        'מי רמת גן', 'מי לוד', 'מי ציונה', 'מי גליל', 'מי הרצליה',
-        'מי מודיעין', 'מי בית שמש', 'מי נתניה', 'מי אונו', 'פלגי מוצקין',
-        'דואר ישראל', 'דואר', 'רשות מקרקעי', 'טאבו', 'הוצאה לפועל',
-        'בתי המשפט', 'משטרת ישראל', 'אגף הגביה', 'היטל', 'אגרות', 'מילגם',
-        'מס במקור', 'ניכוי במקור', 'תשלום מס',
+    # ── Pharm chains (תרופות/טיפוח split is per-transaction) ──
+    'פארם': [
+        'סופר פארם', 'סופר-פארם', 'super pharm', 'super-pharm', 'superpharm',
+        'גוד פארם', 'good pharm', 'ניו פארם', 'new pharm',
+        'פארם', 'pharm', 'דראגסטור', 'drugstore',
     ],
-    'חשמל ומחשבים': [
-        'באג מולטי', 'bug multi', 'ksp',
-        'איביי', 'ebay', 'אמזון', 'amazon',
-        'אלי אקספרס', 'aliexpress', 'ali express',
+    # ── Tech: software, cloud, dev, gaming, AI (part of old חשמל ומחשבים) ──
+    'טכנולוגיה': [
         'apple', 'אפל', 'google', 'גוגל',
         'מיקרוסופט', 'microsoft',
-        'נטפליקס', 'netflix', 'ספוטיפיי', 'spotify',
         'steam', 'playstation', 'xbox', 'nintendo',
-        'אייבורי', 'ivory', 'מחשבים',
-        'samsung', 'סמסונג', 'dell', 'lenovo',
         'app store', 'חנות אפליקציות',
-        'שיאומי', 'xiaomi',
-        'youtube', 'יוטיוב', 'disney', 'דיסני',
-        'hbo', 'prime video',
-        # ── More electronics retailers & digital services ──
-        'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem',
-        'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price',
-        'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין',
-        'temu', 'טמו', 'banggood', 'aliexpress',
-        # NOTE: AI-tool keywords (openai/chatgpt/anthropic/claude/midjourney…)
-        # were moved to the dedicated 'בינה מלאכותית' category and are applied
-        # as an unconditional override (see AI_OVERRIDE_KEYWORDS below).
         'github',
         'adobe', 'canva', 'notion', 'dropbox', 'icloud', 'אייקלאוד',
         'office 365', 'microsoft 365', 'אופיס 365',
-        'paramount', 'פרמאונט', 'apple tv', 'audible', 'kindle',
         'epic games', 'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'discord',
-        'אלקטרוניק', 'electronics', 'גיימינג', 'אודיו', 'audio',
-        # Dev/cloud + streaming-adjacent subscriptions ("DIGITALOCEA"/"BROWSERBA"
-        # are how the card descriptor truncates the full names).
+        'גיימינג',
+        # NOTE: AI-tool keywords (openai/chatgpt/anthropic/claude/midjourney…)
+        # are applied as an unconditional override into טכנולוגיה + subcategory
+        # AI (see AI_OVERRIDE_KEYWORDS below).
+        # Dev/cloud subscriptions ("DIGITALOCEA"/"BROWSERBA" are how the card
+        # descriptor truncates the full names).
         'render.com', 'digitalocean', 'digitalocea', 'alldebrid',
-        'browserbase', 'browserba', 'televizo', 'iptv',
+        'browserbase', 'browserba',
     ],
-    'אופנה': [
+    # ── Shopping: fashion, electronics, furniture, home, online ──
+    'קניות': [
+        # electronics retailers (was חשמל ומחשבים)
+        'באג מולטי', 'bug multi', 'ksp',
+        'איביי', 'ebay', 'אמזון', 'amazon',
+        'אלי אקספרס', 'aliexpress', 'ali express',
+        'אייבורי', 'ivory', 'מחשבים',
+        'samsung', 'סמסונג', 'dell', 'lenovo',
+        'שיאומי', 'xiaomi',
+        'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem',
+        'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price',
+        'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין',
+        'temu', 'טמו', 'banggood',
+        'אלקטרוניק', 'electronics', 'אודיו', 'audio',
+        # fashion & footwear (was אופנה; cosmetics moved to טיפוח)
         'זארה', 'zara', 'h&m', 'פול אנד בר', 'pull&bear',
         'מנגו', 'mango', 'קסטרו', 'castro',
         'אמריקן איגל', 'american eagle',
@@ -276,10 +391,8 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'סטרדיווריוס', 'stradivarius',
         'ברשקה', 'bershka', 'intimissimi', 'calzedonia',
         'נעליים',
-        'primadonna', 'קוסמטיקה', 'cosmetic',
-        'איפור', 'makeup', 'בשמים', 'perfume',
+        'primadonna',
         'לורן', 'lauren', 'טומי', 'tommy',
-        # ── More fashion, footwear, beauty & jewelry ──
         'נקסט', 'next', 'gap', 'old navy', 'lacoste', 'לקוסט', 'ralph',
         'massimo', 'מסימו', 'oysho', 'אוישו', 'victoria', 'דלתא', 'delta',
         'reebok', 'ריבוק', 'under armour', 'new balance', 'crocs', 'קרוקס',
@@ -287,90 +400,79 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'גולברי', 'golbary', 'אדיקה', 'adika', 'factory 54',
         'פקטורי 54', 'superdry', 'tfc', 'carter',
         'תכשיט', 'jewelry', 'pandora', 'פנדורה', 'magnolia', 'מגנוליה',
-        'fossil', 'swarovski', 'סברובסקי', 'sephora', 'ספורה',
-        'body shop', 'laline', 'ללין',
+        'fossil', 'swarovski', 'סברובסקי',
         'children', 'הלבשה', 'הנעלה', 'אאוטלט', 'outlet', 'סטוק פקטורי',
-        'קוסמטיקס', 'pedro pps',
-    ],
-    'עיצוב הבית': [
+        'pedro pps',
+        # furniture & home (was עיצוב הבית)
         'איקאה', 'ikea', 'הום סנטר', 'home center',
         'ace hardware', 'מרכז השיפוצים', 'ריהוט',
         'עצמל"ה', 'home depot', 'שיפוצים',
         'כלי בית', 'מצעים', 'שטיח', 'וילון',
         'פוקס הום', 'fox home',
         'אלקטרה', 'electra',
-        # ── More furniture, homeware, renovation ──
         'ביתילי', 'bitili', 'נעמן', 'naaman', 'ורדינון', 'vardinon',
         'כספי', 'תמי 4', 'tami4', 'עמינח', 'aminach', 'הוליווד',
         'רהיטי', 'furniture', 'מזרן', 'mattress', 'דורגל',
         'טמבור', 'tambour', 'נירלט', 'nirlat', 'צבע', 'paint',
         'כלי עבודה', 'ברזל', 'גמיש', 'urban', 'הכל לבית', 'בית וגן',
         'מ. שטרן', 'דקור', 'decor', 'wishlist', 'מיאדרה',
+        # discount variety / stock stores — household goods
+        'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock',
     ],
-    'פנאי, בידור וספורט': [
-        'סינמה', 'cinema', 'סינמה סיטי', 'yes planet',
-        'הופעה', 'כרטיסים',
-        'eventim', 'לאן', 'leaan', 'הצגה', 'מופע', 'תיאטרון',
+    # ── Personal grooming & beauty ──
+    'טיפוח': [
+        'קוסמטיקה', 'cosmetic', 'קוסמטיקס',
+        'איפור', 'makeup', 'מייקאפ', 'בשמים', 'perfume', 'פרפיום',
+        'sephora', 'ספורה', 'body shop', 'laline', 'ללין',
+        'lush', 'לאש', 'kiko', 'קיקו', 'yves rocher', 'איב רושה',
+        'לוריאל', 'loreal', 'לייף סטייל',
+        'מספרה', 'מספרת', 'עיצוב שיער', 'מעצב שיער', 'ברבר', 'barber',
+        'מכון יופי', 'קוסמטיקאית', 'מניקור', 'פדיקור', 'ציפורניים',
+        'לק ג\'ל', 'בניית ציפורניים', 'הסרת שיער', 'שעווה',
+    ],
+    # ── Classes, sport & studies (old פנאי sport + חינוך ולימודים) ──
+    'חוגים וספורט': [
         'חדר כושר', 'הולמס פלייס', 'holmes place',
         'ספורט', 'sport', 'כושר',
         'חוג', 'חוגים', 'סדנה', 'workshop',
-        'גן חיות', 'zoo',
         'בריכה', 'שחייה', 'swimming',
         'יוגה', 'yoga', 'פילאטיס', 'pilates',
-        # ── More cinemas (incl. Hebrew names), shows, sport, attractions ──
-        'יס פלאנט', 'רב חן', 'רב-חן', 'גלובוס מקס', 'לב סינמה', 'סינמטק',
-        'מוזיאון', 'museum', 'ספארי', 'safari', 'לונה פארק', 'סופרלנד',
-        'גימבורי', 'gymboree', 'משחקייה', 'אסקייפ', 'חדר בריחה', 'באולינג',
-        'bowling', 'קרטינג', 'karting', 'פיינטבול', 'לייזר טאג', 'סקייט',
         'דקאתלון', 'decathlon', 'מגה ספורט', 'sport5', 'אצטדיון',
-        'טוטו', 'winner', 'ווינר', 'מפעל הפיס', 'pais',
-        'זאפה', 'zappa', 'ברבי', 'barby', 'בלוק', 'האנגר', 'hangar',
-        'הבימה', 'הקאמרי', 'בית ליסין', 'תיאטרון גשר', 'צוותא', 'היכל התרבות',
-        'ספא', 'מכון כושר', 'energym', 'בלאק בוקס', 'קולנוע', 'מובילנד',
-        'מאמאנט',
+        'מכון כושר', 'energym', 'מאמאנט',
+        # education & childcare (was חינוך ולימודים)
+        'אוניברסיטה', 'university', 'מכללה', 'college',
+        'בית ספר', 'school', 'גן ילדים', 'kindergarten',
+        'שכר לימוד', 'tuition', 'קורס', 'course',
+        'ספרים', 'books', 'סטימצקי', 'steimatzky',
+        'צעצועים', 'toys',
+        'צהרון', 'מעון', 'משפחתון', 'גנון', 'קייטנה', 'מתנ"ס',
+        'קונסרבטוריון', 'שיעור', 'מורה פרטי', 'אולפן', 'ברליץ', 'berlitz',
+        'wall street', 'udemy', 'coursera', 'duolingo', 'דואולינגו',
+        'מורה לנהיגה', 'שיעורי נהיגה', 'בית ספר לנהיגה', 'אקדמיה',
+        'הטכניון', 'ספרי לימוד', 'משחקי קופסה', 'lego', 'לגו',
+        'אקדמיה ל', 'הסמכה',
     ],
-    'ביטוח': [
-        'ביטוח', 'insurance', 'מגדל ביטוח',
-        'כלל ביטוח', 'הפניקס', 'פוליסה', 'policy',
-        # ── Insurance companies (specific forms to avoid mall/brand clashes) ──
-        # NOTE: bare 'איילון' was removed — it matched "יס פלאנט איילון"
-        # (a cinema at the Ayalon mall) and any purchase at קניון איילון.
-        'איילון חב', 'איילון ביטוח', 'ביטוח איילון', 'איילון פנסיה',
-        'הראל ביטוח', 'הראל פנסיה', 'הראל השקעות', 'מנורה מבטחים',
-        'הכשרה ביטוח', 'ביטוח ישיר', 'ביטוח חקלאי', 'שירביט', 'shirbit',
-        'ליברה', 'libra', 'wobi', 'וובי', '9 מיליון', 'aig', 'איי איי ג\'י',
-        'פספורטכרד', 'passportcard', 'דייויד שילד', 'davidshield',
-        'קצין הביטוח', 'דמי ביטוח', 'גמל', 'פנסיה', 'השתלמות',
-    ],
-    'שירותי תקשורת': [
-        'סלקום', 'cellcom', 'פרטנר', 'partner',
-        'הוט מובייל', 'hot mobile', 'הוט נט', 'hot net',
-        'בזק', 'bezeq', 'פלאפון', 'pelephone',
-        'גולן טלקום', 'golan telecom',
-        'we4g',
-        'סלולר', 'cellular',
-        'רמי לוי תקשורת',
-        # ── More ISPs / telecom ──
-        '012', '013', '014', '019', 'נטוויז\'ן', 'netvision',
-        'triple c', 'אינטרנט רימון', 'fiber', 'סיבים', 'פרי tv',
-        'free telecom', 'הוט טלקום', 'partner tv', 'yes tv',
+    # ── Events & gifts (was מתנות) ──
+    'אירועים ומתנות': [
+        'buyme', 'buy me', 'ביי-מי', 'ביי מי', 'ביימי',
+        'שוברי מתנה', 'שובר מתנה', 'gift card', 'giftcard',
+        'מתנות', 'מתנה',
     ],
     'העברת כספים': [
         'העברה', 'העברה ל', 'העברה מ', 'העברת כספים', 'העברה בנקאית',
         'paypal', 'פייפאל',
         'paybox', 'פייבוקס', 'pepper', 'פפר',
         'western union', 'ווסטרן יוניון',
-        # ── More money-transfer services ──
         'moneygram', 'מאני גרם', 'gmt', 'העברת זה"ב', 'wire transfer',
         'remitly', 'wise transfer',
     ],
-    'חיות מחמד': [
+    # ── Sushi the pet: vet, food & treats (was חיות מחמד) ──
+    'סושי': [
         'וטרינר', 'veterinary', 'חיות מחמד', 'חיות',
         'פט שופ', 'pet shop', 'pet store',
         'מזון לחיות', 'כלב', 'חתול',
         'אניפט', 'anipet', 'פטלנד', 'petland',
         'תן לחיות',
-        # ── More pet shops / services ──
         'פטס', 'all4pet', 'biopet', 'דוקטור בייקר', 'אקווריום',
         'aquarium', 'פנסיון כלבים', 'מספרת כלבים', 'אילוף כלבים', 'וט מרקט',
         'ספידוג', 'דוג סנטר',
@@ -379,48 +481,20 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'משיכת מזומן', 'משיכת מזומנים', 'מזומנים', 'כספומט', 'atm',
         'cash withdrawal', 'מזומן', 'בנקומט',
     ],
-    'חינוך ולימודים': [
-        'אוניברסיטה', 'university', 'מכללה', 'college',
-        'בית ספר', 'school', 'גן ילדים', 'kindergarten',
-        'שכר לימוד', 'tuition', 'קורס', 'course',
-        'ספרים', 'books', 'סטימצקי', 'steimatzky',
-        'צעצועים', 'toys',
-        # ── More education / childcare / courses ──
-        'צהרון', 'מעון', 'משפחתון', 'גנון', 'קייטנה', 'מתנ"ס',
-        'קונסרבטוריון', 'שיעור', 'מורה פרטי', 'אולפן', 'ברליץ', 'berlitz',
-        'wall street', 'udemy', 'coursera', 'duolingo', 'דואולינגו',
-        'מורה לנהיגה', 'שיעורי נהיגה', 'בית ספר לנהיגה', 'אקדמיה',
-        'הטכניון', 'ספרי לימוד', 'משחקי קופסה', 'lego', 'לגו',
-        'אקדמיה ל', 'הסמכה',
-    ],
-    'מתנות': [
-        'buyme', 'buy me', 'ביי-מי', 'ביי מי', 'ביימי',
-        'שוברי מתנה', 'שובר מתנה', 'gift card', 'giftcard',
-    ],
-    'מנויים ושירותים': [
-        'מנוי', 'subscription',
-        'membership', 'annual fee',
-        'דמי ניהול', 'עמלת',
-        'google one',
-        # ── More subscriptions / service fees ──
-        'דמי כרטיס', 'דמי חבר', 'דמי שירות', 'דמי טיפול', 'patreon',
-        'פטראון', 'substack', 'linkedin', 'לינקדאין', 'zoom', 'amazon prime',
-        'דמי מנוי', 'חידוש מנוי',
-    ],
 }
 
 # Short/ambiguous keywords that need word-boundary matching.
 # These are matched with \b (word boundary) regex to prevent
 # false positives like "hot" matching "hotel".
 _EXACT_WORD_KEYWORDS: dict[str, list[str]] = {
-    'שירותי תקשורת': ['הוט', 'hot', 'יס'],
-    'דלק, חשמל וגז': ['פז', 'ten', 'גז'],
-    'מסעדות, קפה וברים': ['בר', 'food', 'פוד'],
-    'תחבורה ורכבים': ['דן'],
-    'עיצוב הבית': ['ace'],
-    'אופנה': ['גולף', 'golf', 'פוקס', 'fox'],
+    'הוצאות שוטפות': ['הוט', 'hot', 'יס', 'פז', 'ten', 'גז'],
+    'בילויים': ['בר', 'פארק', 'park', 'פיס'],
+    'אוכל': ['food', 'פוד'],
+    'הוצאות משתנות': ['דן'],
+    'קניות': ['ace', 'גולף', 'golf', 'פוקס', 'fox'],
     'העברת כספים': ['ביט', 'bit'],
-    'פנאי, בידור וספורט': ['gym', 'פארק', 'park', 'פיס'],
+    'חוגים וספורט': ['gym'],
+    'טיפוח': ['ספא', 'spa'],
 }
 
 # Build flat lookup: keyword (lowercase) → category
@@ -447,15 +521,16 @@ EXACT_WORD_KEYWORDS = dict(
 )
 
 
-# ── AI tools → dedicated category ───────────────────────────────────
-# These merchants used to live under 'חשמל ומחשבים'. They now get their
-# own category, applied as an UNCONDITIONAL override (like Psagot / foreign
-# card) so it re-tags rows that arrived already categorized — existing
-# snapshots migrate on the next restore without a bank-sync re-pull.
-# Matched case-insensitively via substring. Keep this list curated to
-# well-known AI products to avoid false positives (e.g. avoid bare 'gemini'
-# / 'suno' which collide with non-AI merchants).
-AI_CATEGORY = 'בינה מלאכותית'
+# ── AI tools → טכנולוגיה / AI ────────────────────────────────────────
+# Applied as an UNCONDITIONAL override (like Psagot / foreign card): sets the
+# category to טכנולוגיה AND the subcategory to AI, re-tagging rows that
+# arrived already categorized — existing snapshots migrate on the next
+# restore without a bank-sync re-pull. Matched case-insensitively via
+# substring. Keep this list curated to well-known AI products to avoid false
+# positives (e.g. avoid bare 'gemini' / 'suno' which collide with non-AI
+# merchants).
+AI_CATEGORY = 'טכנולוגיה'
+AI_SUBCATEGORY = 'AI'
 AI_OVERRIDE_KEYWORDS: list[str] = [
     'openai', 'chatgpt', 'gpt-4', 'gpt4', 'anthropic', 'claude.ai', 'claude',
     'midjourney', 'perplexity', 'huggingface', 'hugging face',
@@ -495,71 +570,71 @@ FOREIGN_EXEMPT_KEYWORDS: list[str] = [
 # names differently — order specific before generic (e.g. אלקטרוניקה before
 # חשמל, מזון מהיר before מזון). Mirrored in bank-sync categorize.js.
 ISSUER_CATEGORY_RULES: list[tuple[str, str]] = [
-    ('מזון מהיר', 'מסעדות, קפה וברים'),
-    ('מסעד', 'מסעדות, קפה וברים'),
-    ('בתי קפה', 'מסעדות, קפה וברים'),
-    ('בתי אוכל', 'מסעדות, קפה וברים'),
-    ('סופרמרקט', 'מזון וצריכה'),
-    ('רשתות שיווק', 'מזון וצריכה'),
-    ('מרכול', 'מזון וצריכה'),
-    ('מזון', 'מזון וצריכה'),
-    ('אלקטרוניקה', 'חשמל ומחשבים'),
-    ('מחשבים', 'חשמל ומחשבים'),
-    ('סלולר', 'שירותי תקשורת'),
-    ('תקשורת', 'שירותי תקשורת'),
-    ('דלק', 'דלק, חשמל וגז'),
-    ('תחנות תדלוק', 'דלק, חשמל וגז'),
-    ('גז', 'דלק, חשמל וגז'),
-    ('חשמל', 'דלק, חשמל וגז'),
-    ('תחבורה', 'תחבורה ורכבים'),
-    ('חניה', 'תחבורה ורכבים'),
-    ('חניונים', 'תחבורה ורכבים'),
-    ('מוניות', 'תחבורה ורכבים'),
-    ('רכב', 'תחבורה ורכבים'),
-    ('מוסך', 'תחבורה ורכבים'),
+    ('מזון מהיר', 'בילויים'),
+    ('מסעד', 'בילויים'),
+    ('בתי קפה', 'בילויים'),
+    ('בתי אוכל', 'בילויים'),
+    ('סופרמרקט', 'אוכל'),
+    ('רשתות שיווק', 'אוכל'),
+    ('מרכול', 'אוכל'),
+    ('מזון', 'אוכל'),
+    ('אלקטרוניקה', 'קניות'),
+    ('מחשבים', 'קניות'),
+    ('סלולר', 'הוצאות שוטפות'),
+    ('תקשורת', 'הוצאות שוטפות'),
+    ('דלק', 'הוצאות שוטפות'),
+    ('תחנות תדלוק', 'הוצאות שוטפות'),
+    ('גז', 'הוצאות שוטפות'),
+    ('חשמל', 'הוצאות שוטפות'),
+    ('תחבורה', 'הוצאות משתנות'),
+    ('חניה', 'הוצאות משתנות'),
+    ('חניונים', 'הוצאות משתנות'),
+    ('מוניות', 'הוצאות משתנות'),
+    ('רכב', 'הוצאות משתנות'),
+    ('מוסך', 'הוצאות משתנות'),
     ('תעופה', 'טיסות ותיירות'),
     ('טיסות', 'טיסות ותיירות'),
     ('תיירות', 'טיסות ותיירות'),
     ('מלונות', 'טיסות ותיירות'),
     ('בתי מלון', 'טיסות ותיירות'),
     ('נופש', 'טיסות ותיירות'),
-    ('ביגוד', 'אופנה'),
-    ('הלבשה', 'אופנה'),
-    ('הנעלה', 'אופנה'),
-    ('אופנה', 'אופנה'),
-    ('קוסמטיקה', 'אופנה'),
-    ('תכשיט', 'אופנה'),
-    ('ריהוט', 'עיצוב הבית'),
-    ('כלי בית', 'עיצוב הבית'),
-    ('בית וגן', 'עיצוב הבית'),
-    ('שיפוצים', 'עיצוב הבית'),
-    ('בריאות', 'רפואה ובתי מרקחת'),
-    ('רפואה', 'רפואה ובתי מרקחת'),
-    ('מרקחת', 'רפואה ובתי מרקחת'),
-    ('פארם', 'רפואה ובתי מרקחת'),
-    ('אופטיקה', 'רפואה ובתי מרקחת'),
-    ('פנאי', 'פנאי, בידור וספורט'),
-    ('בידור', 'פנאי, בידור וספורט'),
-    ('ספורט', 'פנאי, בידור וספורט'),
-    ('תרבות', 'פנאי, בידור וספורט'),
-    ('בילוי', 'פנאי, בידור וספורט'),
-    ('ביטוח', 'ביטוח'),
-    ('חינוך', 'חינוך ולימודים'),
-    ('לימודים', 'חינוך ולימודים'),
-    ('ספרים', 'חינוך ולימודים'),
-    ('צעצועים', 'חינוך ולימודים'),
-    ('חיות', 'חיות מחמד'),
-    ('עירייה', 'עירייה וממשלה'),
-    ('עיריות', 'עירייה וממשלה'),
-    ('ממשל', 'עירייה וממשלה'),
-    ('רשויות', 'עירייה וממשלה'),
-    ('מיסים', 'עירייה וממשלה'),
-    ('דואר', 'עירייה וממשלה'),
+    ('ביגוד', 'קניות'),
+    ('הלבשה', 'קניות'),
+    ('הנעלה', 'קניות'),
+    ('אופנה', 'קניות'),
+    ('קוסמטיקה', 'טיפוח'),
+    ('תכשיט', 'קניות'),
+    ('ריהוט', 'קניות'),
+    ('כלי בית', 'קניות'),
+    ('בית וגן', 'קניות'),
+    ('שיפוצים', 'קניות'),
+    ('פארם', 'פארם'),
+    ('בריאות', 'תרופות וטיפולים'),
+    ('רפואה', 'תרופות וטיפולים'),
+    ('מרקחת', 'תרופות וטיפולים'),
+    ('אופטיקה', 'תרופות וטיפולים'),
+    ('ספורט', 'חוגים וספורט'),
+    ('פנאי', 'בילויים'),
+    ('בידור', 'בילויים'),
+    ('תרבות', 'בילויים'),
+    ('בילוי', 'בילויים'),
+    ('ביטוח', 'הוצאות שוטפות'),
+    ('חינוך', 'חוגים וספורט'),
+    ('לימודים', 'חוגים וספורט'),
+    ('ספרים', 'חוגים וספורט'),
+    ('צעצועים', 'חוגים וספורט'),
+    ('חיות', 'סושי'),
+    ('עירייה', 'הוצאות שוטפות'),
+    ('עיריות', 'הוצאות שוטפות'),
+    ('ממשל', 'הוצאות שוטפות'),
+    ('רשויות', 'הוצאות שוטפות'),
+    ('מיסים', 'הוצאות שוטפות'),
+    ('דואר', 'הוצאות שוטפות'),
     ('כספומט', 'משיכת מזומן'),
     ('מזומן', 'משיכת מזומן'),
     ('העברות', 'העברת כספים'),
     ('העברת כספים', 'העברת כספים'),
-    ('מתנות', 'מתנות'),
+    ('מתנות', 'אירועים ומתנות'),
 ]
 
 
@@ -583,77 +658,198 @@ def map_issuer_category(issuer_name) -> Optional[str]:
 # refine rows already in that category (no cross-category false positives).
 # Users can create/assign more in the UI; those are stored as merchant rules.
 # First subcategory (in dict order) wins on a keyword hit.
+# NOTE: פארם deliberately has NO seeds and is excluded from the AI subcategory
+# sweep — the תרופות/טיפוח split depends on what was bought, so it's assigned
+# per-transaction (the "אל תשנה עסקאות דומות" pin).
 SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
-    'רפואה ובתי מרקחת': {
-        'טיפול זוגי': ['l.b.y', 'lby group', 'טיפול זוגי', 'מטפלת זוגית'],
-        'קופות חולים': ['מכבי', 'maccabi', 'כללית', 'clalit', 'מאוחדת',
-                          'לאומית שירותי בריאות'],
-        'בתי מרקחת': ['בית מרקחת', 'מרקחת', 'pharm', 'פארם'],
+    'טיסות ותיירות': {
+        'טיסות': ['אל על', 'el al', 'elal', 'wizz', 'ryanair', 'easyjet',
+                    'turkish air', 'lufthansa', 'aegean', 'united airlines',
+                    'british airways', 'ארקיע', 'arkia', 'ישראייר', 'israir',
+                    'pegasus', 'airbaltic', 'air baltic', 'אייר חיפה',
+                    'air haifa', 'etihad', 'טיסה', 'flight', 'airline',
+                    'airways'],
+        'בתי מלון': ['מלון', 'מלונות', 'hotel', 'hostel', 'booking',
+                       'airbnb', 'אירביאנבי', 'בוקינג', 'resort', 'צימר',
+                       'zimmer', 'אכסני', 'fattal', 'פתאל', 'isrotel',
+                       'ישרוטל', 'לאונרדו', 'leonardo', 'club hotel',
+                       'קלאב הוטל', 'רימונים', 'hilton', 'doubletree',
+                       'double tree', 'דן פנורמה', 'הרברט סמואל', 'אגודה',
+                       'agoda'],
+        # שופינג + שונות: manual / AI only.
     },
-    'מזון וצריכה': {
-        # פארם first ('סופר פארם' must not fall to a סופרים keyword), then
-        # סופרים (chains like 'יינות ביתן' must not fall to the 'יין' keyword
-        # of אלכוהול ומשקאות — first subcategory wins).
-        'פארם וטיפוח': ['סופר פארם', 'סופר-פארם', 'super pharm', 'superpharm',
-                          'super-pharm', 'גוד פארם', 'good pharm', 'ניו פארם'],
-        'חנויות סטוק': ['סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק',
-                          'max stock', 'זול בשפע', 'כלבו חצי חינם'],
-        'סופרים': ['שופרסל', 'shufersal', 'רמי לוי', 'rami levy', 'ויקטורי',
-                    'victory', 'יינות ביתן', 'טיב טעם', 'tiv taam', 'אושר עד',
-                    'osher ad', 'חצי חינם', 'יוחננוף', 'yochananof', 'קרפור',
-                    'carrefour', 'מגה בעיר', 'זול ובגדול', 'נתיב החסד', 'ברכל',
-                    'שוק העיר', 'סופרמרקט', 'supermarket', 'מינימרקט', 'פרימדונה',
-                    'מיני מרקט', 'מכולת', 'am:pm', 'אי אם פי אם', 'פרשמרקט',
-                    'freshmarket', 'fresh market'],
-        'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
-                    'בייקרי', 'bakery', 'roladin', 'רולדין', 'לחם'],
-        'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
-        'אלכוהול ומשקאות': ['יין', 'wine', 'אלכוהול', 'משקאות', 'יקב',
-                              'בירה', 'beer'],
-        'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
-                        '10bis', 'תנביס'],
-    },
-    'חשמל ומחשבים': {
+    'הוצאות שוטפות': {
+        'שכר דירה': ['שכר דירה', 'שכירות', 'rent', 'משיכת שיקים',
+                       'משיכת שיק', 'המחאה', 'cheque'],
+        'ארנונה ועירייה': ['ארנונה', 'עירייה', 'עיריית', 'עירית',
+                             'מועצה אזורית', 'מועצה מקומית', 'אגף הגביה',
+                             'מילגם', 'היטל', 'דוח חניה', 'קנס'],
+        'מים': ['תאגיד מים', 'מי אביבים', 'הגיחון', 'מים וביוב', 'מי רמת גן',
+                 'מי שבע', 'מי רעננה', 'מי כרמל', 'מי הרצליה', 'מי מודיעין',
+                 'מי בית שמש', 'מי נתניה', 'מי אונו', 'פלגי מוצקין', 'מי לוד',
+                 'מי ציונה', 'מי גליל', 'מי נע'],
+        'גז': ['סופרגז', 'supergas', 'אמישראגז', 'amisragas', 'פזגז',
+                'דורגז', 'בלוני גז'],
+        'חשמל': ['חברת החשמל', 'תאגיד החשמל', 'חשמל'],
+        'דלק': ['דלק', 'תדלוק', 'סונול', 'sonol', 'דור אלון', 'paz',
+                 'yellow', 'מנטה', 'menta', 'אלונית', 'תחנת דלק', 'דלקן',
+                 'pazomat', 'פזומט', 'דור-ארגמן', 'דור ארגמן'],
         'סטרימינג': ['netflix', 'נטפליקס', 'disney', 'דיסני', 'hbo',
                       'youtube', 'יוטיוב', 'spotify', 'ספוטיפיי', 'apple tv',
                       'prime video', 'אמזון פריים', 'apple.com/bill',
-                      'crunchyroll', 'twitch'],
+                      'crunchyroll', 'paramount', 'פרמאונט', 'televizo',
+                      'iptv'],
+        'אינטרנט': ['בזק', 'bezeq', 'הוט נט', 'hot net', 'נטוויז',
+                     'netvision', 'אינטרנט רימון', 'fiber', 'סיבים',
+                     'yes tv', 'partner tv', 'הוט טלקום', 'triple c',
+                     'free telecom'],
+        'סלולר': ['סלקום', 'cellcom', 'פלאפון', 'pelephone', 'פרטנר',
+                   'partner', 'הוט מובייל', 'hot mobile', 'גולן טלקום',
+                   'golan telecom', 'we4g', '019', 'סלולר', 'cellular',
+                   'רמי לוי תקשורת'],
+        'ביטוח': ['ביטוח', 'insurance', 'פוליסה', 'policy', 'הראל',
+                   'מגדל', 'הפניקס', 'מנורה מבטחים', 'שירביט', 'ליברה',
+                   'libra', 'wobi', 'פספורטכרד', 'passportcard', 'פנסיה',
+                   'גמל', 'השתלמות'],
+        'מנויים ושירותים': ['מנוי', 'subscription', 'membership',
+                              'דמי ניהול', 'דמי כרטיס', 'דמי חבר', 'עמלת',
+                              'patreon', 'פטראון', 'substack', 'linkedin',
+                              'zoom'],
+    },
+    'תרופות וטיפולים': {
+        'טיפולים': ['l.b.y', 'lby group', 'טיפול זוגי', 'מטפלת', 'פסיכולוג',
+                      'פסיכיאטר', 'therapist', 'therapy', 'פיזיותרפיה',
+                      'physiotherapy', 'כירופרקט', 'דיאטנית', 'תזונאי',
+                      'נטורופת', 'הומאופת'],
+        'קופות חולים': ['מכבי', 'maccabi', 'כללית', 'clalit', 'מאוחדת',
+                          'לאומית שירותי בריאות'],
+        'בתי מרקחת': ['בית מרקחת', 'מרקחת', 'pharmacy', 'רוקח'],
+    },
+    'בילויים': {
+        'בתי קפה': ['קפה', 'cafe', 'coffee', 'ארומה', 'aroma', 'לנדוור',
+                      'landwer', 'גרג', 'greg', 'אספרסו', 'espresso',
+                      'starbucks', 'סטארבקס', 'קפולסקי', 'רולדין', 'cofix',
+                      'קופיקס', 'ארקפה', 'arcaffe'],
+        'מזון מהיר': ['מקדונלד', 'mcdonald', 'בורגר', 'burger', 'kfc',
+                        'פיצה', 'פיצריה', 'pizza', 'דומינו', 'domino',
+                        'שווארמה', 'פלאפל', 'falafel', 'טאקו', 'taco',
+                        'ג\'פניקה', 'japanika', 'סושי', 'sushi', 'subway',
+                        'סאבוויי', 'שניצל'],
+        'מסעדות וברים': ['מסעדה', 'מסעדת', 'restaurant', 'ביסטרו', 'bistro',
+                           'בראסרי', 'גריל', 'grill', 'טאבון', 'פאב', 'pub',
+                           'בירה', 'beer', 'שיפודי', 'קייטרינג', 'catering',
+                           'מזנון'],
+        'סרטים': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן',
+                    'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד',
+                    'סינמטק'],
+        'מופעים והופעות': ['הופעה', 'מופע', 'הצגה', 'תיאטרון', 'eventim',
+                             'כרטיסים', 'היכל התרבות', 'זאפה', 'zappa', 'ברבי',
+                             'barby', 'הבימה', 'הקאמרי', 'בית ליסין',
+                             'תיאטרון גשר', 'צוותא'],
+        'פיס והימורים': ['מפעל הפיס', 'פיס מרכז', 'לוטו', 'טוטו', 'ווינר',
+                           'winner', 'הימורים', 'חיש גד'],
+        'אטרקציות': ['מוזיאון', 'museum', 'ספארי', 'safari', 'גן חיות', 'zoo',
+                       'לונה פארק', 'סופרלנד', 'משחקייה', 'גימבורי', 'gymboree',
+                       'חדר בריחה', 'אסקייפ', 'באולינג', 'bowling', 'קרטינג',
+                       'karting', 'פיינטבול', 'לייזר טאג'],
+        # בילויים עם חברים + אחר: manual / AI only.
+    },
+    'אוכל': {
+        # קניות גדולות first (brand chains), then סופרים קטנים (the
+        # neighborhood shops), so a branded branch never falls to the generic
+        # מינימרקט/סופרמרקט keywords.
+        'קניות גדולות': ['שופרסל', 'shufersal', 'רמי לוי', 'rami levy',
+                           'ויקטורי', 'victory', 'יינות ביתן', 'טיב טעם',
+                           'tiv taam', 'אושר עד', 'osher ad', 'חצי חינם',
+                           'יוחננוף', 'yochananof', 'קרפור', 'carrefour',
+                           'מגה בעיר', 'זול ובגדול', 'נתיב החסד', 'ברכל',
+                           'פרשמרקט', 'freshmarket', 'fresh market',
+                           'קינג סטור', 'מחסני השוק', 'שפע שוק', 'יש חסד',
+                           'יש בשכונה', 'מחסני מזון', 'קואופ', 'סטופ מרקט'],
+        'סופרים קטנים': ['מינימרקט', 'מיני מרקט', 'מכולת', 'am:pm',
+                           'אי אם פי אם', 'סופרמרקט', 'supermarket', 'מרכול',
+                           'פרימדונה', 'סיטי מרקט', 'שוק העיר', 'שוק מהדרין',
+                           'פיצוצי', 'פיצוצייה', 'פיצוציה', 'קיוסק',
+                           '7-eleven', '7 eleven', '7-11'],
+        'שוברי מזון': ['סיבוס', 'cibus', 'תן ביס', 'pluxee', 'פלאקסי',
+                        'תנביס'],
+        'משלוחים': ['wolt', 'וולט', '10bis', 'משלוחה', 'משלוחים', 'משלוח',
+                     'הזמנת אוכל', 'delivery'],
+        'מאפיות': ['מאפיה', 'מאפיית', 'מאפה', 'דברי מאפה', 'קונדיטוריה',
+                    'בייקרי', 'bakery', 'לחם'],
+        'קצביות ודגים': ['קצביה', 'קצביית', 'אטליז', 'בשר', 'עוף', 'דגים'],
+        'אלכוהול ומשקאות': ['יין', 'wine', 'אלכוהול', 'משקאות', 'יקב',
+                              'בירה', 'beer'],
+        # שונות: whatever nothing above catches.
+    },
+    'קניות': {
+        'אלקטרוניקה': ['שקם אלקטריק', 'מחסני חשמל', 'באג', 'bug', 'ksp',
+                         'אייבורי', 'ivory', 'אלקטרה', 'זאפ', 'שיא החשמל',
+                         'idigital', 'איי דיגיטל', 'istore', 'מקסטור',
+                         'last price', 'לאסט פרייס', 'samsung', 'סמסונג',
+                         'שיאומי', 'xiaomi', 'אלקטרוניק', 'electronics'],
+        'קניות אונליין': ['aliexpress', 'עלי אקספרס', 'אלי אקספרס', 'amazon',
+                           'אמזון', 'ebay', 'איביי', 'temu', 'טמו', 'banggood',
+                           'gearbest', 'shein', 'asos', 'אסוס'],
+        'אופנה': ['גולף', 'golf', 'קסטרו', 'castro', 'פוקס', 'fox',
+                    'רנואר', 'renuar', 'זארה', 'zara', 'h&m', 'אייץ אנד אם',
+                    'מנגו', 'mango', 'ברשקה', 'bershka', 'פול אנד בר',
+                    'pull&bear', 'pull and bear', 'טרמינל', 'terminal x',
+                    'אורבניקה', 'urbanica', 'אמריקן איגל', 'american eagle',
+                    'ריזרבד', 'reserved', 'הודיס', 'hoodies',
+                    'טוונטי פור סבן', 'twentyfourseven', 'delta', 'דלתא',
+                    'intima', 'אינטימה', 'נעלי', 'shoes', 'סקצ', 'skechers',
+                    'nike', 'נייק', 'אדידס', 'adidas', 'new balance',
+                    'ניו באלנס', 'קרוקס', 'crocs', 'טימברלנד', 'timberland',
+                    'סטיב מאדן', 'steve madden', 'אלדו', 'aldo', 'to go',
+                    'טו גו', 'הלבשה', 'הנעלה'],
+        'תכשיטים ואקססוריז': ['פנדורה', 'pandora', 'תכשיט', 'jewel',
+                                 'מגנוליה', 'magnolia', 'אימפרס', 'impress',
+                                 'שעוני', 'משקפי', 'אופטיק', 'optic'],
+        'ריהוט': ['איקאה', 'ikea', 'ריהוט', 'רהיטי', 'furniture', 'מזרן',
+                    'mattress', 'עמינח', 'aminach', 'ביתילי', 'bitili',
+                    'הוליווד'],
+        'דברים לבית': ['הום סנטר', 'home center', 'ace', 'עצמל"ה',
+                         'home depot', 'שיפוצים', 'כלי בית', 'מצעים', 'שטיח',
+                         'וילון', 'פוקס הום', 'fox home', 'נעמן', 'naaman',
+                         'ורדינון', 'vardinon', 'טמבור', 'tambour', 'נירלט',
+                         'צבע', 'כלי עבודה', 'תמי 4', 'tami4', 'דקור',
+                         'decor', 'סטוק סנטר', 'booom', 'זול סטוק',
+                         'מקס סטוק', 'max stock', 'זול בשפע',
+                         'כלבו חצי חינם'],
+    },
+    'חוגים וספורט': {
+        'ספורט וכושר': ['חדר כושר', 'מכון כושר', 'כושר', 'הולמס פלייס',
+                          'holmes place', 'יוגה', 'yoga', 'פילאטיס', 'pilates',
+                          'בריכה', 'שחייה', 'gym', 'energym', 'ספורט', 'sport',
+                          'דקאתלון', 'decathlon', 'מאמאנט'],
+        'לימודים': ['אוניברסיטה', 'university', 'מכללה', 'college',
+                      'בית ספר', 'school', 'שכר לימוד', 'tuition', 'קורס',
+                      'course', 'אולפן', 'udemy', 'coursera', 'duolingo',
+                      'דואולינגו', 'אקדמיה', 'הטכניון', 'ספרי לימוד',
+                      'סטימצקי', 'steimatzky', 'ברליץ', 'berlitz', 'הסמכה'],
+        'חוגים': ['חוג', 'חוגים', 'סדנה', 'workshop', 'צהרון', 'מעון',
+                    'משפחתון', 'גנון', 'קייטנה', 'מתנ"ס', 'קונסרבטוריון',
+                    'גן ילדים', 'kindergarten', 'שיעור'],
+    },
+    'טכנולוגיה': {
+        'AI': [],  # assigned by the unconditional AI-tool override, not keywords
         'שירותי ענן': ['digitalocean', 'render.com', 'scrapingbee', 'aws',
                         'amazon web', 'google cloud', 'azure', 'github',
                         'gitlab', 'vercel', 'netlify', 'heroku', 'cloudflare',
                         'google one', 'icloud', 'dropbox', 'onedrive',
-                        'microsoft', 'office 365', 'גוגל אחסון', 'wix',
-                        'godaddy', 'namecheap', 'alldebrid'],
-        'חנויות חשמל': ['שקם אלקטריק', 'מחסני חשמל', 'באג', 'bug', 'ksp',
-                         'אייבורי', 'ivory', 'אלקטרה', 'זאפ', 'שיא החשמל',
-                         'idigital', 'איי דיגיטל', 'istore', 'מקסטור',
-                         'last price', 'לאסט פרייס'],
-        'קניות אונליין': ['aliexpress', 'עלי אקספרס', 'amazon', 'אמזון',
-                           'ebay', 'איביי', 'temu', 'טמו', 'banggood',
-                           'gearbest', 'shein'],
+                        'גוגל אחסון', 'wix', 'godaddy', 'namecheap',
+                        'alldebrid', 'browserbase', 'browserba'],
+        'גיימינג': ['steam', 'playstation', 'xbox', 'nintendo', 'epic games',
+                      'ubisoft', 'roblox', 'רובלוקס', 'twitch', 'גיימינג'],
+        'תוכנה ואפליקציות': ['adobe', 'canva', 'notion', 'app store',
+                               'חנות אפליקציות', 'microsoft', 'office 365',
+                               'microsoft 365', 'אופיס 365'],
     },
-    'אופנה': {
-        'רשתות אופנה': ['גולף', 'golf', 'קסטרו', 'castro', 'פוקס', 'fox',
-                          'רנואר', 'renuar', 'זארה', 'zara', 'h&m', 'אייץ אנד אם',
-                          'מנגו', 'mango', 'ברשקה', 'bershka', 'פול אנד בר',
-                          'pull&bear', 'pull and bear', 'טרמינל', 'terminal x',
-                          'אורבניקה', 'urbanica', 'אמריקן איגל', 'american eagle',
-                          'ריזרבד', 'reserved', 'הודיס', 'hoodies',
-                          'טוונטי פור סבן', 'twentyfourseven', 'delta', 'דלתא',
-                          'intima', 'אינטימה'],
-        'נעליים': ['נעלי', 'shoes', 'סקצ', 'skechers', 'nike', 'נייק',
-                     'אדידס', 'adidas', 'new balance', 'ניו באלנס', 'קרוקס',
-                     'crocs', 'טימברלנד', 'timberland', 'סטיב מאדן',
-                     'steve madden', 'אלדו', 'aldo', 'to go', 'טו גו'],
-        'קוסמטיקה': ['קוסמטיק', 'cosmetic', 'בשמים', 'perfume', 'פרפיום',
-                       'סבון', 'lush', 'לאש', 'kiko', 'קיקו', 'sephora',
-                       'ספורה', 'yves rocher', 'איב רושה', 'לוריאל', 'loreal',
-                       'מייקאפ', 'makeup', 'לייף סטייל'],
-        'תכשיטים ואקססוריז': ['פנדורה', 'pandora', 'תכשיט', 'jewel',
-                                 'מגנוליה', 'magnolia', 'אימפרס', 'impress',
-                                 'שעוני', 'משקפי', 'אופטיק', 'optic'],
-    },
-    'תחבורה ורכבים': {
+    'הוצאות משתנות': {
+        'טיפולים רכב': ['מוסך', 'garage', 'צמיג', 'פנצ', 'גרר', 'מצבר',
+                          'חלפים', 'מכון רישוי', 'בדיקת רכב', 'שטיפת רכב',
+                          'רחיצת', 'car wash', 'מכונאי', 'ליסינג', 'leasing'],
         'כבישי אגרה': ['כביש 6', 'כביש אגרה', 'רב-פס', 'רב פס', 'מנהרות',
                          'מנהרת', 'אגרה', 'חוצה ישראל', 'חוצה צפון'],
         'חניונים': ['חניון', 'חניה', 'חנייה', 'parking', 'פנגו', 'pango',
@@ -663,55 +859,55 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
                               'דן באב', 'באבל דן', 'אוטובוס', 'סופרבוס'],
         'מוניות ונסיעות': ['gett', 'מונית', 'taxi', 'yango', 'יאנגו', 'uber',
                              'autotel', 'אוטוטל', 'car2go', 'ווואש', 'woosh'],
-        'מוסכים וטיפולים': ['מוסך', 'garage', 'צמיג', 'פנצ', 'גרר', 'מצבר',
-                               'חלפים', 'מכון רישוי', 'בדיקת רכב', 'שטיפת רכב',
-                               'רחיצת', 'car wash', 'מכונאי'],
     },
-    'מסעדות, קפה וברים': {
-        'משלוחי אוכל': ['wolt', 'וולט', '10bis', 'תנביס', 'משלוחה',
-                          'משלוחים', 'משלוח', 'הזמנת אוכל', 'delivery'],
-        'בתי קפה': ['קפה', 'cafe', 'coffee', 'ארומה', 'aroma', 'לנדוור',
-                      'landwer', 'גרג', 'greg', 'אספרסו', 'espresso',
-                      'starbucks', 'סטארבקס', 'קפולסקי', 'רולדין'],
-        'מזון מהיר': ['מקדונלד', 'mcdonald', 'בורגר', 'burger', 'kfc',
-                        'פיצה', 'פיצריה', 'pizza', 'דומינו', 'domino',
-                        'שווארמה', 'פלאפל', 'falafel', 'טאקו', 'taco',
-                        'ג\'פניקה', 'japanika', 'סושי', 'sushi'],
-    },
-    'פנאי, בידור וספורט': {
-        'פיס והימורים': ['מפעל הפיס', 'פיס מרכז', 'לוטו', 'טוטו', 'ווינר',
-                           'winner', 'הימורים', 'חיש גד'],
-        'קולנוע': ['סינמה', 'cinema', 'יס פלאנט', 'yes planet', 'רב חן',
-                    'רב-חן', 'גלובוס מקס', 'לב סינמה', 'קולנוע', 'מובילנד',
-                    'סינמטק'],
-        'מופעים והופעות': ['הופעה', 'מופע', 'הצגה', 'תיאטרון', 'eventim',
-                             'כרטיסים', 'היכל התרבות', 'זאפה', 'zappa', 'ברבי',
-                             'barby', 'הבימה', 'הקאמרי', 'בית ליסין',
-                             'תיאטרון גשר', 'צוותא'],
-        'ספורט וכושר': ['חדר כושר', 'מכון כושר', 'כושר', 'הולמס פלייס',
-                          'holmes place', 'יוגה', 'yoga', 'פילאטיס', 'pilates',
-                          'בריכה', 'שחייה', 'gym', 'energym', 'ספורט', 'sport',
-                          'דקאתלון', 'decathlon'],
-        'אטרקציות': ['מוזיאון', 'museum', 'ספארי', 'safari', 'גן חיות', 'zoo',
-                       'לונה פארק', 'סופרלנד', 'משחקייה', 'גימבורי', 'gymboree',
-                       'חדר בריחה', 'אסקייפ', 'באולינג', 'bowling', 'קרטינג',
-                       'karting'],
+    'סושי': {
+        'וטרינרית וטיפולים': ['וטרינר', 'veterinary', 'פנסיון כלבים',
+                                 'מספרת כלבים', 'אילוף'],
+        'אוכל וחטיפים': ['פט שופ', 'pet shop', 'pet store', 'מזון לחיות',
+                           'אניפט', 'anipet', 'פטלנד', 'petland', 'וט מרקט',
+                           'all4pet', 'biopet', 'ספידוג', 'דוג סנטר',
+                           'תן לחיות'],
     },
 }
 
 # Optional emoji per seeded subcategory (UI nicety; falls back in the UI).
 SUBCATEGORY_ICONS: dict[str, str] = {
-    'סופרים': '🛒', 'מאפיות': '🥐', 'פארם וטיפוח': '🧴', 'חנויות סטוק': '🧺',
-    'קופות חולים': '🏥', 'בתי מרקחת': '💊',
-    'רשתות אופנה': '👕', 'נעליים': '👟', 'קוסמטיקה': '💄', 'תכשיטים ואקססוריז': '💍',
-    'כבישי אגרה': '🛣️', 'חניונים': '🅿️', 'תחבורה ציבורית': '🚌', 'מוניות ונסיעות': '🚕', 'מוסכים וטיפולים': '🔧',
-    'משלוחי אוכל': '🛵', 'בתי קפה': '☕', 'מזון מהיר': '🍔', 'פיס והימורים': '🎰',
-    'סטרימינג': '📺', 'שירותי ענן': '☁️', 'חנויות חשמל': '🔌', 'קניות אונליין': '📦', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
+    # טיסות ותיירות
+    'טיסות': '✈️', 'בתי מלון': '🏨', 'שופינג': '🛍️',
+    # הוצאות שוטפות
+    'שכר דירה': '🔑', 'ארנונה ועירייה': '🏛️', 'מים': '🚿', 'גז': '🔥',
+    'חשמל': '⚡', 'דלק': '⛽', 'סטרימינג': '📺', 'אינטרנט': '🌐',
+    'סלולר': '📱', 'ביטוח': '🛡️', 'מנויים ושירותים': '🔁',
+    # תרופות וטיפולים
+    'קופות חולים': '🏥', 'בתי מרקחת': '💊', 'טיפולים': '💞',
+    # פארם
+    'תרופות': '💊', 'טיפוח': '🧴',
+    # בילויים
+    'בתי קפה': '☕', 'מזון מהיר': '🍔', 'מסעדות וברים': '🍽️',
+    'סרטים': '🎬', 'מופעים והופעות': '🎭', 'פיס והימורים': '🎰',
+    'אטרקציות': '🎡', 'בילויים עם חברים': '🥂',
+    # אוכל
+    'קניות גדולות': '🛒', 'סופרים קטנים': '🏪', 'משלוחים': '🛵',
+    'מאפיות': '🥐', 'קצביות ודגים': '🥩', 'אלכוהול ומשקאות': '🍷',
     'שוברי מזון': '🎫',
-    'קולנוע': '🎬', 'מופעים והופעות': '🎭', 'ספורט וכושר': '🏋️',
-    'אטרקציות': '🎡',
-    'טיפול זוגי': '💞',
+    # קניות
+    'אלקטרוניקה': '🔌', 'קניות אונליין': '📦', 'אופנה': '👕',
+    'תכשיטים ואקססוריז': '💍', 'ריהוט': '🛋️', 'דברים לבית': '🏠',
+    # חוגים וספורט
+    'ספורט וכושר': '🏋️', 'לימודים': '📚', 'חוגים': '🎨',
+    # טכנולוגיה
+    'AI': '🤖', 'שירותי ענן': '☁️', 'גיימינג': '🎮', 'תוכנה ואפליקציות': '💿',
+    # הוצאות משתנות
+    'טיפולים רכב': '🔧', 'כבישי אגרה': '🛣️', 'חניונים': '🅿️',
+    'תחבורה ציבורית': '🚌', 'מוניות ונסיעות': '🚕',
+    # סושי
+    'וטרינרית וטיפולים': '🩺', 'אוכל וחטיפים': '🦴',
 }
+
+# Categories the automatic AI subcategory sweep must skip: שונות has no parent
+# to refine, and פארם is split per-transaction (תרופות/טיפוח depends on the
+# basket, not the merchant).
+AI_SUBCATEGORIZE_SKIP: set[str] = {'שונות', 'פארם'}
 
 
 def get_icon(category: str) -> str:
@@ -720,4 +916,9 @@ def get_icon(category: str) -> str:
 
 def get_subcategory_catalog() -> dict[str, list[str]]:
     """Parent category → list of seeded subcategory names (for the UI)."""
-    return {parent: list(subs.keys()) for parent, subs in SUBCATEGORY_KEYWORDS.items()}
+    catalog = {parent: list(subs.keys()) for parent, subs in SUBCATEGORY_KEYWORDS.items()}
+    # Pickable subcategories that have no keyword seeds.
+    catalog.setdefault('טיסות ותיירות', []).append('שופינג')
+    catalog.setdefault('בילויים', []).append('בילויים עם חברים')
+    catalog['פארם'] = ['תרופות', 'טיפוח']
+    return catalog

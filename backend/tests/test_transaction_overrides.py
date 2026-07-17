@@ -49,11 +49,11 @@ def test_override_beats_catalog_and_rules():
     sid = _restore(
         [{"id": 1, "תאריך": "2026-07-05", "תיאור": desc,
           "קטגוריה": "שונות", "סכום": -13.9}],
-        rules=[{"merchant": desc, "category": "מתנות"}],
-        overrides=[{"txn_key": key, "category": "חינוך ולימודים"}],
+        rules=[{"merchant": desc, "category": "אירועים ומתנות"}],
+        overrides=[{"txn_key": key, "category": "חוגים וספורט"}],
     )
     row = _rows(sid)[1]
-    assert row["קטגוריה"] == "חינוך ולימודים"
+    assert row["קטגוריה"] == "חוגים וספורט"
     assert row["_locked"] is True
 
 
@@ -64,11 +64,11 @@ def test_override_pins_one_bit_transfer_not_the_others():
          "קטגוריה": "שונות", "סכום": -100.0},
         {"id": 2, "תאריך": "2026-07-08", "תיאור": "העברה בביט",
          "קטגוריה": "שונות", "סכום": -250.0},
-    ], overrides=[{"txn_key": key, "category": "מתנות"}])
+    ], overrides=[{"txn_key": key, "category": "אירועים ומתנות"}])
     rows = _rows(sid)
-    assert rows[1]["קטגוריה"] == "מתנות"
+    assert rows[1]["קטגוריה"] == "אירועים ומתנות"
     assert rows[1]["_locked"] is True
-    assert rows[2]["קטגוריה"] != "מתנות"
+    assert rows[2]["קטגוריה"] != "אירועים ומתנות"
     assert rows[2]["_locked"] is False
 
 
@@ -79,7 +79,7 @@ def test_merchant_wide_update_skips_locked_rows():
          "קטגוריה": "שונות", "סכום": -100.0},
         {"id": 2, "תאריך": "2026-07-08", "תיאור": "העברה בביט",
          "קטגוריה": "שונות", "סכום": -250.0},
-    ], overrides=[{"txn_key": key, "category": "מתנות"}])
+    ], overrides=[{"txn_key": key, "category": "אירועים ומתנות"}])
 
     resp = client.post("/api/merchants/category", json={
         "session_id": sid, "merchant": "העברה בביט", "category": "העברת כספים",
@@ -88,7 +88,7 @@ def test_merchant_wide_update_skips_locked_rows():
     assert resp.json()["affected_count"] == 1
 
     rows = _rows(sid)
-    assert rows[1]["קטגוריה"] == "מתנות"  # pinned row untouched
+    assert rows[1]["קטגוריה"] == "אירועים ומתנות"  # pinned row untouched
     assert rows[2]["קטגוריה"] == "העברת כספים"
 
 
@@ -101,7 +101,7 @@ def test_only_this_endpoint_pins_and_normal_edit_unpins():
 
     resp = client.post("/api/transactions/category", json={
         "session_id": sid, "transaction_id": 1,
-        "category": "מתנות", "only_this": True,
+        "category": "אירועים ומתנות", "only_this": True,
     }).json()
     assert resp["txn_key"] == expected_key
     assert resp["locked"] is True
@@ -112,7 +112,7 @@ def test_only_this_endpoint_pins_and_normal_edit_unpins():
         "session_id": sid, "merchant": "העברה בביט", "category": "העברת כספים",
     }).json()
     assert resp["affected_count"] == 0
-    assert _rows(sid)[1]["קטגוריה"] == "מתנות"
+    assert _rows(sid)[1]["קטגוריה"] == "אירועים ומתנות"
 
     # A normal (rule-mode) edit explicitly unpins.
     resp = client.post("/api/transactions/category", json={
@@ -140,7 +140,7 @@ def test_override_subcategory_survives_seeded_derivation():
     # A merchant-wide edit elsewhere re-runs derive_subcategory on the whole
     # session — the pinned subcategory must survive it.
     client.post("/api/merchants/category", json={
-        "session_id": sid, "merchant": "חנות כלשהי בע\"מ", "category": "מתנות",
+        "session_id": sid, "merchant": "חנות כלשהי בע\"מ", "category": "אירועים ומתנות",
     })
     assert _rows(sid)[1]["קטגוריה_משנה"] == "תרופות"
 
@@ -154,5 +154,5 @@ def test_invalid_override_category_ignored():
         overrides=[{"txn_key": key, "category": "אחר"}],
     )
     row = _rows(sid)[1]
-    assert row["קטגוריה"] == "מזון וצריכה"  # catalog still governs
+    assert row["קטגוריה"] == "אוכל"  # catalog still governs
     assert row["_locked"] is False

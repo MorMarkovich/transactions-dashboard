@@ -10,8 +10,9 @@ from ..utils.validators import detect_header_row, parse_dates, clean_amount
 from ..core.constants import (
     CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
     KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
-    AI_CATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
+    AI_CATEGORY, AI_SUBCATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
     FOREIGN_EXEMPT_KEYWORDS, map_issuer_category,
+    CATEGORY_MIGRATION, CATEGORY_PAIR_MIGRATION, migrate_category,
 )
 from .ai_categorizer import categorize_transactions
 
@@ -36,9 +37,9 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
     - 'פסגות'/'psagot'            → העברה להשקעות
     - foreign card descriptor      → טיסות ותיירות
       (trailing 2-letter country code, no Hebrew, not Israel's own IL)
-    - AI-tool merchants            → בינה מלאכותית
+    - AI-tool merchants            → טכנולוגיה / AI
       Applied as an override (not a keyword-pass entry) so charges that arrived
-      already tagged 'חשמל ומחשבים' migrate without a bank-sync re-pull.
+      already tagged elsewhere migrate without a bank-sync re-pull.
     """
     if df.empty or 'תיאור' not in df.columns or 'קטגוריה' not in df.columns:
         return df
@@ -82,11 +83,13 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = None) -> pd.DataFrame:
-    """Force AI-tool merchants into בינה מלאכותית, unconditionally.
+    """Force AI-tool merchants into טכנולוגיה / AI, unconditionally.
 
     Exposed separately so restore_session can re-assert it AFTER user rules:
     early AI runs persisted junk rules (e.g. CLAUDE.AI → 'אחר') and rules win
     over the main override pass, which let those charges escape the category.
+    Sets BOTH the category and the AI subcategory (Shelly's tree keeps AI as
+    a subcategory of טכנולוגיה, not a top-level category).
     """
     if df.empty or 'תיאור' not in df.columns or 'קטגוריה' not in df.columns:
         return df
@@ -97,7 +100,35 @@ def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = N
     ai_mask = desc_lower.str.contains(_AI_OVERRIDE_PATTERN, na=False, regex=True)
     if ai_mask.any():
         df.loc[ai_mask, 'קטגוריה'] = AI_CATEGORY
+        if 'קטגוריה_משנה' not in df.columns:
+            df['קטגוריה_משנה'] = ''
+        df.loc[ai_mask, 'קטגוריה_משנה'] = AI_SUBCATEGORY
     return df
+
+
+def apply_category_migration(df: pd.DataFrame) -> int:
+    """Translate old-taxonomy category/subcategory names on snapshot rows.
+
+    Stored snapshots (and bank-sync merges) still carry pre-2026-07 names —
+    without this they'd all be reset to שונות by the hygiene pass. Runs FIRST
+    in restore, before hygiene/catalog/rules. Returns migrated-row count.
+    """
+    if df.empty or 'קטגוריה' not in df.columns:
+        return 0
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+    cats = df['קטגוריה'].astype(str)
+    subs = df['קטגוריה_משנה'].fillna('').astype(str)
+    migrated = 0
+    old_names = set(CATEGORY_MIGRATION) | {c for c, _ in CATEGORY_PAIR_MIGRATION}
+    affected = cats.isin(old_names)
+    for idx in df.index[affected]:
+        new_cat, new_sub = migrate_category(cats.at[idx], subs.at[idx])
+        df.at[idx, 'קטגוריה'] = new_cat
+        if new_sub is not None:
+            df.at[idx, 'קטגוריה_משנה'] = new_sub
+        migrated += 1
+    return migrated
 
 
 _INSTALLMENT_SUFFIX = re.compile(r'\s*\(תשלום \d+/\d+\)\s*$')
@@ -449,8 +480,10 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # category. Shared helper so this pipeline and restore_session never drift.
     apply_unconditional_overrides(result)
 
-    # Reclassify check withdrawals as rent (שכר דירה)
+    # Reclassify check withdrawals as rent (הוצאות שוטפות / שכר דירה)
     desc_lower = result['תיאור'].str.lower()
+    if 'קטגוריה_משנה' not in result.columns:
+        result['קטגוריה_משנה'] = ''
     for keyword in CHECK_WITHDRAWAL_KEYWORDS:
         kw = keyword.lower()
         # Short keywords (≤3 chars) need word-boundary matching to avoid
@@ -461,7 +494,8 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
         else:
             mask = desc_lower.str.contains(kw, na=False, regex=False)
         if mask.any():
-            result.loc[mask, 'קטגוריה'] = 'שכר דירה'
+            result.loc[mask, 'קטגוריה'] = 'הוצאות שוטפות'
+            result.loc[mask, 'קטגוריה_משנה'] = 'שכר דירה'
 
     # Reclassify standing orders (הוראות קבע)
     for keyword in STANDING_ORDER_KEYWORDS:

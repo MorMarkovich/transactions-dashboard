@@ -213,6 +213,53 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  // ─── User-created categories (the dynamic taxonomy) ───────────────────
+
+  /**
+   * Categories the user (or the AI, on their behalf) created beyond the
+   * built-in tree. Passed to /restore-session so restores treat them as
+   * valid instead of resetting their rows to שונות.
+   */
+  getUserCategories: async (
+    userId: string,
+  ): Promise<{ name: string; icon?: string | null }[]> => {
+    const { data, error } = await supabase
+      .from('user_categories')
+      .select('name, icon')
+      .eq('user_id', userId);
+    if (error) {
+      // Table may not exist yet (migration not run) — degrade gracefully.
+      // eslint-disable-next-line no-console
+      console.warn('getUserCategories failed:', error.message);
+      return [];
+    }
+    return data || [];
+  },
+
+  upsertUserCategory: async (
+    userId: string,
+    name: string,
+    icon: string | null = null,
+  ): Promise<void> => {
+    if (!name?.trim()) return;
+    const { error } = await supabase
+      .from('user_categories')
+      .upsert(
+        { user_id: userId, name: name.trim(), icon: icon || null },
+        { onConflict: 'user_id,name' },
+      );
+    if (error) throw error;
+  },
+
+  deleteUserCategory: async (userId: string, name: string): Promise<void> => {
+    const { error } = await supabase
+      .from('user_categories')
+      .delete()
+      .eq('user_id', userId)
+      .eq('name', name);
+    if (error) throw error;
+  },
+
   // ─── Single-Transaction Overrides ("אל תשנה עסקאות דומות") ────────────
 
   /**

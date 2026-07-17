@@ -27,14 +27,14 @@ def _restore(rows):
 
 ROWS = [
     # Two installments of one merchant — must collapse to ONE canonical item.
-    {"id": 1, "תאריך": "2026-06-05", "תיאור": "מעדניית הגליל (תשלום 1/2)", "קטגוריה": "מזון וצריכה", "סכום": -200.0},
-    {"id": 2, "תאריך": "2026-07-05", "תיאור": "מעדניית הגליל (תשלום 2/2)", "קטגוריה": "מזון וצריכה", "סכום": -200.0},
-    # Already keyword-subcategorized on restore (שופרסל → סופרים) — not sent.
-    {"id": 3, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "מזון וצריכה", "סכום": -120.0},
+    {"id": 1, "תאריך": "2026-06-05", "תיאור": "מעדניית הגליל (תשלום 1/2)", "קטגוריה": "אוכל", "סכום": -200.0},
+    {"id": 2, "תאריך": "2026-07-05", "תיאור": "מעדניית הגליל (תשלום 2/2)", "קטגוריה": "אוכל", "סכום": -200.0},
+    # Already keyword-subcategorized on restore (שופרסל → קניות גדולות) — not sent.
+    {"id": 3, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "אוכל", "סכום": -120.0},
     # Manually subcategorized — not sent, never clobbered.
-    {"id": 4, "תאריך": "2026-06-08", "תיאור": "חנות מיוחדת", "קטגוריה": "מזון וצריכה", "קטגוריה_משנה": "בחירה ידנית", "סכום": -80.0},
+    {"id": 4, "תאריך": "2026-06-08", "תיאור": "חנות מיוחדת", "קטגוריה": "אוכל", "קטגוריה_משנה": "בחירה ידנית", "סכום": -80.0},
     # Different category — out of scope.
-    {"id": 5, "תאריך": "2026-06-09", "תיאור": "מסעדת השף", "קטגוריה": "מסעדות, קפה וברים", "סכום": -300.0},
+    {"id": 5, "תאריך": "2026-06-09", "תיאור": "ברוזה תל אביב", "קטגוריה": "בילויים", "סכום": -300.0},
 ]
 
 
@@ -49,16 +49,16 @@ def test_ai_subcategorize_groups_applies_and_reports(monkeypatch):
         return [{"index": 0, "subcategory": "מעדניות"}]
 
     monkeypatch.setattr(routes, "suggest_subcategories", fake_suggest)
-    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "מזון וצריכה"})
+    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "אוכל"})
     assert resp.status_code == 200, resp.text
     data = resp.json()
 
     # Only the one unsubcategorized merchant was sent (installments collapsed).
-    assert captured["category"] == "מזון וצריכה"
+    assert captured["category"] == "אוכל"
     assert len(captured["merchants"]) == 1
     assert captured["merchants"][0].startswith("מעדניית הגליל")
     # Existing names offered for reuse include the seeded catalog and in-use ones.
-    assert "סופרים" in captured["existing"]
+    assert "קניות גדולות" in captured["existing"]
     assert "בחירה ידנית" in captured["existing"]
 
     assert len(data["assignments"]) == 1
@@ -72,13 +72,13 @@ def test_ai_subcategorize_groups_applies_and_reports(monkeypatch):
     assert by_id[1]["קטגוריה_משנה"] == "מעדניות"
     assert by_id[2]["קטגוריה_משנה"] == "מעדניות"
     assert by_id[4]["קטגוריה_משנה"] == "בחירה ידנית"
-    assert by_id[3]["קטגוריה_משנה"] == "סופרים"
+    assert by_id[3]["קטגוריה_משנה"] == "קניות גדולות"
 
 
 def test_ai_subcategorize_empty_suggestion_leaves_rows_alone(monkeypatch):
     sid = _restore(ROWS)
     monkeypatch.setattr(routes, "suggest_subcategories", lambda c, i, e: [{"index": 0, "subcategory": ""}])
-    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "מזון וצריכה"})
+    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "אוכל"})
     assert resp.status_code == 200
     assert resp.json()["assignments"] == []
     txns = client.get("/api/transactions", params={"sessionId": sid, "page_size": 100}).json()["transactions"]
@@ -88,10 +88,10 @@ def test_ai_subcategorize_empty_suggestion_leaves_rows_alone(monkeypatch):
 
 def test_ai_subcategorize_nothing_to_do():
     sid = _restore([
-        {"id": 1, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "מזון וצריכה", "סכום": -120.0},
+        {"id": 1, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "אוכל", "סכום": -120.0},
     ])
-    # שופרסל gets סופרים from the keyword catalog on restore → nothing left.
-    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "מזון וצריכה"})
+    # שופרסל gets קניות גדולות from the keyword catalog on restore → nothing left.
+    resp = client.post("/api/ai-subcategorize", json={"session_id": sid, "category": "אוכל"})
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "assignments": [], "remaining": 0}
 
@@ -111,7 +111,7 @@ def test_ai_subcategorize_all_sweeps_every_category(monkeypatch):
 
     # Both categories with unsubcategorized rows are swept; שונות never is.
     swept = {c for c, _ in calls}
-    assert swept == {"מזון וצריכה", "מסעדות, קפה וברים"}
+    assert swept == {"אוכל", "בילויים"}
     assert {a["category"] for a in data["assignments"]} == swept
 
     txns = client.get("/api/transactions", params={"sessionId": sid, "page_size": 100}).json()["transactions"]

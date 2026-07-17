@@ -365,7 +365,7 @@ async def test_mixed_cc_and_bank_rows_consistent_across_widgets(client):
     # Build mixed payload: 3 CC rows + 1 bank rent row + 1 bank income row
     transactions = [
         {"תאריך": "2026-04-10", "תאריך_חיוב": "2026-05-15", "סכום": -100, "סכום_מוחלט": 100, "תיאור": "cc 1", "קטגוריה": "מזון וצריכה", "חודש": "04/2026"},
-        {"תאריך": "2026-04-12", "תאריך_חיוב": "2026-05-15", "סכום": -200, "סכום_מוחלט": 200, "תיאור": "cc 2", "קטגוריה": "דלק, חשמל וגז", "חודש": "04/2026"},
+        {"תאריך": "2026-04-12", "תאריך_חיוב": "2026-05-15", "סכום": -200, "סכום_מוחלט": 200, "תיאור": "cc 2", "קטגוריה": "מסעדות, קפה וברים", "חודש": "04/2026"},
         {"תאריך": "2026-04-20", "תאריך_חיוב": "2026-05-15", "סכום": -300, "סכום_מוחלט": 300, "תיאור": "cc 3", "קטגוריה": "עיצוב הבית", "חודש": "04/2026"},
         {"תאריך": "2026-05-10", "תאריך_חיוב": None, "סכום": -3800, "סכום_מוחלט": 3800, "תיאור": "תשלום שיק", "קטגוריה": "שכר דירה", "חודש": "05/2026"},
         {"תאריך": "2026-05-05", "תאריך_חיוב": None, "סכום": 12000, "סכום_מוחלט": 12000, "תיאור": "הפקדת שכר", "קטגוריה": "הכנסה", "חודש": "05/2026"},
@@ -399,9 +399,9 @@ async def test_mixed_cc_and_bank_rows_consistent_across_widgets(client):
     # Rent (bank row) must appear in both
     mo_cats = {c["name"]: c["expenses"] for c in mo["categories"]}
     cs_cats = {c["name"]: c["total"] for c in cs["categories"]}
-    assert "שכר דירה" in mo_cats, f"rent missing from month-overview: {list(mo_cats)}"
-    assert "שכר דירה" in cs_cats, f"rent missing from category-snapshot: {list(cs_cats)}"
-    assert mo_cats["שכר דירה"] == cs_cats["שכר דירה"] == 3800
+    assert "הוצאות שוטפות" in mo_cats, f"rent missing from month-overview: {list(mo_cats)}"
+    assert "הוצאות שוטפות" in cs_cats, f"rent missing from category-snapshot: {list(cs_cats)}"
+    assert mo_cats["הוצאות שוטפות"] == cs_cats["הוצאות שוטפות"] == 3800
 
     # Income (bank row) must surface in month-overview total_income
     assert mo["total_income"] == 12000, f"income missing: {mo['total_income']}"
@@ -560,7 +560,7 @@ async def test_category_rules_win_where_catalog_is_silent(client):
         {"תאריך": "2026-04-11", "תאריך_חיוב": "2026-05-15", "סכום": -500, "סכום_מוחלט": 500, "תיאור": "אל על נתיבי אויר", "קטגוריה": "טיסות ותיירות", "חודש": "04/2026", "חודש_חיוב": "05/2026"},
     ]
     rules = [
-        {"merchant": "ZZQWX SERVICES", "category": "מתנות"},
+        {"merchant": "ZZQWX SERVICES", "category": "אירועים ומתנות"},
         {"merchant": "אל על נתיבי אויר", "category": "שונות"},
     ]
     resp = await client.post(
@@ -575,7 +575,7 @@ async def test_category_rules_win_where_catalog_is_silent(client):
     )
     body = snap.json()
     cats = {c["name"] for c in body["categories"]}
-    assert "מתנות" in cats, f"expected user rule to win on catalog-unknown merchant, got {cats}"
+    assert "אירועים ומתנות" in cats, f"expected user rule to win on catalog-unknown merchant, got {cats}"
     assert "טיסות ותיירות" in cats, f"catalog must keep governing אל על, got {cats}"
     assert "שונות" not in cats, f"stale rule on a catalog-known merchant must be ignored, got {cats}"
 

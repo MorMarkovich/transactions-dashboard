@@ -193,6 +193,11 @@ export default function Dashboard() {
       if (!sessionId || tx.id == null) return
       try {
         const resp = await transactionsApi.updateTransactionCategory(sessionId, tx.id, newCategory, onlyThis)
+        // A name outside the built-in tree is a user-created category — the
+        // dynamic taxonomy. Persist it so it stays valid on every restore.
+        if (user && !ASSIGNABLE_CATEGORIES.includes(newCategory)) {
+          supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
+        }
         if (user && onlyThis && resp.txn_key) {
           // "אל תשנה עסקאות דומות": pin ONLY this transaction — no merchant
           // rule, so similar transactions (e.g. other ביט transfers) keep
@@ -317,13 +322,15 @@ export default function Dashboard() {
     if (!user || recoveryAttempts.current >= 2) return false
     recoveryAttempts.current += 1
     try {
-      const [transactions, rules, overrides] = await Promise.all([
+      const [transactions, rules, overrides, customCats] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+        supabaseApi.getUserCategories(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return false
-      const restored = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
+      const restored = await transactionsApi.restoreSession(
+        transactions as unknown[], rules, overrides, customCats.map((c) => c.name))
       if (restored.success && restored.session_id) {
         navigate(`/?session_id=${restored.session_id}`, { replace: true })
         return true
@@ -675,13 +682,15 @@ export default function Dashboard() {
   const handleBankSynced = async () => {
     if (!user) return
     try {
-      const [transactions, rules, overrides] = await Promise.all([
+      const [transactions, rules, overrides, customCats] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+        supabaseApi.getUserCategories(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(transactions as unknown[], rules, overrides)
+      const merged = await transactionsApi.restoreSession(
+        transactions as unknown[], rules, overrides, customCats.map((c) => c.name))
       if (merged.success && merged.session_id) {
         navigate(`/?session_id=${merged.session_id}`)
       }

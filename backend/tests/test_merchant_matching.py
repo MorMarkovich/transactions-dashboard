@@ -47,9 +47,9 @@ def test_rule_saved_from_one_installment_hits_all_installments():
     ]
     rules = [{"merchant": "רהיטי עצמל (תשלום 4/12)", "category": "עיצוב הבית"}]
     by_desc = _restore(rows, rules)
-    assert by_desc["רהיטי עצמל (תשלום 4/12)"]["קטגוריה"] == "עיצוב הבית"
-    assert by_desc["רהיטי עצמל (תשלום 5/12)"]["קטגוריה"] == "עיצוב הבית"
-    assert by_desc["רהיטי עצמל"]["קטגוריה"] == "עיצוב הבית"
+    assert by_desc["רהיטי עצמל (תשלום 4/12)"]["קטגוריה"] == "קניות"
+    assert by_desc["רהיטי עצמל (תשלום 5/12)"]["קטגוריה"] == "קניות"
+    assert by_desc["רהיטי עצמל"]["קטגוריה"] == "קניות"
 
 
 def test_rule_matches_across_processor_prefix_and_case():
@@ -58,7 +58,7 @@ def test_rule_matches_across_processor_prefix_and_case():
     ]
     rules = [{"merchant": "nintendo", "category": "חשמל ומחשבים"}]
     by_desc = _restore(rows, rules)
-    assert by_desc["PAYPAL *NINTENDO"]["קטגוריה"] == "חשמל ומחשבים"
+    assert by_desc["PAYPAL *NINTENDO"]["קטגוריה"] == "טכנולוגיה"
 
 
 def test_longest_keyword_wins_across_categories():
@@ -68,5 +68,5 @@ def test_longest_keyword_wins_across_categories():
         {"תאריך": "2026-06-02", "תיאור": "רמי לוי שיווק השקמה", "קטגוריה": "שונות", "סכום": -320},
     ]
     by_desc = _restore(rows)
-    assert by_desc["רמי לוי תקשורת בעמ"]["קטגוריה"] == "שירותי תקשורת"
-    assert by_desc["רמי לוי שיווק השקמה"]["קטגוריה"] == "מזון וצריכה"
+    assert by_desc["רמי לוי תקשורת בעמ"]["קטגוריה"] == "הוצאות שוטפות"
+    assert by_desc["רמי לוי שיווק השקמה"]["קטגוריה"] == "אוכל"

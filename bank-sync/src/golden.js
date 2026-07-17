@@ -2,7 +2,7 @@
 // measure categorization accuracy. Writes bank-sync/golden.json (gitignored —
 // it contains your merchant names):
 //
-//   [{ "merchant": "שופרסל דיל", "category": "מזון וצריכה" }, ...]
+//   [{ "merchant": "שופרסל דיל", "category": "אוכל" }, ...]
 //
 // New merchants are appended with their CURRENT snapshot category as the
 // starting label; existing entries are NEVER overwritten — your manual
