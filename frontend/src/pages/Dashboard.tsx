@@ -323,6 +323,48 @@ export default function Dashboard() {
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
   )
 
+  // ── Bulk category move ──
+  // Several selected transactions → one category (+ optional subcategory) in
+  // a single action, with the same pin/rule semantics as a single edit.
+  const handleBulkCategoryChange = useCallback(
+    async (txs: Transaction[], newCategory: string, newSubcategory: string | null, onlyThis: boolean) => {
+      if (!sessionId) return
+      const ids = txs.map((t) => t.id).filter((i): i is number => i != null)
+      if (!ids.length) return
+      try {
+        const resp = await transactionsApi.bulkUpdateCategory(sessionId, ids, newCategory, newSubcategory, onlyThis)
+        if (!ASSIGNABLE_CATEGORIES.includes(newCategory)) {
+          addCustomCategory(newCategory)
+          if (user) supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
+        }
+        if (newSubcategory) addCustomSubcategory(newCategory, newSubcategory)
+        if (user) {
+          if (onlyThis) {
+            // Pin each selected row.
+            await Promise.allSettled(resp.items.map((it) =>
+              supabaseApi.upsertTransactionOverride(user.id, it.txn_key, newCategory, newSubcategory),
+            ))
+          } else {
+            // One rule per unique merchant + unpin the selected rows.
+            const merchants = Array.from(new Set(resp.items.map((it) => it.merchant).filter(Boolean)))
+            await Promise.allSettled(merchants.map((m) =>
+              newSubcategory
+                ? supabaseApi.upsertCategorySubrule(user.id, m, newCategory, newSubcategory)
+                : supabaseApi.upsertCategoryRule(user.id, m, newCategory),
+            ))
+            Promise.allSettled(resp.items.map((it) =>
+              supabaseApi.deleteTransactionOverride(user.id, it.txn_key),
+            )).catch(() => {})
+          }
+        }
+      } finally {
+        setRefreshKey((k) => k + 1)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+      }
+    },
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
+  )
+
   // ── Per-transaction note ──
   // Saves the note on the live session AND persists it in Supabase
   // (transaction_notes, keyed by fingerprint) so it survives restores.
@@ -2025,6 +2067,7 @@ export default function Dashboard() {
         subcategoryCatalog={subcategoryCatalogMap}
         onSubcategoryChange={handleSubcategoryChange}
         onSaveNote={handleSaveNote}
+        onBulkCategoryChange={handleBulkCategoryChange}
       />
 
       <CategoryManagerModal

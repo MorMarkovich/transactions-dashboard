@@ -264,6 +264,15 @@ class UpdateTransactionSubcategoryRequest(BaseModel):
     only_this: bool = False
 
 
+class BulkUpdateCategoryRequest(BaseModel):
+    """Move several selected transactions to one category at once."""
+    session_id: str
+    transaction_ids: list[int]
+    category: str
+    subcategory: Optional[str] = None
+    only_this: bool = False
+
+
 class RenameCategoryRequest(BaseModel):
     session_id: str
     old_category: str
@@ -706,6 +715,78 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
     return {"success": True, "merchant": merchant, "category": new_category,
             "txn_key": txn_key, "locked": bool(body.only_this),
             "affected_count": affected}
+
+
+@router.post("/transactions/category-bulk")
+async def bulk_update_category(body: BulkUpdateCategoryRequest):
+    """Move a SELECTION of transactions to one category (+ optional
+    subcategory) in a single action.
+
+    Same semantics as the single-row editor, applied to every selected row:
+    - only_this=True: each selected row is pinned individually — nothing else
+      moves, now or ever.
+    - only_this=False: a merchant rule per unique merchant in the selection —
+      applied immediately to ALL of each merchant's transactions (pinned rows
+      skipped), exactly like a normal single edit.
+    Returns per-row {id, merchant, txn_key} so the frontend can persist the
+    pins/rules in Supabase.
+    """
+    if body.session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    df = sessions[body.session_id]
+    if 'id' not in df.columns:
+        raise HTTPException(status_code=400, detail="Session does not support transaction updates")
+
+    new_category = (body.category or '').strip()
+    if not new_category:
+        raise HTTPException(status_code=400, detail="Category cannot be empty")
+    if new_category not in CATEGORY_ICONS:
+        SESSION_CUSTOM_CATS.setdefault(body.session_id, set()).add(new_category)
+    new_sub = (body.subcategory or '').strip()
+
+    ids = [int(i) for i in (body.transaction_ids or [])]
+    sel_mask = df['id'].isin(ids)
+    if not sel_mask.any():
+        raise HTTPException(status_code=404, detail="Transactions not found")
+
+    if '_locked' not in df.columns:
+        df['_locked'] = False
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+
+    # Per-row info for Supabase persistence, computed BEFORE mutation.
+    items = [
+        {
+            "id": int(row['id']),
+            "merchant": str(row.get('תיאור', '')),
+            "txn_key": txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור')),
+        }
+        for _, row in df.loc[sel_mask].iterrows()
+    ]
+
+    if body.only_this:
+        df.loc[sel_mask, 'קטגוריה'] = new_category
+        df.loc[sel_mask, 'קטגוריה_משנה'] = new_sub
+        df.loc[sel_mask, '_locked'] = True
+        affected = int(sel_mask.sum())
+    else:
+        df.loc[sel_mask, '_locked'] = False
+        keys = {normalize_merchant(it["merchant"]) for it in items if it["merchant"]}
+        merchant_mask = df['תיאור'].astype(str).map(normalize_merchant).isin(keys)
+        apply_mask = (merchant_mask | sel_mask) & ~locked_mask(df)
+        changed = apply_mask & (df['קטגוריה'].astype(str) != new_category)
+        df.loc[apply_mask, 'קטגוריה'] = new_category
+        df.loc[changed, 'קטגוריה_משנה'] = ''
+        derive_subcategory(df)
+        # The explicit bulk subcategory is the user's word — applied AFTER the
+        # seeded derivation, like the single-row subcategory editor.
+        if new_sub:
+            df.loc[apply_mask, 'קטגוריה_משנה'] = new_sub
+        affected = int(apply_mask.sum())
+
+    sessions[body.session_id] = df
+    return {"success": True, "category": new_category, "subcategory": new_sub,
+            "items": items, "affected_count": affected}
 
 
 @router.post("/transactions/subcategory")
