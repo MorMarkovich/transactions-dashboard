@@ -186,6 +186,12 @@ class TransactionOverride(BaseModel):
     subcategory: Optional[str] = None
 
 
+class TransactionNote(BaseModel):
+    """User note on one transaction, matched by its stable fingerprint."""
+    txn_key: str
+    note: str
+
+
 class RestoreSessionRequest(BaseModel):
     transactions: list[Any]
     # Optional user-defined merchant→category overrides. Applied AFTER
@@ -193,6 +199,9 @@ class RestoreSessionRequest(BaseModel):
     category_rules: list[CategoryRule] = []
     # Optional single-transaction overrides, applied last (they beat rules).
     transaction_overrides: list[TransactionOverride] = []
+    # Per-transaction user notes (Supabase transaction_notes), matched by
+    # fingerprint and written into הערות.
+    transaction_notes: list[TransactionNote] = []
     # User-created categories (Supabase user_categories) — the dynamic part
     # of the taxonomy. Treated as valid alongside CATEGORY_ICONS everywhere.
     custom_categories: list[str] = []
@@ -221,6 +230,13 @@ class RestoreSessionRequest(BaseModel):
     @field_validator('custom_categories', mode='before')
     @classmethod
     def parse_custom_if_string(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return _json.loads(v)
+        return v or []
+
+    @field_validator('transaction_notes', mode='before')
+    @classmethod
+    def parse_notes_if_string(cls, v: Any) -> Any:
         if isinstance(v, str):
             return _json.loads(v)
         return v or []
@@ -549,6 +565,19 @@ async def restore_session(body: RestoreSessionRequest):
                     df.at[idx, 'קטגוריה_משנה'] = pin_sub or ''
                     df.at[idx, '_locked'] = True
 
+        # ── Per-transaction notes (Supabase transaction_notes) ──────────
+        # Matched by the same fingerprint as pins; notes never affect
+        # categorization, they just repopulate הערות after a cold start.
+        if body.transaction_notes:
+            notes_by_key = {
+                n.txn_key: n.note.strip() for n in body.transaction_notes
+                if n.txn_key and n.note and n.note.strip()
+            }
+            if notes_by_key:
+                keys = compute_txn_keys(df)
+                for idx in df.index[keys.isin(notes_by_key)]:
+                    df.at[idx, 'הערות'] = notes_by_key[keys.at[idx]]
+
         session_id = str(uuid.uuid4())
         sessions[session_id] = df
         if custom_cats:
@@ -603,7 +632,11 @@ async def update_transaction_note(body: UpdateTransactionNoteRequest):
     df.loc[mask, 'הערות'] = value
     sessions[body.session_id] = df
 
-    return {"success": True}
+    # The fingerprint lets the frontend persist the note in Supabase
+    # (transaction_notes) so it survives restores and cold starts.
+    row = df.loc[mask].iloc[0]
+    txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
+    return {"success": True, "txn_key": txn_key, "notes": value}
 
 
 @router.post("/transactions/category")
@@ -633,27 +666,46 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
     if not mask.any():
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    df.loc[mask, 'קטגוריה'] = new_category
-    # "אל תשנה עסקאות דומות": pin/unpin the row. A pinned row is skipped by
-    # rules, merchant-wide edits and the AI; a normal edit explicitly unpins
-    # (the user reverted to merchant-rule behavior for this transaction).
     if '_locked' not in df.columns:
         df['_locked'] = False
-    df.loc[mask, '_locked'] = bool(body.only_this)
-    if body.only_this and 'קטגוריה_משנה' in df.columns:
-        # The old subcategory belonged to the old category (restore clears it
-        # the same way for pinned rows).
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+
+    row = df.loc[mask].iloc[0]
+    merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
+    txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
+
+    if body.only_this:
+        # "אל תשנה עסקאות דומות": this row only, pinned. The old subcategory
+        # belonged to the old category (restore clears it the same way).
+        df.loc[mask, 'קטגוריה'] = new_category
+        df.loc[mask, '_locked'] = True
         df.loc[mask, 'קטגוריה_משנה'] = ''
+        affected = int(mask.sum())
+    else:
+        # Normal edit = a merchant rule: apply it to EVERY transaction of the
+        # same canonical merchant RIGHT NOW (not just on the next restore),
+        # skipping pinned rows. The clicked row is explicitly unpinned first
+        # (the user reverted it to merchant-rule behavior).
+        df.loc[mask, '_locked'] = False
+        key = normalize_merchant(merchant)
+        merchant_mask = df['תיאור'].astype(str).map(normalize_merchant) == key
+        apply_mask = (merchant_mask | mask) & ~locked_mask(df)
+        changed = apply_mask & (df['קטגוריה'].astype(str) != new_category)
+        df.loc[apply_mask, 'קטגוריה'] = new_category
+        # Old subcategories belonged to the old category — re-derive.
+        df.loc[changed, 'קטגוריה_משנה'] = ''
+        derive_subcategory(df)
+        affected = int(apply_mask.sum())
+
     sessions[body.session_id] = df
 
     # Tell the caller what the row's description is, so the frontend can
     # save a merchant→category rule without a separate round-trip — and the
     # row's stable fingerprint for persisting a single-transaction override.
-    row = df.loc[mask].iloc[0]
-    merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
-    txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
     return {"success": True, "merchant": merchant, "category": new_category,
-            "txn_key": txn_key, "locked": bool(body.only_this)}
+            "txn_key": txn_key, "locked": bool(body.only_this),
+            "affected_count": affected}
 
 
 @router.post("/transactions/subcategory")
@@ -677,17 +729,28 @@ async def update_transaction_subcategory(body: UpdateTransactionSubcategoryReque
     new_subcategory = (body.subcategory or '').strip()
     if 'קטגוריה_משנה' not in df.columns:
         df['קטגוריה_משנה'] = ''
-    df.loc[mask, 'קטגוריה_משנה'] = new_subcategory
-    if body.only_this:
-        if '_locked' not in df.columns:
-            df['_locked'] = False
-        df.loc[mask, '_locked'] = True
-    sessions[body.session_id] = df
+    if '_locked' not in df.columns:
+        df['_locked'] = False
 
     row = df.loc[mask].iloc[0]
     merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
     category = str(row['קטגוריה']) if 'קטגוריה' in df.columns else None
     txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
+
+    if body.only_this:
+        df.loc[mask, 'קטגוריה_משנה'] = new_subcategory
+        df.loc[mask, '_locked'] = True
+    else:
+        # Normal edit = a merchant subrule: apply it NOW to every unpinned
+        # transaction of the same merchant within the same category (the same
+        # scoping the rule gets on restore).
+        key = normalize_merchant(merchant)
+        merchant_mask = df['תיאור'].astype(str).map(normalize_merchant) == key
+        scope = merchant_mask & (df['קטגוריה'].astype(str) == (category or ''))
+        df.loc[(scope | mask) & ~locked_mask(df), 'קטגוריה_משנה'] = new_subcategory
+
+    sessions[body.session_id] = df
+
     return {
         "success": True,
         "merchant": merchant,
@@ -699,15 +762,34 @@ async def update_transaction_subcategory(body: UpdateTransactionSubcategoryReque
 
 
 @router.get("/categories/catalog")
-async def get_category_catalog():
+async def get_category_catalog(sessionId: Optional[str] = Query(None)):
     """Return the seeded category + subcategory catalog so the UI's category
     manager and subcategory selectors stay in sync with the backend without
-    hardcoding the Hebrew names in the frontend."""
+    hardcoding the Hebrew names in the frontend.
+
+    When a sessionId is given, every subcategory name actually IN USE in that
+    session (assigned manually, by a rule, a pin or the AI) is merged in per
+    parent — so a name created once stays pickable everywhere, forever (rules
+    and pins re-apply it on every restore, which re-surfaces it here)."""
     sub_catalog = get_subcategory_catalog()
     subcategories = {
         parent: [{"name": name, "icon": SUBCATEGORY_ICONS.get(name, "")} for name in names]
         for parent, names in sub_catalog.items()
     }
+    df = sessions.get(sessionId) if sessionId else None
+    if df is not None and 'קטגוריה' in df.columns and 'קטגוריה_משנה' in df.columns:
+        in_use = (
+            df[['קטגוריה', 'קטגוריה_משנה']]
+            .astype(str)
+            .apply(lambda s: s.str.strip())
+        )
+        in_use = in_use[(in_use['קטגוריה_משנה'] != '') & (in_use['קטגוריה_משנה'].str.lower() != 'nan')]
+        for parent, subs in in_use.groupby('קטגוריה')['קטגוריה_משנה']:
+            entries = subcategories.setdefault(parent, [])
+            known = {e["name"] for e in entries}
+            for name in sorted(set(subs)):
+                if name not in known:
+                    entries.append({"name": name, "icon": SUBCATEGORY_ICONS.get(name, "")})
     return {
         "categories": [{"name": name, "icon": icon} for name, icon in CATEGORY_ICONS.items()],
         "subcategories": subcategories,

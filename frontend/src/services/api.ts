@@ -79,12 +79,14 @@ export const transactionsApi = {
     categoryRules: CategoryRule[] = [],
     transactionOverrides: { txn_key: string; category: string; subcategory?: string | null }[] = [],
     customCategories: string[] = [],
+    transactionNotes: { txn_key: string; note: string }[] = [],
   ): Promise<FileUploadResponse> => {
     const response = await api.post<FileUploadResponse>('/api/restore-session', {
       transactions,
       category_rules: categoryRules,
       transaction_overrides: transactionOverrides,
       custom_categories: customCategories,
+      transaction_notes: transactionNotes,
     });
     return response.data;
   },
@@ -279,8 +281,8 @@ export const transactionsApi = {
     sessionId: string,
     transactionId: number,
     notes: string,
-  ): Promise<{ success: boolean }> => {
-    const response = await api.post<{ success: boolean }>('/api/transactions/note', {
+  ): Promise<{ success: boolean; txn_key: string | null; notes: string | null }> => {
+    const response = await api.post<{ success: boolean; txn_key: string | null; notes: string | null }>('/api/transactions/note', {
       session_id: sessionId,
       transaction_id: transactionId,
       notes,
@@ -340,8 +342,11 @@ export const transactionsApi = {
    * Get the seeded category + subcategory catalog (names + icons) so the UI's
    * category manager and subcategory selectors stay in sync with the backend.
    */
-  getCategoryCatalog: async (signal?: AbortSignal): Promise<CategoryCatalog> => {
-    const response = await api.get<CategoryCatalog>('/api/categories/catalog', { signal });
+  getCategoryCatalog: async (signal?: AbortSignal, sessionId?: string): Promise<CategoryCatalog> => {
+    const response = await api.get<CategoryCatalog>('/api/categories/catalog', {
+      signal,
+      params: sessionId ? { sessionId } : undefined,
+    });
     return response.data;
   },
 
