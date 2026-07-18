@@ -104,3 +104,34 @@ def test_catalog_includes_in_use_subcategories():
     names = [s["name"] for s in cat["subcategories"]["קניות"]]
     assert "ציוד קמפינג" in names   # user-created, surfaced for future picking
     assert "אופנה" in names          # seeded names still there
+
+
+def test_bulk_move_pinned_each_row_only():
+    sid = _restore(BIT_ROWS)
+    resp = client.post("/api/transactions/category-bulk", json={
+        "session_id": sid, "transaction_ids": [1, 3],
+        "category": "אירועים ומתנות", "subcategory": "מתנה לחברים",
+        "only_this": True,
+    }).json()
+    assert resp["affected_count"] == 2
+    assert {it["id"] for it in resp["items"]} == {1, 3}
+    assert all(it["txn_key"] for it in resp["items"])
+    rows = _rows(sid)
+    assert rows[1]["קטגוריה"] == "אירועים ומתנות"
+    assert rows[1]["קטגוריה_משנה"] == "מתנה לחברים"
+    assert rows[1]["_locked"] is True
+    assert rows[2]["קטגוריה"] == "שונות"  # same merchant, NOT selected → untouched
+    assert rows[3]["קטגוריה"] == "אירועים ומתנות"
+
+
+def test_bulk_move_unchecked_applies_merchant_wide():
+    sid = _restore(BIT_ROWS)
+    resp = client.post("/api/transactions/category-bulk", json={
+        "session_id": sid, "transaction_ids": [1],
+        "category": "הוצאות משתנות", "only_this": False,
+    }).json()
+    assert resp["affected_count"] == 2  # both מרצדס rows via the merchant rule
+    rows = _rows(sid)
+    assert rows[1]["קטגוריה"] == "הוצאות משתנות"
+    assert rows[2]["קטגוריה"] == "הוצאות משתנות"
+    assert rows[3]["קטגוריה"] == "שונות"

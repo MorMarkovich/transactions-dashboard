@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote, CheckSquare } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
@@ -39,6 +39,16 @@ interface CategoryTransactionsDrawerProps {
   subcategoryCatalog?: Record<string, string[]>
   /** Saves a free-text note on the transaction (persisted via fingerprint). */
   onSaveNote?: (tx: Transaction, note: string) => Promise<void>
+  /**
+   * Moves several selected transactions to one category (+ optional
+   * subcategory) at once. Enables the multi-select UI when provided.
+   */
+  onBulkCategoryChange?: (
+    txs: Transaction[],
+    category: string,
+    subcategory: string | null,
+    onlyThis: boolean,
+  ) => Promise<void>
 }
 
 export default function CategoryTransactionsDrawer({
@@ -55,6 +65,7 @@ export default function CategoryTransactionsDrawer({
   onSubcategoryChange,
   subcategoryCatalog = {},
   onSaveNote,
+  onBulkCategoryChange,
 }: CategoryTransactionsDrawerProps) {
   const [sortAsc, setSortAsc] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -70,6 +81,13 @@ export default function CategoryTransactionsDrawer({
   const [pendingCat, setPendingCat] = useState<string | null>(null)
   const [pendingSub, setPendingSub] = useState<string | undefined>(undefined)
   const [noteValue, setNoteValue] = useState('')
+  // Multi-select mode: pick several transactions, move them together.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkCat, setBulkCat] = useState<string | null>(null)
+  const [bulkSub, setBulkSub] = useState('')
+  const [bulkOnlyThis, setBulkOnlyThis] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -92,7 +110,38 @@ export default function CategoryTransactionsDrawer({
     setCustomCategory('')
     setCustomSubcategory('')
     setOnlyThis(false)
+    setSelectMode(false)
+    setSelectedIds(new Set())
+    setBulkCat(null)
+    setBulkSub('')
+    setBulkOnlyThis(false)
   }, [isOpen, category])
+
+  const toggleSelected = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const handleBulkSave = useCallback(async () => {
+    if (!onBulkCategoryChange || !bulkCat || selectedIds.size === 0) return
+    const txs = transactions.filter((t) => t.id != null && selectedIds.has(t.id))
+    if (!txs.length) return
+    setBulkSaving(true)
+    try {
+      await onBulkCategoryChange(txs, bulkCat, bulkSub.trim() || null, bulkOnlyThis)
+    } finally {
+      setBulkSaving(false)
+      setSelectMode(false)
+      setSelectedIds(new Set())
+      setBulkCat(null)
+      setBulkSub('')
+      setBulkOnlyThis(false)
+    }
+  }, [onBulkCategoryChange, bulkCat, bulkSub, bulkOnlyThis, selectedIds, transactions])
 
   // Fresh editor state per row: pin toggle from the row's current state, no
   // staged changes, note prefilled. Deliberately NOT keyed on `transactions`
@@ -296,7 +345,36 @@ export default function CategoryTransactionsDrawer({
                   {formatCurrency(total)}
                 </p>
               </div>
-                            <button
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {onBulkCategoryChange && (
+                <button
+                  onClick={() => {
+                    setSelectMode((p) => !p)
+                    setSelectedIds(new Set())
+                    setBulkCat(null)
+                    setBulkSub('')
+                    setEditingId(null)
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-full)',
+                    border: selectMode ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: selectMode ? 'var(--accent-muted)' : 'var(--glass-bg)',
+                    color: selectMode ? 'var(--accent)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-family)',
+                  }}
+                >
+                  <CheckSquare size={12} />
+                  {selectMode ? 'ביטול בחירה' : 'בחירה מרובה'}
+                </button>
+              )}
+              <button
                 onClick={() => setSortAsc((p) => !p)}
                 style={{
                   display: 'flex',
@@ -316,6 +394,7 @@ export default function CategoryTransactionsDrawer({
                 <ArrowUpDown size={12} />
                 {sortAsc ? 'מהנמוך לגבוה' : 'מהגבוה לנמוך'}
               </button>
+              </div>
             </div>
 
             {/* Transaction list */}
@@ -349,17 +428,21 @@ export default function CategoryTransactionsDrawer({
                     const isEditing = editingId === tx.id
                     const isSaving = savingId === tx.id
                     const canEdit = !!onCategoryChange && tx.id != null
+                    const isSelected = tx.id != null && selectedIds.has(tx.id)
                     return (
                       <div
                         key={`${tx.תאריך}-${tx.תיאור}-${i}`}
+                        onClick={selectMode && tx.id != null ? () => toggleSelected(tx.id!) : undefined}
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
                           padding: '10px 14px',
-                          background: 'var(--glass-bg)',
+                          background: isSelected ? 'var(--accent-muted)' : 'var(--glass-bg)',
                           borderRadius: 'var(--radius-md, 8px)',
-                          border: '1px solid var(--glass-border)',
+                          border: isSelected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
                           gap: '8px',
+                          cursor: selectMode ? 'pointer' : undefined,
+                          userSelect: selectMode ? 'none' : undefined,
                         }}
                       >
                         <div
@@ -371,6 +454,25 @@ export default function CategoryTransactionsDrawer({
                             gap: '12px',
                           }}
                         >
+                          {selectMode && (
+                            <span
+                              aria-hidden
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 5,
+                                flexShrink: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: isSelected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                                background: isSelected ? 'var(--accent)' : 'transparent',
+                                color: '#fff',
+                              }}
+                            >
+                              {isSelected && <Check size={12} />}
+                            </span>
+                          )}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p
                               style={{
@@ -455,7 +557,7 @@ export default function CategoryTransactionsDrawer({
                             >
                               {formatCurrency(tx.סכום)}
                             </span>
-                            {canEdit && (
+                            {canEdit && !selectMode && (
                               <button
                                 className="category-change-btn"
                                 onClick={() => setEditingId(isEditing ? null : tx.id ?? null)}
@@ -751,6 +853,137 @@ export default function CategoryTransactionsDrawer({
                 </div>
               )}
             </div>
+
+            {/* Bulk-move bar: pick a category (+ optional subcategory) for
+                every selected transaction, with the same pin semantics. */}
+            {selectMode && (
+              <div
+                style={{
+                  borderTop: '1px solid var(--glass-border)',
+                  padding: '10px 16px 12px',
+                  background: 'var(--glass-bg-hover)',
+                  maxHeight: '48%',
+                  overflowY: 'auto',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {selectedIds.size === 0
+                      ? 'סמנו עסקאות ברשימה'
+                      : selectedIds.size === 1 ? 'עסקה אחת נבחרה' : `${selectedIds.size} עסקאות נבחרו`}
+                  </span>
+                  {selectedIds.size > 0 && (
+                    <button
+                      onClick={() => setSelectedIds(new Set())}
+                      style={{
+                        border: 'none', background: 'transparent', color: 'var(--text-muted)',
+                        fontSize: '0.6875rem', cursor: 'pointer', fontFamily: 'var(--font-family)',
+                      }}
+                    >
+                      נקה סימון
+                    </button>
+                  )}
+                </div>
+                {selectedIds.size > 0 && (
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: 8 }}>
+                      {categoryOptions.map((cat) => {
+                        const selected = cat === bulkCat
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => { setBulkCat(selected ? null : cat); setBulkSub('') }}
+                            disabled={bulkSaving}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              padding: '4px 8px', fontSize: '0.6875rem', borderRadius: 'var(--radius-full)',
+                              border: selected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                              background: selected ? 'var(--accent-muted)' : 'var(--glass-bg)',
+                              color: selected ? 'var(--accent)' : 'var(--text-secondary)',
+                              cursor: bulkSaving ? 'wait' : 'pointer', fontFamily: 'var(--font-family)',
+                            }}
+                          >
+                            <span>{get_icon(cat)}</span>
+                            <span>{cat}</span>
+                            {selected && <Check size={10} />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {bulkCat && (subcategoryCatalog[bulkCat]?.length ?? 0) > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: 8 }}>
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700, width: '100%' }}>
+                          <Tag size={10} /> תת-קטגוריה (לא חובה)
+                        </span>
+                        {(subcategoryCatalog[bulkCat] ?? []).map((sub) => {
+                          const selected = sub === bulkSub
+                          return (
+                            <button
+                              key={sub}
+                              onClick={() => setBulkSub(selected ? '' : sub)}
+                              disabled={bulkSaving}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                padding: '4px 8px', fontSize: '0.6875rem', borderRadius: 'var(--radius-full)',
+                                border: selected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
+                                background: selected ? 'var(--accent-muted)' : 'var(--glass-bg)',
+                                color: selected ? 'var(--accent)' : 'var(--text-secondary)',
+                                cursor: bulkSaving ? 'wait' : 'pointer', fontFamily: 'var(--font-family)',
+                              }}
+                            >
+                              <span>{get_subcategory_icon(sub)}</span>
+                              <span>{sub}</span>
+                              {selected && <Check size={10} />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '7px', marginBottom: 8,
+                        padding: '7px 10px', borderRadius: 'var(--radius-md, 8px)',
+                        border: bulkOnlyThis ? '1px solid var(--accent)' : '1px dashed var(--glass-border)',
+                        background: bulkOnlyThis ? 'var(--accent-muted)' : 'transparent',
+                        cursor: 'pointer', fontSize: '0.6875rem', fontWeight: 600,
+                        color: bulkOnlyThis ? 'var(--accent)' : 'var(--text-secondary)',
+                        fontFamily: 'var(--font-family)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={bulkOnlyThis}
+                        onChange={(e) => setBulkOnlyThis(e.target.checked)}
+                        disabled={bulkSaving}
+                        style={{ accentColor: 'var(--accent)', margin: 0, flexShrink: 0 }}
+                      />
+                      <Lock size={11} style={{ flexShrink: 0 }} />
+                      <span>אל תשנה סיווג של עסקאות דומות — רק העסקאות שסומנו</span>
+                    </label>
+                    <button
+                      onClick={handleBulkSave}
+                      disabled={bulkSaving || !bulkCat}
+                      style={{
+                        width: '100%', padding: '9px 18px', borderRadius: 'var(--radius-full)',
+                        border: 'none',
+                        background: bulkCat ? 'var(--accent)' : 'var(--glass-bg)',
+                        color: bulkCat ? '#fff' : 'var(--text-muted)',
+                        fontSize: '0.8125rem', fontWeight: 700,
+                        cursor: bulkSaving || !bulkCat ? 'not-allowed' : 'pointer',
+                        fontFamily: 'var(--font-family)',
+                      }}
+                    >
+                      {bulkSaving
+                        ? 'מעביר…'
+                        : bulkCat
+                          ? `העבר ${selectedIds.size === 1 ? 'עסקה אחת' : `${selectedIds.size} עסקאות`} ל${bulkCat}`
+                          : 'בחרו קטגוריית יעד'}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </motion.div>
         </>
       )}

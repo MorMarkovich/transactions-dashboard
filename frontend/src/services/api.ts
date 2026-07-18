@@ -320,6 +320,31 @@ export const transactionsApi = {
    * Set a single transaction's subcategory. Returns the merchant + its current
    * category so the caller can persist a merchant→{category, subcategory} rule.
    */
+  /**
+   * Move several selected transactions to one category (+ optional
+   * subcategory) at once. only_this pins each selected row; otherwise a
+   * merchant rule per unique merchant is applied immediately session-wide.
+   */
+  bulkUpdateCategory: async (
+    sessionId: string,
+    transactionIds: number[],
+    category: string,
+    subcategory: string | null,
+    onlyThis: boolean,
+  ): Promise<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }> => {
+    const response = await api.post<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }>(
+      '/api/transactions/category-bulk',
+      {
+        session_id: sessionId,
+        transaction_ids: transactionIds,
+        category,
+        subcategory: subcategory || null,
+        only_this: onlyThis,
+      },
+    );
+    return response.data;
+  },
+
   updateTransactionSubcategory: async (
     sessionId: string,
     transactionId: number,
