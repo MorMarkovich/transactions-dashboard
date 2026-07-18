@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calendar, Tag, CreditCard, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { transactionsApi } from '../../services/api'
+import { supabaseApi } from '../../services/supabaseApi'
+import { useAuth } from '../../lib/AuthContext'
 import type { Transaction as BaseTransaction } from '../../services/types'
 
 // Allow extra dynamic fields (e.g. 'ארבע ספרות אחרונות') on top of the core Transaction shape
@@ -48,6 +50,8 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
     setSaving(false)
   }, [transaction])
 
+  const { user } = useAuth()
+
   const handleSaveNotes = useCallback(async () => {
     if (!transaction || !sessionId || typeof transaction.id !== 'number') {
       return
@@ -55,7 +59,15 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
     try {
       setSaving(true)
       setError(null)
-      await transactionsApi.updateTransactionNote(sessionId, transaction.id, notes)
+      const resp = await transactionsApi.updateTransactionNote(sessionId, transaction.id, notes)
+      // Persist by fingerprint so the note survives restores and cold starts.
+      if (user && resp.txn_key) {
+        if (notes.trim()) {
+          await supabaseApi.upsertTransactionNote(user.id, resp.txn_key, notes).catch(() => {})
+        } else {
+          await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
+        }
+      }
       if (onUpdateTransaction) {
         onUpdateTransaction({ ...transaction, הערות: notes })
       }
@@ -65,7 +77,7 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
     } finally {
       setSaving(false)
     }
-  }, [transaction, sessionId, notes, onUpdateTransaction])
+  }, [transaction, sessionId, notes, onUpdateTransaction, user])
 
   return (
     <AnimatePresence>

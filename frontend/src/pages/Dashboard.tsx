@@ -112,6 +112,29 @@ export default function Dashboard() {
   const [customCategories, setCustomCategories] = useState<string[]>([])
   const [customSubcategories, setCustomSubcategories] = useState<Record<string, string[]>>({})
 
+  const addCustomCategory = useCallback((name: string) => {
+    const n = name.trim()
+    if (!n) return
+    setCustomCategories((prev) => {
+      if (prev.includes(n)) return prev
+      const next = [...prev, n]
+      if (user) { try { localStorage.setItem(`customCats:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
+      return next
+    })
+  }, [user])
+
+  const addCustomSubcategory = useCallback((parent: string, name: string) => {
+    const n = name.trim()
+    if (!n || !parent) return
+    setCustomSubcategories((prev) => {
+      const existing = prev[parent] ?? []
+      if (existing.includes(n)) return prev
+      const next = { ...prev, [parent]: [...existing, n] }
+      if (user) { try { localStorage.setItem(`customSubs:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
+      return next
+    })
+  }, [user])
+
   // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -221,9 +244,11 @@ export default function Dashboard() {
       try {
         const resp = await transactionsApi.updateTransactionCategory(sessionId, tx.id, newCategory, onlyThis)
         // A name outside the built-in tree is a user-created category — the
-        // dynamic taxonomy. Persist it so it stays valid on every restore.
-        if (user && !ASSIGNABLE_CATEGORIES.includes(newCategory)) {
-          supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
+        // dynamic taxonomy. Persist it so it stays valid on every restore,
+        // and remember it locally so pickers offer it immediately.
+        if (!ASSIGNABLE_CATEGORIES.includes(newCategory)) {
+          addCustomCategory(newCategory)
+          if (user) supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
         }
         if (user && onlyThis && resp.txn_key) {
           // "אל תשנה עסקאות דומות": pin ONLY this transaction — no merchant
@@ -254,7 +279,7 @@ export default function Dashboard() {
         if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
   )
 
   // ── Manual subcategory override ──
@@ -266,6 +291,12 @@ export default function Dashboard() {
       if (!sessionId || tx.id == null) return
       try {
         const resp = await transactionsApi.updateTransactionSubcategory(sessionId, tx.id, newSubcategory, onlyThis)
+        // Remember a newly typed subcategory name under its parent so it's
+        // offered in every future picker (localStorage + the session-usage
+        // merge on /categories/catalog keep it available everywhere).
+        if (newSubcategory && resp.category) {
+          addCustomSubcategory(resp.category, newSubcategory)
+        }
         if (user && onlyThis && resp.txn_key && resp.category) {
           // Pin this transaction's {category, subcategory} without creating a
           // merchant-wide rule.
@@ -288,6 +319,25 @@ export default function Dashboard() {
         setRefreshKey((k) => k + 1)
         if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
+    },
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
+  )
+
+  // ── Per-transaction note ──
+  // Saves the note on the live session AND persists it in Supabase
+  // (transaction_notes, keyed by fingerprint) so it survives restores.
+  const handleSaveNote = useCallback(
+    async (tx: Transaction, note: string) => {
+      if (!sessionId || tx.id == null) return
+      const resp = await transactionsApi.updateTransactionNote(sessionId, tx.id, note)
+      if (user && resp.txn_key) {
+        if (note.trim()) {
+          await supabaseApi.upsertTransactionNote(user.id, resp.txn_key, note).catch(() => {})
+        } else {
+          await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
+        }
+      }
+      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
   )
@@ -350,15 +400,16 @@ export default function Dashboard() {
     if (!user || recoveryAttempts.current >= 2) return false
     recoveryAttempts.current += 1
     try {
-      const [transactions, rules, overrides, customCats] = await Promise.all([
+      const [transactions, rules, overrides, customCats, notes] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
+        supabaseApi.getTransactionNotes(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return false
       const restored = await transactionsApi.restoreSession(
-        transactions as unknown[], rules, overrides, customCats.map((c) => c.name))
+        transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
       if (restored.success && restored.session_id) {
         navigate(`/?session_id=${restored.session_id}`, { replace: true })
         return true
@@ -501,15 +552,16 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner])
 
-  // ── Fetch the category/subcategory catalog once (seeded names + icons) ──
+  // ── Fetch the category/subcategory catalog (seeded names + everything in
+  // use in this session, so a subcategory created once stays pickable) ──
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
-    transactionsApi.getCategoryCatalog(controller.signal)
+    transactionsApi.getCategoryCatalog(controller.signal, sessionId)
       .then((data) => setCategoryCatalog(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId])
+  }, [sessionId, refreshKey])
 
   // ── Load user-created category/subcategory names (localStorage) ──
   useEffect(() => {
@@ -522,29 +574,6 @@ export default function Dashboard() {
     } catch {
       // ignore malformed localStorage
     }
-  }, [user])
-
-  const addCustomCategory = useCallback((name: string) => {
-    const n = name.trim()
-    if (!n) return
-    setCustomCategories((prev) => {
-      if (prev.includes(n)) return prev
-      const next = [...prev, n]
-      if (user) { try { localStorage.setItem(`customCats:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
-      return next
-    })
-  }, [user])
-
-  const addCustomSubcategory = useCallback((parent: string, name: string) => {
-    const n = name.trim()
-    if (!n || !parent) return
-    setCustomSubcategories((prev) => {
-      const existing = prev[parent] ?? []
-      if (existing.includes(n)) return prev
-      const next = { ...prev, [parent]: [...existing, n] }
-      if (user) { try { localStorage.setItem(`customSubs:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ } }
-      return next
-    })
   }, [user])
 
   const handleManagerRename = useCallback(async (oldCategory: string, newCategory: string) => {
@@ -608,6 +637,20 @@ export default function Dashboard() {
     const seeded = categoryCatalog?.subcategories?.[drawerCategory]?.map((s) => s.name) ?? []
     return Array.from(new Set([...seeded, ...(customSubcategories[drawerCategory] ?? [])]))
   }, [categoryCatalog, drawerCategory, customSubcategories])
+
+  // Full parent→subcategories map, so the drawer's editor can offer the RIGHT
+  // subcategory list for whichever category the user just picked (not only the
+  // drawer's current category).
+  const subcategoryCatalogMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const [parent, subs] of Object.entries(categoryCatalog?.subcategories ?? {})) {
+      map[parent] = subs.map((s) => s.name)
+    }
+    for (const [parent, subs] of Object.entries(customSubcategories)) {
+      map[parent] = Array.from(new Set([...(map[parent] ?? []), ...subs]))
+    }
+    return map
+  }, [categoryCatalog, customSubcategories])
 
   // Category list for the manager modal: every known category + its subcategories.
   const managerCategories = useMemo<ManagerCategory[]>(() => {
@@ -717,15 +760,16 @@ export default function Dashboard() {
   const handleBankSynced = async () => {
     if (!user) return
     try {
-      const [transactions, rules, overrides, customCats] = await Promise.all([
+      const [transactions, rules, overrides, customCats, notes] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
+        supabaseApi.getTransactionNotes(user.id).catch(() => []),
       ])
       if (!transactions || transactions.length === 0) return
       const merged = await transactionsApi.restoreSession(
-        transactions as unknown[], rules, overrides, customCats.map((c) => c.name))
+        transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
       if (merged.success && merged.session_id) {
         navigate(`/?session_id=${merged.session_id}`)
       }
@@ -1978,7 +2022,9 @@ export default function Dashboard() {
         availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
         subcategoryOptions={drawerSubcategoryOptions}
+        subcategoryCatalog={subcategoryCatalogMap}
         onSubcategoryChange={handleSubcategoryChange}
+        onSaveNote={handleSaveNote}
       />
 
       <CategoryManagerModal

@@ -168,3 +168,25 @@ CREATE POLICY "Users can view own categories" ON public.user_categories FOR SELE
 CREATE POLICY "Users can insert own categories" ON public.user_categories FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own categories" ON public.user_categories FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own categories" ON public.user_categories FOR DELETE USING (auth.uid() = user_id);
+
+-- 9. Per-transaction notes (הערות)
+-- Free-text note on ONE transaction, keyed by the same stable fingerprint as
+-- transaction_overrides. Re-applied on every /restore-session so notes
+-- survive backend cold starts. This whole section is idempotent.
+CREATE TABLE IF NOT EXISTS public.transaction_notes (
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    txn_key TEXT NOT NULL,
+    note TEXT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (user_id, txn_key)
+);
+
+ALTER TABLE public.transaction_notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own txn notes" ON public.transaction_notes;
+DROP POLICY IF EXISTS "Users can insert own txn notes" ON public.transaction_notes;
+DROP POLICY IF EXISTS "Users can update own txn notes" ON public.transaction_notes;
+DROP POLICY IF EXISTS "Users can delete own txn notes" ON public.transaction_notes;
+CREATE POLICY "Users can view own txn notes" ON public.transaction_notes FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own txn notes" ON public.transaction_notes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own txn notes" ON public.transaction_notes FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own txn notes" ON public.transaction_notes FOR DELETE USING (auth.uid() = user_id);

@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
@@ -31,6 +31,14 @@ interface CategoryTransactionsDrawerProps {
    * subcategory edit UI is hidden.
    */
   onSubcategoryChange?: (tx: Transaction, newSubcategory: string, onlyThis?: boolean) => Promise<void>
+  /**
+   * Full parent→subcategory-names map, so when the user picks a NEW category
+   * in the editor, the subcategory chips switch to that category's list and
+   * both can be saved together.
+   */
+  subcategoryCatalog?: Record<string, string[]>
+  /** Saves a free-text note on the transaction (persisted via fingerprint). */
+  onSaveNote?: (tx: Transaction, note: string) => Promise<void>
 }
 
 export default function CategoryTransactionsDrawer({
@@ -45,6 +53,8 @@ export default function CategoryTransactionsDrawer({
   onCategoryChange,
   subcategoryOptions = [],
   onSubcategoryChange,
+  subcategoryCatalog = {},
+  onSaveNote,
 }: CategoryTransactionsDrawerProps) {
   const [sortAsc, setSortAsc] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -54,6 +64,12 @@ export default function CategoryTransactionsDrawer({
   // "אל תשנה סיווג של עסקאות דומות": when checked, the edit applies to THIS
   // transaction only (a pinned override) — no merchant-wide rule is created.
   const [onlyThis, setOnlyThis] = useState(false)
+  // Staged edits: everything is picked first (category, subcategory, note)
+  // and applied together with one שמור — so a category and its subcategory
+  // can be set in the same breath.
+  const [pendingCat, setPendingCat] = useState<string | null>(null)
+  const [pendingSub, setPendingSub] = useState<string | undefined>(undefined)
+  const [noteValue, setNoteValue] = useState('')
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -78,12 +94,20 @@ export default function CategoryTransactionsDrawer({
     setOnlyThis(false)
   }, [isOpen, category])
 
-  // Fresh toggle per row: default to the row's current pinned state.
+  // Fresh editor state per row: pin toggle from the row's current state, no
+  // staged changes, note prefilled. Deliberately NOT keyed on `transactions`
+  // so a background refresh can't wipe a note mid-typing.
   useEffect(() => {
-    if (editingId == null) { setOnlyThis(false); return }
+    setPendingCat(null)
+    setPendingSub(undefined)
+    setCustomCategory('')
+    setCustomSubcategory('')
+    if (editingId == null) { setOnlyThis(false); setNoteValue(''); return }
     const tx = transactions.find((t) => t.id === editingId)
     setOnlyThis(!!tx?._locked)
-  }, [editingId, transactions])
+    setNoteValue(tx?.הערות ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId])
 
   const categoryOptions = useMemo(() => {
     return Array.from(new Set([...availableCategories, ...ASSIGNABLE_CATEGORIES, category]))
@@ -128,42 +152,35 @@ export default function CategoryTransactionsDrawer({
 
   const hasSubGroups = groups.some((g) => g.sub)
 
-  const handlePick = useCallback(
-    async (tx: Transaction, newCategory: string) => {
-      if (!onCategoryChange || tx.id == null) return
-      const trimmed = newCategory.trim()
-      if (!trimmed || trimmed === category) {
+  // Apply every staged change in one go: category first (so the subcategory
+  // is persisted under the right parent), then subcategory, then the note.
+  const handleSaveAll = useCallback(
+    async (tx: Transaction) => {
+      if (tx.id == null) return
+      const curCat = (tx.קטגוריה ?? category).trim()
+      const curSub = (tx.קטגוריה_משנה ?? '').trim()
+      const curNote = (tx.הערות ?? '').trim()
+      const nextCat = (pendingCat ?? curCat).trim()
+      const nextSub = pendingSub === undefined ? curSub : pendingSub.trim()
+      const nextNote = noteValue.trim()
+      const catChanged = !!nextCat && nextCat !== curCat
+      const subChanged = nextSub !== curSub
+      const noteChanged = nextNote !== curNote
+      if (!catChanged && !subChanged && !noteChanged) {
         setEditingId(null)
         return
       }
       setSavingId(tx.id)
       try {
-        await onCategoryChange(tx, trimmed, onlyThis)
+        if (catChanged && onCategoryChange) await onCategoryChange(tx, nextCat, onlyThis)
+        if (subChanged && onSubcategoryChange) await onSubcategoryChange(tx, nextSub, onlyThis)
+        if (noteChanged && onSaveNote) await onSaveNote(tx, nextNote)
       } finally {
         setSavingId(null)
         setEditingId(null)
-        setCustomCategory('')
       }
     },
-    [onCategoryChange, category, onlyThis],
-  )
-
-  const handlePickSub = useCallback(
-    async (tx: Transaction, newSub: string) => {
-      if (!onSubcategoryChange || tx.id == null) return
-      const trimmed = newSub.trim()
-      const current = (tx.קטגוריה_משנה ?? '').trim()
-      if (trimmed === current) return
-      setSavingId(tx.id)
-      try {
-        await onSubcategoryChange(tx, trimmed, onlyThis)
-      } finally {
-        setSavingId(null)
-        setEditingId(null)
-        setCustomSubcategory('')
-      }
-    },
-    [onSubcategoryChange, onlyThis],
+    [category, pendingCat, pendingSub, noteValue, onlyThis, onCategoryChange, onSubcategoryChange, onSaveNote],
   )
 
   return (
@@ -468,7 +485,20 @@ export default function CategoryTransactionsDrawer({
                             )}
                           </div>
                         </div>
-                        {isEditing && canEdit && (
+                        {isEditing && canEdit && (() => {
+                          const curCat = (tx.קטגוריה ?? category).trim()
+                          const effCat = (pendingCat ?? curCat).trim()
+                          const curSub = (tx.קטגוריה_משנה ?? '').trim()
+                          const effSub = pendingSub === undefined ? curSub : pendingSub
+                          const effSubOptions = Array.from(new Set([
+                            ...(subcategoryCatalog[effCat] ?? []),
+                            ...(effCat === category ? subOptions : []),
+                          ])).filter(Boolean).sort((a, b) => a.localeCompare(b, 'he'))
+                          const dirty =
+                            effCat !== curCat
+                            || effSub !== curSub
+                            || noteValue.trim() !== (tx.הערות ?? '').trim()
+                          return (
                           <div
                             style={{
                               display: 'flex',
@@ -511,14 +541,18 @@ export default function CategoryTransactionsDrawer({
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault()
-                                handlePick(tx, customCategory)
+                                if (customCategory.trim()) {
+                                  setPendingCat(customCategory.trim())
+                                  setPendingSub(undefined)
+                                  setCustomCategory('')
+                                }
                               }}
                               style={{ display: 'flex', gap: '6px', width: '100%', marginBottom: '4px' }}
                             >
                               <input
                                 value={customCategory}
                                 onChange={(e) => setCustomCategory(e.target.value)}
-                                placeholder="שם קטגוריה"
+                                placeholder="שם קטגוריה חדשה"
                                 disabled={isSaving}
                                 style={{
                                   flex: 1,
@@ -548,15 +582,20 @@ export default function CategoryTransactionsDrawer({
                                   fontFamily: 'var(--font-family)',
                                 }}
                               >
-                                שמור
+                                בחר
                               </button>
                             </form>
                             {categoryOptions.map((cat) => {
-                              const selected = cat === category
+                              const selected = cat === effCat
                               return (
                                 <button
                                   key={cat}
-                                  onClick={() => handlePick(tx, cat)}
+                                  onClick={() => {
+                                    setPendingCat(cat === curCat ? null : cat)
+                                    // A different parent means the old
+                                    // subcategory no longer applies.
+                                    setPendingSub(undefined)
+                                  }}
                                   disabled={isSaving}
                                   style={{
                                     display: 'inline-flex',
@@ -581,10 +620,16 @@ export default function CategoryTransactionsDrawer({
                             {onSubcategoryChange && (
                               <div style={{ width: '100%', marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--glass-border)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700 }}>
-                                  <Tag size={11} /> תת-קטגוריה
+                                  <Tag size={11} /> תת-קטגוריה {effCat !== curCat ? `של ${effCat}` : ''}
                                 </div>
                                 <form
-                                  onSubmit={(e) => { e.preventDefault(); handlePickSub(tx, customSubcategory) }}
+                                  onSubmit={(e) => {
+                                    e.preventDefault()
+                                    if (customSubcategory.trim()) {
+                                      setPendingSub(customSubcategory.trim())
+                                      setCustomSubcategory('')
+                                    }
+                                  }}
                                   style={{ display: 'flex', gap: '6px', width: '100%', marginBottom: '6px' }}
                                 >
                                   <input
@@ -611,13 +656,13 @@ export default function CategoryTransactionsDrawer({
                                       fontFamily: 'var(--font-family)',
                                     }}
                                   >
-                                    שמור
+                                    בחר
                                   </button>
                                 </form>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                  {(tx.קטגוריה_משנה ?? '').trim() && (
+                                  {!!effSub && (
                                     <button
-                                      onClick={() => handlePickSub(tx, '')}
+                                      onClick={() => setPendingSub('')}
                                       disabled={isSaving}
                                       style={{
                                         padding: '4px 8px', fontSize: '0.6875rem', borderRadius: 'var(--radius-full)',
@@ -629,12 +674,12 @@ export default function CategoryTransactionsDrawer({
                                       נקה תת-קטגוריה
                                     </button>
                                   )}
-                                  {subOptions.map((sub) => {
-                                    const selected = sub === (tx.קטגוריה_משנה ?? '').trim()
+                                  {Array.from(new Set([...effSubOptions, ...(effSub ? [effSub] : [])])).map((sub) => {
+                                    const selected = sub === effSub
                                     return (
                                       <button
                                         key={sub}
-                                        onClick={() => handlePickSub(tx, sub)}
+                                        onClick={() => setPendingSub(sub === curSub && pendingSub !== undefined ? undefined : sub)}
                                         disabled={isSaving}
                                         style={{
                                           display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -654,8 +699,50 @@ export default function CategoryTransactionsDrawer({
                                 </div>
                               </div>
                             )}
+                            {onSaveNote && (
+                              <div style={{ width: '100%', marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--glass-border)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                  <StickyNote size={11} /> הערה
+                                </div>
+                                <textarea
+                                  value={noteValue}
+                                  onChange={(e) => setNoteValue(e.target.value)}
+                                  placeholder="על מה הייתה העסקה? ההערה נשמרת ותוצג כאן בעתיד"
+                                  rows={2}
+                                  disabled={isSaving}
+                                  style={{
+                                    width: '100%', resize: 'vertical',
+                                    border: '1px solid var(--glass-border)',
+                                    borderRadius: 'var(--radius-sm)', padding: '6px 8px',
+                                    fontSize: '0.75rem', background: 'var(--bg-primary)',
+                                    color: 'var(--text-primary)', fontFamily: 'var(--font-family)',
+                                    outline: 'none',
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
+                              <button
+                                onClick={() => handleSaveAll(tx)}
+                                disabled={isSaving || !dirty}
+                                style={{
+                                  padding: '7px 18px',
+                                  borderRadius: 'var(--radius-full)',
+                                  border: 'none',
+                                  background: dirty ? 'var(--accent)' : 'var(--glass-bg)',
+                                  color: dirty ? '#fff' : 'var(--text-muted)',
+                                  fontSize: '0.8125rem',
+                                  fontWeight: 700,
+                                  cursor: isSaving || !dirty ? 'not-allowed' : 'pointer',
+                                  fontFamily: 'var(--font-family)',
+                                }}
+                              >
+                                {isSaving ? 'שומר…' : 'שמור שינויים'}
+                              </button>
+                            </div>
                           </div>
-                        )}
+                          )
+                        })()}
                       </div>
                     )
                       })}

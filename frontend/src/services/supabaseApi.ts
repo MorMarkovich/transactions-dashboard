@@ -315,6 +315,49 @@ export const supabaseApi = {
     if (error) throw error;
   },
 
+  // ─── Per-transaction notes (הערות) ────────────────────────────────────
+
+  getTransactionNotes: async (
+    userId: string,
+  ): Promise<{ txn_key: string; note: string }[]> => {
+    const { data, error } = await supabase
+      .from('transaction_notes')
+      .select('txn_key, note')
+      .eq('user_id', userId);
+    if (error) {
+      // Table may not exist yet (migration not run) — degrade gracefully.
+      // eslint-disable-next-line no-console
+      console.warn('getTransactionNotes failed:', error.message);
+      return [];
+    }
+    return data || [];
+  },
+
+  upsertTransactionNote: async (
+    userId: string,
+    txnKey: string,
+    note: string,
+  ): Promise<void> => {
+    if (!txnKey || !note?.trim()) return;
+    const { error } = await supabase
+      .from('transaction_notes')
+      .upsert(
+        { user_id: userId, txn_key: txnKey, note: note.trim(), updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,txn_key' },
+      );
+    if (error) throw error;
+  },
+
+  deleteTransactionNote: async (userId: string, txnKey: string): Promise<void> => {
+    if (!txnKey) return;
+    const { error } = await supabase
+      .from('transaction_notes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('txn_key', txnKey);
+    if (error) throw error;
+  },
+
   // ─── Data Management ──────────────────────────────────────────────────
 
   deleteAllTransactions: async (userId: string): Promise<void> => {

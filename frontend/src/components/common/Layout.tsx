@@ -93,8 +93,9 @@ export default function Layout({ children }: LayoutProps) {
         supabaseApi.getCategoryRules(user.id).catch(() => []),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
+        supabaseApi.getTransactionNotes(user.id).catch(() => []),
       ])
-        .then(([transactions, rules, overrides, customCats]) => {
+        .then(([transactions, rules, overrides, customCats, notes]) => {
           if (!transactions || transactions.length === 0) return
           // Taxonomy migration: rules saved under the OLD category tree are
           // rewritten to the new one — in memory for this restore, and
@@ -121,7 +122,7 @@ export default function Layout({ children }: LayoutProps) {
               .catch(() => {}) // best-effort; backend ignores them regardless
           }
           const validRules = effectiveRules.filter((r) => isValidRuleCategory(r.category, customNames))
-          return transactionsApi.restoreSession(transactions, validRules, overrides, customNames)
+          return transactionsApi.restoreSession(transactions, validRules, overrides, customNames, notes)
         })
         .then(response => {
           if (response?.success && response.session_id) {
