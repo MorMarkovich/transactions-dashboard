@@ -67,7 +67,12 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-sync-token': token },
         body: '{}',
-      })
+        // Chrome 142+ requires public HTTPS pages to explicitly identify
+        // requests that are intended for a service on the user's own machine.
+        // This also lets Chrome apply its Local Network Access permission
+        // instead of rejecting the HTTP loopback request as mixed content.
+        targetAddressSpace: 'local',
+      } as RequestInit)
 
       // Bad/expired token → drop it and let the user re-enter once.
       if (res.status === 401 || res.status === 403) {

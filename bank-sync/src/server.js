@@ -23,6 +23,14 @@ function applyCors(req, res) {
   if (origin && isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Vary', 'Origin')
+
+    // Chromium sends this header when a public HTTPS dashboard calls a
+    // loopback service. Explicitly opt in only for an origin we already trust;
+    // without the matching response header some browser versions reject the
+    // request before POST /sync is ever sent.
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    }
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-sync-token')
