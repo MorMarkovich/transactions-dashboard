@@ -16,6 +16,7 @@ def test_api_rejects_anonymous_requests_when_auth_is_enabled(monkeypatch):
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert "default-src 'self'" in response.headers["content-security-policy"]
+    assert "http://127.0.0.1:4000" in response.headers["content-security-policy"]
 
 
 def test_session_ids_cannot_cross_user_boundaries(monkeypatch):

@@ -68,8 +68,15 @@ async def request_limits_and_security_headers(request: Request, call_next):
         else ""
     )
     supabase_ws_origin = f"wss://{parsed_supabase.netloc}" if parsed_supabase.netloc else ""
+    # The bank-sync companion binds only to this loopback origin and requires
+    # both an allow-listed dashboard Origin and a keychain-backed token. Keep
+    # the CSP exception exact so the dashboard cannot connect to arbitrary
+    # LAN devices or other localhost ports.
+    bank_sync_origin = "http://127.0.0.1:4000"
     connect_sources = " ".join(
-        source for source in ["'self'", supabase_origin, supabase_ws_origin] if source
+        source
+        for source in ["'self'", supabase_origin, supabase_ws_origin, bank_sync_origin]
+        if source
     )
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
