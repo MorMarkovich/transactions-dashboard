@@ -1,0 +1,17 @@
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+.venv
+backend/uploads
+*.xlsx
+*.xls
+*.csv
+*.log
+.DS_Store

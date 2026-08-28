@@ -18,6 +18,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { formatCurrency } from '../utils/formatting'
 import type { SavingsGoal } from '../services/types'
+import { useAuth } from '../lib/AuthContext'
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -55,31 +56,37 @@ const cardVariants = {
 
 // ─── Helpers ────────────────────────────────────────────────────────────
 
-function getStorageKey(sessionId: string | null): string {
-  return sessionId ? `${STORAGE_KEY_PREFIX}-${sessionId}` : STORAGE_KEY_PREFIX
+function getStorageKey(ownerId: string | null): string {
+  return ownerId ? `${STORAGE_KEY_PREFIX}-user-${ownerId}` : STORAGE_KEY_PREFIX
 }
 
-function loadGoals(sessionId: string | null): SavingsGoal[] {
+function loadGoals(ownerId: string | null, legacySessionId: string | null): SavingsGoal[] {
   try {
-    const stored = localStorage.getItem(getStorageKey(sessionId))
+    let stored = localStorage.getItem(getStorageKey(ownerId))
+    if (!stored && ownerId && legacySessionId) {
+      stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${legacySessionId}`)
+      if (stored) localStorage.setItem(getStorageKey(ownerId), stored)
+    }
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function saveGoals(goals: SavingsGoal[], sessionId: string | null) {
-  localStorage.setItem(getStorageKey(sessionId), JSON.stringify(goals))
+function saveGoals(goals: SavingsGoal[], ownerId: string | null) {
+  localStorage.setItem(getStorageKey(ownerId), JSON.stringify(goals))
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 
 export default function SavingsGoals() {
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const sessionId = searchParams.get('session_id')
+  const ownerId = user?.id ?? null
 
   // State
-  const [goals, setGoals] = useState<SavingsGoal[]>(() => loadGoals(sessionId))
+  const [goals, setGoals] = useState<SavingsGoal[]>(() => loadGoals(ownerId, sessionId))
   const [showForm, setShowForm] = useState(false)
   const [addFundsId, setAddFundsId] = useState<string | null>(null)
   const [addFundsAmount, setAddFundsAmount] = useState('')
@@ -123,21 +130,21 @@ export default function SavingsGoals() {
     }
     const updated = [...goals, goal]
     setGoals(updated)
-    saveGoals(updated, sessionId)
+    saveGoals(updated, ownerId)
     setNewName('')
     setNewTarget('')
     setNewCategory(CATEGORIES[0])
     setNewColor(PRESET_COLORS[0])
     setShowForm(false)
-  }, [newName, newTarget, newCategory, newColor, goals])
+  }, [newName, newTarget, newCategory, newColor, goals, ownerId])
 
   const removeGoal = useCallback(
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
       setGoals(updated)
-      saveGoals(updated, sessionId)
+      saveGoals(updated, ownerId)
     },
-    [goals],
+    [goals, ownerId],
   )
 
   const handleAddFunds = useCallback(
@@ -151,11 +158,11 @@ export default function SavingsGoals() {
           : g,
       )
       setGoals(updated)
-      saveGoals(updated, sessionId)
+      saveGoals(updated, ownerId)
       setAddFundsId(null)
       setAddFundsAmount('')
     },
-    [goals, addFundsAmount],
+    [goals, addFundsAmount, ownerId],
   )
 
   return (

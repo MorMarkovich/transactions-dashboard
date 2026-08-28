@@ -21,6 +21,7 @@ import AnimatedNumber from '../components/ui/AnimatedNumber'
 import { formatCurrency, formatPercent } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import type { MetricsData, RawDonutData } from '../services/types'
+import { useAuth } from '../lib/AuthContext'
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -34,21 +35,26 @@ const STORAGE_KEY_PREFIX = 'budget-goals'
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
-function getStorageKey(sessionId: string | null): string {
-  return sessionId ? `${STORAGE_KEY_PREFIX}-${sessionId}` : STORAGE_KEY_PREFIX
+function getStorageKey(ownerId: string | null): string {
+  return ownerId ? `${STORAGE_KEY_PREFIX}-user-${ownerId}` : STORAGE_KEY_PREFIX
 }
 
-function loadGoals(sessionId: string | null): BudgetGoal[] {
+function loadGoals(ownerId: string | null, legacySessionId: string | null): BudgetGoal[] {
   try {
-    const stored = localStorage.getItem(getStorageKey(sessionId))
+    let stored = localStorage.getItem(getStorageKey(ownerId))
+    // One-time migration from the old ephemeral-session key.
+    if (!stored && ownerId && legacySessionId) {
+      stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${legacySessionId}`)
+      if (stored) localStorage.setItem(getStorageKey(ownerId), stored)
+    }
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function saveGoals(goals: BudgetGoal[], sessionId: string | null) {
-  localStorage.setItem(getStorageKey(sessionId), JSON.stringify(goals))
+function saveGoals(goals: BudgetGoal[], ownerId: string | null) {
+  localStorage.setItem(getStorageKey(ownerId), JSON.stringify(goals))
 }
 
 // ─── Animation ─────────────────────────────────────────────────────────
@@ -66,7 +72,9 @@ const cardVariants = {
 
 export default function Budget() {
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const sessionId = searchParams.get('session_id')
+  const ownerId = user?.id ?? null
 
   // Data
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
@@ -74,7 +82,7 @@ export default function Budget() {
   const [loading, setLoading] = useState(false)
 
   // Budget goals
-  const [goals, setGoals] = useState<BudgetGoal[]>(() => loadGoals(sessionId))
+  const [goals, setGoals] = useState<BudgetGoal[]>(() => loadGoals(ownerId, sessionId))
   const [newCategory, setNewCategory] = useState('')
   const [newLimit, setNewLimit] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -165,19 +173,19 @@ export default function Budget() {
     }
     const updated = [...goals, goal]
     setGoals(updated)
-    saveGoals(updated, sessionId)
+    saveGoals(updated, ownerId)
     setNewCategory('')
     setNewLimit('')
     setShowForm(false)
-  }, [newCategory, newLimit, goals])
+  }, [newCategory, newLimit, goals, ownerId])
 
   const removeGoal = useCallback(
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
       setGoals(updated)
-      saveGoals(updated, sessionId)
+      saveGoals(updated, ownerId)
     },
-    [goals],
+    [goals, ownerId],
   )
 
   // ── No session ──────────────────────────────────────────────────────

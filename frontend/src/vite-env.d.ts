@@ -8,18 +8,18 @@ declare module 'react-plotly.js/factory' {
     data: Data[];
     layout?: Partial<Layout>;
     config?: Partial<Config>;
-    frames?: any[];
+    frames?: unknown[];
     style?: React.CSSProperties;
     className?: string;
     useResizeHandler?: boolean;
     debug?: boolean;
-    onInitialized?: (figure: any, graphDiv: any) => void;
-    onUpdate?: (figure: any, graphDiv: any) => void;
-    onPurge?: (figure: any, graphDiv: any) => void;
+    onInitialized?: (figure: unknown, graphDiv: HTMLElement) => void;
+    onUpdate?: (figure: unknown, graphDiv: HTMLElement) => void;
+    onPurge?: (figure: unknown, graphDiv: HTMLElement) => void;
     onError?: (err: Error) => void;
     divId?: string;
   }
 
-  const createPlotlyComponent: (plotly: any) => React.ComponentType<PlotParams>;
+  const createPlotlyComponent: (plotly: unknown) => React.ComponentType<PlotParams>;
   export default createPlotlyComponent;
 }

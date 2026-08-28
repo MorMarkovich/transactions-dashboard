@@ -34,7 +34,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
         borderBottom: '1px solid var(--glass-border)',
         position: 'sticky',
         top: 0,
-        zIndex: 'var(--z-sticky, 20)' as any,
+        zIndex: 'var(--z-sticky, 20)',
         direction: 'rtl',
         gap: 'var(--space-md)',
         flexShrink: 0,

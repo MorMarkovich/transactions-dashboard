@@ -2,7 +2,7 @@ import { formatCurrency } from '../../utils/formatting'
 
 interface ChartTooltipProps {
   active?: boolean
-  payload?: any[]
+  payload?: Array<{ value?: number; name?: string }>
   label?: string
   formatter?: (value: number) => string
   showPercentage?: boolean

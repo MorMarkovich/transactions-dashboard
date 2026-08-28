@@ -110,7 +110,7 @@ export default function Transactions() {
   const [activeDateChip, setActiveDateChip] = useState('all')
 
   // Drawer state
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   // UI state

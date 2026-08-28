@@ -4,8 +4,11 @@ API routes for transactions dashboard
 import uuid
 import os
 import math
+import logging
+import time
+import zipfile
 from typing import Optional, Any
-from fastapi import APIRouter, UploadFile, File, Query, HTTPException
+from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
 import json as _json
 import datetime as _dt
 from pydantic import BaseModel, field_validator
@@ -35,8 +38,19 @@ from ..services.chart_generator import (
 )
 from ..services.export_service import export_to_excel
 from ..utils.validators import detect_amount_column, find_column
+from ..core.security import (
+    authorize_api_request,
+    bind_session,
+    current_user_id,
+    session_owner,
+    unbind_session,
+)
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Every API route requires a valid Supabase access token. Static assets and the
+# health check are registered outside this router and remain public.
+router = APIRouter(dependencies=[Depends(authorize_api_request)])
 
 # Background-AI progress per session, read by GET /ai-progress so the UI can
 # show a live "categorizing… n/m" meter. In-memory like `sessions` (wiped on
@@ -70,12 +84,65 @@ async def get_ai_progress(sessionId: str = Query(...)):
 async def test():
     return {"status": "ok"}
 
-# In-memory storage for sessions (in production, use Redis or database)
+# In-memory storage for sessions. Each session is user-bound by the security
+# dependency and capped/expired below so one account cannot exhaust the worker.
 sessions: dict[str, pd.DataFrame] = {}
+SESSION_CREATED_AT: dict[str, float] = {}
+MAX_SESSIONS_PER_USER = max(2, int(os.environ.get("MAX_SESSIONS_PER_USER", "12")))
+SESSION_TTL_SECONDS = max(300, int(os.environ.get("SESSION_TTL_SECONDS", "21600")))
+
+
+def _remove_session(session_id: str) -> None:
+    sessions.pop(session_id, None)
+    SESSION_CREATED_AT.pop(session_id, None)
+    SESSION_CUSTOM_CATS.pop(session_id, None)
+    AI_PROGRESS.pop(session_id, None)
+    unbind_session(session_id)
+
+
+def _store_session(session_id: str, df: pd.DataFrame) -> None:
+    """Store a user-owned session and evict that user's stale/oldest entries."""
+    user_id = current_user_id()
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    now = time.monotonic()
+
+    for sid, created in list(SESSION_CREATED_AT.items()):
+        if now - created > SESSION_TTL_SECONDS:
+            _remove_session(sid)
+
+    sessions[session_id] = df
+    SESSION_CREATED_AT[session_id] = now
+    bind_session(session_id, user_id)
+
+    owned = sorted(
+        (sid for sid in SESSION_CREATED_AT if session_owner(sid) == user_id),
+        key=lambda sid: SESSION_CREATED_AT[sid],
+    )
+    for sid in owned[:-MAX_SESSIONS_PER_USER]:
+        _remove_session(sid)
 
 # Directory for uploaded files
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_UPLOAD_BYTES = max(1_000_000, int(os.environ.get("MAX_UPLOAD_BYTES", str(20 * 1024 * 1024))))
+MAX_XLSX_UNCOMPRESSED_BYTES = max(
+    MAX_UPLOAD_BYTES,
+    int(os.environ.get("MAX_XLSX_UNCOMPRESSED_BYTES", str(200 * 1024 * 1024))),
+)
+ALLOWED_UPLOAD_SUFFIXES = {".xlsx", ".xls", ".csv", ".pdf"}
+
+
+def _validate_xlsx_archive(file_path: str) -> None:
+    """Reject malformed/oversized XLSX archives before openpyxl expands them."""
+    try:
+        with zipfile.ZipFile(file_path) as archive:
+            members = archive.infolist()
+            expanded_size = sum(member.file_size for member in members)
+            if len(members) > 10_000 or expanded_size > MAX_XLSX_UNCOMPRESSED_BYTES:
+                raise HTTPException(status_code=413, detail="Spreadsheet expands beyond the safe processing limit")
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Invalid Excel file") from exc
 
 
 @router.post("/upload")
@@ -83,11 +150,21 @@ async def upload_file(file: UploadFile = File(...)):
     """Upload and process transaction file"""
     file_path = None
     try:
+        safe_name = os.path.basename(file.filename or "upload")
+        suffix = os.path.splitext(safe_name)[1].lower()
+        if suffix not in ALLOWED_UPLOAD_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Unsupported file format")
+
         # Save file temporarily
-        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
+        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{safe_name}")
         with open(file_path, "wb") as f:
-            content = await file.read()
+            content = await file.read(MAX_UPLOAD_BYTES + 1)
+            if len(content) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="Uploaded file is too large")
             f.write(content)
+
+        if suffix == ".xlsx":
+            _validate_xlsx_archive(file_path)
         
         # Load and process file (ensure file is closed before processing)
         df_raw = load_transaction_file(file_path)
@@ -130,7 +207,7 @@ async def upload_file(file: UploadFile = File(...)):
         
         # Create session
         session_id = str(uuid.uuid4())
-        sessions[session_id] = df
+        _store_session(session_id, df)
         
         # Clean up temp file (with delay to ensure pandas closed it)
         if file_path and os.path.exists(file_path):
@@ -154,18 +231,22 @@ async def upload_file(file: UploadFile = File(...)):
             "transaction_count": len(df)
         }
     except HTTPException:
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                logger.warning("Could not remove failed upload %s", file_path)
         raise
     except Exception as e:
-        import traceback
         import time
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
         if file_path and os.path.exists(file_path):
             try:
                 time.sleep(0.2)  # Wait before trying to delete
                 os.remove(file_path)
             except:
                 pass
-        raise HTTPException(status_code=500, detail=error_detail)
+        logger.exception("Transaction upload failed")
+        raise HTTPException(status_code=500, detail="Failed to process uploaded file") from e
 
 
 class CategoryRule(BaseModel):
@@ -210,7 +291,11 @@ class RestoreSessionRequest(BaseModel):
     @classmethod
     def parse_if_string(cls, v: Any) -> Any:
         if isinstance(v, str):
-            return _json.loads(v)
+            v = _json.loads(v)
+        if not isinstance(v, list):
+            raise ValueError("transactions must be an array")
+        if len(v) > 100_000:
+            raise ValueError("too many transactions in one restore")
         return v
 
     @field_validator('category_rules', mode='before')
@@ -588,7 +673,7 @@ async def restore_session(body: RestoreSessionRequest):
                     df.at[idx, 'הערות'] = notes_by_key[keys.at[idx]]
 
         session_id = str(uuid.uuid4())
-        sessions[session_id] = df
+        _store_session(session_id, df)
         if custom_cats:
             SESSION_CUSTOM_CATS[session_id] = custom_cats
 
@@ -611,8 +696,8 @@ async def restore_session(body: RestoreSessionRequest):
             "message": msg,
         }
     except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"{str(e)}\n{traceback.format_exc()}")
+        logger.exception("Session restore failed")
+        raise HTTPException(status_code=500, detail="Failed to restore transaction session") from e
 
 
 @router.post("/transactions/note")
@@ -944,7 +1029,7 @@ async def get_transactions(
     if category:
         df = df[df['קטגוריה'] == category]
     if search:
-        df = df[df['תיאור'].str.contains(search, case=False, na=False)]
+        df = df[df['תיאור'].str.contains(search, case=False, na=False, regex=False)]
     if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
         if min_amount is not None:
             df = df[df['סכום_מוחלט'] >= min_amount]
@@ -1101,8 +1186,7 @@ async def delete_session_file(sessionId: str = Query(...), file_name: str = Quer
 @router.delete("/session")
 async def delete_session(sessionId: str = Query(...)):
     """Delete an entire session and all its in-memory data."""
-    if sessionId in sessions:
-        del sessions[sessionId]
+    _remove_session(sessionId)
     return {"success": True, "message": "Session cleared"}
 
 
@@ -1217,7 +1301,7 @@ async def scope_session(body: ScopeSessionRequest):
     if '_owner' not in df.columns:
         return {"session_id": base}
     scoped_id = f"{base}::owner={owner}"
-    sessions[scoped_id] = df[df['_owner'] == owner].reset_index(drop=True)
+    _store_session(scoped_id, df[df['_owner'] == owner].reset_index(drop=True))
     # The scoped view keeps the base session's custom categories valid.
     if base in SESSION_CUSTOM_CATS:
         SESSION_CUSTOM_CATS[scoped_id] = SESSION_CUSTOM_CATS[base]
@@ -2995,7 +3079,7 @@ async def get_anomalies(sessionId: str = Query(...)):
 @router.get("/search")
 async def search_transactions(
     sessionId: str = Query(...),
-    q: str = Query(..., min_length=1),
+    q: str = Query(..., min_length=1, max_length=200),
     limit: int = Query(default=20, le=50),
 ):
     """Full-text search across transaction descriptions and categories."""
@@ -3008,10 +3092,10 @@ async def search_transactions(
 
     q_lower = q.lower()
 
-    mask = df["תיאור"].astype(str).str.lower().str.contains(q_lower, na=False)
+    mask = df["תיאור"].astype(str).str.lower().str.contains(q_lower, na=False, regex=False)
 
     if "קטגוריה" in df.columns:
-        mask = mask | df["קטגוריה"].astype(str).str.lower().str.contains(q_lower, na=False)
+        mask = mask | df["קטגוריה"].astype(str).str.lower().str.contains(q_lower, na=False, regex=False)
 
     results_df = df[mask].head(limit)
 

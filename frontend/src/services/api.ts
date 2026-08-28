@@ -2,6 +2,7 @@
  * API client for backend communication
  */
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 import type {
   TransactionResponse,
   MetricsData,
@@ -43,6 +44,17 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// FastAPI validates the same Supabase session that protects the database.
+// Fetching the session is local in supabase-js; no network round-trip occurs.
+api.interceptors.request.use(async (config) => {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return config;
 });
 
 export const transactionsApi = {

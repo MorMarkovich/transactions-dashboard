@@ -189,17 +189,14 @@ export default function Income() {
     const loadAll = async () => {
       setLoading(true)
       try {
-        const promises: Promise<any>[] = [supabaseApi.getIncomes(user.id)]
+        const [incomeRows, transactionMetrics] = await Promise.all([
+          supabaseApi.getIncomes(user.id),
+          sessionId ? transactionsApi.getMetrics(sessionId) : Promise.resolve(null),
+        ])
+        setIncomes(incomeRows as IncomeType[])
 
-        if (sessionId) {
-          promises.push(transactionsApi.getMetrics(sessionId))
-        }
-
-        const results = await Promise.all(promises)
-        setIncomes(results[0] as IncomeType[])
-
-        if (results[1]) {
-          setMetrics(results[1] as MetricsData)
+        if (transactionMetrics) {
+          setMetrics(transactionMetrics as MetricsData)
         }
       } catch (err) {
         console.error('Error loading income data:', err)

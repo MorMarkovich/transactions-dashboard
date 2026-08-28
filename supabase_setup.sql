@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see/edit their own profile
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
@@ -29,7 +32,7 @@ BEGIN
     VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name');
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
@@ -47,6 +50,9 @@ CREATE TABLE IF NOT EXISTS public.incomes (
 );
 
 ALTER TABLE public.incomes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own incomes" ON public.incomes;
+DROP POLICY IF EXISTS "Users can insert own incomes" ON public.incomes;
+DROP POLICY IF EXISTS "Users can delete own incomes" ON public.incomes;
 CREATE POLICY "Users can view own incomes" ON public.incomes FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own incomes" ON public.incomes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own incomes" ON public.incomes FOR DELETE USING (auth.uid() = user_id);
@@ -65,6 +71,8 @@ CREATE TABLE IF NOT EXISTS public.upload_history (
 );
 
 ALTER TABLE public.upload_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own uploads" ON public.upload_history;
+DROP POLICY IF EXISTS "Users can insert own uploads" ON public.upload_history;
 CREATE POLICY "Users can view own uploads" ON public.upload_history FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own uploads" ON public.upload_history FOR INSERT WITH CHECK (auth.uid() = user_id);
 
@@ -77,6 +85,9 @@ CREATE TABLE IF NOT EXISTS public.saved_transactions (
 );
 
 ALTER TABLE public.saved_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own transactions" ON public.saved_transactions;
+DROP POLICY IF EXISTS "Users can insert own transactions" ON public.saved_transactions;
+DROP POLICY IF EXISTS "Users can delete own transactions" ON public.saved_transactions;
 CREATE POLICY "Users can view own transactions" ON public.saved_transactions FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own transactions" ON public.saved_transactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can delete own transactions" ON public.saved_transactions FOR DELETE USING (auth.uid() = user_id);
@@ -90,6 +101,9 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
 );
 
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can upsert own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can update own settings" ON public.user_settings;
 CREATE POLICY "Users can view own settings" ON public.user_settings FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can upsert own settings" ON public.user_settings FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own settings" ON public.user_settings FOR UPDATE USING (auth.uid() = user_id);
@@ -116,6 +130,10 @@ CREATE TABLE IF NOT EXISTS public.user_category_rules (
 ALTER TABLE public.user_category_rules ADD COLUMN IF NOT EXISTS subcategory TEXT;
 
 ALTER TABLE public.user_category_rules ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view own category rules" ON public.user_category_rules;
+DROP POLICY IF EXISTS "Users can insert own category rules" ON public.user_category_rules;
+DROP POLICY IF EXISTS "Users can update own category rules" ON public.user_category_rules;
+DROP POLICY IF EXISTS "Users can delete own category rules" ON public.user_category_rules;
 CREATE POLICY "Users can view own category rules" ON public.user_category_rules FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own category rules" ON public.user_category_rules FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own category rules" ON public.user_category_rules FOR UPDATE USING (auth.uid() = user_id);
@@ -190,3 +208,13 @@ CREATE POLICY "Users can view own txn notes" ON public.transaction_notes FOR SEL
 CREATE POLICY "Users can insert own txn notes" ON public.transaction_notes FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update own txn notes" ON public.transaction_notes FOR UPDATE USING (auth.uid() = user_id);
 CREATE POLICY "Users can delete own txn notes" ON public.transaction_notes FOR DELETE USING (auth.uid() = user_id);
+
+-- Query-path indexes for predictable performance as each user's data grows.
+CREATE INDEX IF NOT EXISTS idx_saved_transactions_user_created
+    ON public.saved_transactions (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_upload_history_user_uploaded
+    ON public.upload_history (user_id, uploaded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incomes_user_created
+    ON public.incomes (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_category_rules_user_updated
+    ON public.user_category_rules (user_id, updated_at DESC);

@@ -14,6 +14,7 @@ import './Layout.css'
 // ─── Constants ────────────────────────────────────────────────────────
 const MOBILE_BREAKPOINT = 1024
 const COLLAPSED_KEY = 'sidebar-collapsed'
+const AUTO_AI_ENABLED = import.meta.env.VITE_AUTO_AI !== 'false'
 
 interface LayoutProps {
   children: ReactNode
@@ -133,7 +134,7 @@ export default function Layout({ children }: LayoutProps) {
             // background — restore no longer waits for it, so the app paints
             // immediately. Resolved merchants are persisted as rules so each
             // is identified once, and open pages are told to refetch.
-            runAiChain(response.session_id, user.id)
+            if (AUTO_AI_ENABLED) runAiChain(response.session_id, user.id)
           }
         })
         .catch(() => {}) // Silent fail — user can upload a new file
@@ -162,6 +163,9 @@ export default function Layout({ children }: LayoutProps) {
           setSessionValidating(false)
         }
       })
+  // runAiChain is intentionally stable (empty useCallback dependency list)
+  // and is declared below this restore effect for readability.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, searchParams, navigate])
 
   // ── Fully automatic background AI chain ──────────────────────────────

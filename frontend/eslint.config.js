@@ -19,5 +19,13 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // These compiler-oriented rules are not actionable until this app opts
+      // into React Compiler and several effects intentionally reset UI state.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      // Context modules intentionally colocate providers and their hooks.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

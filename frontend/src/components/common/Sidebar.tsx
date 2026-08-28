@@ -75,7 +75,7 @@ const SUPPORTED_FORMATS = [
   { label: 'MAX', variant: 'info' as const },
   { label: 'לאומי', variant: 'success' as const },
   { label: 'דיסקונט', variant: 'purple' as const },
-  { label: 'ויזה כאל', variant: 'warning' as const },
+  { label: 'ישראכרט', variant: 'warning' as const },
   { label: 'CSV', variant: 'default' as const },
 ]
 
@@ -236,7 +236,7 @@ export default function Sidebar({
     e.preventDefault()
     setIsDragging(false)
     const files = Array.from(e.dataTransfer.files).filter(
-      f => /\.(xlsx|xls|csv)$/i.test(f.name)
+      f => /\.(xlsx|xls|csv|pdf)$/i.test(f.name)
     )
     if (files.length > 0) handleUploadFiles(files)
   }

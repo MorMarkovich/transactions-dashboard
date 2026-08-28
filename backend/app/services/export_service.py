@@ -16,7 +16,14 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
     export_df['סכום'] = export_df['סכום'].abs()
     
     # יצירת Excel
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    # Uploaded descriptions are untrusted. Disabling formula/URL conversion
+    # prevents spreadsheet-formula injection when a value begins with =, +,
+    # -, or @ and the exported workbook is opened.
+    with pd.ExcelWriter(
+        output,
+        engine='xlsxwriter',
+        engine_kwargs={'options': {'strings_to_formulas': False, 'strings_to_urls': False}},
+    ) as writer:
         export_df.to_excel(writer, sheet_name='עסקאות', index=False)
         
         workbook = writer.book

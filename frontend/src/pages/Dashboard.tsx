@@ -257,13 +257,11 @@ export default function Dashboard() {
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, newCategory, null)
             .catch((e) => {
-              // eslint-disable-next-line no-console
               console.warn('Failed to persist transaction override:', e)
             })
         } else if (user && !onlyThis) {
           if (resp.merchant) {
             await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory).catch((e) => {
-              // eslint-disable-next-line no-console
               console.warn('Failed to persist category rule (will retry on next edit):', e)
             })
           }
@@ -279,7 +277,7 @@ export default function Dashboard() {
         if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory],
   )
 
   // ── Manual subcategory override ──
@@ -303,14 +301,12 @@ export default function Dashboard() {
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, resp.category, newSubcategory || null)
             .catch((e) => {
-              // eslint-disable-next-line no-console
               console.warn('Failed to persist transaction override:', e)
             })
         } else if (user && !onlyThis && resp.merchant && resp.category) {
           await supabaseApi
             .upsertCategorySubrule(user.id, resp.merchant, resp.category, newSubcategory)
             .catch((e) => {
-              // eslint-disable-next-line no-console
               console.warn('Failed to persist subcategory rule (will retry on next edit):', e)
             })
         }
@@ -320,7 +316,7 @@ export default function Dashboard() {
         if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
+    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomSubcategory],
   )
 
   // ── Bulk category move ──
@@ -534,7 +530,7 @@ export default function Dashboard() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, refreshKey, selectedOwner])
+  }, [sessionId, dateType, refreshKey, selectedOwner, tryRecoverSession])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
@@ -751,7 +747,6 @@ export default function Dashboard() {
             user.id,
             resp.merchants.map((merchant) => ({ merchant, category: newCategory })),
           ).catch((e) => {
-            // eslint-disable-next-line no-console
             console.warn('Failed to persist category rename rules:', e)
           })
         }

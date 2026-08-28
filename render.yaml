@@ -3,8 +3,10 @@ services:
     name: transactions-dashboard
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: free
+    dockerContext: .
+    plan: starter
     healthCheckPath: /health
+    autoDeployTrigger: checksPass
     envVars:
       # Supabase – set these in the Render dashboard (Settings → Environment)
       - key: VITE_SUPABASE_URL
@@ -13,3 +15,7 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://transactions-dashboard-bfxn.onrender.com
+      - key: VITE_AUTO_AI
+        value: "true"

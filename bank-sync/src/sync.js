@@ -144,7 +144,10 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     }
   } else if (added > 0 || enriched > 0 || shifted > 0) {
     log(`שומר snapshot (${merged.length} עסקאות, ${added} חדשות${enriched ? `, ${enriched} עודכנו` : ''})…`)
-    await insertSnapshot(supabase, userId, merged)
+    const newId = await insertSnapshot(supabase, userId, merged)
+    // Keep a small recovery window without letting routine syncs grow the
+    // snapshot table forever.
+    await deleteOtherSnapshots(supabase, userId, newId, 5)
   } else {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }

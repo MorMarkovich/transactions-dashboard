@@ -61,10 +61,30 @@ export const supabaseApi = {
   // ─── Transaction Persistence ──────────────────────────────────────────
 
   saveTransactions: async (userId: string, transactions: unknown[]): Promise<void> => {
+    // Insert first so a transient database error can never erase the user's
+    // last good snapshot. Once durable, prune older snapshots best-effort.
     const { error } = await supabase
       .from('saved_transactions')
       .insert({ user_id: userId, data: transactions });
     if (error) throw error;
+
+    const { data: snapshots, error: listError } = await supabase
+      .from('saved_transactions')
+      .select('id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false });
+    const staleIds = snapshots?.slice(1).map((row) => row.id) ?? [];
+    if (!listError && staleIds.length) {
+      const { error: cleanupError } = await supabase
+        .from('saved_transactions')
+        .delete()
+        .eq('user_id', userId)
+        .in('id', staleIds);
+      if (cleanupError) console.warn('Old transaction snapshots could not be pruned:', cleanupError.message);
+    } else if (listError) {
+      console.warn('Old transaction snapshots could not be listed:', listError.message);
+    }
   },
 
   getLatestTransactions: async (userId: string): Promise<unknown[] | null> => {
@@ -72,7 +92,9 @@ export const supabaseApi = {
       .from('saved_transactions')
       .select('data')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1);
     if (error || !data || data.length === 0) return null;
 
     // New format: single row whose data is already a full array
@@ -80,8 +102,15 @@ export const supabaseApi = {
       return data[0].data as unknown[];
     }
 
-    // Old format: one row per transaction, data may be a JSON string or plain object
-    const transactions = data.map(row => {
+    // Old format: one row per transaction. Fetch all rows only for this legacy
+    // shape; modern snapshots stay on the bounded one-row fast path above.
+    const { data: legacyRows, error: legacyError } = await supabase
+      .from('saved_transactions')
+      .select('data')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (legacyError || !legacyRows) return null;
+    const transactions = legacyRows.map(row => {
       const d = row.data;
       if (typeof d === 'string') {
         try { return JSON.parse(d); } catch { return null; }
@@ -115,7 +144,6 @@ export const supabaseApi = {
         .eq('user_id', userId);
       if (legacyErr) {
         // Table may not exist yet on older deployments — degrade gracefully.
-        // eslint-disable-next-line no-console
         console.warn('getCategoryRules failed:', legacyErr.message);
         return [];
       }
@@ -229,7 +257,6 @@ export const supabaseApi = {
       .eq('user_id', userId);
     if (error) {
       // Table may not exist yet (migration not run) — degrade gracefully.
-      // eslint-disable-next-line no-console
       console.warn('getUserCategories failed:', error.message);
       return [];
     }
@@ -276,7 +303,6 @@ export const supabaseApi = {
       .eq('user_id', userId);
     if (error) {
       // Table may not exist yet (migration not run) — degrade gracefully.
-      // eslint-disable-next-line no-console
       console.warn('getTransactionOverrides failed:', error.message);
       return [];
     }
@@ -326,7 +352,6 @@ export const supabaseApi = {
       .eq('user_id', userId);
     if (error) {
       // Table may not exist yet (migration not run) — degrade gracefully.
-      // eslint-disable-next-line no-console
       console.warn('getTransactionNotes failed:', error.message);
       return [];
     }
