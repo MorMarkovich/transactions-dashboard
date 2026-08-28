@@ -69,9 +69,9 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
         body: '{}',
         // Chrome 142+ requires public HTTPS pages to explicitly identify
         // requests that are intended for a service on the user's own machine.
-        // This also lets Chrome apply its Local Network Access permission
-        // instead of rejecting the HTTP loopback request as mixed content.
-        targetAddressSpace: 'local',
+        // 127.0.0.1 is the loopback address space (not the broader LAN/local
+        // space); declaring the wrong space makes Chrome reject the request.
+        targetAddressSpace: 'loopback',
       } as RequestInit)
 
       // Bad/expired token → drop it and let the user re-enter once.
