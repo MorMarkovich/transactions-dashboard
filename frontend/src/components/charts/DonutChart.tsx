@@ -184,7 +184,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             innerRadius={isCompact ? '58%' : '60%'}
             outerRadius={isCompact ? '78%' : '85%'}
             paddingAngle={2}
-            animationDuration={0}
+            isAnimationActive={false}
             label={isCompact ? false : (renderCustomLabel as any)}
             labelLine={false}
           >
