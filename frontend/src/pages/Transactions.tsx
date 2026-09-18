@@ -10,6 +10,7 @@ import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
 import { formatCurrency, formatNumber, formatPercent, formatDate } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
+import { useDashboardFilters } from '../context/FilterContext'
 import type { Transaction, TransactionFilters } from '../services/types'
 
 // ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ const DATE_CHIPS: DateChip[] = [
 export default function Transactions() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
 
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -93,6 +95,7 @@ export default function Transactions() {
   const [dateFrom, setDateFrom] = useState<string | null>(null)
   const [dateTo, setDateTo] = useState<string | null>(null)
   const [categories, setCategories] = useState<string[]>([])
+  const [subcategoryMap, setSubcategoryMap] = useState<Record<string, string[]>>({})
 
   // Filter / pagination state
   const [page, setPage] = useState(1)
@@ -104,7 +107,7 @@ export default function Transactions() {
     endDate?: string
     minAmount?: number
     maxAmount?: number
-  }>({})
+  }>({ category: category || undefined })
 
   // Date chip state
   const [activeDateChip, setActiveDateChip] = useState('all')
@@ -134,6 +137,22 @@ export default function Transactions() {
     return () => controller.abort()
   }, [sessionId])
 
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    transactionsApi.getCategoryCatalog(controller.signal, sessionId)
+      .then((catalog) => setSubcategoryMap(Object.fromEntries(
+        Object.entries(catalog.subcategories).map(([parent, values]) => [parent, values.map((item) => item.name)]),
+      )))
+      .catch(() => setSubcategoryMap({}))
+    return () => controller.abort()
+  }, [sessionId])
+
+  useEffect(() => {
+    setFilters((previous) => ({ ...previous, category: category || undefined }))
+    setPage(1)
+  }, [category])
+
   // ---- Effect 2: fetch transactions on sessionId, filters, page change ----
   useEffect(() => {
     if (!sessionId) return
@@ -147,7 +166,8 @@ export default function Transactions() {
         page,
         page_size: pageSize,
         search: filters.search,
-        category: filters.category,
+        category: category || filters.category,
+        subcategory: subcategory || undefined,
         start_date: filters.startDate,
         end_date: filters.endDate,
         min_amount: filters.minAmount,
@@ -186,7 +206,7 @@ export default function Transactions() {
     fetchTransactions()
 
     return () => controller.abort()
-  }, [sessionId, filters, page, pageSize])
+  }, [sessionId, filters, page, pageSize, category, subcategory])
 
   // ---- Computed stats -------------------------------------------------------
   const stats = useMemo(() => ({
@@ -244,7 +264,8 @@ export default function Transactions() {
 
     try {
       const blob = await transactionsApi.exportTransactions(sessionId, {
-        category: filters.category,
+        category: category || filters.category,
+        subcategory: subcategory || undefined,
       })
 
       const url = window.URL.createObjectURL(blob)
@@ -256,7 +277,7 @@ export default function Transactions() {
     } catch (err) {
       console.error('Error exporting:', err)
     }
-  }, [sessionId, filters.category])
+  }, [sessionId, filters.category, category, subcategory])
 
   // ---- No session: empty state --------------------------------------------
   if (!sessionId) {
@@ -427,11 +448,39 @@ export default function Transactions() {
         </div>
       )}
 
+      <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
+        <div className="dashboard-filter-heading">
+          <div>
+            <strong>סינון קטגוריות</strong>
+            <span>הבחירה נשמרת גם במעבר בין מסכים</span>
+          </div>
+          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+        </div>
+        <div className="dashboard-filter-fields">
+          <label>
+            <span>קטגוריה</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="">כל הקטגוריות</option>
+              {categories.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>תת-קטגוריה</span>
+            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
+              <option value="">כל תתי-הקטגוריות</option>
+              {(subcategoryMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+        </div>
+        {(category || subcategory) && <div className="active-filter-summary">מציג: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+      </section>
+
       <AdvancedFilters
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}
         loading={loading}
+        showCategory={false}
       />
 
       {/* ── Quick Date Filter Chips ───────────────────────────────────── */}

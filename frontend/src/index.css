@@ -61,3 +61,55 @@ h1, h2, h3 {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
+
+/* Shared, persistent category controls */
+.dashboard-filter-bar {
+  position: relative;
+  z-index: 2;
+  margin-block: 0 var(--space-lg);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--bg-elevated), color-mix(in srgb, var(--accent) 7%, var(--bg-card)));
+  box-shadow: var(--shadow-sm);
+  text-align: start;
+}
+.dashboard-filter-heading,
+.dashboard-filter-fields {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dashboard-filter-heading { justify-content: space-between; margin-bottom: 12px; }
+.dashboard-filter-heading > div { display: grid; gap: 3px; }
+.dashboard-filter-heading strong { color: var(--text-primary); font-size: .95rem; }
+.dashboard-filter-heading span { color: var(--text-muted); font-size: .75rem; }
+.dashboard-filter-fields { align-items: end; flex-wrap: wrap; }
+.dashboard-filter-fields label { display: grid; gap: 6px; min-width: min(220px, 100%); flex: 1; }
+.dashboard-filter-fields label > span { color: var(--text-secondary); font-size: .75rem; font-weight: 700; }
+.dashboard-filter-fields select {
+  width: 100%; min-height: 42px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--bg-card); color: var(--text-primary); font: inherit;
+  text-align: start; cursor: pointer;
+}
+.dashboard-filter-fields select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dashboard-filter-fields select:disabled { opacity: .55; cursor: not-allowed; }
+.filter-clear-button {
+  border: 0; background: transparent; color: var(--accent); cursor: pointer;
+  font: inherit; font-size: .78rem; font-weight: 700; padding: 6px 8px;
+}
+.active-filter-summary {
+  width: fit-content; margin-top: 10px; padding: 5px 10px;
+  border-radius: var(--radius-full); background: var(--accent-muted);
+  color: var(--accent); font-size: .75rem; font-weight: 700;
+}
+/* RTL alignment sweep: text starts consistently while numeric columns stay centered. */
+[dir="rtl"] :is(.section-header-v2, .page-header, .card-title, label, th, td) { text-align: start; }
+[dir="rtl"] :is(.col-amount, .col-date, td[style*="text-align: center"], th[style*="text-align: center"]) { text-align: center; }
+@media (max-width: 640px) {
+  .dashboard-filter-bar { padding: 13px; }
+  .dashboard-filter-heading { align-items: flex-start; }
+  .dashboard-filter-fields { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .dashboard-filter-fields label { min-width: 0; }
+}

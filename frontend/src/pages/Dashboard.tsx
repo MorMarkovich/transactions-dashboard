@@ -42,6 +42,7 @@ import { formatCurrency, ltrIsolate } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
+import { useDashboardFilters } from '../context/FilterContext'
 import type {
   MetricsData,
   RawDonutData,
@@ -88,6 +89,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
+  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
   const { setNotifications } = useAppNotifications()
   const { user } = useAuth()
 
@@ -207,7 +209,7 @@ export default function Dashboard() {
     if (!sessionId) return
     setDrawerLoading(true)
     try {
-      const sid = await transactionsApi.scopeSession(sessionId, selectedOwner)
+      const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategory)
       const data = await transactionsApi.getCategoryTransactions(
         sid, '', categoryName, dateType, undefined, undefined,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
@@ -220,7 +222,7 @@ export default function Dashboard() {
     } finally {
       setDrawerLoading(false)
     }
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategory])
 
   const handleCategoryCardClick = useCallback(async (categoryName: string) => {
     if (!sessionId) return
@@ -470,7 +472,7 @@ export default function Dashboard() {
 
       try {
         // Re-scope to the selected person; reads use sid, edits use sessionId.
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategory)
         const results = await Promise.all([
           transactionsApi.getMetrics(sid, signal),
           transactionsApi.getDonutChartV2(sid, signal),
@@ -530,7 +532,7 @@ export default function Dashboard() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, refreshKey, selectedOwner, tryRecoverSession])
+  }, [sessionId, dateType, refreshKey, selectedOwner, category, subcategory, tryRecoverSession])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
@@ -540,7 +542,7 @@ export default function Dashboard() {
     const fetchOverview = async () => {
       setMonthOverviewLoading(true)
       try {
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategory)
         const data = await transactionsApi.getMonthOverview(sid, selectedMonth, dateType, controller.signal)
         setMonthOverview(data)
       } catch {
@@ -552,7 +554,7 @@ export default function Dashboard() {
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner])
+  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategory])
 
   // ── Derived data ───────────────────────────────────────────────────
   const monthlyAmounts = useMemo(() => {
@@ -580,7 +582,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
-    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategory)
       .then((sid) => transactionsApi.getCategorySnapshot(
         sid, controller.signal,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
@@ -588,7 +590,7 @@ export default function Dashboard() {
       .then((data) => setCategorySnapshot(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategory])
 
   // ── Fetch the category/subcategory catalog (seeded names + everything in
   // use in this session, so a subcategory created once stays pickable) ──
@@ -884,6 +886,33 @@ export default function Dashboard() {
         subtitle="סקירה כללית של ההוצאות וההכנסות שלך"
         icon={LayoutDashboard}
       />
+
+      <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
+        <div className="dashboard-filter-heading">
+          <div>
+            <strong>מיקוד הדשבורד</strong>
+            <span>בחר קטגוריה ותת-קטגוריה. כל המדדים והתצוגות יתעדכנו.</span>
+          </div>
+          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+        </div>
+        <div className="dashboard-filter-fields">
+          <label>
+            <span>קטגוריה</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="">כל הקטגוריות</option>
+              {availableCategoryNames.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>תת-קטגוריה</span>
+            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
+              <option value="">כל תתי-הקטגוריות</option>
+              {(subcategoryCatalogMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+        </div>
+        {(category || subcategory) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+      </section>
 
       {/* ── Per-person filter (הכל = everyone incl. shared; person chips
               only — "משותף"/shared rows are part of הכל, not a separate view) ── */}
