@@ -113,3 +113,24 @@ h1, h2, h3 {
   .dashboard-filter-fields { display: grid; grid-template-columns: minmax(0, 1fr); }
   .dashboard-filter-fields label { min-width: 0; }
 }
+
+/* Accessible checklist-style multi-select used by the dashboard filters. */
+.multi-select { position: relative; width: 100%; }
+.multi-select-trigger { width: 100%; min-height: 42px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-primary); font: inherit; cursor: pointer; text-align: start; }
+.multi-select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.multi-select-trigger:disabled { opacity: .55; cursor: not-allowed; }
+.multi-select-placeholder { color: var(--text-muted); }
+.multi-select-menu { position: absolute; z-index: 30; inset-inline: 0; top: calc(100% + 6px); max-height: 260px; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-elevated); box-shadow: var(--shadow-lg); display: grid; gap: 3px; }
+.multi-select-option, .multi-select-clear { width: 100%; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font: inherit; font-size: .82rem; padding: 8px; display: flex; align-items: center; gap: 8px; text-align: start; cursor: pointer; }
+.multi-select-option:hover, .multi-select-option.selected { background: var(--accent-muted); }
+.multi-select-clear { color: var(--accent); border-bottom: 1px solid var(--border); border-radius: 0; margin-bottom: 3px; }
+.multi-select-check { width: 18px; height: 18px; display: inline-grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; flex: 0 0 auto; }
+.multi-select-option.selected .multi-select-check { background: var(--accent); border-color: var(--accent); color: white; }
+.multi-select-empty { padding: 10px; color: var(--text-muted); font-size: .8rem; }
+.multi-select-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.multi-select-chips button { display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: var(--radius-full); padding: 4px 8px; background: var(--accent-muted); color: var(--accent); font: inherit; font-size: .72rem; cursor: pointer; }
+.multi-select-chips button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: start; }
+@media (max-width: 640px) {
+  .multi-select-menu { position: static; margin-top: 6px; max-height: 220px; }
+  .monthly-pie-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}

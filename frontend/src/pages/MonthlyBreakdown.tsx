@@ -13,6 +13,7 @@ import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import DonutChart from '../components/charts/DonutChart'
+import MultiSelect from '../components/ui/MultiSelect'
 import BarChart from '../components/charts/BarChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyComparison'
@@ -55,7 +56,7 @@ const MAX_PIE_SLICES = 10
 export default function MonthlyBreakdown() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
 
   // ── Data state ────────────────────────────────────────────────────
   const [comparison, setComparison] = useState<CategoryMonthlyComparisonData | null>(null)
@@ -108,7 +109,7 @@ export default function MonthlyBreakdown() {
       setLoading(true)
       setError(null)
       try {
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategory)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategories)
         const [metrics, comparisonData, industryData] = await Promise.all([
           transactionsApi.getMetrics(sid, signal),
           transactionsApi.getCategoryMonthlyComparison(sid, dateType, signal),
@@ -128,16 +129,17 @@ export default function MonthlyBreakdown() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, selectedOwner, category, subcategory])
+  }, [sessionId, dateType, selectedOwner, category, subcategories])
 
   useEffect(() => {
-    if (!sessionId || !category) { setSubcategoryMonthly(null); return }
+    if (!sessionId || !selectedCategory) { setSubcategoryMonthly(null); return }
+    setSubcategoryMonthly(null)
     const controller = new AbortController()
-    transactionsApi.getSubcategoryMonthly(sessionId, category, dateType, controller.signal)
+    transactionsApi.getSubcategoryMonthly(sessionId, selectedCategory, dateType, controller.signal)
       .then(setSubcategoryMonthly)
       .catch(() => setSubcategoryMonthly(null))
     return () => controller.abort()
-  }, [sessionId, category, dateType])
+  }, [sessionId, selectedCategory, dateType])
 
   // Sync month/category defaults when comparison data (re)loads
   useEffect(() => {
@@ -202,6 +204,19 @@ export default function MonthlyBreakdown() {
     })
     return { slices: top, total }
   }, [comparison, pieMonth])
+
+
+  const subcategoryPieData = useMemo(() => {
+    if (!subcategoryMonthly || !pieMonth) return { slices: [] as { name: string; value: number; pct: number }[], total: 0 }
+    const monthIndex = subcategoryMonthly.months.indexOf(pieMonth)
+    if (monthIndex < 0) return { slices: [], total: 0 }
+    const items = subcategoryMonthly.series
+      .map((series) => ({ name: series.name, value: series.data[monthIndex] ?? 0 }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+    return { slices: items.map((item) => ({ ...item, pct: total ? item.value / total * 100 : 0 })), total }
+  }, [subcategoryMonthly, pieMonth])
 
   // ── Bars: the selected category's spend in every month ─────────────
   const categoryRow = useMemo(
@@ -304,7 +319,7 @@ export default function MonthlyBreakdown() {
             <strong>בחירת ענף להשוואה לאורך זמן</strong>
             <span>אפשר להתמקד בענף ובתת-ענף, למשל סופרים קטנים מול סופר גדול.</span>
           </div>
-          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
+          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -316,16 +331,20 @@ export default function MonthlyBreakdown() {
           </label>
           <label>
             <span>תת-ענף</span>
-            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
-              <option value="">כל תתי-הענפים</option>
-              {(subcategoryMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <MultiSelect
+              options={subcategoryMap[category] ?? []}
+              value={subcategories}
+              onChange={setSubcategories}
+              placeholder="כל תתי-הענפים"
+              ariaLabel="בחירת מספר תתי-ענפים"
+              disabled={!category}
+            />
           </label>
         </div>
-        {(category || subcategory) && <div className="active-filter-summary">משווה לאורך זמן: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+        {(category || subcategories.length) && <div className="active-filter-summary">משווה לאורך זמן: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
-      {subcategoryMonthly && subcategoryMonthly.series.length > 0 && (
+      {category && selectedCategory === category && subcategoryMonthly && subcategoryMonthly.series.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 'var(--space-lg)' }}>
           <div className="section-header-v2">
             <Layers size={18} />
@@ -333,9 +352,9 @@ export default function MonthlyBreakdown() {
           </div>
           <Card className="glass-card" padding="md">
             <IndustryMonthlyChart
-              data={subcategory ? {
+              data={subcategories.length ? {
                 months: subcategoryMonthly.months,
-                series: subcategoryMonthly.series.filter((item) => item.name === subcategory),
+                series: subcategoryMonthly.series.filter((item) => subcategories.includes(item.name)),
               } : subcategoryMonthly}
               height={320}
             />
@@ -434,7 +453,7 @@ export default function MonthlyBreakdown() {
               {pieData.slices.map((slice, i) => (
                 <div
                   key={slice.name}
-                  onClick={slice.name === 'אחר' ? undefined : () => setSelectedCategory(slice.name)}
+                  onClick={slice.name === 'אחר' ? undefined : () => setSelectedCategory((current) => current === slice.name ? null : slice.name)}
                   title={slice.name === 'אחר' ? undefined : 'הצגת הקטגוריה לאורך זמן'}
                   style={{
                     display: 'flex',
@@ -463,6 +482,31 @@ export default function MonthlyBreakdown() {
         </Card>
       </motion.div>
 
+      {selectedCategory && subcategoryPieData.slices.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 'var(--space-lg)' }}>
+          <div className="section-header-v2">
+            <PieChart size={18} />
+            <span>פירוט {selectedCategory} לפי תתי-קטגוריות</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>לחצו על קטגוריה בעוגה למעלה כדי להיכנס אליה</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 'var(--space-lg)', alignItems: 'center' }}>
+              <DonutChart data={subcategoryPieData.slices} total={subcategoryPieData.total} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {subcategoryPieData.slices.map((slice, index) => (
+                  <div key={slice.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px' }}>
+                    <span className="category-dot" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span style={{ flex: 1 }}>{slice.name}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>{slice.pct.toFixed(1)}%</span>
+                    <strong style={{ fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(slice.value)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {/* ── Selected category across months (bar chart) ────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -474,7 +518,7 @@ export default function MonthlyBreakdown() {
           <BarChart3 size={18} />
           <span>קטגוריה לאורך זמן</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-            בחרו קטגוריה כדי לראות את ההוצאות שלה בכל חודש
+            בחרו קטגוריה כדי לראות את ההוצאות שלה בכל חודש; לחיצה נוספת תחזיר לתצוגה הכללית
           </span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: 'var(--space-sm)' }}>
@@ -483,7 +527,7 @@ export default function MonthlyBreakdown() {
             return (
               <button
                 key={cat.name}
-                onClick={() => setSelectedCategory(cat.name)}
+                onClick={() => setSelectedCategory((current) => current === cat.name ? null : cat.name)}
                 style={{
                   padding: '3px 10px',
                   borderRadius: 'var(--radius-full)',

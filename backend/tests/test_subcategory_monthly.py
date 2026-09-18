@@ -22,3 +22,34 @@ async def test_subcategory_monthly_splits_selected_category():
         ]}
     finally:
         routes.sessions.pop(sid, None)
+
+@pytest.mark.asyncio
+async def test_subcategory_monthly_single_subcategory_and_hebrew_label():
+    sid = 'subcategory-monthly-single'
+    routes.sessions[sid] = pd.DataFrame([
+        {'תאריך': pd.Timestamp('2026-09-01'), 'קטגוריה': 'אוכל', 'קטגוריה_משנה': 'בתי קפה ומאפים', 'סכום': -75, 'סכום_מוחלט': 75},
+    ])
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.get('/api/charts/v2/subcategory-monthly', params={'sessionId': sid, 'category': 'אוכל'})
+        assert response.status_code == 200
+        assert response.json() == {'months': ['09/2026'], 'series': [
+            {'name': 'בתי קפה ומאפים', 'data': [75.0]},
+        ]}
+    finally:
+        routes.sessions.pop(sid, None)
+
+
+@pytest.mark.asyncio
+async def test_subcategory_monthly_empty_when_category_has_no_subcategories():
+    sid = 'subcategory-monthly-empty'
+    routes.sessions[sid] = pd.DataFrame([
+        {'תאריך': pd.Timestamp('2026-09-01'), 'קטגוריה': 'אוכל', 'קטגוריה_משנה': '', 'סכום': -75, 'סכום_מוחלט': 75},
+    ])
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.get('/api/charts/v2/subcategory-monthly', params={'sessionId': sid, 'category': 'אוכל'})
+        assert response.status_code == 200
+        assert response.json() == {'months': [], 'series': []}
+    finally:
+        routes.sessions.pop(sid, None)
