@@ -16,6 +16,7 @@ interface AdvancedFiltersProps {
   onExport?: () => void
   categories: string[]
   loading?: boolean
+  showCategory?: boolean
 }
 
 const PRESETS_KEY = 'txn-filter-presets'
@@ -30,6 +31,7 @@ export default function AdvancedFilters({
   onExport,
   categories,
   loading = false,
+  showCategory = true,
 }: AdvancedFiltersProps) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -142,8 +144,8 @@ export default function AdvancedFilters({
           />
         </div>
 
-        {/* Category dropdown */}
-        <div className="advanced-filter-select" style={{ position: 'relative', minWidth: '140px' }}>
+        {/* Category lives in the shared persistent filter bar on Transactions. */}
+        {showCategory && <div className="advanced-filter-select" style={{ position: 'relative', minWidth: '140px' }}>
           <select
             value={category}
             onChange={(e) => {
@@ -192,7 +194,7 @@ export default function AdvancedFilters({
               color: 'var(--text-muted)',
             }}
           />
-        </div>
+        </div>}
 
         {/* Advanced toggle */}
         <Button

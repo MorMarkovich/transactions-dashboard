@@ -72,11 +72,19 @@ export const transactionsApi = {
    * the other read endpoints so every chart/metric reflects that person.
    * An empty owner returns the base session unchanged.
    */
-  scopeSession: async (sessionId: string, owner: string | null, signal?: AbortSignal): Promise<string> => {
-    if (!owner) return sessionId;
+  scopeSession: async (
+    sessionId: string,
+    owner: string | null,
+    signal?: AbortSignal,
+    category?: string,
+    subcategory?: string,
+  ): Promise<string> => {
+    if (!owner && !category && !subcategory) return sessionId;
     const response = await api.post<{ session_id: string }>('/api/session/scope', {
       session_id: sessionId,
       owner,
+      category: category || null,
+      subcategory: subcategory || null,
     }, { signal });
     return response.data.session_id || sessionId;
   },
@@ -271,6 +279,7 @@ export const transactionsApi = {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
+      if (filters.subcategory) params.append('subcategory', filters.subcategory);
       if (filters.search) params.append('search', filters.search);
       if (filters.min_amount != null) params.append('min_amount', filters.min_amount.toString());
       if (filters.max_amount != null) params.append('max_amount', filters.max_amount.toString());
@@ -512,7 +521,7 @@ export const transactionsApi = {
    */
   exportTransactions: async (
     sessionId: string,
-    filters?: { start_date?: string; end_date?: string; category?: string },
+    filters?: { start_date?: string; end_date?: string; category?: string; subcategory?: string },
     signal?: AbortSignal
   ): Promise<Blob> => {
     const params = new URLSearchParams();
@@ -522,6 +531,7 @@ export const transactionsApi = {
       if (filters.start_date) params.append('start_date', filters.start_date);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
+      if (filters.subcategory) params.append('subcategory', filters.subcategory);
     }
 
     const response = await api.get(`/api/export?${params.toString()}`, {
@@ -720,6 +730,19 @@ export const transactionsApi = {
   getIndustryMonthly: async (sessionId: string, dateType?: string, signal?: AbortSignal): Promise<IndustryMonthlyData> => {
     const response = await api.get<IndustryMonthlyData>('/api/charts/v2/industry-monthly', {
       params: { sessionId, ...(dateType && { date_type: dateType }) },
+      signal,
+    });
+    return response.data;
+  },
+
+  getSubcategoryMonthly: async (
+    sessionId: string,
+    category: string,
+    dateType?: string,
+    signal?: AbortSignal,
+  ): Promise<IndustryMonthlyData> => {
+    const response = await api.get<IndustryMonthlyData>('/api/charts/v2/subcategory-monthly', {
+      params: { sessionId, category, ...(dateType && { date_type: dateType }) },
       signal,
     });
     return response.data;

@@ -113,6 +113,7 @@ export interface TransactionFilters {
   start_date?: string;
   end_date?: string;
   category?: string;
+  subcategory?: string;
   search?: string;
   min_amount?: number;
   max_amount?: number;

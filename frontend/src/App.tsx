@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { FilterProvider } from './context/FilterContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import Layout from './components/common/Layout'
 import { Loader2 } from 'lucide-react'
@@ -128,9 +129,11 @@ export default function App() {
       <ErrorBoundary>
         <NotificationProvider>
           <AuthProvider>
-            <BrowserRouter>
+            <FilterProvider>
+              <BrowserRouter>
               <AppRoutes />
             </BrowserRouter>
+            </FilterProvider>
           </AuthProvider>
         </NotificationProvider>
       </ErrorBoundary>

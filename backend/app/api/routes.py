@@ -1007,6 +1007,7 @@ async def get_transactions(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     category: Optional[str] = None,
+    subcategory: Optional[str] = None,
     search: Optional[str] = None,
     min_amount: Optional[float] = None,
     max_amount: Optional[float] = None,
@@ -1028,6 +1029,8 @@ async def get_transactions(
         df = df[df['תאריך'] <= pd.to_datetime(end_date)]
     if category:
         df = df[df['קטגוריה'] == category]
+    if subcategory and 'קטגוריה_משנה' in df.columns:
+        df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
     if search:
         df = df[df['תיאור'].str.contains(search, case=False, na=False, regex=False)]
     if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
@@ -1280,6 +1283,8 @@ async def get_owners(sessionId: str = Query(...)):
 class ScopeSessionRequest(BaseModel):
     session_id: str
     owner: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
 
 
 @router.post("/session/scope")
@@ -1295,13 +1300,20 @@ async def scope_session(body: ScopeSessionRequest):
     if base not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     owner = (body.owner or '').strip()
-    if not owner or owner.lower() == 'all' or owner == 'הכל':
+    category = (body.category or '').strip()
+    subcategory = (body.subcategory or '').strip()
+    if not owner and not category and not subcategory:
         return {"session_id": base}
-    df = sessions[base]
-    if '_owner' not in df.columns:
-        return {"session_id": base}
-    scoped_id = f"{base}::owner={owner}"
-    _store_session(scoped_id, df[df['_owner'] == owner].reset_index(drop=True))
+    df = sessions[base].copy()
+    if owner and owner.lower() != 'all' and owner != 'הכל' and '_owner' in df.columns:
+        df = df[df['_owner'] == owner]
+    if category and 'קטגוריה' in df.columns:
+        df = df[df['קטגוריה'] == category]
+    if subcategory and 'קטגוריה_משנה' in df.columns:
+        df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
+    scope_parts = [f"owner={owner}" if owner else '', f"category={category}" if category else '', f"subcategory={subcategory}" if subcategory else '']
+    scoped_id = f"{base}::{'&'.join(part for part in scope_parts if part)}"
+    _store_session(scoped_id, df.reset_index(drop=True))
     # The scoped view keeps the base session's custom categories valid.
     if base in SESSION_CUSTOM_CATS:
         SESSION_CUSTOM_CATS[scoped_id] = SESSION_CUSTOM_CATS[base]
@@ -1730,10 +1742,10 @@ async def get_metrics(sessionId: str = Query(...)):
     has_billing_date = 'תאריך_חיוב' in df.columns and df['תאריך_חיוב'].notna().any()
 
     return {
-        "total_transactions": total_transactions,
-        "total_expenses": total_expenses,
-        "total_income": total_income,
-        "average_transaction": average_transaction,
+        "total_transactions": int(total_transactions),
+        "total_expenses": _sanitize(float(total_expenses)),
+        "total_income": _sanitize(float(total_income)),
+        "average_transaction": _sanitize(float(average_transaction)),
         "trend": trend,
         "has_billing_date": bool(has_billing_date),
     }
@@ -1802,7 +1814,8 @@ async def export_transactions(
     sessionId: str = Query(...),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    subcategory: Optional[str] = None
 ):
     """Export transactions to Excel"""
     if sessionId not in sessions:
@@ -1817,6 +1830,8 @@ async def export_transactions(
         df = df[df['תאריך'] <= pd.to_datetime(end_date)]
     if category:
         df = df[df['קטגוריה'] == category]
+    if subcategory and 'קטגוריה_משנה' in df.columns:
+        df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
     
     # Export
     excel_buffer = export_to_excel(df)
@@ -2683,6 +2698,38 @@ async def get_industry_monthly(
         series.append({"name": "אחר", "data": [round(_sanitize(v), 2) for v in other_data]})
 
     return {"months": months, "series": series}
+
+
+@router.get("/charts/v2/subcategory-monthly")
+async def get_subcategory_monthly(
+    sessionId: str = Query(...),
+    category: str = Query(...),
+    date_type: str = Query("transaction"),
+):
+    """Return one category split into subcategories month by month."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    df = sessions[sessionId]
+    if 'קטגוריה_משנה' not in df.columns:
+        return {"months": [], "series": []}
+    expenses = df[(df['סכום'] < 0) & (df['קטגוריה'] == category)].copy()
+    expenses['קטגוריה_משנה'] = expenses['קטגוריה_משנה'].fillna('').astype(str).str.strip()
+    expenses = expenses[expenses['קטגוריה_משנה'] != '']
+    if expenses.empty:
+        return {"months": [], "series": []}
+    expenses['_month'] = _month_series(expenses, date_type)
+    expenses = expenses[expenses['_month'] != '']
+    pivot = pd.pivot_table(expenses, values='סכום_מוחלט', index='_month', columns='קטגוריה_משנה', aggfunc='sum', fill_value=0)
+    month_order = sorted(pivot.index, key=lambda value: tuple(reversed(str(value).split('/'))))
+    pivot = pivot.reindex(month_order)
+    totals = expenses.groupby('קטגוריה_משנה')['סכום_מוחלט'].sum().sort_values(ascending=False)
+    return {
+        "months": [str(month) for month in pivot.index],
+        "series": [
+            {"name": str(name), "data": [round(_sanitize(float(value)), 2) for value in pivot[name].values]}
+            for name in totals.index if name in pivot.columns
+        ],
+    }
 
 
 @router.get("/charts/v2/category-monthly-comparison")

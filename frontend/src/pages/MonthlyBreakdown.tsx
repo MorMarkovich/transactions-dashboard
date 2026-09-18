@@ -19,6 +19,7 @@ import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyCompa
 import { get_icon } from '../utils/constants'
 import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
+import { useDashboardFilters } from '../context/FilterContext'
 import type {
   IndustryMonthlyData,
   CategoryMonthlyComparisonData,
@@ -54,12 +55,15 @@ const MAX_PIE_SLICES = 10
 export default function MonthlyBreakdown() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
 
   // ── Data state ────────────────────────────────────────────────────
   const [comparison, setComparison] = useState<CategoryMonthlyComparisonData | null>(null)
   const [industryMonthly, setIndustryMonthly] = useState<IndustryMonthlyData | null>(null)
+  const [subcategoryMonthly, setSubcategoryMonthly] = useState<IndustryMonthlyData | null>(null)
   const [hasBillingDate, setHasBillingDate] = useState(false)
   const [owners, setOwners] = useState<string[]>([])
+  const [subcategoryMap, setSubcategoryMap] = useState<Record<string, string[]>>({})
 
   // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
@@ -83,6 +87,17 @@ export default function MonthlyBreakdown() {
     return () => controller.abort()
   }, [sessionId])
 
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    transactionsApi.getCategoryCatalog(controller.signal, sessionId)
+      .then((catalog) => setSubcategoryMap(Object.fromEntries(
+        Object.entries(catalog.subcategories).map(([parent, values]) => [parent, values.map((item) => item.name)]),
+      )))
+      .catch(() => setSubcategoryMap({}))
+    return () => controller.abort()
+  }, [sessionId])
+
   // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionId) return
@@ -93,7 +108,7 @@ export default function MonthlyBreakdown() {
       setLoading(true)
       setError(null)
       try {
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategory)
         const [metrics, comparisonData, industryData] = await Promise.all([
           transactionsApi.getMetrics(sid, signal),
           transactionsApi.getCategoryMonthlyComparison(sid, dateType, signal),
@@ -113,7 +128,16 @@ export default function MonthlyBreakdown() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, selectedOwner])
+  }, [sessionId, dateType, selectedOwner, category, subcategory])
+
+  useEffect(() => {
+    if (!sessionId || !category) { setSubcategoryMonthly(null); return }
+    const controller = new AbortController()
+    transactionsApi.getSubcategoryMonthly(sessionId, category, dateType, controller.signal)
+      .then(setSubcategoryMonthly)
+      .catch(() => setSubcategoryMonthly(null))
+    return () => controller.abort()
+  }, [sessionId, category, dateType])
 
   // Sync month/category defaults when comparison data (re)loads
   useEffect(() => {
@@ -128,9 +152,9 @@ export default function MonthlyBreakdown() {
       setSelectedCategory((prev) =>
         prev && comparison.categories.some((c) => c.name === prev)
           ? prev
-          : comparison.categories[0].name)
+          : (category && comparison.categories.some((c) => c.name === category) ? category : comparison.categories[0].name))
     }
-  }, [comparison])
+  }, [comparison, category])
 
   // Sync stacked-chart month selection when industry data loads
   useEffect(() => {
@@ -273,6 +297,51 @@ export default function MonthlyBreakdown() {
         subtitle="ניתוח ההוצאות שלך חודש-אחר-חודש, לפי קטגוריה"
         icon={CalendarRange}
       />
+
+      <section className="dashboard-filter-bar sector-filter-bar" aria-label="בחירת ענפים להשוואה">
+        <div className="dashboard-filter-heading">
+          <div>
+            <strong>בחירת ענף להשוואה לאורך זמן</strong>
+            <span>אפשר להתמקד בענף ובתת-ענף, למשל סופרים קטנים מול סופר גדול.</span>
+          </div>
+          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
+        </div>
+        <div className="dashboard-filter-fields">
+          <label>
+            <span>ענף</span>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="">כל הענפים</option>
+              {comparison.categories.map((item) => <option key={item.name} value={item.name}>{get_icon(item.name)} {item.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>תת-ענף</span>
+            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
+              <option value="">כל תתי-הענפים</option>
+              {(subcategoryMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+        </div>
+        {(category || subcategory) && <div className="active-filter-summary">משווה לאורך זמן: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+      </section>
+
+      {subcategoryMonthly && subcategoryMonthly.series.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 'var(--space-lg)' }}>
+          <div className="section-header-v2">
+            <Layers size={18} />
+            <span>{category} - השוואת תתי-ענפים לאורך זמן</span>
+          </div>
+          <Card className="glass-card" padding="md">
+            <IndustryMonthlyChart
+              data={subcategory ? {
+                months: subcategoryMonthly.months,
+                series: subcategoryMonthly.series.filter((item) => item.name === subcategory),
+              } : subcategoryMonthly}
+              height={320}
+            />
+          </Card>
+        </motion.div>
+      )}
 
       {/* ── Per-person filter ──────────────────────────────────────── */}
       {owners.filter((o) => o !== 'משותף').length > 1 && (
