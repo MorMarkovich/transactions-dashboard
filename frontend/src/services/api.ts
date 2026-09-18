@@ -77,14 +77,14 @@ export const transactionsApi = {
     owner: string | null,
     signal?: AbortSignal,
     category?: string,
-    subcategory?: string,
+    subcategories?: string[],
   ): Promise<string> => {
-    if (!owner && !category && !subcategory) return sessionId;
+    if (!owner && !category && !subcategories?.length) return sessionId;
     const response = await api.post<{ session_id: string }>('/api/session/scope', {
       session_id: sessionId,
       owner,
       category: category || null,
-      subcategory: subcategory || null,
+      subcategories: subcategories?.length ? subcategories : null,
     }, { signal });
     return response.data.session_id || sessionId;
   },
@@ -359,7 +359,7 @@ export const transactionsApi = {
         session_id: sessionId,
         transaction_ids: transactionIds,
         category,
-        subcategory: subcategory || null,
+        subcategory,
         only_this: onlyThis,
       },
     );

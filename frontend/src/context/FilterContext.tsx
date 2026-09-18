@@ -2,12 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 export interface DashboardFilters {
   category: string
-  subcategory: string
+  subcategories: string[]
 }
 
 interface FilterContextValue extends DashboardFilters {
   setCategory: (value: string) => void
-  setSubcategory: (value: string) => void
+  setSubcategories: (value: string[]) => void
   clearFilters: () => void
 }
 
@@ -19,10 +19,12 @@ function readSaved(): DashboardFilters {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
     return {
       category: typeof saved.category === 'string' ? saved.category : '',
-      subcategory: typeof saved.subcategory === 'string' ? saved.subcategory : '',
+      subcategories: Array.isArray(saved.subcategories)
+        ? saved.subcategories.filter((item: unknown): item is string => typeof item === 'string')
+        : (typeof saved.subcategory === 'string' && saved.subcategory ? [saved.subcategory] : []),
     }
   } catch {
-    return { category: '', subcategory: '' }
+    return { category: '', subcategories: [] }
   }
 }
 
@@ -36,15 +38,15 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
   const setCategory = useCallback((category: string) => {
     setFilters((previous) => ({
       category,
-      subcategory: category === previous.category ? previous.subcategory : '',
+      subcategories: category === previous.category ? previous.subcategories : [],
     }))
   }, [])
-  const setSubcategory = useCallback((subcategory: string) => {
-    setFilters((previous) => ({ ...previous, subcategory }))
+  const setSubcategories = useCallback((subcategories: string[]) => {
+    setFilters((previous) => ({ ...previous, subcategories: [...new Set(subcategories)] }))
   }, [])
-  const clearFilters = useCallback(() => setFilters({ category: '', subcategory: '' }), [])
+  const clearFilters = useCallback(() => setFilters({ category: '', subcategories: [] }), [])
 
-  const value = useMemo(() => ({ ...filters, setCategory, setSubcategory, clearFilters }), [filters, setCategory, setSubcategory, clearFilters])
+  const value = useMemo(() => ({ ...filters, setCategory, setSubcategories, clearFilters }), [filters, setCategory, setSubcategories, clearFilters])
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>
 }
 

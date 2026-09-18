@@ -38,6 +38,7 @@ import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
+import MultiSelect from '../components/ui/MultiSelect'
 import { formatCurrency, ltrIsolate } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
@@ -89,7 +90,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
   const { setNotifications } = useAppNotifications()
   const { user } = useAuth()
 
@@ -209,7 +210,7 @@ export default function Dashboard() {
     if (!sessionId) return
     setDrawerLoading(true)
     try {
-      const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategory)
+      const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategories)
       const data = await transactionsApi.getCategoryTransactions(
         sid, '', categoryName, dateType, undefined, undefined,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
@@ -222,7 +223,7 @@ export default function Dashboard() {
     } finally {
       setDrawerLoading(false)
     }
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategory])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategories])
 
   const handleCategoryCardClick = useCallback(async (categoryName: string) => {
     if (!sessionId) return
@@ -472,7 +473,7 @@ export default function Dashboard() {
 
       try {
         // Re-scope to the selected person; reads use sid, edits use sessionId.
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategory)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategories)
         const results = await Promise.all([
           transactionsApi.getMetrics(sid, signal),
           transactionsApi.getDonutChartV2(sid, signal),
@@ -532,7 +533,7 @@ export default function Dashboard() {
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, refreshKey, selectedOwner, category, subcategory, tryRecoverSession])
+  }, [sessionId, dateType, refreshKey, selectedOwner, category, subcategories, tryRecoverSession])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
@@ -542,7 +543,7 @@ export default function Dashboard() {
     const fetchOverview = async () => {
       setMonthOverviewLoading(true)
       try {
-        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategory)
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategories)
         const data = await transactionsApi.getMonthOverview(sid, selectedMonth, dateType, controller.signal)
         setMonthOverview(data)
       } catch {
@@ -554,7 +555,7 @@ export default function Dashboard() {
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategory])
+  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories])
 
   // ── Derived data ───────────────────────────────────────────────────
   const monthlyAmounts = useMemo(() => {
@@ -582,7 +583,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
-    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategory)
+    transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategories)
       .then((sid) => transactionsApi.getCategorySnapshot(
         sid, controller.signal,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
@@ -590,7 +591,7 @@ export default function Dashboard() {
       .then((data) => setCategorySnapshot(data))
       .catch(() => {})
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategory])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategories])
 
   // ── Fetch the category/subcategory catalog (seeded names + everything in
   // use in this session, so a subcategory created once stays pickable) ──
@@ -893,7 +894,7 @@ export default function Dashboard() {
             <strong>מיקוד הדשבורד</strong>
             <span>בחר קטגוריה ותת-קטגוריה. כל המדדים והתצוגות יתעדכנו.</span>
           </div>
-          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -905,13 +906,17 @@ export default function Dashboard() {
           </label>
           <label>
             <span>תת-קטגוריה</span>
-            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
-              <option value="">כל תתי-הקטגוריות</option>
-              {(subcategoryCatalogMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <MultiSelect
+              options={subcategoryCatalogMap[category] ?? []}
+              value={subcategories}
+              onChange={setSubcategories}
+              placeholder="כל תתי-הקטגוריות"
+              ariaLabel="בחירת מספר תתי-קטגוריות"
+              disabled={!category}
+            />
           </label>
         </div>
-        {(category || subcategory) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+        {(category || subcategories.length) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
       {/* ── Per-person filter (הכל = everyone incl. shared; person chips

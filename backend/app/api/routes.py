@@ -1285,6 +1285,7 @@ class ScopeSessionRequest(BaseModel):
     owner: Optional[str] = None
     category: Optional[str] = None
     subcategory: Optional[str] = None
+    subcategories: Optional[list[str]] = None
 
 
 @router.post("/session/scope")
@@ -1301,17 +1302,19 @@ async def scope_session(body: ScopeSessionRequest):
         raise HTTPException(status_code=404, detail="Session not found")
     owner = (body.owner or '').strip()
     category = (body.category or '').strip()
-    subcategory = (body.subcategory or '').strip()
-    if not owner and not category and not subcategory:
+    subcategories = [str(value).strip() for value in (body.subcategories or []) if str(value).strip()]
+    if not subcategories and body.subcategory and body.subcategory.strip():
+        subcategories = [body.subcategory.strip()]
+    if not owner and not category and not subcategories:
         return {"session_id": base}
     df = sessions[base].copy()
     if owner and owner.lower() != 'all' and owner != 'הכל' and '_owner' in df.columns:
         df = df[df['_owner'] == owner]
     if category and 'קטגוריה' in df.columns:
         df = df[df['קטגוריה'] == category]
-    if subcategory and 'קטגוריה_משנה' in df.columns:
-        df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
-    scope_parts = [f"owner={owner}" if owner else '', f"category={category}" if category else '', f"subcategory={subcategory}" if subcategory else '']
+    if subcategories and 'קטגוריה_משנה' in df.columns:
+        df = df[df['קטגוריה_משנה'].fillna('').astype(str).isin(subcategories)]
+    scope_parts = [f"owner={owner}" if owner else '', f"category={category}" if category else '', f"subcategories={','.join(subcategories)}" if subcategories else '']
     scoped_id = f"{base}::{'&'.join(part for part in scope_parts if part)}"
     _store_session(scoped_id, df.reset_index(drop=True))
     # The scoped view keeps the base session's custom categories valid.

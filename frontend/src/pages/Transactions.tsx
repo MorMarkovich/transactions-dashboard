@@ -5,6 +5,7 @@ import TransactionsTable from '../components/table/TransactionsTable'
 import TransactionDrawer from '../components/table/TransactionDrawer'
 import AdvancedFilters from '../components/table/AdvancedFilters'
 import EmptyState from '../components/common/EmptyState'
+import MultiSelect from '../components/ui/MultiSelect'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
@@ -77,7 +78,7 @@ const DATE_CHIPS: DateChip[] = [
 export default function Transactions() {
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategory, setCategory, setSubcategory, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
 
   // Data state
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -162,12 +163,12 @@ export default function Transactions() {
     const fetchTransactions = async () => {
       setLoading(true)
 
+      const scopedId = await transactionsApi.scopeSession(sessionId, null, controller.signal, category, subcategories)
       const apiFilters: TransactionFilters = {
         page,
         page_size: pageSize,
         search: filters.search,
         category: category || filters.category,
-        subcategory: subcategory || undefined,
         start_date: filters.startDate,
         end_date: filters.endDate,
         min_amount: filters.minAmount,
@@ -176,7 +177,7 @@ export default function Transactions() {
 
       try {
         const response = await transactionsApi.getTransactions(
-          sessionId,
+          scopedId,
           apiFilters,
           controller.signal,
         )
@@ -206,7 +207,7 @@ export default function Transactions() {
     fetchTransactions()
 
     return () => controller.abort()
-  }, [sessionId, filters, page, pageSize, category, subcategory])
+  }, [sessionId, filters, page, pageSize, category, subcategories])
 
   // ---- Computed stats -------------------------------------------------------
   const stats = useMemo(() => ({
@@ -263,10 +264,8 @@ export default function Transactions() {
     if (!sessionId) return
 
     try {
-      const blob = await transactionsApi.exportTransactions(sessionId, {
-        category: category || filters.category,
-        subcategory: subcategory || undefined,
-      })
+      const scopedId = await transactionsApi.scopeSession(sessionId, null, undefined, category, subcategories)
+      const blob = await transactionsApi.exportTransactions(scopedId, { category: category || filters.category })
 
       const url = window.URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -277,7 +276,7 @@ export default function Transactions() {
     } catch (err) {
       console.error('Error exporting:', err)
     }
-  }, [sessionId, filters.category, category, subcategory])
+  }, [sessionId, filters.category, category, subcategories])
 
   // ---- No session: empty state --------------------------------------------
   if (!sessionId) {
@@ -454,7 +453,7 @@ export default function Transactions() {
             <strong>סינון קטגוריות</strong>
             <span>הבחירה נשמרת גם במעבר בין מסכים</span>
           </div>
-          {(category || subcategory) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -466,13 +465,10 @@ export default function Transactions() {
           </label>
           <label>
             <span>תת-קטגוריה</span>
-            <select value={subcategory} onChange={(event) => setSubcategory(event.target.value)} disabled={!category}>
-              <option value="">כל תתי-הקטגוריות</option>
-              {(subcategoryMap[category] ?? []).map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
+            <MultiSelect options={subcategoryMap[category] ?? []} value={subcategories} onChange={setSubcategories} placeholder="כל תתי-הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
           </label>
         </div>
-        {(category || subcategory) && <div className="active-filter-summary">מציג: {[category, subcategory].filter(Boolean).join(' / ')}</div>}
+        {(category || subcategories.length) && <div className="active-filter-summary">מציג: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
       <AdvancedFilters
