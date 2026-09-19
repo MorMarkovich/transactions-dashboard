@@ -48,7 +48,7 @@ const NAV_SECTIONS = [
   {
     label: 'ניתוח',
     items: [
-      { to: '/monthly', label: 'פילוח חודשי', icon: CalendarRange },
+      { to: '/monthly', label: 'השוואת חודשים', icon: CalendarRange },
       { to: '/trends', label: 'מגמות', icon: TrendingUp },
       { to: '/insights', label: 'תובנות', icon: Lightbulb },
       { to: '/merchants', label: 'בתי עסק', icon: Store },

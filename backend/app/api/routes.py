@@ -1316,6 +1316,12 @@ async def scope_session(body: ScopeSessionRequest):
         df = df[df['קטגוריה_משנה'].fillna('').astype(str).isin(subcategories)]
     scope_parts = [f"owner={owner}" if owner else '', f"category={category}" if category else '', f"subcategories={','.join(subcategories)}" if subcategories else '']
     scoped_id = f"{base}::{'&'.join(part for part in scope_parts if part)}"
+    # Filter changes can create many short-lived scoped views. Keep only the
+    # current base session's newest view so the per-user session cap never
+    # evicts the base session and leaves the dashboard stuck on stale data.
+    for existing_id in list(sessions):
+        if existing_id.startswith(f"{base}::") and existing_id != scoped_id:
+            _remove_session(existing_id)
     _store_session(scoped_id, df.reset_index(drop=True))
     # The scoped view keeps the base session's custom categories valid.
     if base in SESSION_CUSTOM_CATS:

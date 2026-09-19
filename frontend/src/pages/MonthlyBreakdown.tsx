@@ -308,8 +308,8 @@ export default function MonthlyBreakdown() {
   return (
     <div style={{ direction: 'rtl', position: 'relative' }}>
       <PageHeader
-        title="פילוח חודשי"
-        subtitle="ניתוח ההוצאות שלך חודש-אחר-חודש, לפי קטגוריה"
+        title="השוואת חודשים"
+        subtitle="השוואת הרכב ההוצאות בין חודשים שונים, לפי קטגוריה ותת-קטגוריה"
         icon={CalendarRange}
       />
 
