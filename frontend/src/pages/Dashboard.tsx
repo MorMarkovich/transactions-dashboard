@@ -28,6 +28,7 @@ import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFi
 import { ASSIGNABLE_CATEGORIES, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
+import DonutChart from '../components/charts/DonutChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
@@ -783,6 +784,14 @@ export default function Dashboard() {
     return availableMonths.findIndex((m) => m.month === selectedMonth)
   }, [selectedMonth, availableMonths])
 
+  const monthExpensePie = useMemo(() => {
+    if (!monthOverview) return []
+    return monthOverview.categories
+      .filter((item) => item.expenses > 0)
+      .map((item) => ({ name: item.name, value: item.expenses }))
+      .sort((a, b) => b.value - a.value)
+  }, [monthOverview])
+
   const goToPrevMonth = useCallback(() => {
     if (selectedMonthIdx < availableMonths.length - 1) {
       setSelectedMonth(availableMonths[selectedMonthIdx + 1].month)
@@ -1083,7 +1092,7 @@ export default function Dashboard() {
           {/* Section header */}
           <div className="section-header-v2">
             <Calendar size={18} />
-            <span>סקירת חודש</span>
+            <span>פילוח חודשי</span>
             {hasBillingDate && (
               <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
                 {dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'}
@@ -1225,25 +1234,24 @@ export default function Dashboard() {
                   </Card>
                 )}
 
-                {/* Top category */}
-                {monthOverview.categories.length > 0 && (
-                  <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>חלוקה לפי קטגוריה</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {monthOverview.categories.filter((c) => c.expenses > 0).slice(0, 5).map((cat) => {
-                        const pct = monthOverview.total_expenses > 0 ? (cat.expenses / monthOverview.total_expenses) * 100 : 0
-                        return (
-                          <div key={cat.name}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>{cat.name}</span>
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{pct.toFixed(0)}%</span>
-                            </div>
-                            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
-                            </div>
+                {monthExpensePie.length > 0 && (
+                  <Card variant="glass" padding="md" className="month-breakdown-pie-card">
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                      הרכב ההוצאות - {formatMonthLabel(monthOverview.month)}
+                    </div>
+                    <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
+                      <DonutChart data={monthExpensePie} total={monthOverview.total_expenses} />
+                      <div className="month-pie-legend">
+                        {monthExpensePie.map((item, index) => {
+                          const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
+                          return <div key={item.name} className="month-pie-legend-row">
+                            <span className={`month-pie-color color-${index % 11}`} />
+                            <span className="month-pie-name">{get_icon(item.name)} {item.name}</span>
+                            <span className="month-pie-percent">{pct.toFixed(0)}%</span>
+                            <strong>{formatCurrency(item.value)}</strong>
                           </div>
-                        )
-                      })}
+                        })}
+                      </div>
                     </div>
                   </Card>
                 )}
@@ -1828,7 +1836,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Monthly breakdown moved to its own tab (פילוח חודשי) ───── */}
+      {/* ── Multi-month composition comparison ───────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1844,9 +1852,9 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             <BarChart3 size={18} style={{ color: 'var(--accent)' }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>פילוח חודשי</div>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>השוואת חודשים</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                השוואת חודשים לפי קטגוריה, עוגת קטגוריות לכל חודש ומעקב קטגוריה לאורך זמן
+                השוואת הרכב ההוצאות בין כמה חודשים, לפי קטגוריה ותת-קטגוריה
               </div>
             </div>
             <ChevronLeft size={16} style={{ color: 'var(--text-muted)' }} />

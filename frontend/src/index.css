@@ -134,3 +134,17 @@ h1, h2, h3 {
   .multi-select-menu { position: static; margin-top: 6px; max-height: 220px; }
   .monthly-pie-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+.month-breakdown-pie-card { grid-column: 1 / -1; }
+.month-pie-legend { display: grid; gap: 8px; min-width: 0; }
+.month-pie-legend-row { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: .78rem; }
+.month-pie-legend-row strong { direction: ltr; font-family: var(--font-mono); color: var(--text-primary); }
+.month-pie-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.month-pie-percent { color: var(--text-muted); font-size: .7rem; }
+.month-pie-color { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.month-pie-color.color-0 { background: #818cf8; } .month-pie-color.color-1 { background: #34d399; }
+.month-pie-color.color-2 { background: #f87171; } .month-pie-color.color-3 { background: #fbbf24; }
+.month-pie-color.color-4 { background: #38bdf8; } .month-pie-color.color-5 { background: #a78bfa; }
+.month-pie-color.color-6 { background: #f6ad55; } .month-pie-color.color-7 { background: #68d391; }
+.month-pie-color.color-8 { background: #fc8181; } .month-pie-color.color-9 { background: #63b3ed; }
+.month-pie-color.color-10 { background: #94a3b8; }
