@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote, CheckSquare } from 'lucide-react'
+import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote, CheckSquare, Search } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
@@ -88,6 +88,8 @@ export default function CategoryTransactionsDrawer({
   const [bulkSub, setBulkSub] = useState('')
   const [bulkOnlyThis, setBulkOnlyThis] = useState(false)
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [transactionQuery, setTransactionQuery] = useState('')
+  const [classificationQuery, setClassificationQuery] = useState('')
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -115,6 +117,8 @@ export default function CategoryTransactionsDrawer({
     setBulkCat(null)
     setBulkSub('')
     setBulkOnlyThis(false)
+    setTransactionQuery('')
+    setClassificationQuery('')
   }, [isOpen, category])
 
   const toggleSelected = useCallback((id: number) => {
@@ -175,11 +179,18 @@ export default function CategoryTransactionsDrawer({
       .sort((a, b) => a.localeCompare(b, 'he'))
   }, [subcategoryOptions, transactions])
 
-  // Group transactions by subcategory (empty group last), each group sorted by
+  const visibleTransactions = useMemo(() => {
+    const q = transactionQuery.trim().toLocaleLowerCase('he')
+    if (!q) return transactions
+    return transactions.filter((tx) => [tx.תיאור, tx.קטגוריה, tx.קטגוריה_משנה, tx.הערות]
+      .some((value) => String(value ?? '').toLocaleLowerCase('he').includes(q)))
+  }, [transactions, transactionQuery])
+
+  // Group visible transactions by subcategory (empty group last), each group sorted by
   // amount per the current sort direction.
   const groups = useMemo(() => {
     const bySub = new Map<string, Transaction[]>()
-    for (const tx of transactions) {
+    for (const tx of visibleTransactions) {
       const sub = (tx.קטגוריה_משנה ?? '').trim()
       const arr = bySub.get(sub)
       if (arr) arr.push(tx)
@@ -197,7 +208,7 @@ export default function CategoryTransactionsDrawer({
       sub,
       items: [...items].sort(sortFn),
     }))
-  }, [transactions, sortAsc])
+  }, [visibleTransactions, sortAsc])
 
   const hasSubGroups = groups.some((g) => g.sub)
 
@@ -397,6 +408,20 @@ export default function CategoryTransactionsDrawer({
               </div>
             </div>
 
+            <div style={{ padding: '12px 16px 0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 11px', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)' }}>
+                <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                <input
+                  value={transactionQuery}
+                  onChange={(event) => setTransactionQuery(event.target.value)}
+                  placeholder={category === 'שונות' ? 'חיפוש עסקה לסיווג מהיר...' : 'חיפוש לפי שם עסקה, קטגוריה או תת-קטגוריה...'}
+                  aria-label="חיפוש עסקאות לסיווג"
+                  style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-family)', fontSize: '0.8rem' }}
+                />
+                {transactionQuery && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{visibleTransactions.length} תוצאות</span>}
+              </label>
+            </div>
+
             {/* Transaction list */}
             <div
               style={{
@@ -409,9 +434,9 @@ export default function CategoryTransactionsDrawer({
                 <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                   טוען...
                 </div>
-              ) : transactions.length === 0 ? (
+              ) : visibleTransactions.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-                  אין עסקאות
+                  {transactionQuery ? 'לא נמצאו עסקאות לחיפוש הזה' : 'אין עסקאות'}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -687,7 +712,11 @@ export default function CategoryTransactionsDrawer({
                                 בחר
                               </button>
                             </form>
-                            {categoryOptions.map((cat) => {
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', marginBottom: 4, padding: '7px 9px', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
+                              <Search size={13} style={{ color: 'var(--text-muted)' }} />
+                              <input value={classificationQuery} onChange={(event) => setClassificationQuery(event.target.value)} placeholder="חיפוש קטגוריה או תת-קטגוריה" aria-label="חיפוש קטגוריות ותתי קטגוריות" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-family)', fontSize: '0.75rem' }} />
+                            </label>
+                            {categoryOptions.filter((cat) => !classificationQuery.trim() || cat.toLocaleLowerCase('he').includes(classificationQuery.trim().toLocaleLowerCase('he')) || (subcategoryCatalog[cat] ?? []).some((sub) => sub.toLocaleLowerCase('he').includes(classificationQuery.trim().toLocaleLowerCase('he')))).map((cat) => {
                               const selected = cat === effCat
                               return (
                                 <button
@@ -776,7 +805,7 @@ export default function CategoryTransactionsDrawer({
                                       נקה תת-קטגוריה
                                     </button>
                                   )}
-                                  {Array.from(new Set([...effSubOptions, ...(effSub ? [effSub] : [])])).map((sub) => {
+                                  {Array.from(new Set([...effSubOptions, ...(effSub ? [effSub] : [])])).filter((sub) => !classificationQuery.trim() || sub.toLocaleLowerCase('he').includes(classificationQuery.trim().toLocaleLowerCase('he'))).map((sub) => {
                                     const selected = sub === effSub
                                     return (
                                       <button

@@ -8,7 +8,6 @@ import {
   RefreshCw,
   TrendingUp,
   Zap,
-  Bell,
   LayoutDashboard,
   ChevronRight,
   ChevronLeft,
@@ -32,7 +31,6 @@ import DonutChart from '../components/charts/DonutChart'
 import MetricsGrid from '../components/metrics/MetricsGrid'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
-import SpendingAlerts from '../components/ui/SpendingAlerts'
 import EmptyState from '../components/common/EmptyState'
 import RefreshFromBanks from '../components/common/RefreshFromBanks'
 import PageHeader from '../components/common/PageHeader'
@@ -55,7 +53,6 @@ import type {
   ForecastData,
   SpendingVelocityData,
   AnomalyItem,
-  RecurringTransaction,
   MonthOverviewData,
   CategorySnapshotData,
   CategoryCatalog,
@@ -105,7 +102,6 @@ export default function Dashboard() {
   const [forecast, setForecast] = useState<ForecastData | null>(null)
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
-  const [recurring, setRecurring] = useState<RecurringTransaction[]>([])
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
   const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshotData | null>(null)
   const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalog | null>(null)
@@ -142,7 +138,6 @@ export default function Dashboard() {
   // ── UI state ──────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   // View state (selected month / date-type / person) survives data refreshes,
   // page switches and session rebuilds — an edit must never bounce the user
   // from the month they were looking at back to the latest one.
@@ -232,10 +227,6 @@ export default function Dashboard() {
     setDrawerOpen(true)
     await loadDrawerTransactions(categoryName)
   }, [sessionId, loadDrawerTransactions])
-
-  const handleDismissAlert = useCallback((id: string) => {
-    setDismissedAlerts((prev) => new Set(prev).add(id))
-  }, [])
 
   // ── Manual category override ──
   // Persists the new category in two places: (1) the in-memory backend
@@ -484,7 +475,6 @@ export default function Dashboard() {
           transactionsApi.getForecast(sid, signal).catch(() => null),
           transactionsApi.getSpendingVelocity(sid, signal).catch(() => null),
           transactionsApi.getAnomalies(sid, signal).catch(() => null),
-          transactionsApi.getRecurring(sid, signal).catch(() => null),
           transactionsApi.getIncomeSources(sid, signal).catch(() => null),
         ])
 
@@ -496,8 +486,7 @@ export default function Dashboard() {
         if (results[5]) setForecast(results[5] as ForecastData)
         if (results[6]) setVelocity(results[6] as SpendingVelocityData)
         if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
-        if (results[8]) setRecurring((results[8] as { recurring: RecurringTransaction[] }).recurring ?? [])
-        setIncomeSources((results[9] as IncomeSourcesData) ?? null)
+        setIncomeSources((results[8] as IncomeSourcesData) ?? null)
 
         recoveryAttempts.current = 0 // healthy load — allow future recovery
         setDataLoadedAt(new Date())
@@ -1861,29 +1850,6 @@ export default function Dashboard() {
           </div>
         </Card>
       </motion.div>
-
-      {/* ── Spending Alerts ────────────────────────────────────────── */}
-      {(anomalies.length > 0 || recurring.length > 0 || forecast) && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
-        >
-          <div className="section-header-v2">
-            <Bell size={18} />
-            <span>התראות והמלצות</span>
-          </div>
-          <SpendingAlerts
-            metrics={metrics}
-            anomalies={anomalies}
-            recurring={recurring}
-            forecast={forecast}
-            dismissedAlerts={dismissedAlerts}
-            onDismiss={handleDismissAlert}
-          />
-        </motion.div>
-      )}
 
       {/* ── Weekly Summary ─────────────────────────────────────────── */}
       {weeklySummary && (

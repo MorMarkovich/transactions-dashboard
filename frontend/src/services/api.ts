@@ -11,10 +11,10 @@ import type {
   TransactionFilters,
   RawDonutData,
   IncomeSourcesData,
+  IncomeAnalysisData,
   RawMonthlyData,
   RawWeekdayData,
   RawTrendData,
-  InsightData,
   MerchantData,
   TrendStats,
   HeatmapData,
@@ -559,6 +559,11 @@ export const transactionsApi = {
    * Income broken down by source (where it came from). Respects the scoped
    * session, so it follows the per-person filter.
    */
+  getIncomeAnalysis: async (sessionId: string, filters?: { month?: string; source?: string; category?: string }, signal?: AbortSignal): Promise<IncomeAnalysisData> => {
+    const response = await api.get<IncomeAnalysisData>('/api/income-analysis', { params: { sessionId, ...filters }, signal });
+    return response.data;
+  },
+
   getIncomeSources: async (sessionId: string, signal?: AbortSignal): Promise<IncomeSourcesData> => {
     const response = await api.get<IncomeSourcesData>('/api/charts/v2/income-sources', {
       params: { sessionId },
@@ -601,17 +606,6 @@ export const transactionsApi = {
   },
 
   // ─── Insights & Analytics ─────────────────────────────────────────
-
-  /**
-   * Get transaction insights (biggest expense, top merchant, etc.)
-   */
-  getInsights: async (sessionId: string, signal?: AbortSignal): Promise<InsightData> => {
-    const response = await api.get<InsightData>('/api/insights', {
-      params: { sessionId },
-      signal,
-    });
-    return response.data;
-  },
 
   /**
    * Get top merchants with aggregated stats

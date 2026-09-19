@@ -1899,6 +1899,16 @@ def _month_key(m) -> tuple:
         return (0, 0)
 
 
+def _safe_str(val) -> str:
+    """Return a display-safe string without leaking pandas NaN values."""
+    try:
+        if pd.isnull(val):
+            return ''
+    except (TypeError, ValueError):
+        pass
+    return str(val or '')
+
+
 def _to_json_safe(val):
     """Convert any pandas/numpy value to a JSON-serializable Python type.
 
@@ -1953,6 +1963,58 @@ async def get_donut_v2(sessionId: str = Query(...)):
     total = round(_sanitize(float(cat_totals.sum())), 2)
     return {"categories": categories, "total": total}
 
+
+
+
+@router.get("/income-analysis")
+async def get_income_analysis(
+    sessionId: str = Query(...),
+    month: Optional[str] = None,
+    source: Optional[str] = None,
+    category: Optional[str] = None,
+):
+    """Detailed, filterable income ledger and analytics."""
+    if sessionId not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    df = sessions[sessionId].copy()
+    income = df[df['סכום'] > 0].copy()
+    empty = {"transactions": [], "total": 0, "count": 0, "average": 0, "months": [], "sources": [], "categories": []}
+    if income.empty:
+        return empty
+    income['_month'] = _month_series(income, 'transaction').astype(str)
+    if month:
+        income = income[income['_month'] == month]
+    if source:
+        income = income[income['תיאור'].fillna('').astype(str) == source]
+    if category:
+        income = income[income['קטגוריה'].fillna('').astype(str) == category]
+    if income.empty:
+        return empty
+    def account_of(row):
+        for key in ('חשבון', 'בנק', 'כרטיס', '_owner'):
+            value = row.get(key)
+            if value is not None and str(value).strip() and str(value).lower() != 'nan':
+                return str(value)
+        return 'לא צוין'
+    records = []
+    for idx, row in income.sort_values('תאריך', ascending=False).iterrows():
+        records.append({
+            "id": int(idx), "date": _to_json_safe(row.get('תאריך')),
+            "source": _safe_str(row.get('תיאור')), "amount": round(_sanitize(float(row['סכום'])), 2),
+            "category": _safe_str(row.get('קטגוריה')), "subcategory": _safe_str(row.get('קטגוריה_משנה')),
+            "account": account_of(row), "notes": _safe_str(row.get('הערות')), "month": str(row['_month']),
+        })
+    month_group = income.groupby('_month')['סכום'].agg(['sum', 'count']).sort_index()
+    source_group = income.groupby('תיאור')['סכום'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+    category_group = income.groupby('קטגוריה')['סכום'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+    total = round(_sanitize(float(income['סכום'].sum())), 2)
+    return {
+        "transactions": records, "total": total, "count": len(records),
+        "average": round(total / len(records), 2) if records else 0,
+        "months": [{"name": str(k), "value": round(_sanitize(float(v['sum'])), 2), "count": int(v['count'])} for k, v in month_group.iterrows()],
+        "sources": [{"name": str(k), "value": round(_sanitize(float(v['sum'])), 2), "count": int(v['count'])} for k, v in source_group.iterrows()],
+        "categories": [{"name": str(k), "value": round(_sanitize(float(v['sum'])), 2), "count": int(v['count'])} for k, v in category_group.iterrows()],
+    }
 
 @router.get("/charts/v2/income-sources")
 async def get_income_sources(sessionId: str = Query(...)):
@@ -2388,84 +2450,6 @@ async def get_trend_v2(sessionId: str = Query(...)):
         for _, row in df.iterrows()
     ]
     return {"points": points}
-
-
-@router.get("/insights")
-async def get_insights(sessionId: str = Query(...)):
-    """Return smart insights derived from transaction data."""
-    if sessionId not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    df = sessions[sessionId]
-    expenses = df[df['סכום'] < 0].copy()
-
-    if expenses.empty:
-        return {
-            "biggest_expense": None,
-            "top_merchant": None,
-            "expensive_day": None,
-            "avg_transaction": 0,
-            "large_transactions": [],
-        }
-
-    # Biggest single expense
-    idx_max = expenses['סכום_מוחלט'].idxmax()
-    biggest = expenses.loc[idx_max]
-    biggest_expense = {
-        "description": str(biggest['תיאור']),
-        "amount": round(_sanitize(biggest['סכום_מוחלט']), 2),
-        "date": biggest['תאריך'].strftime('%Y-%m-%d') if hasattr(biggest['תאריך'], 'strftime') else str(biggest['תאריך']),
-        "category": str(biggest['קטגוריה']),
-    }
-
-    # Top merchant by count
-    merchant_stats = expenses.groupby('תיאור').agg(
-        count=('סכום_מוחלט', 'size'),
-        total=('סכום_מוחלט', 'sum'),
-    )
-    top_merch = merchant_stats.sort_values('count', ascending=False).iloc[0]
-    top_merchant = {
-        "name": str(top_merch.name),
-        "count": int(top_merch['count']),
-        "total": round(_sanitize(top_merch['total']), 2),
-    }
-
-    # Most expensive day of week (by average daily spend)
-    day_names = {
-        0: 'שני', 1: 'שלישי', 2: 'רביעי', 3: 'חמישי',
-        4: 'שישי', 5: 'שבת', 6: 'ראשון',
-    }
-    day_avg = expenses.groupby('יום_בשבוע')['סכום_מוחלט'].mean()
-    exp_day_num = day_avg.idxmax()
-    expensive_day = {
-        "day": day_names.get(int(exp_day_num), str(exp_day_num)),
-        "average": round(_sanitize(day_avg.loc[exp_day_num]), 2),
-    }
-
-    # Average transaction amount
-    avg_transaction = round(_sanitize(expenses['סכום_מוחלט'].mean()), 2)
-
-    # Large transactions (above 90th percentile, max 10)
-    p90 = expenses['סכום_מוחלט'].quantile(0.9)
-    large = expenses[expenses['סכום_מוחלט'] >= p90].nlargest(10, 'סכום_מוחלט')
-    large_transactions = [
-        {
-            "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
-            "תיאור": str(row['תיאור']),
-            "קטגוריה": str(row['קטגוריה']),
-            "סכום": round(_sanitize(float(row['סכום'])), 2),
-            "סכום_מוחלט": round(_sanitize(float(row['סכום_מוחלט'])), 2),
-        }
-        for _, row in large.iterrows()
-    ]
-
-    return {
-        "biggest_expense": biggest_expense,
-        "top_merchant": top_merchant,
-        "expensive_day": expensive_day,
-        "avg_transaction": avg_transaction,
-        "large_transactions": large_transactions,
-    }
 
 
 @router.get("/merchants")

@@ -5,7 +5,6 @@ import {
   Receipt,
   CalendarRange,
   TrendingUp,
-  Lightbulb,
   Store,
   Wallet,
   Target,
@@ -50,7 +49,6 @@ const NAV_SECTIONS = [
     items: [
       { to: '/monthly', label: 'השוואת חודשים', icon: CalendarRange },
       { to: '/trends', label: 'מגמות', icon: TrendingUp },
-      { to: '/insights', label: 'תובנות', icon: Lightbulb },
       { to: '/merchants', label: 'בתי עסק', icon: Store },
     ],
   },
