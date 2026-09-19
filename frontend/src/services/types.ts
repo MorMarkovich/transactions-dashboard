@@ -152,27 +152,6 @@ export interface RawTrendData {
   points: { date: string; balance: number }[];
 }
 
-// Insights
-export interface InsightData {
-  biggest_expense: {
-    description: string;
-    amount: number;
-    date: string;
-    category: string;
-  };
-  top_merchant: {
-    name: string;
-    count: number;
-    total: number;
-  };
-  expensive_day: {
-    day: string;
-    average: number;
-  };
-  avg_transaction: number;
-  large_transactions: Transaction[];
-}
-
 // Merchants
 export interface MerchantData {
   merchants: {
@@ -425,3 +404,6 @@ export interface CategoryRule {
   category: string
   subcategory?: string | null
 }
+
+export interface IncomeTransactionDetail { id:number; date:string; source:string; amount:number; category:string; subcategory:string; account:string; notes:string; month:string }
+export interface IncomeAnalysisData { transactions:IncomeTransactionDetail[]; total:number; count:number; average:number; months:{name:string;value:number;count:number}[]; sources:{name:string;value:number;count:number}[]; categories:{name:string;value:number;count:number}[] }
