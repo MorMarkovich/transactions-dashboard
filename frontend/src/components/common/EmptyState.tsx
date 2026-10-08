@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { Database } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -9,7 +10,7 @@ interface EmptyStateProps {
   action?: ReactNode
 }
 
-export default function EmptyState({ icon, title, text, action }: EmptyStateProps) {
+export default function EmptyState({ title, text, action }: EmptyStateProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -31,10 +32,10 @@ export default function EmptyState({ icon, title, text, action }: EmptyStateProp
           fontSize: '4rem',
           lineHeight: 1,
           marginBottom: 'var(--space-lg)',
-          animation: 'pulse 2s ease-in-out infinite',
+
         }}
       >
-        {icon}
+        <Database size={40} style={{color:'var(--accent)'}}/>
       </div>
 
       {/* Title */}
