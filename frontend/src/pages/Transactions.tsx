@@ -299,6 +299,7 @@ export default function Transactions() {
       />
 
       {/* ── Primary Stats Row ─────────────────────────────────────────── */}
+      <div className="orbit-transaction-metrics">
       <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-sm)' }}>
         <div className="stat-card-compact glass-card">
           <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
@@ -360,6 +361,7 @@ export default function Transactions() {
         </div>
       </div>
 
+      </div>
       {/* ── Extremes + Date Range ─────────────────────────────────────── */}
       {(maxTransaction || minTransaction || dateFrom) && (
         <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '0.8125rem' }}>
@@ -538,4 +540,4 @@ const catTdStyle: React.CSSProperties = {
   padding: '10px 12px',
   color: 'var(--text-primary)',
   fontSize: '0.8125rem',
-}
+         }
