@@ -32,13 +32,13 @@ interface PayloadEntry {
 /* ------------------------------------------------------------------ */
 
 const formatShekel = (v: number): string =>
-  ltrIsolate(`₪${v < 0 ? '-' : ''}${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
+  ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
 
 const formatAxisShekel = (v: number): string => {
   const sign = v < 0 ? '-' : ''
   const a = Math.abs(v)
-  if (a >= 1000) return ltrIsolate(`₪${sign}${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
-  return ltrIsolate(`₪${sign}${a}`)
+  if (a >= 1000) return ltrIsolate(`${sign}₪${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
+  return ltrIsolate(`${sign}₪${a}`)
 }
 
 /** Format a date label to DD/MM/YYYY for Hebrew locale display. */
@@ -61,7 +61,7 @@ function AreaGradient({ color }: { color: string }) {
   return (
     <defs>
       <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+        <stop offset="0%" stopColor={color} stopOpacity={0.18} />
         <stop offset="95%" stopColor={color} stopOpacity={0.02} />
       </linearGradient>
     </defs>
@@ -129,7 +129,7 @@ function ActiveDot({ cx, cy, stroke }: ActiveDotProps) {
 const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   data,
   height = 300,
-  color = '#818cf8',
+  color = 'var(--accent)',
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
 
@@ -142,10 +142,10 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
+    <div dir="ltr"><ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
       <AreaChart
         data={data}
-        margin={isCompact ? { top: 8, right: 0, left: 0, bottom: 4 } : { top: 8, right: 8, left: 4, bottom: 8 }}
+        margin={isCompact ? { top: 12, right: 12, left: 12, bottom: 12 } : { top: 12, right: 20, left: 12, bottom: 12 }}
       >
         <AreaGradient color={color} />
 
@@ -162,6 +162,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
             fill: 'var(--text-secondary)',
             fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
+            direction:'ltr', unicodeBidi:'isolate',
           }}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
@@ -174,10 +175,11 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
             fill: 'var(--text-secondary)',
             fontSize: isCompact ? 10 : 12,
             fontFamily: 'var(--font-family)',
+            direction:'ltr', unicodeBidi:'isolate',
           }}
           tickLine={false}
           axisLine={false}
-          width={isCompact ? 42 : 56}
+          width={isCompact ? 60 : 68}
           orientation="right"
         />
 
@@ -187,17 +189,17 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
         />
 
         <Area
-          type="monotone"
+          type="linear"
           dataKey="value"
           stroke={color}
           strokeWidth={2.5}
           fill={`url(#${GRADIENT_ID})`}
           dot={false}
           activeDot={<ActiveDot cx={0} cy={0} stroke={color} />}
-          animationDuration={0}
+          isAnimationActive={false}
         />
       </AreaChart>
-    </ResponsiveContainer>
+    </ResponsiveContainer></div>
   )
 })
 
