@@ -1475,7 +1475,7 @@ export default function Dashboard() {
                             }}
                             aria-label="ערוך שם קטגוריה" title="ערוך שם קטגוריה"
                             style={{
-                              height: 24,
+                              height: 36, minWidth: 36,
                               borderRadius: 'var(--radius-full)',
                               border: '1px solid var(--border)',
                               background: 'var(--bg-elevated)',
@@ -1730,7 +1730,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
                 <span
                   style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
-                  title="ממוצע ההוצאות החודשי על פני כל התקופה — התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד"
+                  title={`ממוצע ההוצאות החודשי על פני ${forecast.monthly_data?.length ?? 0} חודשי החיוב בנתונים. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
                 >
                   ממוצע בפועל: {formatCurrency(forecast.avg_monthly)}
                 </span>
@@ -1813,7 +1813,7 @@ export default function Dashboard() {
             <BarChart3 size={18} />
             <span>השוואת חודשים</span>
             <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-              {monthlyData.months.length} חודשים
+              {Math.min(monthlyData.months.length, 6)} חודשים אחרונים
             </span>
           </div>
           <Card className="glass-card" padding="md">
