@@ -180,6 +180,14 @@ export default function Dashboard() {
   }, [])
   const [snapshotSort, setSnapshotSort] = useState<'amount' | 'change' | 'count' | 'avg'>('amount')
   const [snapshotExpanded, setSnapshotExpanded] = useState(false)
+  const [chipsOpen, setChipsOpen] = useState(false)
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const fn = () => setIsNarrow(mq.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
+  }, [])
   const [snapshotSearch, setSnapshotSearch] = useState('')
   const [snapshotExcluded, setSnapshotExcluded] = useState<Set<string>>(new Set())
   const [snapshotMinAmount, setSnapshotMinAmount] = useState('')
@@ -1187,7 +1195,7 @@ export default function Dashboard() {
             >
               {snapshotSelectedCats === null ? 'הכל' : 'בחר הכל'}
             </button>
-            {categorySnapshot.categories.map((cat) => {
+            {categorySnapshot.categories.filter((c, i) => !isNarrow || chipsOpen || i < 5 || snapshotExcluded.has(c.name) || (snapshotSelectedCats !== null && !snapshotSelectedCats.has(c.name))).map((cat) => {
               const isSelected = snapshotSelectedCats === null || snapshotSelectedCats.has(cat.name)
               const isExcluded = snapshotExcluded.has(cat.name)
               return (
@@ -1233,6 +1241,20 @@ export default function Dashboard() {
                 </button>
               )
             })}
+            {isNarrow && categorySnapshot.categories.length > 5 && (
+              <button
+                onClick={() => setChipsOpen(o => !o)}
+                aria-expanded={chipsOpen}
+                style={{
+                  padding: '4px 12px', minHeight: 36, borderRadius: 'var(--radius-full)',
+                  border: '1px dashed var(--border)', background: 'transparent',
+                  color: 'var(--text-muted)', fontSize: '0.6875rem', fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'var(--font-family)',
+                }}
+              >
+                {chipsOpen ? 'הצג פחות' : `עוד ${categorySnapshot.categories.length - 5} קטגוריות`}
+              </button>
+            )}
           </div>
 
           {/* ─── Advanced filters panel (collapsible) ─── */}
