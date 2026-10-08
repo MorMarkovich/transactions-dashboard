@@ -176,7 +176,8 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
           angle={needsRotation ? -40 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
           height={needsRotation ? 55 : 30}
-          interval={0}
+          interval={needsRotation ? 'preserveStartEnd' : 0}
+          minTickGap={needsRotation ? 14 : 0}
         />
 
         <YAxis
