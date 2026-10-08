@@ -1056,7 +1056,12 @@ def get_transactions(
     if subcategory and 'קטגוריה_משנה' in df.columns:
         df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
     if search:
-        df = df[df['תיאור'].str.contains(search, case=False, na=False, regex=False)]
+        _m = df['תיאור'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה' in df.columns:
+            _m = _m | df['קטגוריה'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה_משנה' in df.columns:
+            _m = _m | df['קטגוריה_משנה'].fillna('').astype(str).str.contains(search, case=False, na=False, regex=False)
+        df = df[_m]
     if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
         if min_amount is not None:
             df = df[df['סכום_מוחלט'] >= min_amount]
