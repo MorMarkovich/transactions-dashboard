@@ -3063,8 +3063,9 @@ def get_weekly_summary(sessionId: str = Query(...)):
             "change_pct": 0,
         }
 
-    # Use the last date in data as "today" reference
-    max_date = df_copy["date"].max()
+    # "Today" is the real today, never a future-dated row (e.g. an installment dated next month)
+    max_date = min(df_copy["date"].max(), pd.Timestamp.now().normalize())
+    df_copy = df_copy[df_copy["date"] <= max_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)]
 
     # This week: last 7 days from max_date
     this_week_start = max_date - pd.Timedelta(days=6)
@@ -3122,15 +3123,19 @@ def get_spending_velocity(sessionId: str = Query(...)):
     expenses["date"] = pd.to_datetime(expenses["תאריך"], dayfirst=True, errors="coerce")
     expenses = expenses.dropna(subset=["date"])
 
-    daily = expenses.groupby(expenses["date"].dt.date)["סכום"].sum().abs()
-    daily = daily.sort_index()
-
-    if daily.empty:
+    # Calendar-day basis up to the real today (days with no spending count as 0)
+    today = pd.Timestamp.now().normalize()
+    expenses = expenses[expenses["date"] <= today + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)]
+    if expenses.empty:
         return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
+    daily = expenses.groupby(expenses["date"].dt.normalize())["סכום"].sum().abs()
+    full_range = pd.date_range(daily.index.min(), min(today, max(daily.index.max(), today)), freq="D")
+    daily = daily.reindex(full_range, fill_value=0.0).sort_index()
+    daily.index = [d.date() for d in daily.index]
 
     daily_avg = daily.mean()
-    rolling_7 = daily.tail(7).mean() if len(daily) >= 7 else daily.mean()
-    rolling_30 = daily.tail(30).mean() if len(daily) >= 30 else daily.mean()
+    rolling_7 = daily.tail(7).mean()
+    rolling_30 = daily.tail(30).mean()
 
     # Return last 30 daily data points for sparkline
     daily_data = [

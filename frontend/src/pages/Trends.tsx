@@ -167,7 +167,7 @@ export default function Trends() {
     <div>
       <PageHeader
         title="מגמות"
-        subtitle="ניתוח מגמות ההוצאות לאורך זמן"
+        subtitle="ניתוח מגמות ההוצאות לאורך זמן, לפי תאריך העסקה (לא תאריך החיוב)"
         icon={TrendingUp}
       />
 

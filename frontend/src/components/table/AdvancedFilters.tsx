@@ -174,6 +174,7 @@ export default function AdvancedFilters({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="חיפוש עסקאות..."
+            aria-label="חיפוש עסקאות"
             icon={<Search size={16} />}
           />
         </div>
