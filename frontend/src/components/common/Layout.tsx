@@ -42,7 +42,7 @@ function useScrollMemory(pathname: string) {
     let tries = 0
     const id = window.setInterval(() => {
       tries += 1
-      window.scrollTo(0, y)
+      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
       if (Math.abs(window.scrollY - y) < 4 || tries > 25) window.clearInterval(id)
     }, 80)
     return () => window.clearInterval(id)
