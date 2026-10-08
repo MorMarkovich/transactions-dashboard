@@ -109,6 +109,44 @@ export default function CategoryTransactionsDrawer({
     }
   }, [isOpen, handleKeyDown])
 
+  // Keyboard modal: move focus in, keep Tab inside, restore focus on close.
+  useEffect(() => {
+    if (!isOpen) return
+    const opener = document.activeElement as HTMLElement | null
+    const outside = Array.from(document.querySelectorAll<HTMLElement>('.orbit-topbar, .mobile-bottom-nav'))
+    const previous = outside.map((el) => el.inert)
+    outside.forEach((el) => { el.inert = true })
+    const getDrawer = () => document.querySelector<HTMLElement>('.category-transactions-drawer')
+    const focusable = () => {
+      const d = getDrawer()
+      if (!d) return [] as HTMLElement[]
+      return Array.from(d.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter((el) => el.getClientRects().length > 0)
+    }
+    const t = window.setTimeout(() => {
+      const d = getDrawer()
+      const target = d?.querySelector<HTMLElement>('button[aria-label="סגור"]') ?? focusable()[0] ?? d
+      target?.focus()
+    }, 60)
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const d = getDrawer()
+      const items = focusable()
+      if (!d || items.length === 0) { event.preventDefault(); d?.focus(); return }
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey && (active === first || !d.contains(active))) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && (active === last || !d.contains(active))) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', trap)
+    return () => {
+      window.clearTimeout(t)
+      document.removeEventListener('keydown', trap)
+      outside.forEach((el, i) => { el.inert = previous[i] })
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [isOpen])
+
   // Lock page scroll behind the drawer so touch scrolling never moves the page.
   useEffect(() => {
     if (!isOpen) return
@@ -279,6 +317,10 @@ export default function CategoryTransactionsDrawer({
           {/* Drawer */}
           <motion.div
             className="category-transactions-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`עסקאות בקטגוריה ${category}`}
+            tabIndex={-1}
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
