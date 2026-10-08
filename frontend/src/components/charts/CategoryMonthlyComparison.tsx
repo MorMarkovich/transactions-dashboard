@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CategoryMonthlyComparisonData } from '../../services/types'
-import { get_icon } from '../../utils/constants'
+import { formatCurrency } from '../../utils/formatting'
+import { categoryColor } from '../../utils/chartPalette'
 
 interface CategoryMonthlyComparisonProps {
   data: CategoryMonthlyComparisonData
@@ -10,12 +11,12 @@ interface CategoryMonthlyComparisonProps {
   onCategoryClick?: (category: string) => void
 }
 
-const shekel = (v: number): string => `₪${Math.round(v).toLocaleString('he-IL')}`
+const shekel = formatCurrency
 
 // Heat tint for a cell, scaled by its share of the month's total expenses.
 function heatBg(pct: number): string {
   const a = Math.min(Math.max(pct, 0) / 100, 1) * 0.32
-  return `rgba(129, 140, 248, ${a.toFixed(3)})`
+  return `rgba(169, 155, 255, ${a.toFixed(3)})`
 }
 
 export default function CategoryMonthlyComparison({
@@ -167,7 +168,7 @@ export default function CategoryMonthlyComparison({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{ marginInlineEnd: 6 }}>{get_icon(cat.name)}</span>
+                  <span style={{marginInlineEnd:8,display:'inline-block',width:6,height:6,borderRadius:'50%',background:categoryColor(cat.name)}}/>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{cat.name}</span>
                 </td>
                 {months.map((m) => {
