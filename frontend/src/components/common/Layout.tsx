@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect, useCallback, useRef } from 'react'
+import { type ReactNode, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { useDashboardFilters } from '../../context/FilterContext'
 import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -35,12 +35,21 @@ function useScrollMemory(pathname: string) {
     return () => { window.history.scrollRestoration = prev }
   }, [])
   const currentPath = useRef(pathname)
-  useEffect(() => { currentPath.current = pathname }, [pathname])
+  // While a page is swapping/restoring, the browser clamps scroll to the (short, still
+  // loading) new document and fires scroll events. Those must never overwrite the
+  // remembered position of either page.
+  const suspended = useRef(false)
+  useLayoutEffect(() => {
+    suspended.current = true
+    currentPath.current = pathname
+  }, [pathname])
   useEffect(() => {
     let raf = 0
     const onScroll = () => {
       cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => scrollPositions.set(currentPath.current, window.scrollY))
+      raf = requestAnimationFrame(() => {
+        if (!suspended.current) scrollPositions.set(currentPath.current, window.scrollY)
+      })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
@@ -48,12 +57,14 @@ function useScrollMemory(pathname: string) {
   useEffect(() => {
     const y = scrollPositions.get(pathname) ?? 0
     let tries = 0
+    let release = 0
+    const finish = () => { release = window.setTimeout(() => { suspended.current = false }, 200) }
     const id = window.setInterval(() => {
       tries += 1
       window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
-      if (Math.abs(window.scrollY - y) < 4 || tries > 50) window.clearInterval(id)
+      if (Math.abs(window.scrollY - y) < 4 || tries > 50) { window.clearInterval(id); finish() }
     }, 80)
-    return () => window.clearInterval(id)
+    return () => { window.clearInterval(id); window.clearTimeout(release) }
   }, [pathname])
 }
 
