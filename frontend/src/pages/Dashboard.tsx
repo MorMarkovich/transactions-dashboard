@@ -1704,7 +1704,7 @@ export default function Dashboard() {
             <Card variant="glass" padding="md">
               <div className="section-header-v2" style={{ marginTop: 0 }}>
                 <TrendingUp size={18} />
-                <span>תחזית חודש הבא</span>
+                <span title="תחזית לינארית על חודשים קלנדריים מלאים (לפי תאריך העסקה, בלי החודש הנוכחי). שונה מסרגל החודשים למעלה שמבוסס על תאריך חיוב.">תחזית חודש הבא</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
                 <AnimatedNumber
@@ -1730,7 +1730,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
                 <span
                   style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
-                  title={`ממוצע ההוצאות לחודש קלנדרי מלא (לפי תאריך העסקה), על פני ${forecast.monthly_data?.length ?? 0} חודשים, בלי החודש הנוכחי. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
+                  title={`ממוצע ההוצאות לחודש קלנדרי מלא (לפי תאריך העסקה, בנפרד מסרגל החודשים שמבוסס על תאריך חיוב), על פני ${forecast.monthly_data?.length ?? 0} חודשים, בלי החודש הנוכחי. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
                 >
                   ממוצע בפועל: {formatCurrency(forecast.avg_monthly)}
                 </span>
@@ -1770,12 +1770,13 @@ export default function Dashboard() {
               )}
               {/* Monthly burn-down progress bar */}
               {forecast && forecast.avg_monthly > 0 && (() => {
-                const burnPct = Math.min((velocity.rolling_30day / forecast.avg_monthly) * 100, 100)
-                const isOver = velocity.rolling_30day > forecast.avg_monthly
+                const last30Total = velocity.rolling_30day * 30
+                const burnPct = Math.min((last30Total / forecast.avg_monthly) * 100, 100)
+                const isOver = last30Total > forecast.avg_monthly
                 return (
                   <div style={{ marginTop: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>שריפת תקציב חודשי</span>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', cursor: 'help' }} title="סך ההוצאות ב-30 הימים האחרונים (ממוצע יומי כפול 30) מול ממוצע ההוצאות החודשי. לא קשור ליעדי התקציב.">הוצאות 30 יום מול ממוצע חודשי</span>
                       <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: isOver ? 'var(--danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                         {burnPct.toFixed(0)}%
                       </span>
