@@ -71,7 +71,7 @@ export default function CategoryManagerModal({
     border: '1px solid var(--accent)',
     borderRadius: 'var(--radius-sm, 6px)',
     background: 'var(--accent)',
-    color: '#fff',
+    color: 'var(--on-accent, #fff)',
     padding: '0 12px',
     fontSize: '0.8125rem',
     fontWeight: 700,
