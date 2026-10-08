@@ -291,7 +291,7 @@ export default function Transactions() {
 
   // ---- Render -------------------------------------------------------------
   return (
-    <div>
+    <div className="transactions-page">
       <PageHeader
         title="עסקאות"
         subtitle="צפייה וניתוח מעמיק של העסקאות שלך"
