@@ -40,8 +40,27 @@ export default function MultiSelect({ options, value, onChange, placeholder, dis
     onChange(value.includes(option) ? value.filter((item) => item !== option) : [...value, option])
   }
 
+  // Arrow keys move through the options; ArrowDown on the trigger opens the list.
+  const onRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    if (!open) {
+      if (event.target === triggerRef.current && event.key === 'ArrowDown') {
+        event.preventDefault()
+        setOpen(true)
+        window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>('.multi-select-menu button')?.focus(), 0)
+      }
+      return
+    }
+    const items = Array.from(rootRef.current?.querySelectorAll<HTMLElement>('.multi-select-menu button') ?? [])
+    if (items.length === 0) return
+    event.preventDefault()
+    const index = items.indexOf(document.activeElement as HTMLElement)
+    const next = event.key === 'ArrowDown' ? (index + 1) % items.length : (index <= 0 ? items.length - 1 : index - 1)
+    items[next].focus()
+  }
+
   return (
-    <div className="multi-select" ref={rootRef}>
+    <div className="multi-select" ref={rootRef} onKeyDown={onRootKeyDown}>
       <button
         type="button"
         ref={triggerRef}
