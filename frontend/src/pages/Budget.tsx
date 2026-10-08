@@ -379,6 +379,7 @@ export default function Budget() {
                   קטגוריה
                 </label>
                 <select
+                  aria-label="קטגוריה"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   style={{
@@ -413,6 +414,7 @@ export default function Budget() {
                   value={newLimit}
                   onChange={(e) => setNewLimit(e.target.value)}
                   placeholder="0"
+                  aria-label="תקציב (₪)"
                   style={{
                     width: '100%',
                     height: '40px',
@@ -429,7 +431,7 @@ export default function Budget() {
                 />
               </div>
 
-              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit}>
+              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit || Number(newLimit) <= 0}>
                 הוסף
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
