@@ -1100,7 +1100,7 @@ def get_transactions(
     if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not expenses_df.empty:
         cat_group = expenses_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
         cat_group = cat_group.sort_values('sum', ascending=False).head(10)
-        cat_total = cat_group['sum'].sum()
+        cat_total = expenses_df['סכום_מוחלט'].sum()  # share of ALL filtered expenses, not just the top 10
         for _, row in cat_group.iterrows():
             category_breakdown.append({
                 "name": str(row['קטגוריה']),
