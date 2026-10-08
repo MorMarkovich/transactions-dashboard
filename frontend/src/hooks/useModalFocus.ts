@@ -13,7 +13,7 @@ export function useModalFocus(open: boolean) {
     const original = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')).filter(el => !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
-    ;(drawer.querySelector<HTMLElement>('.sidebar-close-btn') || focusable()[0] || drawer).focus()
+    ;(focusable()[0] || drawer).focus()
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
       const items = focusable()
