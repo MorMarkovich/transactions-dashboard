@@ -206,25 +206,35 @@ export default function Dashboard() {
   const [drawerTransactions, setDrawerTransactions] = useState<Transaction[]>([])
   const [drawerTotal, setDrawerTotal] = useState(0)
   const [drawerLoading, setDrawerLoading] = useState(false)
+  const [drawerError, setDrawerError] = useState(false)
+  const drawerReqRef = useRef(0)
 
   // Load (or reload) the drawer's transaction list for a category, using the
   // snapshot date-range filters so it matches what the card displays.
-  const loadDrawerTransactions = useCallback(async (categoryName: string) => {
+  const loadDrawerTransactions = useCallback(async (categoryName: string, keepList = false) => {
     if (!sessionId) return
+    const reqId = ++drawerReqRef.current
     setDrawerLoading(true)
-    try {
+    setDrawerError(false)
+    if (!keepList) { setDrawerTransactions([]); setDrawerTotal(0) }
+    const attempt = async () => {
       const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategories)
-      const data = await transactionsApi.getCategoryTransactions(
+      return transactionsApi.getCategoryTransactions(
         sid, '', categoryName, dateType, undefined, undefined,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
       )
+    }
+    try {
+      let data
+      try { data = await attempt() } catch { await new Promise((r) => setTimeout(r, 900)); data = await attempt() }
+      if (reqId !== drawerReqRef.current) return
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
     } catch {
-      setDrawerTransactions([])
-      setDrawerTotal(0)
+      if (reqId !== drawerReqRef.current) return
+      setDrawerError(true)
     } finally {
-      setDrawerLoading(false)
+      if (reqId === drawerReqRef.current) setDrawerLoading(false)
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategories])
 
@@ -276,7 +286,7 @@ export default function Dashboard() {
         // Refresh every widget, but KEEP the drawer open on the same list —
         // an edit must not bounce the user back to the dashboard.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory],
@@ -315,7 +325,7 @@ export default function Dashboard() {
       } finally {
         // Same as handleCategoryChange: refresh in place, don't close.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomSubcategory],
@@ -357,7 +367,7 @@ export default function Dashboard() {
         }
       } finally {
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
@@ -377,7 +387,7 @@ export default function Dashboard() {
           await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
         }
       }
-      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
   )
@@ -901,7 +911,7 @@ export default function Dashboard() {
         <div className="dashboard-filter-fields">
           <label>
             <span>קטגוריה</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select key={`cat-${availableCategoryNames.length}`} value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="">כל הקטגוריות</option>
               {availableCategoryNames.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
             </select>
@@ -1875,6 +1885,8 @@ export default function Dashboard() {
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}
+        error={drawerError}
+        onRetry={() => drawerCategory && loadDrawerTransactions(drawerCategory)}
         availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
         subcategoryOptions={drawerSubcategoryOptions}
