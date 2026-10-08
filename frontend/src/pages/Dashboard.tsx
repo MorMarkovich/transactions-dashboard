@@ -1730,7 +1730,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
                 <span
                   style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
-                  title={`ממוצע ההוצאות החודשי על פני ${forecast.monthly_data?.length ?? 0} חודשי החיוב בנתונים. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
+                  title={`ממוצע ההוצאות לחודש קלנדרי מלא (לפי תאריך העסקה), על פני ${forecast.monthly_data?.length ?? 0} חודשים, בלי החודש הנוכחי. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
                 >
                   ממוצע בפועל: {formatCurrency(forecast.avg_monthly)}
                 </span>
