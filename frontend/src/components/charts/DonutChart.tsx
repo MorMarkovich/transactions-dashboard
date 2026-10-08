@@ -1,3 +1,4 @@
+import { categoryColor } from '../../utils/chartPalette'
 import { ltrIsolate } from '../../utils/formatting'
 import React, { useCallback } from 'react'
 import {
@@ -30,22 +31,8 @@ interface PayloadEntry {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const COLORS = [
-  '#818cf8',
-  '#34d399',
-  '#f87171',
-  '#fbbf24',
-  '#38bdf8',
-  '#a78bfa',
-  '#f6ad55',
-  '#68d391',
-  '#fc8181',
-  '#63b3ed',
-  '#94a3b8',
-]
-
 const formatShekel = (v: number): string =>
-  ltrIsolate(`₪${v < 0 ? '-' : ''}${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+  ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 
 /* ------------------------------------------------------------------ */
 /*  Custom tooltip                                                     */
@@ -87,38 +74,6 @@ function ChartTooltip({ active, payload, total }: TooltipProps) {
 /* ------------------------------------------------------------------ */
 /*  Custom label on slices                                             */
 /* ------------------------------------------------------------------ */
-
-interface LabelProps {
-  cx: number
-  cy: number
-  midAngle: number
-  innerRadius: number
-  outerRadius: number
-  percent: number
-}
-
-function renderCustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }: LabelProps) {
-  if (percent < 0.04) return null // hide labels for tiny slices
-  const RADIAN = Math.PI / 180
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-
-  return (
-    <text
-      x={x}
-      y={y}
-      fill="white"
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={12}
-      fontWeight={600}
-      style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
-    >
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  )
-}
 
 /* ------------------------------------------------------------------ */
 /*  Center label (total) — HTML overlay centered over the donut hole   */
@@ -173,7 +128,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
 
   return (
     <div style={{ position: 'relative' }}>
-      <ResponsiveContainer width="100%" height={isCompact ? 260 : 340}>
+      <ResponsiveContainer width="100%" height={isCompact ? 240 : 280}>
         <PieChart>
           <Pie
             data={data}
@@ -181,15 +136,15 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius={isCompact ? '58%' : '60%'}
-            outerRadius={isCompact ? '78%' : '85%'}
+            innerRadius="74%"
+            outerRadius="95%"
             paddingAngle={2}
             isAnimationActive={false}
-            label={isCompact ? false : (renderCustomLabel as any)}
+            label={false}
             labelLine={false}
           >
-            {data.map((_entry, idx) => (
-              <Cell key={idx} fill={COLORS[idx % COLORS.length]} stroke="none" />
+            {data.map((entry, idx) => (
+              <Cell key={idx} fill={categoryColor(entry.name)} stroke="var(--bg-card)" strokeWidth={3} />
             ))}
           </Pie>
 

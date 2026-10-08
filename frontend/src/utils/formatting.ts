@@ -22,14 +22,14 @@ export function ltrIsolate(text: string): string {
  * Pass explicitPlus to show ₪+ on positive amounts (e.g. net balance).
  */
 export function formatCurrency(amount: number, explicitPlus = false): string {
-  if (amount === 0) return '₪0'
+  if (amount === 0) return ltrIsolate('₪0')
   const abs = Math.abs(amount)
   const formatted = abs.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
   const sign = amount < 0 ? '-' : explicitPlus ? '+' : ''
-  return ltrIsolate(`₪${sign}${formatted}`)
+  return ltrIsolate(`${sign}₪${formatted}`)
 }
 
 /**
@@ -44,7 +44,7 @@ export function formatDate(dateStr: string): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const year = date.getFullYear()
 
-  return `${day}/${month}/${year}`
+  return ltrIsolate(`${day}/${month}/${year}`)
 }
 
 /**

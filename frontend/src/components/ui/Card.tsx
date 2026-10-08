@@ -24,9 +24,7 @@ const variantStyles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--border-color)',
   },
   glass: {
-    background: 'var(--glass-bg, rgba(255,255,255,0.05))',
-    backdropFilter: 'blur(var(--glass-blur, 12px))',
-    WebkitBackdropFilter: 'blur(var(--glass-blur, 12px))',
+    background: 'var(--bg-card)',
     border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
   },
   elevated: {
@@ -35,9 +33,7 @@ const variantStyles: Record<string, React.CSSProperties> = {
     boxShadow: 'var(--elevation-2, var(--shadow-lg))',
   },
   stat: {
-    background: 'var(--glass-bg, rgba(255,255,255,0.05))',
-    backdropFilter: 'blur(var(--glass-blur, 12px))',
-    WebkitBackdropFilter: 'blur(var(--glass-blur, 12px))',
+    background: 'var(--bg-card)',
     border: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
   },
 }

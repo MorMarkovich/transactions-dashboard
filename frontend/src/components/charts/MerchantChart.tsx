@@ -118,7 +118,7 @@ function MerchantTick({ x, y, payload }: CustomTickProps) {
       textAnchor="end"
       fill="var(--text-secondary)"
       fontSize={12}
-      fontFamily="var(--font-family)"
+      fontFamily="var(--font-family)" style={{unicodeBidi:'plaintext'}}
     >
       {label}
     </text>
@@ -151,7 +151,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
         {data.map((item) => (
           <div key={item.name} className="mobile-chart-row">
             <div className="mobile-chart-row-header">
-              <span className="mobile-chart-row-title">{item.name}</span>
+              <bdi className="mobile-chart-row-title">{item.name}</bdi>
               <span className="mobile-chart-row-value">{formatShekel(item.total)}</span>
             </div>
             <div className="mobile-chart-bar-track">
@@ -174,7 +174,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   const computedHeight = height ?? Math.max(200, data.length * 36 + 40)
 
   return (
-    <ResponsiveContainer width="100%" height={computedHeight}>
+    <div dir="ltr"><ResponsiveContainer width="100%" height={computedHeight}>
       <BarChart
         data={data}
         layout="vertical"
@@ -221,10 +221,10 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
           fill={`url(#${GRADIENT_ID})`}
           radius={[0, 4, 4, 0]}
           maxBarSize={28}
-          animationDuration={0}
+          isAnimationActive={false}
         />
       </BarChart>
-    </ResponsiveContainer>
+    </ResponsiveContainer></div>
   )
 })
 

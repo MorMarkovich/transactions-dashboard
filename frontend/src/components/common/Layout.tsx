@@ -1,10 +1,11 @@
 import { type ReactNode, useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
-import QuickActions from './QuickActions'
+import { LayoutDashboard, Receipt, CalendarRange, Menu } from 'lucide-react'
+import Skeleton from '../ui/Skeleton'
 import { useAuth } from '../../lib/AuthContext'
 import { isValidRuleCategory, migrateRule } from '../../utils/constants'
 import { supabaseApi } from '../../services/supabaseApi'
@@ -32,8 +33,7 @@ export default function Layout({ children }: LayoutProps) {
   const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Block rendering children until a stale session_id is verified/restored
   const [sessionValidating, setSessionValidating] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return !!params.get('session_id')
+    return true
   })
 
   // Sidebar defaults: open on desktop, closed on mobile
@@ -142,7 +142,7 @@ export default function Layout({ children }: LayoutProps) {
     }
 
     if (!sessionId) {
-      setSessionValidating(false)
+      setSessionValidating(true)
       doRestore()
       return
     }
@@ -317,6 +317,7 @@ export default function Layout({ children }: LayoutProps) {
           onClose={closeSidebar}
           onFileUploaded={handleFileUploaded}
           onToggleCollapse={toggleCollapse}
+          onSearch={() => setCommandPaletteOpen(true)}
         />
 
         {/* Mobile overlay backdrop */}
@@ -329,11 +330,8 @@ export default function Layout({ children }: LayoutProps) {
         {/* Main content area */}
         <main className="main-content">
           {sessionValidating ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', direction: 'rtl' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>...מאמת סשן</p>
-              </div>
+            <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
+              <Skeleton variant="rectangular" height={52}/><div className="studio-loading-grid"><Skeleton variant="rectangular" height={260}/><Skeleton variant="rectangular" height={260}/></div><Skeleton variant="rectangular" height={320}/>
             </div>
           ) : (
             <AnimatePresence mode="wait">
@@ -355,7 +353,10 @@ export default function Layout({ children }: LayoutProps) {
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
-      <QuickActions />
+      <nav className="mobile-bottom-nav" aria-label="ניווט מהיר">
+        {[{to:'/',text:'דשבורד',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}
+        <button onClick={toggleSidebar}><Menu size={20}/><span>עוד</span></button>
+      </nav>
 
       {/* Background-AI progress pill — visible while the automatic
           categorize → subcategorize → audit chain runs, then "done". */}
@@ -367,8 +368,8 @@ export default function Layout({ children }: LayoutProps) {
             exit={{ opacity: 0, y: 16 }}
             style={{
               position: 'fixed',
-              bottom: 16,
-              right: 16,
+              bottom: 88,
+              left: 16,
               zIndex: 9999,
               direction: 'rtl',
               display: 'flex',
