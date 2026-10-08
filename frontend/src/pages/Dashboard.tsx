@@ -208,6 +208,7 @@ export default function Dashboard() {
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState(false)
   const drawerReqRef = useRef(0)
+  const recoverRef = useRef<(() => Promise<boolean>) | null>(null)
 
   // Load (or reload) the drawer's transaction list for a category, using the
   // snapshot date-range filters so it matches what the card displays.
@@ -217,6 +218,7 @@ export default function Dashboard() {
     setDrawerLoading(true)
     setDrawerError(false)
     if (!keepList) { setDrawerTransactions([]); setDrawerTotal(0) }
+    let recovering = false
     const attempt = async () => {
       const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategories)
       return transactionsApi.getCategoryTransactions(
@@ -230,11 +232,14 @@ export default function Dashboard() {
       if (reqId !== drawerReqRef.current) return
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
-    } catch {
+    } catch (err) {
       if (reqId !== drawerReqRef.current) return
+      const status = (err as { response?: { status?: number } })?.response?.status
+      // Session lost (idle/deploy): rebuild it; the sessionId effect reloads the drawer.
+      if (status === 404 && recoverRef.current && (await recoverRef.current())) { recovering = true; return }
       setDrawerError(true)
     } finally {
-      if (reqId === drawerReqRef.current) setDrawerLoading(false)
+      if (reqId === drawerReqRef.current && !recovering) setDrawerLoading(false)
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategories])
 
@@ -469,6 +474,16 @@ export default function Dashboard() {
     }
     return false
   }, [user, navigate])
+
+  useEffect(() => { recoverRef.current = tryRecoverSession }, [tryRecoverSession])
+
+  // After a session restore the id changes: reload an open category drawer on the new session.
+  const drawerSessionRef = useRef(sessionId)
+  useEffect(() => {
+    if (drawerSessionRef.current === sessionId) return
+    drawerSessionRef.current = sessionId
+    if (drawerOpen && drawerCategory) void loadDrawerTransactions(drawerCategory)
+  }, [sessionId, drawerOpen, drawerCategory, loadDrawerTransactions])
 
   // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
