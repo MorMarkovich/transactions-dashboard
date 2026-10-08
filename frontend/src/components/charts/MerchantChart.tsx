@@ -47,8 +47,8 @@ function MerchantGradient() {
   return (
     <defs>
       <linearGradient id={GRADIENT_ID} x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stopColor="#818cf8" stopOpacity={0.85} />
-        <stop offset="100%" stopColor="#a78bfa" stopOpacity={1} />
+        <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.85} />
+        <stop offset="100%" stopColor="var(--accent-secondary)" stopOpacity={1} />
       </linearGradient>
     </defs>
   )
