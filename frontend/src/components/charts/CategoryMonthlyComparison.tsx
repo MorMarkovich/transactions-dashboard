@@ -118,11 +118,12 @@ export default function CategoryMonthlyComparison({
       </div>
 
       {/* ── Table ── */}
-      <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem', minWidth: 460 }}>
+      <div className="cmc-scroll" tabIndex={0} role="region" aria-label="טבלת השוואה חודשית, ניתנת לגלילה אופקית" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+        <table className="cmc-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem', minWidth: 460 }}>
           <thead>
             <tr style={{ background: 'var(--bg-elevated)' }}>
               <th
+                className="cmc-sticky"
                 style={{
                   position: 'sticky',
                   insetInlineStart: 0,
@@ -158,6 +159,7 @@ export default function CategoryMonthlyComparison({
                 }}
               >
                 <td
+                  className="cmc-sticky"
                   style={{
                     position: 'sticky',
                     insetInlineStart: 0,
@@ -207,6 +209,7 @@ export default function CategoryMonthlyComparison({
           <tfoot>
             <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--bg-elevated)' }}>
               <td
+                className="cmc-sticky"
                 style={{
                   position: 'sticky',
                   insetInlineStart: 0,
