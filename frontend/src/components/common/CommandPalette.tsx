@@ -79,6 +79,42 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     }
   }, [isOpen])
 
+  // Modal behaviour: remember opener, trap Tab, close on Escape from anywhere, restore focus
+  useEffect(() => {
+    if (!isOpen) return
+    const opener = document.activeElement as HTMLElement | null
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const dlg = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      if (!dlg) return
+      const items = Array.from(dlg.querySelectorAll<HTMLElement>('button, input, [href], [tabindex]:not([tabindex="-1"])')).filter((el) => !el.hasAttribute('disabled'))
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (!dlg.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      if (opener && document.contains(opener)) opener.focus()
+    }
+  }, [isOpen, onClose])
+
   // Keep selected index in bounds
   useEffect(() => {
     if (selectedIndex >= filteredCommands.length) {
