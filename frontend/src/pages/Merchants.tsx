@@ -186,7 +186,7 @@ export default function Merchants() {
             </div>
             <div className="stat-content">
               <div className="stat-value">{summaryStats.uniqueCount}</div>
-              <div className="stat-label">בתי עסק</div>
+              <div className="stat-label">בתי עסק מובילים</div>
             </div>
           </div>
           <div className="stat-card-compact glass-card">
@@ -195,7 +195,7 @@ export default function Merchants() {
             </div>
             <div className="stat-content">
               <div className="stat-value">{formatCurrency(summaryStats.totalSpending)}</div>
-              <div className="stat-label">סה"כ הוצאות</div>
+              <div className="stat-label">סה"כ הוצאות (בתי העסק המוצגים)</div>
             </div>
           </div>
           <div className="stat-card-compact glass-card">
