@@ -341,7 +341,7 @@ export default function MonthlyBreakdown() {
         <div className="dashboard-filter-fields">
           <label>
             <span>ענף</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select key={`cat-${comparison.categories.length}`} value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="">כל הענפים</option>
               {comparison.categories.map((item) => <option key={item.name} value={item.name}>{get_icon(item.name)} {item.name}</option>)}
             </select>

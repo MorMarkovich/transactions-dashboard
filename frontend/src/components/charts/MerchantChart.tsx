@@ -109,7 +109,8 @@ interface CustomTickProps {
 }
 
 function MerchantTick({ x, y, payload }: CustomTickProps) {
-  const label = payload.value.length > 18 ? payload.value.slice(0, 17) + '...' : payload.value
+  // Keep the tail: cheque/reference numbers differ only at the end
+  const label = payload.value.length > 18 ? payload.value.slice(0, 9) + '…' + payload.value.slice(-7) : payload.value
   return (
     <text
       x={x}

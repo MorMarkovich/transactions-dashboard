@@ -206,25 +206,35 @@ export default function Dashboard() {
   const [drawerTransactions, setDrawerTransactions] = useState<Transaction[]>([])
   const [drawerTotal, setDrawerTotal] = useState(0)
   const [drawerLoading, setDrawerLoading] = useState(false)
+  const [drawerError, setDrawerError] = useState(false)
+  const drawerReqRef = useRef(0)
 
   // Load (or reload) the drawer's transaction list for a category, using the
   // snapshot date-range filters so it matches what the card displays.
-  const loadDrawerTransactions = useCallback(async (categoryName: string) => {
+  const loadDrawerTransactions = useCallback(async (categoryName: string, keepList = false) => {
     if (!sessionId) return
+    const reqId = ++drawerReqRef.current
     setDrawerLoading(true)
-    try {
+    setDrawerError(false)
+    if (!keepList) { setDrawerTransactions([]); setDrawerTotal(0) }
+    const attempt = async () => {
       const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategories)
-      const data = await transactionsApi.getCategoryTransactions(
+      return transactionsApi.getCategoryTransactions(
         sid, '', categoryName, dateType, undefined, undefined,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
       )
+    }
+    try {
+      let data
+      try { data = await attempt() } catch { await new Promise((r) => setTimeout(r, 900)); data = await attempt() }
+      if (reqId !== drawerReqRef.current) return
       setDrawerTransactions(data.transactions)
       setDrawerTotal(data.total)
     } catch {
-      setDrawerTransactions([])
-      setDrawerTotal(0)
+      if (reqId !== drawerReqRef.current) return
+      setDrawerError(true)
     } finally {
-      setDrawerLoading(false)
+      if (reqId === drawerReqRef.current) setDrawerLoading(false)
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategories])
 
@@ -276,7 +286,7 @@ export default function Dashboard() {
         // Refresh every widget, but KEEP the drawer open on the same list —
         // an edit must not bounce the user back to the dashboard.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory],
@@ -315,7 +325,7 @@ export default function Dashboard() {
       } finally {
         // Same as handleCategoryChange: refresh in place, don't close.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomSubcategory],
@@ -357,7 +367,7 @@ export default function Dashboard() {
         }
       } finally {
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
       }
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
@@ -377,7 +387,7 @@ export default function Dashboard() {
           await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
         }
       }
-      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory)
+      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
     },
     [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
   )
@@ -901,7 +911,7 @@ export default function Dashboard() {
         <div className="dashboard-filter-fields">
           <label>
             <span>קטגוריה</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select key={`cat-${availableCategoryNames.length}`} value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="">כל הקטגוריות</option>
               {availableCategoryNames.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
             </select>
@@ -1704,7 +1714,7 @@ export default function Dashboard() {
             <Card variant="glass" padding="md">
               <div className="section-header-v2" style={{ marginTop: 0 }}>
                 <TrendingUp size={18} />
-                <span>תחזית חודש הבא</span>
+                <span title="תחזית לינארית על חודשים קלנדריים מלאים (לפי תאריך העסקה, בלי החודש הנוכחי). שונה מסרגל החודשים למעלה שמבוסס על תאריך חיוב.">תחזית חודש הבא</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
                 <AnimatedNumber
@@ -1730,7 +1740,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>·</span>
                 <span
                   style={{ fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'help' }}
-                  title={`ממוצע ההוצאות לחודש קלנדרי מלא (לפי תאריך העסקה), על פני ${forecast.monthly_data?.length ?? 0} חודשים, בלי החודש הנוכחי. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
+                  title={`ממוצע ההוצאות לחודש קלנדרי מלא (לפי תאריך העסקה, בנפרד מסרגל החודשים שמבוסס על תאריך חיוב), על פני ${forecast.monthly_data?.length ?? 0} חודשים, בלי החודש הנוכחי. התחזית מבוססת על מגמת שינוי ולא על הממוצע בלבד`}
                 >
                   ממוצע בפועל: {formatCurrency(forecast.avg_monthly)}
                 </span>
@@ -1770,12 +1780,13 @@ export default function Dashboard() {
               )}
               {/* Monthly burn-down progress bar */}
               {forecast && forecast.avg_monthly > 0 && (() => {
-                const burnPct = Math.min((velocity.rolling_30day / forecast.avg_monthly) * 100, 100)
-                const isOver = velocity.rolling_30day > forecast.avg_monthly
+                const last30Total = velocity.rolling_30day * 30
+                const burnPct = Math.min((last30Total / forecast.avg_monthly) * 100, 100)
+                const isOver = last30Total > forecast.avg_monthly
                 return (
                   <div style={{ marginTop: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>שריפת תקציב חודשי</span>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', cursor: 'help' }} title="סך ההוצאות ב-30 הימים האחרונים (ממוצע יומי כפול 30) מול ממוצע ההוצאות החודשי. לא קשור ליעדי התקציב.">הוצאות 30 יום מול ממוצע חודשי</span>
                       <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: isOver ? 'var(--danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                         {burnPct.toFixed(0)}%
                       </span>
@@ -1874,6 +1885,8 @@ export default function Dashboard() {
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}
+        error={drawerError}
+        onRetry={() => drawerCategory && loadDrawerTransactions(drawerCategory)}
         availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
         subcategoryOptions={drawerSubcategoryOptions}

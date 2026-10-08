@@ -1313,8 +1313,9 @@ def get_owners(sessionId: str = Query(...)):
     df = sessions[sessionId]
     if '_owner' not in df.columns:
         return []
-    vals = [str(o).strip() for o in df['_owner'].dropna().unique().tolist()]
-    return sorted(v for v in vals if v and v.lower() != 'nan')
+    # "joint" and "משותף" are the same owner: expose one label
+    vals = [('משותף' if str(o).strip().lower() == 'joint' else str(o).strip()) for o in df['_owner'].dropna().unique().tolist()]
+    return sorted({v for v in vals if v and v.lower() != 'nan'})
 
 
 class ScopeSessionRequest(BaseModel):
@@ -1347,7 +1348,10 @@ def scope_session(body: ScopeSessionRequest):
         return {"session_id": base}
     df = sessions[base].copy()
     if owner and owner.lower() != 'all' and owner != 'הכל' and '_owner' in df.columns:
-        df = df[df['_owner'] == owner]
+        if owner in ('joint', 'משותף'):
+            df = df[df['_owner'].astype(str).str.strip().isin(['joint', 'משותף'])]
+        else:
+            df = df[df['_owner'] == owner]
     if category and 'קטגוריה' in df.columns:
         df = df[df['קטגוריה'] == category]
     if subcategories and 'קטגוריה_משנה' in df.columns:
