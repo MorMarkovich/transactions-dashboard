@@ -382,7 +382,7 @@ export default function MonthlyBreakdown() {
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(o) }}
             >
-              {o}
+              {o === 'joint' ? 'משותף' : o}
             </span>
           ))}
         </div>
