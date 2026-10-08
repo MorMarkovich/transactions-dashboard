@@ -1,3 +1,4 @@
+import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
@@ -15,8 +16,6 @@ import {
   ArrowUpDown,
   Grid3X3,
   Tag,
-  Activity,
-  Clock,
   Search,
   X,
   SlidersHorizontal,
@@ -38,7 +37,7 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import MultiSelect from '../components/ui/MultiSelect'
-import { formatCurrency, ltrIsolate } from '../utils/formatting'
+import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
@@ -166,7 +165,6 @@ export default function Dashboard() {
     else sessionStorage.removeItem('dash-owner')
   }, [selectedOwner])
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
-  const [dataLoadedAt, setDataLoadedAt] = useState<Date | null>(null)
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -489,7 +487,6 @@ export default function Dashboard() {
         setIncomeSources((results[8] as IncomeSourcesData) ?? null)
 
         recoveryAttempts.current = 0 // healthy load — allow future recovery
-        setDataLoadedAt(new Date())
 
         // Auto-select the most recent month ONLY when nothing is selected yet
         // (or the remembered month no longer exists in the data). A refresh
@@ -532,14 +529,15 @@ export default function Dashboard() {
 
     const fetchOverview = async () => {
       setMonthOverviewLoading(true)
+      setMonthOverview(null)
       try {
         const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategories)
         const data = await transactionsApi.getMonthOverview(sid, selectedMonth, dateType, controller.signal)
-        setMonthOverview(data)
+        if (!controller.signal.aborted) setMonthOverview(data)
       } catch {
         // non-critical
       } finally {
-        setMonthOverviewLoading(false)
+        if (!controller.signal.aborted) setMonthOverviewLoading(false)
       }
     }
 
@@ -884,6 +882,11 @@ export default function Dashboard() {
         title="דשבורד"
         subtitle="סקירה כללית של ההוצאות וההכנסות שלך"
         icon={LayoutDashboard}
+        actions={<label className="dashboard-month-control">חודש לתצוגה
+          <select aria-label="חודש לתצוגה" value={selectedMonth || ''} onChange={e => setSelectedMonth(e.target.value)}>
+            {availableMonths.map(m => <option key={m.month} value={m.month}>{formatMonthLabel(m.month)}</option>)}
+          </select>
+        </label>}
       />
 
       <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
@@ -892,7 +895,7 @@ export default function Dashboard() {
             <strong>מיקוד הדשבורד</strong>
             <span>בחר קטגוריה ותת-קטגוריה. כל המדדים והתצוגות יתעדכנו.</span>
           </div>
-          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+          {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -914,7 +917,7 @@ export default function Dashboard() {
             />
           </label>
         </div>
-        {(category || subcategories.length) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
+        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
       {/* ── Per-person filter (הכל = everyone incl. shared; person chips
@@ -949,92 +952,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Financial Health Banner ──────────────────────────────────── */}
-      {metrics && (() => {
-        // Use month-specific data when a month is selected, otherwise global metrics
-        const hasMonthData = selectedMonth && monthOverview
-        const displayExpenses = hasMonthData ? monthOverview.total_expenses : Math.abs(metrics.total_expenses)
-        const displayIncome = hasMonthData ? monthOverview.total_income : metrics.total_income
-        const displayBalance = displayIncome - displayExpenses
-        const displaySavingsRate = displayIncome > 0 ? (displayBalance / displayIncome * 100) : 0
-        // When expenses dwarf income the raw rate explodes (e.g. -10151%), which
-        // is noise — show a capped "deficit" indicator instead of the number.
-        const savingsRateText = displaySavingsRate < -100
-          ? 'גירעון'
-          : ltrIsolate(`${displaySavingsRate.toFixed(1)}%`)
-        const periodLabel = hasMonthData ? selectedMonth : 'כל התקופה'
-
-        return (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          style={{
-            position: 'relative', zIndex: 1,
-            marginBottom: 'var(--space-md)',
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-lg)',
-            background: 'var(--glass-bg)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid var(--glass-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--space-md)',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Activity size={18} style={{ color: 'var(--accent)' }} />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>בריאות פיננסית</span>
-            <span style={{ fontSize: '0.625rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 500 }}>
-              {periodLabel}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-lg)', flexWrap: 'wrap' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הוצאות</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {formatCurrency(displayExpenses)}
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>הכנסות</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: displayIncome > 0 ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {formatCurrency(displayIncome)}
-              </div>
-              {hasMonthData && displayIncome === 0 && metrics.total_income > 0 && (
-                <div style={{ fontSize: '0.5625rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                  אין הכנסות בחודש זה
-                </div>
-              )}
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יתרה</div>
-              <div style={{ fontSize: '1rem', fontWeight: 700, color: displayBalance >= 0 ? 'var(--success)' : 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                {formatCurrency(displayBalance, true)}
-              </div>
-            </div>
-            {displayIncome > 0 && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '2px' }}>שיעור חיסכון</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: displaySavingsRate >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {savingsRateText}
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Last Updated Timestamp */}
-          {dataLoadedAt && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block', flexShrink: 0 }} />
-              <Clock size={11} />
-              <span>עודכן {dataLoadedAt.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}</span>
-            </div>
-          )}
-        </motion.div>
-        )
-      })()}
+      <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
+        overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
+        category={category} subcategories={subcategories} refreshKey={refreshKey}
+        onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
+        onCategory={handleCategoryCardClick}
+        onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
 
       {/* ── Date type toggle (billing / transaction) ───────────────── */}
       {hasBillingDate && (
@@ -2083,4 +2006,4 @@ export default function Dashboard() {
       />
     </div>
   )
-}
+      }
