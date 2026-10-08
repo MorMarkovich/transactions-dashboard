@@ -2988,6 +2988,11 @@ def get_spending_forecast(sessionId: str = Query(...)):
     monthly = expenses.groupby("month_key")["סכום"].sum().abs().reset_index()
     monthly.columns = ["month", "amount"]
     monthly = monthly.sort_values("month")
+    # Only COMPLETE calendar months feed the average/trend: the current month is partial and
+    # future-dated installments would otherwise drag the numbers (fall back if too little history).
+    _complete = monthly[monthly["month"] < pd.Timestamp.now().to_period("M")]
+    if len(_complete) >= 2:
+        monthly = _complete
 
     monthly_data = [
         {"month": str(row["month"]), "amount": _sanitize(round(row["amount"], 2))}
