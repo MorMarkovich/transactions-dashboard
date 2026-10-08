@@ -557,7 +557,13 @@ export default function Dashboard() {
   // List of months to show in selector (last 12 months)
   const availableMonths = useMemo(() => {
     if (!monthlyData?.months) return []
-    return [...monthlyData.months].reverse().slice(0, 12)
+    const seen = new Set<string>()
+    return [...monthlyData.months].reverse().filter((m) => {
+      const key = formatMonthLabel(m.month)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }).slice(0, 12)
   }, [monthlyData])
 
   const hasBillingDate = metrics?.has_billing_date ?? false
