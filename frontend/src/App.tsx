@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -121,7 +121,35 @@ function AppRoutes() {
   )
 }
 
+// After the first screen is up, fetch the other pages' code in idle time so
+// the first tap on a tab does not wait for a chunk download.
+const PAGE_LOADERS = [
+  () => import('./pages/Transactions'),
+  () => import('./pages/MonthlyBreakdown'),
+  () => import('./pages/Income'),
+  () => import('./pages/Merchants'),
+  () => import('./pages/Trends'),
+  () => import('./pages/Budget'),
+  () => import('./pages/SavingsGoals'),
+  () => import('./pages/DataManagement'),
+]
+
+function usePrefetchPages() {
+  useEffect(() => {
+    const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+    const timers: number[] = []
+    const run = () => {
+      PAGE_LOADERS.forEach((load, i) => {
+        timers.push(window.setTimeout(() => { load().catch(() => {}) }, i * 250))
+      })
+    }
+    const handle = window.setTimeout(() => (idle ? idle(run) : run()), 2500)
+    return () => { window.clearTimeout(handle); timers.forEach((t) => window.clearTimeout(t)) }
+  }, [])
+}
+
 export default function App() {
+  usePrefetchPages()
   return (
     <ThemeProvider>
       <ErrorBoundary>
