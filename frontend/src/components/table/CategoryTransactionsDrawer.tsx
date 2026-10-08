@@ -13,6 +13,8 @@ interface CategoryTransactionsDrawerProps {
   transactions: Transaction[]
   total: number
   loading?: boolean
+  error?: boolean
+  onRetry?: () => void
   availableCategories?: string[]
   /**
    * Called when the user saves a new category for a transaction.
@@ -59,6 +61,8 @@ export default function CategoryTransactionsDrawer({
   transactions,
   total,
   loading,
+  error,
+  onRetry,
   availableCategories = [],
   onCategoryChange,
   subcategoryOptions = [],
@@ -104,6 +108,14 @@ export default function CategoryTransactionsDrawer({
       return () => document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, handleKeyDown])
+
+  // Lock page scroll behind the drawer so touch scrolling never moves the page.
+  useEffect(() => {
+    if (!isOpen) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = original }
+  }, [isOpen])
 
   // Reset edit state when drawer closes or category changes.
   useEffect(() => {
@@ -318,8 +330,8 @@ export default function CategoryTransactionsDrawer({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 32,
-                  height: 32,
+                  width: 40,
+                  height: 40,
                   borderRadius: 8,
                   border: 'none',
                   background: 'var(--glass-bg)',
@@ -427,12 +439,18 @@ export default function CategoryTransactionsDrawer({
               style={{
                 flex: 1,
                 overflowY: 'auto',
+                overscrollBehavior: 'contain',
                 padding: '12px 16px',
               }}
             >
               {loading ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
                   טוען...
+                </div>
+              ) : error ? (
+                <div role="alert" style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+                  <div style={{ marginBottom: 12 }}>לא הצלחנו לטעון את העסקאות</div>
+                  {onRetry && <button type="button" onClick={onRetry} style={{ minHeight: 44, padding: '0 20px', borderRadius: 999, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontWeight: 700, fontFamily: 'inherit' }}>נסו שוב</button>}
                 </div>
               ) : visibleTransactions.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
