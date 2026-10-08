@@ -130,7 +130,7 @@ export default function MonthlyBreakdown() {
         setComparison(comparisonData)
         if (industryData) setIndustryMonthly(industryData)
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         setError(err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים')
       } finally {
@@ -156,10 +156,15 @@ export default function MonthlyBreakdown() {
   useEffect(() => {
     if (!comparison) return
     if (comparison.months.length) {
+      // Default to the latest month with real data, not a barely-started billing month
+      const totals = comparison.months.map((m) => comparison.month_totals[m] ?? 0)
+      const maxTotal = Math.max(...totals, 0)
+      let defaultIdx = comparison.months.length - 1
+      while (defaultIdx > 0 && totals[defaultIdx] < maxTotal * 0.2) defaultIdx--
       setPieMonth((prev) =>
         prev && comparison.months.includes(prev)
           ? prev
-          : comparison.months[comparison.months.length - 1])
+          : comparison.months[defaultIdx])
     }
     if (comparison.categories.length) {
       setSelectedCategory((prev) =>
