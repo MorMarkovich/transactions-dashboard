@@ -17,6 +17,14 @@ describe('calendar comparisons', () => {
   it('includes categories removed since last month', () => expect(categoryChanges({...current,categories:[]},prior)[0].amount).toBe(-100))
 })
 describe('MonthlyPulse', () => {
+  it('renders three separate cards with exact real-data amounts and a negative net', () => {
+    const {container}=render(<MonthlyPulse {...props} overview={{...current,total_expenses:39184.66,total_income:32071.59,transaction_count:143}}/>);
+    expect(container.querySelector('.pulse-first-row')?.children).toHaveLength(3);
+    expect(container.querySelector('.pulse-spending')?.textContent).toContain('39,184.66');
+    expect(container.querySelector('.pulse-income')?.textContent).toContain('32,071.59');
+    expect(container.querySelector('.pulse-net')?.textContent).toContain('-₪7,113.07');
+    expect(container.querySelector('.pulse-net .amount-negative')).toBeInTheDocument();
+  })
   it('uses the same scope and date basis for comparison', async () => { render(<MonthlyPulse {...props} category="אוכל" subcategories={['סופרים קטנים']} owner="מור"/>); await waitFor(() => expect(transactionsApi.getMonthOverview).toHaveBeenCalledWith('scoped','09/2026','billing',expect.any(AbortSignal))); expect(transactionsApi.scopeSession).toHaveBeenCalledWith('sid','מור',expect.any(AbortSignal),'אוכל',['סופרים קטנים']); expect(screen.getByText('לא יתרת חשבון הבנק')).toBeInTheDocument() })
   it('opens the category drilldown', async () => { render(<MonthlyPulse {...props}/>); fireEvent.click(await screen.findByRole('button',{name:/אוכל/})); expect(props.onCategory).toHaveBeenCalledWith('אוכל') })
   it('saves and reapplies filters without pinning the month', async () => { render(<MonthlyPulse {...props} category="אוכל"/>); fireEvent.click(screen.getByText('תצוגות שמורות')); fireEvent.change(screen.getByLabelText('שם התצוגה'),{target:{value:'בית'}}); fireEvent.click(screen.getByText('שמור תצוגה')); fireEvent.click(screen.getByRole('button',{name:'בית'})); expect(props.onApplyView).toHaveBeenCalledWith(expect.objectContaining({name:'בית',category:'אוכל'})); expect(JSON.parse(localStorage.getItem('dashboard-views:test-user')!)[0]).not.toHaveProperty('month'); fireEvent.click(screen.getByLabelText('מחק תצוגה בית')); expect(localStorage.getItem('dashboard-views:test-user')).toBe('[]') })
