@@ -1,7 +1,5 @@
 import { Sun, Moon, Menu, X, CreditCard, Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
-import { useAppNotifications } from '../../context/NotificationContext'
-import NotificationCenter from './NotificationCenter'
 
 // ─── Types ────────────────────────────────────────────────────────────
 interface HeaderProps {
@@ -17,7 +15,6 @@ const isMac =
 
 export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
-  const { notifications, clearNotifications } = useAppNotifications()
 
   return (
     <header
@@ -163,7 +160,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
         }}
       >
         {/* Notifications */}
-        <NotificationCenter notifications={notifications} onClear={clearNotifications} />
+
 
         {/* Theme toggle */}
         <button
