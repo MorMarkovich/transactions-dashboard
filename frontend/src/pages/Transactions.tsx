@@ -154,7 +154,7 @@ export default function Transactions() {
       .getCategories(sessionId, controller.signal)
       .then(setCategories)
       .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         console.error('Error loading categories:', err)
       })
@@ -220,7 +220,7 @@ export default function Transactions() {
         setDateFrom(response.date_from ?? null)
         setDateTo(response.date_to ?? null)
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         console.error('Error loading transactions:', err)
       } finally {
@@ -362,7 +362,7 @@ export default function Transactions() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{formatCurrency(stats.avg)}</div>
-            <div className="stat-label">ממוצע לעסקה</div>
+            <div className="stat-label">ממוצע להוצאה</div>
           </div>
         </div>
         <div className="stat-card-compact glass-card">
@@ -371,7 +371,7 @@ export default function Transactions() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{formatCurrency(stats.medianTransaction)}</div>
-            <div className="stat-label">חציון עסקה</div>
+            <div className="stat-label">חציון הוצאה</div>
           </div>
         </div>
         <div className="stat-card-compact glass-card">

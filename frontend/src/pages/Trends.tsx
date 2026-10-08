@@ -105,7 +105,7 @@ export default function Trends() {
         setTrendData(trendRes)
         setTrendStats(statsRes)
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         console.error('Error loading trend data:', err)
       } finally {
         setLoading(false)

@@ -106,7 +106,7 @@ export default function Budget() {
         setDonutData(donutRes)
         setAllCategoryTotals((snapshotRes?.categories ?? []).map((c) => ({ name: c.name, total: c.total })))
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         console.error('Error loading budget data:', err)
       } finally {
         setLoading(false)

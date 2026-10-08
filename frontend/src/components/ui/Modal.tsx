@@ -39,14 +39,39 @@ export default function Modal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  // Focus trap: auto-focus first focusable element
+  // Focus trap: focus the first control, keep Tab inside, restore focus to the opener on close
   useEffect(() => {
     if (!isOpen || !contentRef.current) return
-
+    const root = contentRef.current
+    const opener = document.activeElement as HTMLElement | null
     const focusableSelector =
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    const firstFocusable = contentRef.current.querySelector<HTMLElement>(focusableSelector)
-    firstFocusable?.focus()
+    const list = () =>
+      Array.from(root.querySelectorAll<HTMLElement>(focusableSelector)).filter((el) => !el.hasAttribute('disabled'))
+    list()[0]?.focus()
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const items = list()
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      if (!active || !root.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onTab)
+    return () => {
+      document.removeEventListener('keydown', onTab)
+      if (opener && document.contains(opener)) opener.focus()
+    }
   }, [isOpen])
 
   // Lock body scroll when open
