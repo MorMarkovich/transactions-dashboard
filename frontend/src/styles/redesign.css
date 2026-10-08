@@ -264,3 +264,10 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
 .section-header-v2 {padding-inline:0 !important;}
 /* Filter chips ("תצוגה לפי"): center the label inside every chip */
 .filter-chip {display:inline-flex !important;align-items:center;justify-content:center;text-align:center;}
+@media(max-width:767px) {
+  /* category cards: let long names wrap instead of truncating next to the amount */
+  .studio-category span[style*="text-overflow"] {white-space:normal !important;overflow:visible !important;text-overflow:clip !important;overflow-wrap:anywhere;line-height:1.3;}
+  /* spend velocity: three equal columns */
+  .velocity-stats {display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px !important;}
+  .velocity-stats>div>*:last-child {font-size:1rem !important;}
+}
