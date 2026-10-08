@@ -18,7 +18,12 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Info,
+  CreditCard,
+  Search,
+  Sun,
+  Moon,
 } from 'lucide-react'
+import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
 import RefreshFromBanks from './RefreshFromBanks'
 import { useAuth } from '../../lib/AuthContext'
@@ -33,6 +38,7 @@ interface SidebarProps {
   onClose?: () => void
   onFileUploaded?: (sessionId: string) => void
   onToggleCollapse?: () => void
+  onSearch?: () => void
 }
 
 // ─── Navigation Sections ─────────────────────────────────────────────
@@ -53,7 +59,7 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'תקציב',
+    label: 'תכנון',
     items: [
       { to: '/budget', label: 'תקציב', icon: Target },
       { to: '/income', label: 'הכנסות', icon: Wallet },
@@ -83,8 +89,10 @@ export default function Sidebar({
   onClose,
   onFileUploaded,
   onToggleCollapse,
+  onSearch,
 }: SidebarProps) {
   const [searchParams] = useSearchParams()
+  const {theme, toggleTheme} = useTheme()
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('מעלה קובץ...')
   const [error, setError] = useState<string | null>(null)
@@ -241,6 +249,8 @@ export default function Sidebar({
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong>מנתח עסקאות</strong><small>התמונה הפיננסית שלך</small></div>}</div>
+      <div className="studio-sidebar-tools"><button onClick={onSearch} aria-label="חיפוש"><Search size={18}/>{!collapsed && <span>חיפוש <kbd dir="ltr">⌘ K</kbd></span>}</button><button onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
       {/* ─── Close button (mobile only) ─── */}
       <button
         className="sidebar-close-btn"
