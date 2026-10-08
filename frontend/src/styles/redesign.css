@@ -328,3 +328,4 @@ html, body { overflow-anchor: none; }
 .cmc-table tbody tr{min-height:44px;}
 }
 .month-pie-percent{text-align:center;font-variant-numeric:tabular-nums;}
+.month-pie-legend-row{grid-template-columns:7px minmax(70px,1fr) 34px 96px !important;}
