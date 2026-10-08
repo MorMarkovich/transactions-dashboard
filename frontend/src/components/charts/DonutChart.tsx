@@ -137,7 +137,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             nameKey="name"
             cx="50%"
             cy="50%"
-            innerRadius="74%"
+            innerRadius="85%"
             outerRadius="95%"
             paddingAngle={2}
             isAnimationActive={false}
@@ -145,7 +145,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             labelLine={false}
           >
             {data.map((entry, idx) => (
-              <Cell key={idx} fill={categoryColor(entry.name)} stroke="var(--bg-card)" strokeWidth={3} />
+              <Cell key={idx} fill={categoryColor(entry.name)} stroke="var(--bg-card)" strokeWidth={1} />
             ))}
           </Pie>
 
