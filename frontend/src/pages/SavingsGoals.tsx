@@ -34,6 +34,15 @@ const CATEGORIES = [
   'אחר',
 ]
 
+const COLOR_NAMES: Record<string, string> = {
+  '#818cf8': 'סגול',
+  '#34d399': 'ירוק',
+  '#f87171': 'אדום',
+  '#fbbf24': 'צהוב',
+  '#38bdf8': 'תכלת',
+  '#fb923c': 'כתום',
+}
+
 const PRESET_COLORS = [
   '#818cf8',
   '#34d399',
@@ -483,8 +492,8 @@ export default function SavingsGoals() {
                         key={color}
                         onClick={() => setNewColor(color)}
                         style={{
-                          width: 28,
-                          height: 28,
+                          width: 36,
+                          height: 36,
                           borderRadius: '50%',
                           background: color,
                           border:
@@ -496,7 +505,9 @@ export default function SavingsGoals() {
                           outline: 'none',
                           boxShadow: newColor === color ? `0 0 8px ${color}` : 'none',
                         }}
-                        title={color}
+                        title={COLOR_NAMES[color] ?? color}
+                        aria-label={`צבע ${COLOR_NAMES[color] ?? color}`}
+                        aria-pressed={newColor === color}
                       />
                     ))}
                   </div>
