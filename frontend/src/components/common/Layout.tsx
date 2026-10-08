@@ -1,4 +1,5 @@
 import { type ReactNode, useState, useEffect, useCallback, useRef } from 'react'
+import { useDashboardFilters } from '../../context/FilterContext'
 import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
@@ -61,6 +62,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   useScrollMemory(location.pathname)
+  const { category: activeCategory, subcategories: activeSubs, clearFilters } = useDashboardFilters()
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const hasTriedRestore = useRef(false)
@@ -361,6 +363,15 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main content area */}
         <main className="main-content">
+          {!sessionValidating && activeCategory && (
+            <div className="active-filter-banner" role="status">
+              <span>
+                מסונן לפי קטגוריה: <strong>{activeCategory}</strong>
+                {activeSubs.length > 0 ? ` (${activeSubs.length} תתי-קטגוריות)` : ''}
+              </span>
+              <button type="button" className="ui-btn" onClick={clearFilters}>נקה סינון</button>
+            </div>
+          )}
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
               <Skeleton variant="rectangular" height={52}/><div className="studio-loading-grid"><Skeleton variant="rectangular" height={260}/><Skeleton variant="rectangular" height={260}/></div><Skeleton variant="rectangular" height={320}/>
