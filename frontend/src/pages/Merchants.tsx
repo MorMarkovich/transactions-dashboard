@@ -240,6 +240,7 @@ export default function Merchants() {
             key={n}
             variant={merchantCount === n ? 'primary' : 'secondary'}
             size="sm"
+            style={{ minHeight: 40, minWidth: 44 }}
             onClick={() => setMerchantCount(n)}
           >
             {n}
@@ -313,8 +314,10 @@ export default function Merchants() {
                     fontWeight: 700,
                     color: 'var(--text-primary)',
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    overflowWrap: 'anywhere',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
                   }}
                   title={merchant.name}
                 >
