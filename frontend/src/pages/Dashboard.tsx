@@ -973,7 +973,7 @@ export default function Dashboard() {
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   background: dateType === type ? 'var(--accent)' : 'transparent',
-                  color: dateType === type ? '#fff' : 'var(--text-secondary)',
+                  color: dateType === type ? 'var(--on-accent, #fff)' : 'var(--text-secondary)',
                 }}
               >
                 {type === 'transaction' ? 'תאריך עסקה' : 'תאריך חיוב'}
@@ -1157,7 +1157,7 @@ export default function Dashboard() {
                 {snapshotActiveFilterCount > 0 && (
                   <span style={{
                     minWidth: '16px', height: '16px', borderRadius: '50%', background: 'var(--accent)',
-                    color: '#fff', fontSize: '0.6rem', fontWeight: 700, display: 'inline-flex',
+                    color: 'var(--on-accent, #fff)', fontSize: '0.6rem', fontWeight: 700, display: 'inline-flex',
                     alignItems: 'center', justifyContent: 'center',
                   }}>{snapshotActiveFilterCount}</span>
                 )}
@@ -1237,7 +1237,7 @@ export default function Dashboard() {
                 >
                   <span style={{ fontSize: '0.8rem' }}><Tag size={18}/></span>
                   {cat.name}
-                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({cat.percent.toFixed(0)}%)</span>
+                  <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({cat.percent.toFixed(1)}%)</span>
                 </button>
               )
             })}
@@ -1418,7 +1418,7 @@ export default function Dashboard() {
                                 borderRadius: 6,
                                 border: '1px solid var(--accent)',
                                 background: 'var(--accent)',
-                                color: '#fff',
+                                color: 'var(--on-accent, #fff)',
                                 cursor: isSavingRename ? 'wait' : 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
