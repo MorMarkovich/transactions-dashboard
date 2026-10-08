@@ -291,3 +291,18 @@ select option { background: var(--bg-card, #fff); color: var(--text-primary, #11
 /* Desktop nav + brand: 36px tall hit areas */
 .orbit-nav a { display:inline-flex; align-items:center; min-height:36px; padding-block:8px; }
 .orbit-brand { display:inline-flex; align-items:center; min-height:36px; }
+
+/* KPI icons never shrink next to long values */
+.stat-icon { flex-shrink: 0; min-width: 36px; }
+
+/* Restored scroll positions must not drift when charts load above the fold */
+html, body { overflow-anchor: none; }
+.orbit-nav a { min-width: 44px; justify-content: center; }
+
+/* 320px polish: balanced date chips, no orphan KPI card, icons that keep their size */
+@media (max-width: 480px) {
+  .date-chips { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .date-chips > * { justify-content: center; text-align: center; }
+  .card-grid-responsive > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+.orbit-kpi .stat-icon, .orbit-transaction-metrics .stat-icon, .card-grid-responsive .stat-icon { flex: 0 0 40px; width: 40px; height: 40px; min-width: 40px; }
