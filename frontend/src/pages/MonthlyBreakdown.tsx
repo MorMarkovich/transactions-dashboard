@@ -281,10 +281,24 @@ export default function MonthlyBreakdown() {
     )
   }
 
+  // Keep the selected month pill visible inside its horizontally scrollable strip.
+  useEffect(() => {
+    document.querySelectorAll<HTMLElement>('.month-strip').forEach((strip) => {
+      const active = strip.querySelector<HTMLElement>('[aria-pressed="true"]')
+      if (!active) return
+      const s = strip.getBoundingClientRect()
+      const a = active.getBoundingClientRect()
+      if (a.left < s.left || a.right > s.right) {
+        strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2
+      }
+    })
+  })
+
   const monthChip = (m: string, active: boolean, onClick: () => void) => (
     <button
       key={m}
       onClick={onClick}
+      aria-pressed={active}
       style={{
         padding: '4px 10px',
         borderRadius: 'var(--radius-full)',
