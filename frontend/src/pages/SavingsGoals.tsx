@@ -367,6 +367,7 @@ export default function SavingsGoals() {
                   </label>
                   <input
                     type="text"
+                    aria-label="שם היעד"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="למשל: חופשה באירופה"
@@ -403,6 +404,7 @@ export default function SavingsGoals() {
                     type="number"
                     min="0"
                     step="100"
+                    aria-label="סכום יעד (₪)"
                     value={newTarget}
                     onChange={(e) => setNewTarget(e.target.value)}
                     placeholder="0"
@@ -437,6 +439,7 @@ export default function SavingsGoals() {
                     קטגוריה
                   </label>
                   <select
+                    aria-label="קטגוריה"
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     style={{
