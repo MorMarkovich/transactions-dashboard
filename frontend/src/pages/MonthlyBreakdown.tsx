@@ -77,6 +77,19 @@ export default function MonthlyBreakdown() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   // ── Load the list of people (owners) for the per-person filter ──
+  // Keep the selected month pill visible inside its horizontally scrollable strip.
+  useEffect(() => {
+    document.querySelectorAll<HTMLElement>('.month-strip').forEach((strip) => {
+      const active = strip.querySelector<HTMLElement>('[aria-pressed="true"]')
+      if (!active) return
+      const s = strip.getBoundingClientRect()
+      const a = active.getBoundingClientRect()
+      if (a.left < s.left || a.right > s.right) {
+        strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2
+      }
+    })
+  })
+
   useEffect(() => {
     if (!sessionId) { setOwners([]); return }
     const controller = new AbortController()
@@ -280,19 +293,6 @@ export default function MonthlyBreakdown() {
       />
     )
   }
-
-  // Keep the selected month pill visible inside its horizontally scrollable strip.
-  useEffect(() => {
-    document.querySelectorAll<HTMLElement>('.month-strip').forEach((strip) => {
-      const active = strip.querySelector<HTMLElement>('[aria-pressed="true"]')
-      if (!active) return
-      const s = strip.getBoundingClientRect()
-      const a = active.getBoundingClientRect()
-      if (a.left < s.left || a.right > s.right) {
-        strip.scrollLeft += a.left - s.left - (s.width - a.width) / 2
-      }
-    })
-  })
 
   const monthChip = (m: string, active: boolean, onClick: () => void) => (
     <button
