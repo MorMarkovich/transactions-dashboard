@@ -57,11 +57,34 @@ function useScrollMemory(pathname: string) {
   }, [pathname])
 }
 
+// Give every chart an accessible name (recharts renders unlabeled SVGs)
+function useChartLabels(pathname: string) {
+  useEffect(() => {
+    const label = () => {
+      document.querySelectorAll<HTMLElement>('.recharts-wrapper:not([data-a11y])').forEach((el) => {
+        let name = 'תרשים'
+        let node: HTMLElement | null = el
+        for (let i = 0; i < 6 && node; i += 1) {
+          const header = node.parentElement?.querySelector<HTMLElement>('.section-header-v2, h2, h3')
+          if (header?.innerText?.trim()) { name = `תרשים: ${header.innerText.trim().split('\n')[0]}`; break }
+          node = node.parentElement
+        }
+        el.setAttribute('role', 'img')
+        el.setAttribute('aria-label', name)
+        el.setAttribute('data-a11y', '1')
+      })
+    }
+    const timers = [600, 1800, 4000].map((ms) => window.setTimeout(label, ms))
+    return () => timers.forEach(window.clearTimeout)
+  }, [pathname])
+}
+
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   useScrollMemory(location.pathname)
+  useChartLabels(location.pathname)
   const { category: activeCategory, subcategories: activeSubs, clearFilters } = useDashboardFilters()
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
