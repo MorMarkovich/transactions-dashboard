@@ -513,7 +513,7 @@ export default function Dashboard() {
           })
         }
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         // Stale in-memory session (e.g. backend cold-start on Render's free
         // tier) → rebuild it from Supabase and retry, instead of erroring.
