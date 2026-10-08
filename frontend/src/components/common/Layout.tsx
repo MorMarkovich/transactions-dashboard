@@ -20,10 +20,40 @@ interface LayoutProps {
   children: ReactNode
 }
 
+// Remember how far each page was scrolled so tapping back to it (tab bar,
+// back button) returns to the same place instead of the top.
+const scrollPositions = new Map<string, number>()
+const LAST_SESSION_KEY = 'transactions-dashboard:last-session'
+
+function useScrollMemory(pathname: string) {
+  const currentPath = useRef(pathname)
+  useEffect(() => { currentPath.current = pathname }, [pathname])
+  useEffect(() => {
+    let raf = 0
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => scrollPositions.set(currentPath.current, window.scrollY))
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
+  }, [])
+  useEffect(() => {
+    const y = scrollPositions.get(pathname) ?? 0
+    let tries = 0
+    const id = window.setInterval(() => {
+      tries += 1
+      window.scrollTo(0, y)
+      if (Math.abs(window.scrollY - y) < 4 || tries > 25) window.clearInterval(id)
+    }, 80)
+    return () => window.clearInterval(id)
+  }, [pathname])
+}
+
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  useScrollMemory(location.pathname)
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const hasTriedRestore = useRef(false)
@@ -34,6 +64,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sessionValidating, setSessionValidating] = useState(() => {
     return true
   })
+  const [restoreFailed, setRestoreFailed] = useState(false)
 
   // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -56,11 +87,16 @@ export default function Layout({ children }: LayoutProps) {
 
   // Auto-restore last session from Supabase when user logs in with no active session
   useEffect(() => {
-    const sessionId = searchParams.get('session_id')
+    const urlSession = searchParams.get('session_id')
+    if (urlSession && !urlSession.includes('::')) localStorage.setItem(LAST_SESSION_KEY, urlSession)
     if (!user || hasTriedRestore.current) return
     hasTriedRestore.current = true
+    // A link without ?session_id (bookmark, address bar) reuses the last
+    // session rather than rebuilding one from the database every time.
+    const rememberedSession = urlSession ? null : localStorage.getItem(LAST_SESSION_KEY)
+    const sessionId = urlSession || rememberedSession
 
-    const doRestore = () => {
+    const doRestore = (attempt = 0) => {
       // Load saved transactions AND user-defined category rules in parallel,
       // then pass both to /restore-session so the rules are applied during
       // re-categorization.
@@ -112,7 +148,18 @@ export default function Layout({ children }: LayoutProps) {
             if (AUTO_AI_ENABLED) runAiChain(response.session_id, user.id)
           }
         })
-        .catch(() => {}) // Silent fail — user can upload a new file
+        .catch(async (err: unknown) => {
+          // Rate-limited restore: wait out Retry-After once instead of
+          // leaving the user on an empty account screen.
+          const res = (err as { response?: { status?: number; headers?: Record<string, string> } })?.response
+          if (res?.status === 429 && attempt < 1) {
+            const wait = Math.min(20, Math.max(2, Number(res.headers?.['retry-after']) || 5))
+            await new Promise((r) => setTimeout(r, wait * 1000))
+            doRestore(attempt + 1)
+            return
+          }
+          setRestoreFailed(true)
+        })
         .finally(() => setSessionValidating(false))
     }
 
@@ -129,6 +176,9 @@ export default function Layout({ children }: LayoutProps) {
     transactionsApi.getMetrics(sessionId)
       .then(() => {
         // Session is valid — allow children to render
+        if (rememberedSession) {
+          navigate(`${window.location.pathname}?session_id=${rememberedSession}`, { replace: true })
+        }
         setSessionValidating(false)
       })
       .catch(err => {
@@ -307,6 +357,11 @@ export default function Layout({ children }: LayoutProps) {
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
               <Skeleton variant="rectangular" height={52}/><div className="studio-loading-grid"><Skeleton variant="rectangular" height={260}/><Skeleton variant="rectangular" height={260}/></div><Skeleton variant="rectangular" height={320}/>
+            </div>
+          ) : restoreFailed ? (
+            <div className="studio-loading" role="alert" style={{ textAlign: 'center', padding: '40px 16px' }}>
+              <p style={{ marginBottom: 12 }}>לא הצלחנו לטעון את הנתונים כרגע. הנתונים שלך שמורים.</p>
+              <button className="ui-btn" onClick={() => window.location.reload()}>נסה שוב</button>
             </div>
           ) : (
             <AnimatePresence mode="wait">

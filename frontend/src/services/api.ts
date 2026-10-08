@@ -2,6 +2,7 @@
  * API client for backend communication
  */
 import axios from 'axios';
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { supabase } from '../lib/supabase';
 import type {
   TransactionResponse,
@@ -45,6 +46,76 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// ── Response cache ──────────────────────────────────────────────────────
+// Pages are separate components, so leaving a page throws its state away and
+// coming back used to refetch every chart from the (single-worker) backend.
+// GET responses are kept briefly in memory and identical in-flight GETs are
+// shared. Any write (anything that is not a GET, except the read-only session
+// scope call) clears the cache, so edits are always reflected.
+const CACHE_TTL_MS = 60_000;
+const NO_CACHE = ['/api/ai-progress', '/health'];
+const responseCache = new Map<string, { at: number; res: AxiosResponse }>();
+const inflight = new Map<string, Promise<AxiosResponse>>();
+let cacheGeneration = 0;
+
+export function invalidateApiCache() {
+  cacheGeneration++;
+  responseCache.clear();
+  inflight.clear();
+}
+
+const networkAdapter = axios.getAdapter(axios.defaults.adapter);
+
+function withSignal(p: Promise<AxiosResponse>, config: InternalAxiosRequestConfig): Promise<AxiosResponse> {
+  const signal = config.signal as AbortSignal | undefined;
+  if (!signal) return p;
+  return new Promise<AxiosResponse>((resolve, reject) => {
+    const onAbort = () => reject(new axios.CanceledError('canceled', config));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    p.then(
+      (r) => { signal.removeEventListener('abort', onAbort); resolve(r); },
+      (e) => { signal.removeEventListener('abort', onAbort); reject(e); },
+    );
+  });
+}
+
+const cachingAdapter = async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
+  const method = (config.method || 'get').toLowerCase();
+  const url = config.url || '';
+  if (method !== 'get') {
+    const readOnly = url.includes('/session/scope');
+    if (!readOnly) invalidateApiCache();
+    try {
+      return await networkAdapter(config);
+    } finally {
+      if (!readOnly) invalidateApiCache();
+    }
+  }
+  if (NO_CACHE.some((u) => url.includes(u))) return networkAdapter(config);
+
+  const key = `${config.headers?.Authorization ? 'a' : 'n'}|${axios.getUri(config)}`;
+  const hit = responseCache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+    return { ...hit.res, config, headers: hit.res.headers };
+  }
+  let pending = inflight.get(key);
+  if (!pending) {
+    const generation = cacheGeneration;
+    // The shared request must not die with one caller's AbortSignal.
+    pending = networkAdapter({ ...config, signal: undefined } as InternalAxiosRequestConfig).then((res) => {
+      if (generation === cacheGeneration) responseCache.set(key, { at: Date.now(), res });
+      return res;
+    }).finally(() => {
+      if (inflight.get(key) === pending) inflight.delete(key);
+    });
+    inflight.set(key, pending);
+  }
+  const res = await withSignal(pending, config);
+  return { ...res, config };
+};
+api.defaults.adapter = cachingAdapter;
 
 // FastAPI validates the same Supabase session that protects the database.
 // Fetching the session is local in supabase-js; no network round-trip occurs.

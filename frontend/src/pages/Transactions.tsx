@@ -99,7 +99,21 @@ export default function Transactions() {
   const [subcategoryMap, setSubcategoryMap] = useState<Record<string, string[]>>({})
 
   // Filter / pagination state
-  const [page, setPage] = useState(1)
+  // The view (page, filters, date chip) survives leaving and re-entering the
+  // page: it is kept per session in sessionStorage.
+  const viewKey = `tx-view:v1:${sessionId || ''}`
+  const [saved] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(viewKey) || 'null') as {
+        page?: number
+        filters?: Record<string, unknown>
+        chip?: string
+      } | null
+    } catch {
+      return null
+    }
+  })
+  const [page, setPage] = useState(saved?.page && saved.page > 0 ? saved.page : 1)
   const [pageSize] = useState(50)
   const [filters, setFilters] = useState<{
     search?: string
@@ -108,10 +122,18 @@ export default function Transactions() {
     endDate?: string
     minAmount?: number
     maxAmount?: number
-  }>({ category: category || undefined })
+  }>(category ? { category } : ((saved?.filters as object) ?? {}))
 
   // Date chip state
-  const [activeDateChip, setActiveDateChip] = useState('all')
+  const [activeDateChip, setActiveDateChip] = useState(saved?.chip || 'all')
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(viewKey, JSON.stringify({ page, filters, chip: activeDateChip }))
+    } catch {
+      // storage unavailable - view just won't persist
+    }
+  }, [viewKey, page, filters, activeDateChip])
 
   // Drawer state
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)

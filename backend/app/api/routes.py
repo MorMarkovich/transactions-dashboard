@@ -2,12 +2,14 @@
 API routes for transactions dashboard
 """
 import uuid
+import functools
 import os
 import math
 import logging
 import time
 import zipfile
 from typing import Optional, Any
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
 import json as _json
 import datetime as _dt
@@ -71,8 +73,21 @@ def _valid_categories(session_id: Optional[str] = None) -> set:
     return valid
 
 
+def _offload(fn):
+    """Run a blocking (pandas / AI) route body in the threadpool.
+
+    Routes are awaitable coroutines (tests await them directly), but the work
+    must not run on the event loop: one slow request used to freeze every
+    other request on the single worker."""
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await run_in_threadpool(fn, *args, **kwargs)
+    return wrapper
+
+
 @router.get("/ai-progress")
-async def get_ai_progress(sessionId: str = Query(...)):
+@_offload
+def get_ai_progress(sessionId: str = Query(...)):
     """Live progress of the background AI chain (categorize → subcategorize).
 
     Stages: idle | categorizing | categorized | subcategorizing | done.
@@ -81,7 +96,8 @@ async def get_ai_progress(sessionId: str = Query(...)):
 
 
 @router.get("/test")
-async def test():
+@_offload
+def test():
     return {"status": "ok"}
 
 # In-memory storage for sessions. Each session is user-bound by the security
@@ -365,7 +381,8 @@ class RenameCategoryRequest(BaseModel):
 
 
 @router.post("/restore-session")
-async def restore_session(body: RestoreSessionRequest):
+@_offload
+def restore_session(body: RestoreSessionRequest):
     """Restore a backend session from saved transaction JSON data."""
     if not body.transactions:
         raise HTTPException(status_code=400, detail="No transactions provided")
@@ -701,7 +718,8 @@ async def restore_session(body: RestoreSessionRequest):
 
 
 @router.post("/transactions/note")
-async def update_transaction_note(body: UpdateTransactionNoteRequest):
+@_offload
+def update_transaction_note(body: UpdateTransactionNoteRequest):
     """Update the manual notes (הערות) field for a single transaction."""
     if body.session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -734,7 +752,8 @@ async def update_transaction_note(body: UpdateTransactionNoteRequest):
 
 
 @router.post("/transactions/category")
-async def update_transaction_category(body: UpdateTransactionCategoryRequest):
+@_offload
+def update_transaction_category(body: UpdateTransactionCategoryRequest):
     """Reclassify a single transaction's category. Used by the dashboard's
     'edit category' UI; the merchant→category mapping is persisted to
     Supabase separately by the frontend so future uploads pick it up via
@@ -803,7 +822,8 @@ async def update_transaction_category(body: UpdateTransactionCategoryRequest):
 
 
 @router.post("/transactions/category-bulk")
-async def bulk_update_category(body: BulkUpdateCategoryRequest):
+@_offload
+def bulk_update_category(body: BulkUpdateCategoryRequest):
     """Move a SELECTION of transactions to one category (+ optional
     subcategory) in a single action.
 
@@ -875,7 +895,8 @@ async def bulk_update_category(body: BulkUpdateCategoryRequest):
 
 
 @router.post("/transactions/subcategory")
-async def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
+@_offload
+def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
     """Set a single transaction's subcategory (קטגוריה_משנה) in the session.
 
     Returns the row's merchant AND current category so the frontend can persist
@@ -928,7 +949,8 @@ async def update_transaction_subcategory(body: UpdateTransactionSubcategoryReque
 
 
 @router.get("/categories/catalog")
-async def get_category_catalog(sessionId: Optional[str] = Query(None)):
+@_offload
+def get_category_catalog(sessionId: Optional[str] = Query(None)):
     """Return the seeded category + subcategory catalog so the UI's category
     manager and subcategory selectors stay in sync with the backend without
     hardcoding the Hebrew names in the frontend.
@@ -963,7 +985,8 @@ async def get_category_catalog(sessionId: Optional[str] = Query(None)):
 
 
 @router.post("/categories/rename")
-async def rename_category(body: RenameCategoryRequest):
+@_offload
+def rename_category(body: RenameCategoryRequest):
     """Rename a category across the current in-memory session.
 
     The frontend persists returned merchant descriptions as category rules so
@@ -1002,7 +1025,8 @@ async def rename_category(body: RenameCategoryRequest):
 
 
 @router.get("/transactions")
-async def get_transactions(
+@_offload
+def get_transactions(
     sessionId: str = Query(...),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -1126,7 +1150,8 @@ async def get_transactions(
 
 
 @router.get("/session-files")
-async def get_session_files(sessionId: str = Query(...)):
+@_offload
+def get_session_files(sessionId: str = Query(...)):
     """List source files in the current session with per-file stats."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1161,7 +1186,8 @@ async def get_session_files(sessionId: str = Query(...)):
 
 
 @router.delete("/session-files")
-async def delete_session_file(sessionId: str = Query(...), file_name: str = Query(...)):
+@_offload
+def delete_session_file(sessionId: str = Query(...), file_name: str = Query(...)):
     """Remove all transactions from a specific source file."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1187,14 +1213,16 @@ async def delete_session_file(sessionId: str = Query(...), file_name: str = Quer
 
 
 @router.delete("/session")
-async def delete_session(sessionId: str = Query(...)):
+@_offload
+def delete_session(sessionId: str = Query(...)):
     """Delete an entire session and all its in-memory data."""
     _remove_session(sessionId)
     return {"success": True, "message": "Session cleared"}
 
 
 @router.get("/session-info")
-async def get_session_info(sessionId: str = Query(...)):
+@_offload
+def get_session_info(sessionId: str = Query(...)):
     """Get detailed metadata about the current session data."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1269,7 +1297,8 @@ async def get_session_info(sessionId: str = Query(...)):
 
 
 @router.get("/owners")
-async def get_owners(sessionId: str = Query(...)):
+@_offload
+def get_owners(sessionId: str = Query(...)):
     """Distinct owners present in the session, for the per-person filter."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1289,7 +1318,8 @@ class ScopeSessionRequest(BaseModel):
 
 
 @router.post("/session/scope")
-async def scope_session(body: ScopeSessionRequest):
+@_offload
+def scope_session(body: ScopeSessionRequest):
     """Return a session id whose data is filtered to a single owner (_owner).
 
     The dashboard's per-person filter calls this and then passes the returned id
@@ -1528,7 +1558,8 @@ class UpdateMerchantCategoryRequest(BaseModel):
 
 
 @router.post("/merchants/category")
-async def update_merchant_category(body: UpdateMerchantCategoryRequest):
+@_offload
+def update_merchant_category(body: UpdateMerchantCategoryRequest):
     """Reclassify EVERY transaction of a merchant (canonical-key match) in the
     live session — one decision per merchant, applied everywhere. The frontend
     persists the same mapping as a user_category_rules row so it survives
@@ -1723,7 +1754,8 @@ def ai_subcategorize_all(body: AISubcategorizeAllRequest):
 
 
 @router.get("/metrics")
-async def get_metrics(sessionId: str = Query(...)):
+@_offload
+def get_metrics(sessionId: str = Query(...)):
     """Get metrics data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1761,7 +1793,8 @@ async def get_metrics(sessionId: str = Query(...)):
 
 
 @router.get("/categories")
-async def get_categories(sessionId: str = Query(...)):
+@_offload
+def get_categories(sessionId: str = Query(...)):
     """Get list of unique categories"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1775,7 +1808,8 @@ async def get_categories(sessionId: str = Query(...)):
 
 
 @router.get("/charts/donut")
-async def get_donut_chart(sessionId: str = Query(...)):
+@_offload
+def get_donut_chart(sessionId: str = Query(...)):
     """Get donut chart data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1786,7 +1820,8 @@ async def get_donut_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/monthly")
-async def get_monthly_chart(sessionId: str = Query(...)):
+@_offload
+def get_monthly_chart(sessionId: str = Query(...)):
     """Get monthly chart data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1797,7 +1832,8 @@ async def get_monthly_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/weekday")
-async def get_weekday_chart(sessionId: str = Query(...)):
+@_offload
+def get_weekday_chart(sessionId: str = Query(...)):
     """Get weekday chart data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1808,7 +1844,8 @@ async def get_weekday_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/trend")
-async def get_trend_chart(sessionId: str = Query(...)):
+@_offload
+def get_trend_chart(sessionId: str = Query(...)):
     """Get trend chart data"""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1819,7 +1856,8 @@ async def get_trend_chart(sessionId: str = Query(...)):
 
 
 @router.get("/export")
-async def export_transactions(
+@_offload
+def export_transactions(
     sessionId: str = Query(...),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -1932,7 +1970,8 @@ def _to_json_safe(val):
 
 
 @router.get("/charts/v2/donut")
-async def get_donut_v2(sessionId: str = Query(...)):
+@_offload
+def get_donut_v2(sessionId: str = Query(...)):
     """Return raw category breakdown (top 10 + 'אחר')."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -1967,7 +2006,8 @@ async def get_donut_v2(sessionId: str = Query(...)):
 
 
 @router.get("/income-analysis")
-async def get_income_analysis(
+@_offload
+def get_income_analysis(
     sessionId: str = Query(...),
     month: Optional[str] = None,
     source: Optional[str] = None,
@@ -2017,7 +2057,8 @@ async def get_income_analysis(
     }
 
 @router.get("/charts/v2/income-sources")
-async def get_income_sources(sessionId: str = Query(...)):
+@_offload
+def get_income_sources(sessionId: str = Query(...)):
     """Income (positive amounts) grouped by source — i.e. where it came from
     (the payer/description), top 10 + 'אחר'. Respects the scoped session, so the
     per-person filter applies automatically."""
@@ -2052,7 +2093,8 @@ async def get_income_sources(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/category-snapshot")
-async def get_category_snapshot(
+@_offload
+def get_category_snapshot(
     sessionId: str = Query(...),
     month_from: str = Query(default=None),
     month_to: str = Query(default=None),
@@ -2205,7 +2247,8 @@ async def get_category_snapshot(
 
 
 @router.get("/charts/v2/category-transactions")
-async def get_category_transactions(
+@_offload
+def get_category_transactions(
     sessionId: str = Query(...),
     month: str = Query(""),
     month_from: str = Query(""),
@@ -2278,7 +2321,8 @@ async def get_category_transactions(
 
 
 @router.get("/charts/v2/category-merchants")
-async def get_category_merchants(
+@_offload
+def get_category_merchants(
     sessionId: str = Query(...),
     month: str = Query(...),
     category: str = Query(...),
@@ -2322,7 +2366,8 @@ async def get_category_merchants(
 
 
 @router.get("/charts/v2/merchant-transactions")
-async def get_merchant_transactions(
+@_offload
+def get_merchant_transactions(
     sessionId: str = Query(...),
     month: str = Query(...),
     category: str = Query(...),
@@ -2367,7 +2412,8 @@ async def get_merchant_transactions(
 
 
 @router.get("/charts/v2/monthly")
-async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
+@_offload
+def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
     """Return raw monthly expense totals."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2391,7 +2437,8 @@ async def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("tr
 
 
 @router.get("/charts/v2/weekday")
-async def get_weekday_v2(sessionId: str = Query(...)):
+@_offload
+def get_weekday_v2(sessionId: str = Query(...)):
     """Return raw weekday expense totals with Hebrew day names."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2429,7 +2476,8 @@ async def get_weekday_v2(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/trend")
-async def get_trend_v2(sessionId: str = Query(...)):
+@_offload
+def get_trend_v2(sessionId: str = Query(...)):
     """Return cumulative balance over time."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2453,7 +2501,8 @@ async def get_trend_v2(sessionId: str = Query(...)):
 
 
 @router.get("/merchants")
-async def get_merchants(
+@_offload
+def get_merchants(
     sessionId: str = Query(...),
     n: int = Query(default=8, ge=1),
 ):
@@ -2492,7 +2541,8 @@ async def get_merchants(
 
 
 @router.get("/trend-stats")
-async def get_trend_stats(sessionId: str = Query(...)):
+@_offload
+def get_trend_stats(sessionId: str = Query(...)):
     """Return trend statistics and month-over-month changes."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2550,7 +2600,8 @@ async def get_trend_stats(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/heatmap")
-async def get_heatmap_v2(sessionId: str = Query(...)):
+@_offload
+def get_heatmap_v2(sessionId: str = Query(...)):
     """Return category x month matrix for heatmap visualization."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2582,7 +2633,8 @@ async def get_heatmap_v2(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/month-overview")
-async def get_month_overview(
+@_offload
+def get_month_overview(
     sessionId: str = Query(...),
     month: str = Query(...),
     date_type: str = Query("transaction"),
@@ -2635,7 +2687,8 @@ async def get_month_overview(
 
 
 @router.get("/charts/v2/industry-monthly")
-async def get_industry_monthly(
+@_offload
+def get_industry_monthly(
     sessionId: str = Query(...),
     date_type: str = Query("transaction"),
     top_n: int = Query(default=8, ge=1, le=20),
@@ -2694,7 +2747,8 @@ async def get_industry_monthly(
 
 
 @router.get("/charts/v2/subcategory-monthly")
-async def get_subcategory_monthly(
+@_offload
+def get_subcategory_monthly(
     sessionId: str = Query(...),
     category: str = Query(...),
     date_type: str = Query("transaction"),
@@ -2726,7 +2780,8 @@ async def get_subcategory_monthly(
 
 
 @router.get("/charts/v2/category-monthly-comparison")
-async def get_category_monthly_comparison(
+@_offload
+def get_category_monthly_comparison(
     sessionId: str = Query(...),
     date_type: str = Query("transaction"),
 ):
@@ -2814,7 +2869,8 @@ async def get_category_monthly_comparison(
 # ---------------------------------------------------------------------------
 
 @router.get("/analytics/recurring")
-async def get_recurring_transactions(sessionId: str = Query(...)):
+@_offload
+def get_recurring_transactions(sessionId: str = Query(...)):
     """Detect recurring/subscription transactions."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2892,7 +2948,8 @@ async def get_recurring_transactions(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/forecast")
-async def get_spending_forecast(sessionId: str = Query(...)):
+@_offload
+def get_spending_forecast(sessionId: str = Query(...)):
     """Linear forecast of next month's spending."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2962,7 +3019,8 @@ async def get_spending_forecast(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/weekly-summary")
-async def get_weekly_summary(sessionId: str = Query(...)):
+@_offload
+def get_weekly_summary(sessionId: str = Query(...)):
     """This week vs last week comparison."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -3028,7 +3086,8 @@ async def get_weekly_summary(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/spending-velocity")
-async def get_spending_velocity(sessionId: str = Query(...)):
+@_offload
+def get_spending_velocity(sessionId: str = Query(...)):
     """Daily spending rate and rolling averages."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -3069,7 +3128,8 @@ async def get_spending_velocity(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/anomalies")
-async def get_anomalies(sessionId: str = Query(...)):
+@_offload
+def get_anomalies(sessionId: str = Query(...)):
     """Find transactions beyond 2 standard deviations from category mean."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -3117,7 +3177,8 @@ async def get_anomalies(sessionId: str = Query(...)):
 
 
 @router.get("/search")
-async def search_transactions(
+@_offload
+def search_transactions(
     sessionId: str = Query(...),
     q: str = Query(..., min_length=1, max_length=200),
     limit: int = Query(default=20, le=50),
