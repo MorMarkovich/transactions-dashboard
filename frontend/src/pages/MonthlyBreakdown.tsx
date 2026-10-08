@@ -433,7 +433,7 @@ export default function MonthlyBreakdown() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
+        <div className="month-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
           {comparison.months.map((m) => monthChip(m, m === pieMonth, () => setPieMonth(m)))}
         </div>
         <Card className="glass-card" padding="md">
@@ -621,7 +621,7 @@ export default function MonthlyBreakdown() {
             )}
           </div>
           {/* Month selector pills */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
+          <div className="month-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
             {industryMonthly.months.map((m) =>
               monthChip(m, selectedComparisonMonths.has(m), () => setSelectedComparisonMonths(prev => {
                 const next = new Set(prev)
