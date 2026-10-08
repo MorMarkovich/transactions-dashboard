@@ -14,13 +14,27 @@ export default function MultiSelect({ options, value, onChange, placeholder, dis
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
   useEffect(() => {
     const close = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
     }
+    // Escape closes the list and returns focus to the trigger.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && open) {
+        event.stopPropagation()
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
     document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [open])
 
   const toggle = (option: string) => {
     onChange(value.includes(option) ? value.filter((item) => item !== option) : [...value, option])
@@ -30,6 +44,7 @@ export default function MultiSelect({ options, value, onChange, placeholder, dis
     <div className="multi-select" ref={rootRef}>
       <button
         type="button"
+        ref={triggerRef}
         className="multi-select-trigger"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
