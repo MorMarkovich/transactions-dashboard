@@ -312,3 +312,9 @@ html, body { overflow-anchor: none; }
   .orbit-transaction-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .orbit-transaction-metrics .card-grid-responsive { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
+
+.active-filter-banner { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 14px; padding:8px 14px; border:1px solid var(--border-accent, var(--border)); border-radius:12px; background:var(--accent-muted, rgba(104,244,211,.12)); color:var(--text-primary); font-size:13px; }
+.active-filter-banner strong { color: var(--accent); }
+@media (max-width: 480px) {
+  .advanced-filters-primary > * { flex: 0 0 auto !important; min-width: 0 !important; }
+}
