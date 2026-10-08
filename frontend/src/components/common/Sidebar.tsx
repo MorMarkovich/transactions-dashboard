@@ -46,7 +46,7 @@ const NAV_SECTIONS = [
   {
     label: 'ראשי',
     items: [
-      { to: '/', label: 'דשבורד', icon: LayoutDashboard },
+      { to: '/', label: 'סקירה', icon: LayoutDashboard },
       { to: '/transactions', label: 'עסקאות', icon: Receipt },
     ],
   },
@@ -248,8 +248,8 @@ export default function Sidebar({
   }
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong>מנתח עסקאות</strong><small>התמונה הפיננסית שלך</small></div>}</div>
+    <aside role={isOpen ? "dialog" : undefined} aria-modal={isOpen ? true : undefined} aria-label="תפריט ניהול וניווט" tabIndex={-1} className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong dir="ltr">ORBIT</strong><small>התמונה הפיננסית שלך</small></div>}</div>
       <div className="studio-sidebar-tools"><button onClick={onSearch} aria-label="חיפוש"><Search size={18}/>{!collapsed && <span>חיפוש <kbd dir="ltr">⌘ K</kbd></span>}</button><button onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
       {/* ─── Close button (mobile only) ─── */}
       <button
@@ -277,9 +277,7 @@ export default function Sidebar({
                   `sidebar-nav-link ${isActive ? 'active' : ''}`
                 }
                 onClick={() => {
-                  if (window.innerWidth < 1024) {
-                    onClose?.()
-                  }
+                  onClose?.()
                 }}
                 title={collapsed ? label : undefined}
               >
