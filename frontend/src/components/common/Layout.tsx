@@ -26,6 +26,13 @@ const scrollPositions = new Map<string, number>()
 const LAST_SESSION_KEY = 'transactions-dashboard:last-session'
 
 function useScrollMemory(pathname: string) {
+  // Own scroll restoration, including back/forward (the browser's automatic restore fires
+  // before the page content exists and lands on 0).
+  useEffect(() => {
+    const prev = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    return () => { window.history.scrollRestoration = prev }
+  }, [])
   const currentPath = useRef(pathname)
   useEffect(() => { currentPath.current = pathname }, [pathname])
   useEffect(() => {
@@ -43,7 +50,7 @@ function useScrollMemory(pathname: string) {
     const id = window.setInterval(() => {
       tries += 1
       window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
-      if (Math.abs(window.scrollY - y) < 4 || tries > 25) window.clearInterval(id)
+      if (Math.abs(window.scrollY - y) < 4 || tries > 50) window.clearInterval(id)
     }, 80)
     return () => window.clearInterval(id)
   }, [pathname])
