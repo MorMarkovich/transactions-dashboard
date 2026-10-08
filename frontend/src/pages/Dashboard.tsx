@@ -1564,8 +1564,9 @@ export default function Dashboard() {
         >
           <div className="section-header-v2" style={{ flexWrap: 'wrap' }}>
             <span>מקורות הכנסה</span>
+            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600 }}>כל התקופה</span>
             <span style={{ marginInlineStart: 'auto', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-              {incomeSources.total.toLocaleString('he-IL')} ₪
+              {formatCurrency(incomeSources.total)}
             </span>
           </div>
           <div
@@ -1592,7 +1593,7 @@ export default function Dashboard() {
                     </span>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>{Math.round(pct)}%</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--success)', direction: 'ltr', flexShrink: 0 }}>
-                      {s.value.toLocaleString('he-IL')} ₪
+                      {formatCurrency(s.value)}
                     </span>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
@@ -1650,12 +1651,12 @@ export default function Dashboard() {
               )}
             </div>
             <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.this_week.total)}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.this_week.count} עסקאות · {weeklySummary.this_week.top_category}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.this_week.count} עסקאות{weeklySummary.this_week.top_category ? ` · ${weeklySummary.this_week.top_category}` : ''}</p>
           </div>
           <div className="glass-card" style={{ padding: '18px 22px' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '10px' }}>שבוע שעבר</span>
             <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr', textAlign: 'right' }}>{formatCurrency(weeklySummary.last_week.total)}</p>
-            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.last_week.count} עסקאות · {weeklySummary.last_week.top_category}</p>
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{weeklySummary.last_week.count} עסקאות{weeklySummary.last_week.top_category ? ` · ${weeklySummary.last_week.top_category}` : ''}</p>
           </div>
         </motion.div>
       )}
@@ -1720,7 +1721,7 @@ export default function Dashboard() {
                 <Zap size={18} />
                 <span>קצב הוצאות</span>
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <div className="velocity-stats" style={{ display: 'flex', gap: 'var(--space-lg)', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px' }}>יומי</div>
                   <AnimatedNumber value={velocity.daily_avg} formatter={formatCurrency} style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }} />
