@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Search, Filter, Download, X, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '../ui/Button'
@@ -17,6 +17,15 @@ interface AdvancedFiltersProps {
   categories: string[]
   loading?: boolean
   showCategory?: boolean
+  /** Filters to start from (restored view when coming back to the page). */
+  initial?: {
+    search?: string
+    category?: string
+    startDate?: string
+    endDate?: string
+    minAmount?: number
+    maxAmount?: number
+  }
 }
 
 const PRESETS_KEY = 'txn-filter-presets'
@@ -32,14 +41,16 @@ export default function AdvancedFilters({
   categories,
   loading = false,
   showCategory = true,
+  initial,
 }: AdvancedFiltersProps) {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [minAmount, setMinAmount] = useState('')
-  const [maxAmount, setMaxAmount] = useState('')
+  const [search, setSearch] = useState(initial?.search ?? '')
+  const [category, setCategory] = useState(initial?.category ?? '')
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '')
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '')
+  const [minAmount, setMinAmount] = useState(initial?.minAmount != null ? String(initial.minAmount) : '')
+  const [maxAmount, setMaxAmount] = useState(initial?.maxAmount != null ? String(initial.maxAmount) : '')
   const [expanded, setExpanded] = useState(false)
+  const firstRun = useRef(true)
   const [presets, setPresets] = useState<SavedPreset[]>([])
   const [presetName, setPresetName] = useState('')
 
@@ -53,6 +64,8 @@ export default function AdvancedFilters({
 
   // Debounced search
   useEffect(() => {
+    // Mounting must not emit: it would wipe the restored filters.
+    if (firstRun.current) { firstRun.current = false; return }
     const timer = setTimeout(() => {
       emitFilters()
     }, 300)

@@ -2171,6 +2171,16 @@ def get_category_snapshot(
         .set_index('קטגוריה')
     )
 
+    # Every merchant per category, so the overview search can find a merchant
+    # and show the category that contains it (not only the top merchant).
+    merchants_by_category = (
+        cat_merchant
+        .sort_values('merchant_total', ascending=False)
+        .groupby('קטגוריה')['תיאור']
+        .apply(lambda names: [str(n) for n in names.head(200)])
+        .to_dict()
+    )
+
     # -- Last two months for trend calculation --
     last_month = all_months[-1] if all_months else None
     prev_month = all_months[-2] if len(all_months) >= 2 else None
@@ -2233,6 +2243,7 @@ def get_category_snapshot(
             "month_change": month_change,
             "top_merchant": merchant_name,
             "top_merchant_total": merchant_total_val,
+            "merchants": merchants_by_category.get(cat_name, []),
             "sparkline": sparkline,
         })
 

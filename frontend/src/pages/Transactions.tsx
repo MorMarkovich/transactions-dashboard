@@ -124,6 +124,8 @@ export default function Transactions() {
     maxAmount?: number
   }>(category ? { category } : ((saved?.filters as object) ?? {}))
 
+  const [initialFilters] = useState(filters)
+
   // Date chip state
   const [activeDateChip, setActiveDateChip] = useState(saved?.chip || 'all')
 
@@ -496,6 +498,7 @@ export default function Transactions() {
       </section>
 
       <AdvancedFilters
+        initial={initialFilters}
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}
