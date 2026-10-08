@@ -219,3 +219,26 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
  --category-3:#a35817; --category-4:#727c19; --category-5:#bb3553;
  --category-6:#426d85; --category-7:#7160bd; --category-8:#506d80;
 }
+
+/* ── Mobile QA fixes (phones ≤767px) ───────────────────────────── */
+.income-source-name {display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;}
+@media(max-width:767px) {
+  /* touch-sized targets */
+  .orbit-brand {min-height:44px;display:inline-flex;align-items:center;}
+  .main-content button:not(.month-strip button):not(.category-hide-btn),
+  .main-content select,
+  .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {min-height:40px;}
+  .month-strip button {min-height:44px;}
+  .filter-chip,.main-content .filter-chips button {min-height:40px;}
+  /* hide-category button: bigger, parked bottom-left so it never covers the amount */
+  .studio-category .category-hide-btn {width:28px !important;height:28px !important;top:auto !important;bottom:-4px !important;left:-4px !important;opacity:.6 !important;}
+  /* background-AI status pill: sit above the bottom nav, never over content below it */
+  .ai-status-pill {bottom:calc(84px + env(safe-area-inset-bottom)) !important;left:12px !important;right:12px;max-width:calc(100vw - 24px);width:max-content;font-size:.75rem !important;}
+  /* month label must not wrap next to the select */
+  .dashboard-month-control {display:flex;align-items:center;gap:10px;white-space:nowrap;}
+  /* transactions: filters first, then the long breakdown/table */
+  .transactions-page {display:flex;flex-direction:column;}
+  .transactions-page>.page-header {order:-3;}
+  .transactions-page>.dashboard-filter-bar {order:-2;}
+  .transactions-page>.filter-chips {order:-1;}
+}
