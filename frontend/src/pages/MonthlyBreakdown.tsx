@@ -421,7 +421,7 @@ export default function MonthlyBreakdown() {
                   cursor: 'pointer',
                   transition: 'all 0.15s',
                   background: dateType === type ? 'var(--accent)' : 'transparent',
-                  color: dateType === type ? '#fff' : 'var(--text-secondary)',
+                  color: dateType === type ? 'var(--on-accent, #fff)' : 'var(--text-secondary)',
                 }}
               >
                 {type === 'transaction' ? 'תאריך עסקה' : 'תאריך חיוב'}
