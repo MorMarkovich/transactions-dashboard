@@ -911,7 +911,7 @@ export default function Dashboard() {
         <div className="dashboard-filter-fields">
           <label>
             <span>קטגוריה</span>
-            <select key={`cat-${availableCategoryNames.length}`} value={category} onChange={(event) => setCategory(event.target.value)}>
+            <select value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="">כל הקטגוריות</option>
               {availableCategoryNames.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
             </select>
