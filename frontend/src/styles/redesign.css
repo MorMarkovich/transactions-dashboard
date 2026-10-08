@@ -233,7 +233,7 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
   /* hide-category button: bigger, parked bottom-left so it never covers the amount */
   .studio-category .category-hide-btn {width:28px !important;height:28px !important;top:auto !important;bottom:-4px !important;left:-4px !important;opacity:.6 !important;}
   /* background-AI status pill: sit above the bottom nav, never over content below it */
-  .ai-status-pill {bottom:calc(84px + env(safe-area-inset-bottom)) !important;left:12px !important;right:12px;max-width:calc(100vw - 24px);width:max-content;font-size:.75rem !important;}
+  .ai-status-pill {z-index:50 !important;bottom:calc(84px + env(safe-area-inset-bottom)) !important;left:12px !important;right:12px;max-width:calc(100vw - 24px);width:max-content;font-size:.75rem !important;}
   /* month label must not wrap next to the select */
   .dashboard-month-control {display:flex;align-items:center;gap:10px;white-space:nowrap;}
   /* transactions: filters first, then the long breakdown/table */
@@ -242,3 +242,25 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
   .transactions-page>.dashboard-filter-bar {order:-2;}
   .transactions-page>.filter-chips {order:-1;}
 }
+@media(max-width:767px) {
+  /* income ledger: stacked rows instead of a 720px-wide sideways-scrolling table */
+  .income-table-wrap {overflow:visible;}
+  .income-table-wrap table,.income-table-wrap tbody {display:block;width:100%;min-width:0;}
+  .income-table-wrap thead {display:none;}
+  .income-table-wrap tr {display:grid;grid-template-columns:minmax(0,1fr) auto 24px;gap:4px 10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+  .income-table-wrap td {display:block;padding:0;border:0;min-width:0;white-space:normal;overflow-wrap:anywhere;}
+  .income-table-wrap td:nth-child(2) {grid-column:1;grid-row:1;font-size:14px;}
+  .income-table-wrap td:nth-child(5) {grid-column:2;grid-row:1;white-space:nowrap;}
+  .income-table-wrap td:nth-child(6) {grid-column:3;grid-row:1;}
+  .income-table-wrap td:nth-child(1) {grid-column:1;grid-row:2;font-size:12px;color:var(--text-muted);}
+  .income-table-wrap td:nth-child(3) {grid-column:2;grid-row:2;font-size:12px;color:var(--text-muted);}
+  .income-table-wrap td:nth-child(4) {grid-column:3;grid-row:2;font-size:12px;color:var(--text-muted);}
+  .studio-category .category-hide-btn {width:36px !important;height:36px !important;}
+  .studio-category button:not(.category-hide-btn) {min-width:36px;}
+  .main-content .ui-btn {min-width:40px;}
+}
+/* Section headers: the accent bar floated against wrapped headers and looked misaligned - removed */
+.section-header-v2::before {display:none !important;}
+.section-header-v2 {padding-inline:0 !important;}
+/* Filter chips ("תצוגה לפי"): center the label inside every chip */
+.filter-chip {display:inline-flex !important;align-items:center;justify-content:center;text-align:center;}
