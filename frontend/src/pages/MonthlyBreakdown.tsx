@@ -319,7 +319,7 @@ export default function MonthlyBreakdown() {
             <strong>בחירת ענף להשוואה לאורך זמן</strong>
             <span>אפשר להתמקד בענף ובתת-ענף, למשל סופרים קטנים מול סופר גדול.</span>
           </div>
-          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
+          {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -341,7 +341,7 @@ export default function MonthlyBreakdown() {
             />
           </label>
         </div>
-        {(category || subcategories.length) && <div className="active-filter-summary">משווה לאורך זמן: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
+        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">משווה לאורך זמן: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
       {category && selectedCategory === category && subcategoryMonthly && subcategoryMonthly.series.length > 0 && (
