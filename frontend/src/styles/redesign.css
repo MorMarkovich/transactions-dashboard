@@ -306,3 +306,9 @@ html, body { overflow-anchor: none; }
   .card-grid-responsive > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 .orbit-kpi .stat-icon, .orbit-transaction-metrics .stat-icon, .card-grid-responsive .stat-icon { flex: 0 0 40px; width: 40px; height: 40px; min-width: 40px; }
+.stat-icon svg, .stat-card-compact .stat-icon svg { flex: 0 0 auto; width: 20px; height: 20px; min-width: 20px; }
+:root[data-theme="light"] .stat-icon svg { stroke: var(--accent) !important; color: var(--accent); }
+@media (min-width: 900px) {
+  .orbit-transaction-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .orbit-transaction-metrics .card-grid-responsive { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
