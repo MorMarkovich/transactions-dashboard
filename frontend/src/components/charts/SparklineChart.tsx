@@ -32,14 +32,7 @@ const SparklineChart: React.FC<SparklineChartProps> = React.memo(function Sparkl
       y: padding + (1 - (val - min) / range) * (height - padding * 2),
     }))
 
-    // Smooth curve using quadratic bezier
-    let line = `M ${points[0].x},${points[0].y}`
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1]
-      const curr = points[i]
-      const cpx = (prev.x + curr.x) / 2
-      line += ` Q ${cpx},${prev.y} ${curr.x},${curr.y}`
-    }
+    const line = points.map((point,i)=>`${i ? 'L' : 'M'} ${point.x},${point.y}`).join(' ')
 
     // Area path (line + close to bottom)
     const last = points[points.length - 1]
