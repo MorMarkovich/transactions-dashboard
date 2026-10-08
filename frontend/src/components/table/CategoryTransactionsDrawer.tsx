@@ -492,7 +492,7 @@ export default function CategoryTransactionsDrawer({
                                 justifyContent: 'center',
                                 border: isSelected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
                                 background: isSelected ? 'var(--accent)' : 'transparent',
-                                color: '#fff',
+                                color: 'var(--on-accent, #fff)',
                               }}
                             >
                               {isSelected && <Check size={12} />}
@@ -596,7 +596,7 @@ export default function CategoryTransactionsDrawer({
                                   borderRadius: 'var(--radius-full)',
                                   border: '1px solid var(--glass-border)',
                                   background: isEditing ? 'var(--accent)' : 'var(--bg-elevated)',
-                                  color: isEditing ? '#fff' : 'var(--accent)',
+                                  color: isEditing ? 'var(--on-accent, #fff)' : 'var(--accent)',
                                   cursor: isSaving ? 'wait' : 'pointer',
                                   flexShrink: 0,
                                   gap: '4px',
@@ -701,7 +701,7 @@ export default function CategoryTransactionsDrawer({
                                   border: '1px solid var(--accent)',
                                   borderRadius: 'var(--radius-sm)',
                                   background: customCategory.trim() ? 'var(--accent)' : 'transparent',
-                                  color: customCategory.trim() ? '#fff' : 'var(--text-muted)',
+                                  color: customCategory.trim() ? 'var(--on-accent, #fff)' : 'var(--text-muted)',
                                   padding: '0 10px',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
@@ -781,7 +781,7 @@ export default function CategoryTransactionsDrawer({
                                     style={{
                                       border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)',
                                       background: customSubcategory.trim() ? 'var(--accent)' : 'transparent',
-                                      color: customSubcategory.trim() ? '#fff' : 'var(--text-muted)',
+                                      color: customSubcategory.trim() ? 'var(--on-accent, #fff)' : 'var(--text-muted)',
                                       padding: '0 10px', fontSize: '0.75rem', fontWeight: 700,
                                       cursor: isSaving || !customSubcategory.trim() ? 'not-allowed' : 'pointer',
                                       fontFamily: 'var(--font-family)',
@@ -861,7 +861,7 @@ export default function CategoryTransactionsDrawer({
                                   borderRadius: 'var(--radius-full)',
                                   border: 'none',
                                   background: dirty ? 'var(--accent)' : 'var(--glass-bg)',
-                                  color: dirty ? '#fff' : 'var(--text-muted)',
+                                  color: dirty ? 'var(--on-accent, #fff)' : 'var(--text-muted)',
                                   fontSize: '0.8125rem',
                                   fontWeight: 700,
                                   cursor: isSaving || !dirty ? 'not-allowed' : 'pointer',
@@ -997,7 +997,7 @@ export default function CategoryTransactionsDrawer({
                         width: '100%', padding: '9px 18px', borderRadius: 'var(--radius-full)',
                         border: 'none',
                         background: bulkCat ? 'var(--accent)' : 'var(--glass-bg)',
-                        color: bulkCat ? '#fff' : 'var(--text-muted)',
+                        color: bulkCat ? 'var(--on-accent, #fff)' : 'var(--text-muted)',
                         fontSize: '0.8125rem', fontWeight: 700,
                         cursor: bulkSaving || !bulkCat ? 'not-allowed' : 'pointer',
                         fontFamily: 'var(--font-family)',
