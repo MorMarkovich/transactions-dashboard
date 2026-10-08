@@ -319,3 +319,12 @@ html, body { overflow-anchor: none; }
   .advanced-filters-primary > * { flex: 0 0 auto !important; min-width: 0 !important; }
 }
 .income-kpi svg { flex: 0 0 20px; width: 20px; height: 20px; min-width: 20px; }
+@media(max-width:767px){
+.cmc-table{min-width:0 !important;width:max-content !important;font-size:12px !important;}
+.cmc-table th,.cmc-table td{padding:7px 6px !important;}
+.cmc-table th.cmc-sticky,.cmc-table td.cmc-sticky{min-width:92px !important;max-width:92px !important;white-space:normal !important;line-height:1.25;box-shadow:-1px 0 0 var(--border);}
+.cmc-table td:not(.cmc-sticky),.cmc-table th:not(.cmc-sticky){min-width:84px;}
+.cmc-scroll{overscroll-behavior-x:contain;scroll-snap-type:x proximity;}
+.cmc-table tbody tr{min-height:44px;}
+}
+.month-pie-percent{text-align:center;font-variant-numeric:tabular-nums;}
