@@ -78,14 +78,14 @@ body { background:var(--bg-primary); } button,input,select,textarea {font:inheri
 :root[data-theme="dark"] {
  --bg-primary:#07131f;--bg-secondary:#0d2130;--bg-card:#112b38;--bg-card-hover:#1a3a46;--bg-elevated:#183746;--bg-input:#0c2230;
  --text-primary:#edf9f9;--text-secondary:#b2cbd0;--text-muted:#8daab7;--text-disabled:#658392;
- --accent:#68f4d3;--accent-hover:#a0ffe8;--accent-secondary:#519afb;--accent-muted:rgba(80,241,205,.1);--border:rgba(117,196,193,.22);--border-accent:rgba(104,244,211,.5);
+ --on-accent:#04231d; --accent:#68f4d3;--accent-hover:#a0ffe8;--accent-secondary:#519afb;--accent-muted:rgba(80,241,205,.1);--border:rgba(117,196,193,.22);--border-accent:rgba(104,244,211,.5);
  --glass-bg:linear-gradient(145deg,rgba(37,68,78,.55),rgba(12,27,44,.85));--glass-bg-hover:#1a3a46;--gradient-primary:linear-gradient(115deg,#68f4d3,#519afb);
  --gradient-card:linear-gradient(145deg,rgba(37,68,78,.55),rgba(12,27,44,.85));--success:#68f4d3;--danger:#ff979f;--info:#75bcff;
 }
 :root[data-theme="light"] {
  --bg-primary:#eef6f6;--bg-secondary:#e0eeef;--bg-card:#f9ffff;--bg-card-hover:#e7f5f3;--bg-elevated:#fff;--bg-input:#f0f8f8;
  --text-primary:#143340;--text-secondary:#355c67;--text-muted:#4e707d;--text-disabled:#6e8894;
- --accent:#087f69;--accent-hover:#056753;--accent-secondary:#296dc3;--accent-muted:rgba(8,127,105,.09);--border:rgba(29,99,105,.2);--border-accent:#5dad9d;
+ --on-accent:#ffffff; --accent:#087f69;--accent-hover:#056753;--accent-secondary:#296dc3;--accent-muted:rgba(8,127,105,.09);--border:rgba(29,99,105,.2);--border-accent:#5dad9d;
  --glass-bg:linear-gradient(145deg,rgba(255,255,255,.96),rgba(231,246,246,.94));--glass-bg-hover:#fff;--gradient-primary:linear-gradient(115deg,#087f69,#296dc3);
  --gradient-card:var(--glass-bg);--success:#087f69;--danger:#b9364a;--info:#296dc3;
 }
@@ -271,3 +271,16 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
   .velocity-stats {display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px !important;}
   .velocity-stats>div>*:last-child {font-size:1rem !important;}
 }
+
+/* ── Touch/click targets: nothing interactive below 36px, any width ── */
+.main-content button:not(.multi-select-chips button):not([role="option"]),
+.main-content a.ui-btn,
+.main-content .ui-btn { min-height: 36px; }
+.main-content .category-hide-btn { min-width: 36px; min-height: 36px; }
+.login-card a, .login-form a, a[href*="forgot"] { display: inline-flex; align-items: center; min-height: 36px; }
+
+/* Native <select> popups: readable on both themes, above cards */
+select { color-scheme: light; }
+:root[data-theme="dark"] select { color-scheme: dark; }
+select option { background: var(--bg-card, #fff); color: var(--text-primary, #111); }
+.income-filters, .income-filters label { position: relative; z-index: 5; }
