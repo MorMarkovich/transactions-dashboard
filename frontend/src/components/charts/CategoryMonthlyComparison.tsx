@@ -78,7 +78,7 @@ export default function CategoryMonthlyComparison({
                 border: 'none',
                 cursor: 'pointer',
                 background: display === mode ? 'var(--accent)' : 'transparent',
-                color: display === mode ? '#fff' : 'var(--text-secondary)',
+                color: display === mode ? 'var(--on-accent, #fff)' : 'var(--text-secondary)',
                 fontWeight: 600,
               }}
             >
