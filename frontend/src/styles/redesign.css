@@ -287,3 +287,7 @@ select option { background: var(--bg-card, #fff); color: var(--text-primary, #11
 
 /* Theme flip: no transitions, so every surface changes together */
 .theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
+
+/* Desktop nav + brand: 36px tall hit areas */
+.orbit-nav a { display:inline-flex; align-items:center; min-height:36px; padding-block:8px; }
+.orbit-brand { display:inline-flex; align-items:center; min-height:36px; }
