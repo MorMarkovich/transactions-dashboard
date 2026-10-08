@@ -284,3 +284,6 @@ select { color-scheme: light; }
 :root[data-theme="dark"] select { color-scheme: dark; }
 select option { background: var(--bg-card, #fff); color: var(--text-primary, #111); }
 .income-filters, .income-filters label { position: relative; z-index: 5; }
+
+/* Theme flip: no transitions, so every surface changes together */
+.theme-switching, .theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
