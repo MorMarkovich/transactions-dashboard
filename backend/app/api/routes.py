@@ -2,12 +2,14 @@
 API routes for transactions dashboard
 """
 import uuid
+import functools
 import os
 import math
 import logging
 import time
 import zipfile
 from typing import Optional, Any
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
 import json as _json
 import datetime as _dt
@@ -71,7 +73,20 @@ def _valid_categories(session_id: Optional[str] = None) -> set:
     return valid
 
 
+def _offload(fn):
+    """Run a blocking (pandas / AI) route body in the threadpool.
+
+    Routes are awaitable coroutines (tests await them directly), but the work
+    must not run on the event loop: one slow request used to freeze every
+    other request on the single worker."""
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        return await run_in_threadpool(fn, *args, **kwargs)
+    return wrapper
+
+
 @router.get("/ai-progress")
+@_offload
 def get_ai_progress(sessionId: str = Query(...)):
     """Live progress of the background AI chain (categorize → subcategorize).
 
@@ -81,6 +96,7 @@ def get_ai_progress(sessionId: str = Query(...)):
 
 
 @router.get("/test")
+@_offload
 def test():
     return {"status": "ok"}
 
@@ -365,6 +381,7 @@ class RenameCategoryRequest(BaseModel):
 
 
 @router.post("/restore-session")
+@_offload
 def restore_session(body: RestoreSessionRequest):
     """Restore a backend session from saved transaction JSON data."""
     if not body.transactions:
@@ -701,6 +718,7 @@ def restore_session(body: RestoreSessionRequest):
 
 
 @router.post("/transactions/note")
+@_offload
 def update_transaction_note(body: UpdateTransactionNoteRequest):
     """Update the manual notes (הערות) field for a single transaction."""
     if body.session_id not in sessions:
@@ -734,6 +752,7 @@ def update_transaction_note(body: UpdateTransactionNoteRequest):
 
 
 @router.post("/transactions/category")
+@_offload
 def update_transaction_category(body: UpdateTransactionCategoryRequest):
     """Reclassify a single transaction's category. Used by the dashboard's
     'edit category' UI; the merchant→category mapping is persisted to
@@ -803,6 +822,7 @@ def update_transaction_category(body: UpdateTransactionCategoryRequest):
 
 
 @router.post("/transactions/category-bulk")
+@_offload
 def bulk_update_category(body: BulkUpdateCategoryRequest):
     """Move a SELECTION of transactions to one category (+ optional
     subcategory) in a single action.
@@ -875,6 +895,7 @@ def bulk_update_category(body: BulkUpdateCategoryRequest):
 
 
 @router.post("/transactions/subcategory")
+@_offload
 def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
     """Set a single transaction's subcategory (קטגוריה_משנה) in the session.
 
@@ -928,6 +949,7 @@ def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
 
 
 @router.get("/categories/catalog")
+@_offload
 def get_category_catalog(sessionId: Optional[str] = Query(None)):
     """Return the seeded category + subcategory catalog so the UI's category
     manager and subcategory selectors stay in sync with the backend without
@@ -963,6 +985,7 @@ def get_category_catalog(sessionId: Optional[str] = Query(None)):
 
 
 @router.post("/categories/rename")
+@_offload
 def rename_category(body: RenameCategoryRequest):
     """Rename a category across the current in-memory session.
 
@@ -1002,6 +1025,7 @@ def rename_category(body: RenameCategoryRequest):
 
 
 @router.get("/transactions")
+@_offload
 def get_transactions(
     sessionId: str = Query(...),
     start_date: Optional[str] = None,
@@ -1126,6 +1150,7 @@ def get_transactions(
 
 
 @router.get("/session-files")
+@_offload
 def get_session_files(sessionId: str = Query(...)):
     """List source files in the current session with per-file stats."""
     if sessionId not in sessions:
@@ -1161,6 +1186,7 @@ def get_session_files(sessionId: str = Query(...)):
 
 
 @router.delete("/session-files")
+@_offload
 def delete_session_file(sessionId: str = Query(...), file_name: str = Query(...)):
     """Remove all transactions from a specific source file."""
     if sessionId not in sessions:
@@ -1187,6 +1213,7 @@ def delete_session_file(sessionId: str = Query(...), file_name: str = Query(...)
 
 
 @router.delete("/session")
+@_offload
 def delete_session(sessionId: str = Query(...)):
     """Delete an entire session and all its in-memory data."""
     _remove_session(sessionId)
@@ -1194,6 +1221,7 @@ def delete_session(sessionId: str = Query(...)):
 
 
 @router.get("/session-info")
+@_offload
 def get_session_info(sessionId: str = Query(...)):
     """Get detailed metadata about the current session data."""
     if sessionId not in sessions:
@@ -1269,6 +1297,7 @@ def get_session_info(sessionId: str = Query(...)):
 
 
 @router.get("/owners")
+@_offload
 def get_owners(sessionId: str = Query(...)):
     """Distinct owners present in the session, for the per-person filter."""
     if sessionId not in sessions:
@@ -1289,6 +1318,7 @@ class ScopeSessionRequest(BaseModel):
 
 
 @router.post("/session/scope")
+@_offload
 def scope_session(body: ScopeSessionRequest):
     """Return a session id whose data is filtered to a single owner (_owner).
 
@@ -1528,6 +1558,7 @@ class UpdateMerchantCategoryRequest(BaseModel):
 
 
 @router.post("/merchants/category")
+@_offload
 def update_merchant_category(body: UpdateMerchantCategoryRequest):
     """Reclassify EVERY transaction of a merchant (canonical-key match) in the
     live session — one decision per merchant, applied everywhere. The frontend
@@ -1723,6 +1754,7 @@ def ai_subcategorize_all(body: AISubcategorizeAllRequest):
 
 
 @router.get("/metrics")
+@_offload
 def get_metrics(sessionId: str = Query(...)):
     """Get metrics data"""
     if sessionId not in sessions:
@@ -1761,6 +1793,7 @@ def get_metrics(sessionId: str = Query(...)):
 
 
 @router.get("/categories")
+@_offload
 def get_categories(sessionId: str = Query(...)):
     """Get list of unique categories"""
     if sessionId not in sessions:
@@ -1775,6 +1808,7 @@ def get_categories(sessionId: str = Query(...)):
 
 
 @router.get("/charts/donut")
+@_offload
 def get_donut_chart(sessionId: str = Query(...)):
     """Get donut chart data"""
     if sessionId not in sessions:
@@ -1786,6 +1820,7 @@ def get_donut_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/monthly")
+@_offload
 def get_monthly_chart(sessionId: str = Query(...)):
     """Get monthly chart data"""
     if sessionId not in sessions:
@@ -1797,6 +1832,7 @@ def get_monthly_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/weekday")
+@_offload
 def get_weekday_chart(sessionId: str = Query(...)):
     """Get weekday chart data"""
     if sessionId not in sessions:
@@ -1808,6 +1844,7 @@ def get_weekday_chart(sessionId: str = Query(...)):
 
 
 @router.get("/charts/trend")
+@_offload
 def get_trend_chart(sessionId: str = Query(...)):
     """Get trend chart data"""
     if sessionId not in sessions:
@@ -1819,6 +1856,7 @@ def get_trend_chart(sessionId: str = Query(...)):
 
 
 @router.get("/export")
+@_offload
 def export_transactions(
     sessionId: str = Query(...),
     start_date: Optional[str] = None,
@@ -1932,6 +1970,7 @@ def _to_json_safe(val):
 
 
 @router.get("/charts/v2/donut")
+@_offload
 def get_donut_v2(sessionId: str = Query(...)):
     """Return raw category breakdown (top 10 + 'אחר')."""
     if sessionId not in sessions:
@@ -1967,6 +2006,7 @@ def get_donut_v2(sessionId: str = Query(...)):
 
 
 @router.get("/income-analysis")
+@_offload
 def get_income_analysis(
     sessionId: str = Query(...),
     month: Optional[str] = None,
@@ -2017,6 +2057,7 @@ def get_income_analysis(
     }
 
 @router.get("/charts/v2/income-sources")
+@_offload
 def get_income_sources(sessionId: str = Query(...)):
     """Income (positive amounts) grouped by source — i.e. where it came from
     (the payer/description), top 10 + 'אחר'. Respects the scoped session, so the
@@ -2052,6 +2093,7 @@ def get_income_sources(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/category-snapshot")
+@_offload
 def get_category_snapshot(
     sessionId: str = Query(...),
     month_from: str = Query(default=None),
@@ -2205,6 +2247,7 @@ def get_category_snapshot(
 
 
 @router.get("/charts/v2/category-transactions")
+@_offload
 def get_category_transactions(
     sessionId: str = Query(...),
     month: str = Query(""),
@@ -2278,6 +2321,7 @@ def get_category_transactions(
 
 
 @router.get("/charts/v2/category-merchants")
+@_offload
 def get_category_merchants(
     sessionId: str = Query(...),
     month: str = Query(...),
@@ -2322,6 +2366,7 @@ def get_category_merchants(
 
 
 @router.get("/charts/v2/merchant-transactions")
+@_offload
 def get_merchant_transactions(
     sessionId: str = Query(...),
     month: str = Query(...),
@@ -2367,6 +2412,7 @@ def get_merchant_transactions(
 
 
 @router.get("/charts/v2/monthly")
+@_offload
 def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
     """Return raw monthly expense totals."""
     if sessionId not in sessions:
@@ -2391,6 +2437,7 @@ def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transact
 
 
 @router.get("/charts/v2/weekday")
+@_offload
 def get_weekday_v2(sessionId: str = Query(...)):
     """Return raw weekday expense totals with Hebrew day names."""
     if sessionId not in sessions:
@@ -2429,6 +2476,7 @@ def get_weekday_v2(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/trend")
+@_offload
 def get_trend_v2(sessionId: str = Query(...)):
     """Return cumulative balance over time."""
     if sessionId not in sessions:
@@ -2453,6 +2501,7 @@ def get_trend_v2(sessionId: str = Query(...)):
 
 
 @router.get("/merchants")
+@_offload
 def get_merchants(
     sessionId: str = Query(...),
     n: int = Query(default=8, ge=1),
@@ -2492,6 +2541,7 @@ def get_merchants(
 
 
 @router.get("/trend-stats")
+@_offload
 def get_trend_stats(sessionId: str = Query(...)):
     """Return trend statistics and month-over-month changes."""
     if sessionId not in sessions:
@@ -2550,6 +2600,7 @@ def get_trend_stats(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/heatmap")
+@_offload
 def get_heatmap_v2(sessionId: str = Query(...)):
     """Return category x month matrix for heatmap visualization."""
     if sessionId not in sessions:
@@ -2582,6 +2633,7 @@ def get_heatmap_v2(sessionId: str = Query(...)):
 
 
 @router.get("/charts/v2/month-overview")
+@_offload
 def get_month_overview(
     sessionId: str = Query(...),
     month: str = Query(...),
@@ -2635,6 +2687,7 @@ def get_month_overview(
 
 
 @router.get("/charts/v2/industry-monthly")
+@_offload
 def get_industry_monthly(
     sessionId: str = Query(...),
     date_type: str = Query("transaction"),
@@ -2694,6 +2747,7 @@ def get_industry_monthly(
 
 
 @router.get("/charts/v2/subcategory-monthly")
+@_offload
 def get_subcategory_monthly(
     sessionId: str = Query(...),
     category: str = Query(...),
@@ -2726,6 +2780,7 @@ def get_subcategory_monthly(
 
 
 @router.get("/charts/v2/category-monthly-comparison")
+@_offload
 def get_category_monthly_comparison(
     sessionId: str = Query(...),
     date_type: str = Query("transaction"),
@@ -2814,6 +2869,7 @@ def get_category_monthly_comparison(
 # ---------------------------------------------------------------------------
 
 @router.get("/analytics/recurring")
+@_offload
 def get_recurring_transactions(sessionId: str = Query(...)):
     """Detect recurring/subscription transactions."""
     if sessionId not in sessions:
@@ -2892,6 +2948,7 @@ def get_recurring_transactions(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/forecast")
+@_offload
 def get_spending_forecast(sessionId: str = Query(...)):
     """Linear forecast of next month's spending."""
     if sessionId not in sessions:
@@ -2962,6 +3019,7 @@ def get_spending_forecast(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/weekly-summary")
+@_offload
 def get_weekly_summary(sessionId: str = Query(...)):
     """This week vs last week comparison."""
     if sessionId not in sessions:
@@ -3028,6 +3086,7 @@ def get_weekly_summary(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/spending-velocity")
+@_offload
 def get_spending_velocity(sessionId: str = Query(...)):
     """Daily spending rate and rolling averages."""
     if sessionId not in sessions:
@@ -3069,6 +3128,7 @@ def get_spending_velocity(sessionId: str = Query(...)):
 
 
 @router.get("/analytics/anomalies")
+@_offload
 def get_anomalies(sessionId: str = Query(...)):
     """Find transactions beyond 2 standard deviations from category mean."""
     if sessionId not in sessions:
@@ -3117,6 +3177,7 @@ def get_anomalies(sessionId: str = Query(...)):
 
 
 @router.get("/search")
+@_offload
 def search_transactions(
     sessionId: str = Query(...),
     q: str = Query(..., min_length=1, max_length=200),
