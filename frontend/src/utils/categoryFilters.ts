@@ -27,10 +27,11 @@ export function filterAndSortCategories(
     // Category multi-select (null = all selected)
     if (opts.selectedCategories !== null && !opts.selectedCategories.has(c.name)) return false
 
-    // Text search (category name or top merchant)
+    // Text search (category name or any merchant in it)
     if (searchLower &&
         !c.name.toLowerCase().includes(searchLower) &&
-        !(c.top_merchant && c.top_merchant.toLowerCase().includes(searchLower))) {
+        !(c.top_merchant && c.top_merchant.toLowerCase().includes(searchLower)) &&
+        !(c.merchants && c.merchants.some((m) => m.toLowerCase().includes(searchLower)))) {
       return false
     }
 
