@@ -90,6 +90,7 @@ function CenterLabel({ total, compact = false }: { total: number; compact?: bool
         alignItems: 'center',
         justifyContent: 'center',
         pointerEvents: 'none',
+        zIndex: 1,
         textAlign: 'center',
         fontFamily: 'var(--font-family)',
       }}
@@ -148,7 +149,13 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             ))}
           </Pie>
 
-          <Tooltip content={tooltipContent as any} />
+          {/* The HTML center label is a sibling overlay. Keep the tooltip above it,
+              and do not animate between sectors while the pointer moves. */}
+          <Tooltip
+            content={tooltipContent as any}
+            wrapperStyle={{ zIndex: 2, pointerEvents: 'none' }}
+            isAnimationActive={false}
+          />
         </PieChart>
       </ResponsiveContainer>
       <CenterLabel total={total} compact={isCompact} />
