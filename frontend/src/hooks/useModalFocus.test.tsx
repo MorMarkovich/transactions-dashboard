@@ -1,0 +1,6 @@
+import {describe,it,expect} from 'vitest'
+import {render,screen,fireEvent} from '@testing-library/react'
+import {useState} from 'react'
+import {useModalFocus} from './useModalFocus'
+function Demo(){const[open,setOpen]=useState(false);useModalFocus(open);return <><header className="orbit-topbar"><button onClick={()=>setOpen(true)}>open</button></header><main className="main-content"><button>background</button></main><aside className="sidebar" role="dialog" aria-label="management" style={{visibility:open?'visible':'hidden'}}><button className="sidebar-close-btn" onClick={()=>setOpen(false)}>close</button><button>last</button></aside></>}
+describe('management keyboard modal',()=>{it('enters, cycles, isolates background and restores focus',()=>{render(<Demo/>);const opener=screen.getByText('open');opener.focus();fireEvent.click(opener);expect(screen.getByText('close')).toHaveFocus();expect(document.querySelector<HTMLElement>('.main-content')?.inert).toBe(true);screen.getByText('last').focus();fireEvent.keyDown(document,{key:'Tab'});expect(screen.getByText('close')).toHaveFocus();fireEvent.keyDown(document,{key:'Tab',shiftKey:true});expect(screen.getByText('last')).toHaveFocus();fireEvent.click(screen.getByText('close'));expect(opener).toHaveFocus();expect(document.querySelector<HTMLElement>('.main-content')?.inert).not.toBe(true)})})
