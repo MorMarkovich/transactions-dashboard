@@ -153,6 +153,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           textAnchor={needsRotation ? 'end' : 'middle'}
           height={needsRotation ? (isCompact ? 58 : 70) : 30}
           interval="preserveStartEnd"
+          padding={{ left: 6, right: isCompact ? 14 : 6 }}
         />
 
         <YAxis
