@@ -203,7 +203,7 @@ export default function Merchants() {
               <Crown size={18} color="#fff" />
             </div>
             <div className="stat-content">
-              <div className="stat-value">{summaryStats.mostFrequent.name}</div>
+              <div className="stat-value"><bdi dir="auto">{summaryStats.mostFrequent.name.replace(/ב(?=[A-Z])/g, 'ב-')}</bdi></div>
               <div className="stat-label">הכי תדיר ({summaryStats.mostFrequent.count} ביקורים)</div>
             </div>
           </div>
@@ -304,7 +304,7 @@ export default function Merchants() {
                     flexShrink: 0,
                   }}
                 >
-                  <Store size={20} style={{ color: '#818cf8' }} />
+                  <Store size={20} style={{ color: 'var(--accent)'  }} />
                 </div>
                 <h3
                   style={{
