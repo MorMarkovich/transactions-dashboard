@@ -288,6 +288,7 @@ export interface CategorySnapshotItem {
   month_change: number
   top_merchant: string | null
   top_merchant_total: number
+  merchants?: string[]
   sparkline: number[]
 }
 
