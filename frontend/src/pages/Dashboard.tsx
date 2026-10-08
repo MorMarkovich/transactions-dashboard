@@ -1,3 +1,5 @@
+import { defaultMonth } from '../utils/defaultMonth'
+import { categoryColor } from '../utils/chartPalette'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -10,9 +12,8 @@ import {
   TrendingUp,
   Zap,
   LayoutDashboard,
-  ChevronRight,
-  ChevronLeft,
   CreditCard,
+  ChevronLeft,
   ArrowUpDown,
   Grid3X3,
   Tag,
@@ -27,7 +28,6 @@ import { ASSIGNABLE_CATEGORIES, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import DonutChart from '../components/charts/DonutChart'
-import MetricsGrid from '../components/metrics/MetricsGrid'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import EmptyState from '../components/common/EmptyState'
@@ -494,9 +494,8 @@ export default function Dashboard() {
         const monthly = results[2] as RawMonthlyData
         if (monthly?.months?.length) {
           const months = monthly.months.map((m) => m.month)
-          const latest = months[months.length - 1]
           setSelectedMonth((prev) => {
-            const next = prev && months.includes(prev) ? prev : latest
+            const next = defaultMonth(months, prev) || months[months.length-1]
             // Keep the snapshot range in step on first load / invalid month;
             // the selectedMonth sync effect handles user-driven changes.
             setSnapshotMonthFrom((f) => (f && months.includes(f) ? f : next))
@@ -546,11 +545,6 @@ export default function Dashboard() {
   }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories])
 
   // ── Derived data ───────────────────────────────────────────────────
-  const monthlyAmounts = useMemo(() => {
-    if (!monthlyData?.months) return undefined
-    return monthlyData.months.map((m) => m.amount)
-  }, [monthlyData])
-
   // List of months to show in selector (last 12 months)
   const availableMonths = useMemo(() => {
     if (!monthlyData?.months) return []
@@ -765,12 +759,6 @@ export default function Dashboard() {
     [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, user],
   )
 
-  // ── Month selector navigation ──────────────────────────────────────
-  const selectedMonthIdx = useMemo(() => {
-    if (!selectedMonth || !availableMonths.length) return 0
-    return availableMonths.findIndex((m) => m.month === selectedMonth)
-  }, [selectedMonth, availableMonths])
-
   const monthExpensePie = useMemo(() => {
     if (!monthOverview) return []
     return monthOverview.categories
@@ -779,17 +767,7 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value)
   }, [monthOverview])
 
-  const goToPrevMonth = useCallback(() => {
-    if (selectedMonthIdx < availableMonths.length - 1) {
-      setSelectedMonth(availableMonths[selectedMonthIdx + 1].month)
-    }
-  }, [selectedMonthIdx, availableMonths])
-
-  const goToNextMonth = useCallback(() => {
-    if (selectedMonthIdx > 0) {
-      setSelectedMonth(availableMonths[selectedMonthIdx - 1].month)
-    }
-  }, [selectedMonthIdx, availableMonths])
+  const monthChartData = monthExpensePie.length > 7 ? [...monthExpensePie.slice(0,6), {name:'יתר הקטגוריות',value:monthExpensePie.slice(6).reduce((sum,item)=>sum+item.value,0)}] : monthExpensePie
 
   // After the local bank-sync tool writes a fresh snapshot to Supabase, load it
   // through the normal restore path (same flow as a manual upload).
@@ -874,7 +852,7 @@ export default function Dashboard() {
 
   // ── Main view ──────────────────────────────────────────────────────
   return (
-    <div style={{ direction: 'rtl', position: 'relative' }}>
+    <div className="studio-dashboard" style={{ direction: 'rtl', position: 'relative' }}>
       {/* Mesh gradient background */}
       <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
@@ -889,7 +867,14 @@ export default function Dashboard() {
         </label>}
       />
 
-      <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
+      <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
+        overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
+        category={category} subcategories={subcategories} refreshKey={refreshKey}
+        onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
+        onCategory={handleCategoryCardClick}
+        onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
+
+      <details className="dashboard-filter-bar" aria-label="סינון קטגוריות"><summary><SlidersHorizontal size={16}/> סינון ומיקוד <span>{category || 'כל הקטגוריות'}{subcategories.length ? ` · ${subcategories.length} תתי-קטגוריות` : ''}</span></summary>
         <div className="dashboard-filter-heading">
           <div>
             <strong>מיקוד הדשבורד</strong>
@@ -918,7 +903,7 @@ export default function Dashboard() {
           </label>
         </div>
         {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
-      </section>
+      </details>
 
       {/* ── Per-person filter (הכל = everyone incl. shared; person chips
               only — "משותף"/shared rows are part of הכל, not a separate view) ── */}
@@ -946,18 +931,13 @@ export default function Dashboard() {
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(o) }}
             >
-              {o}
+              {o === 'joint' ? 'משותף' : o}
             </span>
           ))}
         </div>
       )}
 
-      <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
-        overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
-        category={category} subcategories={subcategories} refreshKey={refreshKey}
-        onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
-        onCategory={handleCategoryCardClick}
-        onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
+
 
       {/* ── Date type toggle (billing / transaction) ───────────────── */}
       {hasBillingDate && (
@@ -965,7 +945,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          style={{ marginBottom: 'var(--space-md)', position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}
+          className="studio-date-toggle" style={{ marginBottom: 'var(--space-md)', position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}
         >
           <CreditCard size={15} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>קיבוץ לפי:</span>
@@ -995,7 +975,7 @@ export default function Dashboard() {
 
       {/* ── Month selector + overview ──────────────────────────────── */}
       {availableMonths.length > 0 && (
-        <motion.div
+        <motion.div className="studio-breakdown"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.35 }}
@@ -1012,78 +992,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Month selector bar */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-sm)',
-            marginBottom: 'var(--space-md)',
-            flexWrap: 'wrap',
-          }}>
-            <button
-              onClick={goToPrevMonth}
-              disabled={selectedMonthIdx >= availableMonths.length - 1}
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                cursor: selectedMonthIdx >= availableMonths.length - 1 ? 'not-allowed' : 'pointer',
-                opacity: selectedMonthIdx >= availableMonths.length - 1 ? 0.4 : 1,
-                padding: '6px 10px',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-              aria-label="חודש קודם"
-            >
-              <ChevronRight size={16} />
-            </button>
-
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-              {availableMonths.slice(0, 8).map((m) => (
-                <button
-                  key={m.month}
-                  onClick={() => setSelectedMonth(m.month)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    border: '1px solid',
-                    borderColor: selectedMonth === m.month ? 'var(--accent)' : 'var(--border)',
-                    background: selectedMonth === m.month ? 'var(--accent-muted)' : 'transparent',
-                    color: selectedMonth === m.month ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontWeight: selectedMonth === m.month ? 700 : 500,
-                    fontSize: '0.8125rem',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-family)',
-                    transition: 'all 0.15s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatMonthLabel(m.month)}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={goToNextMonth}
-              disabled={selectedMonthIdx <= 0}
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                cursor: selectedMonthIdx <= 0 ? 'not-allowed' : 'pointer',
-                opacity: selectedMonthIdx <= 0 ? 0.4 : 1,
-                padding: '6px 10px',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-              aria-label="חודש הבא"
-            >
-              <ChevronLeft size={16} />
-            </button>
-          </div>
-
           {/* Month overview content */}
           {monthOverviewLoading ? (
             <Skeleton variant="rectangular" height={320} />
@@ -1095,73 +1003,23 @@ export default function Dashboard() {
             }}
               className="month-overview-grid"
             >
-              {/* Summary cards */}
               <>
-                <Card variant="glass" padding="md">
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }} />
-                    הוצאות — {formatMonthLabel(monthOverview.month)}
-                  </div>
-                  <AnimatedNumber
-                    value={monthOverview.total_expenses}
-                    formatter={formatCurrency}
-                    style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--danger)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {monthOverview.transaction_count === 1 ? 'עסקה אחת' : `${monthOverview.transaction_count} עסקאות`}
-                  </div>
-                </Card>
-
-                {monthOverview.total_income > 0 && (
-                  <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)', display: 'inline-block' }} />
-                      הכנסות — {formatMonthLabel(monthOverview.month)}
-                    </div>
-                    <AnimatedNumber
-                      value={monthOverview.total_income}
-                      formatter={formatCurrency}
-                      style={{ fontSize: '1.625rem', fontWeight: 700, color: 'var(--success)', fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block' }}
-                    />
-                  </Card>
-                )}
-
-                {monthOverview.total_income > 0 && (
-                  <Card variant="glass" padding="md">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px' }}>יתרה נטו</div>
-                    {(() => {
-                      const balance = monthOverview.total_income - monthOverview.total_expenses
-                      return (
-                        <AnimatedNumber
-                          value={Math.abs(balance)}
-                          formatter={(v) => formatCurrency(balance >= 0 ? v : -v, true)}
-                          style={{
-                            fontSize: '1.625rem', fontWeight: 700,
-                            color: balance >= 0 ? 'var(--success)' : 'var(--danger)',
-                            fontFamily: 'var(--font-mono)', direction: 'ltr', display: 'block'
-                          }}
-                        />
-                      )
-                    })()}
-                  </Card>
-                )}
-
                 {monthExpensePie.length > 0 && (
                   <Card variant="glass" padding="md" className="month-breakdown-pie-card">
                     <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
                       הרכב ההוצאות - {formatMonthLabel(monthOverview.month)}
                     </div>
                     <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
-                      <DonutChart data={monthExpensePie} total={monthOverview.total_expenses} />
+                      <div><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
                       <div className="month-pie-legend">
-                        {monthExpensePie.map((item, index) => {
+                        {monthExpensePie.map((item) => {
                           const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
-                          return <div key={item.name} className="month-pie-legend-row">
-                            <span className={`month-pie-color color-${index % 11}`} />
-                            <span className="month-pie-name">{get_icon(item.name)} {item.name}</span>
-                            <span className="month-pie-percent">{pct.toFixed(0)}%</span>
+                          return <button type="button" onClick={() => handleCategoryCardClick(item.name)} key={item.name} className="month-pie-legend-row">
+                            <span className="month-pie-color" style={{background:categoryColor(item.name)}} />
+                            <span className="month-pie-name">{item.name}</span>
+                            <span className="month-pie-share"><i style={{width:`${pct}%`}}/></span><span className="month-pie-percent">{pct.toFixed(0)}%</span>
                             <strong>{formatCurrency(item.value)}</strong>
-                          </div>
+                          </button>
                         })}
                       </div>
                     </div>
@@ -1366,7 +1224,7 @@ export default function Dashboard() {
                     opacity: isExcluded ? 0.6 : 1,
                   }}
                 >
-                  <span style={{ fontSize: '0.8rem' }}>{get_icon(cat.name)}</span>
+                  <span style={{ fontSize: '0.8rem' }}><Tag size={18}/></span>
                   {cat.name}
                   <span style={{ fontSize: '0.6rem', opacity: 0.7 }}>({cat.percent.toFixed(0)}%)</span>
                 </button>
@@ -1452,7 +1310,7 @@ export default function Dashboard() {
               const isRenaming = editingCategoryName === cat.name
               const isSavingRename = savingCategoryName === cat.name
               return (
-                <div key={cat.name} style={{ cursor: 'pointer' }}>
+                <div key={cat.name} className="studio-category" style={{ cursor: 'pointer' }}>
                 <Card
                   variant="glass"
                   padding="sm"
@@ -1489,7 +1347,7 @@ export default function Dashboard() {
                       fontSize: '1.2rem',
                       flexShrink: 0,
                     }}>
-                      {get_icon(cat.name)}
+                      <Tag size={18}/>
                     </div>
 
                     {/* Content */}
@@ -1583,7 +1441,7 @@ export default function Dashboard() {
                               e.stopPropagation()
                               startCategoryRename(cat.name)
                             }}
-                            title="ערוך שם קטגוריה"
+                            aria-label="ערוך שם קטגוריה" title="ערוך שם קטגוריה"
                             style={{
                               height: 24,
                               borderRadius: 'var(--radius-full)',
@@ -1602,7 +1460,6 @@ export default function Dashboard() {
                             }}
                           >
                             <Edit2 size={11} />
-                            ערוך שם
                           </button>
                         )}
                         {/* Transaction count */}
@@ -1628,7 +1485,7 @@ export default function Dashboard() {
                       </div>
 
                       {/* Row 3: Analytical details */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                      <details className="category-extra" onClick={e => e.stopPropagation()}><summary>פרטים נוספים</summary><div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           ממוצע: <strong style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(cat.avg_transaction)}</strong>
                         </span>
@@ -1641,10 +1498,11 @@ export default function Dashboard() {
                       {/* Row 4: Top merchant */}
                       {cat.top_merchant && (
                         <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          🏪 {cat.top_merchant} ({formatCurrency(cat.top_merchant_total)})
+                          <bdi>{cat.top_merchant}</bdi> ({formatCurrency(cat.top_merchant_total)})
                         </div>
                       )}
 
+                      </details>
                       {/* Row 5: Progress bar + mini sparkline */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                         <div style={{ flex: 1, height: '3px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
@@ -1691,11 +1549,6 @@ export default function Dashboard() {
           )}
         </motion.div>
       )}
-
-      {/* ── Metrics Grid (totals) ─────────────────────────────────── */}
-      <div style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}>
-        <MetricsGrid metrics={metrics} monthlyAmounts={monthlyAmounts} />
-      </div>
 
       {/* ── Income sources (where income came from) ────────────────── */}
       {incomeSources && incomeSources.sources.length > 0 && (
@@ -1920,12 +1773,12 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.35 }}
+          transition={{ duration: 0.22 }}
           style={{ marginTop: 'var(--space-lg)' }}
         >
           <div className="section-header-v2">
             <BarChart3 size={18} />
-            <span>השוואה חודשית</span>
+            <span>השוואת חודשים</span>
             <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
               {monthlyData.months.length} חודשים
             </span>
@@ -1940,7 +1793,7 @@ export default function Dashboard() {
                 const changePct = prev ? ((month.amount - prev) / Math.abs(prev)) * 100 : null
                 const isSelected = month.month === selectedMonth
                 return (
-                  <div
+                  <button type="button"
                     key={month.month}
                     onClick={() => setSelectedMonth(month.month)}
                     style={{
@@ -1959,12 +1812,13 @@ export default function Dashboard() {
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
                       {formatCurrency(month.amount)}
                     </div>
+                    <div className="month-bar-track"><i style={{height:`${Math.max(2,month.amount/Math.max(...monthlyData.months.map(m=>m.amount))*100)}%`}}/></div>
                     {changePct !== null && (
                       <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--success)' }}>
                         {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
                       </div>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -2006,4 +1860,4 @@ export default function Dashboard() {
       />
     </div>
   )
-      }
+                                           }
