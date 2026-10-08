@@ -1087,7 +1087,10 @@ def get_transactions(
     income_df = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
     total_expenses = round(_sanitize(float(expenses_df['סכום_מוחלט'].sum())), 2) if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns else 0
     total_income = round(_sanitize(float(income_df['סכום'].sum())), 2) if not income_df.empty else 0
-    median_transaction = round(_sanitize(float(df['סכום_מוחלט'].median())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
+    # Median / average are for EXPENSES only, matching /trends and /budget
+    median_transaction = round(_sanitize(float(expenses_df['סכום_מוחלט'].median())), 2) if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns else 0
+    if expense_count > 0:
+        avg_transaction = round(_sanitize(total_expenses / expense_count), 2)
 
     # Max/min transactions
     max_transaction = None
