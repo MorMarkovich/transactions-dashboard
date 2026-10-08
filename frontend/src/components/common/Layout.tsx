@@ -2,6 +2,7 @@ import { type ReactNode, useState, useEffect, useCallback, useRef } from 'react'
 import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
+import { useModalFocus } from '../../hooks/useModalFocus'
 import Sidebar from './Sidebar'
 import CommandPalette from './CommandPalette'
 import { LayoutDashboard, Receipt, CalendarRange, Menu } from 'lucide-react'
@@ -13,8 +14,6 @@ import { transactionsApi } from '../../services/api'
 import './Layout.css'
 
 // ─── Constants ────────────────────────────────────────────────────────
-const MOBILE_BREAKPOINT = 1024
-const COLLAPSED_KEY = 'sidebar-collapsed'
 const AUTO_AI_ENABLED = import.meta.env.VITE_AUTO_AI !== 'false'
 
 interface LayoutProps {
@@ -36,42 +35,18 @@ export default function Layout({ children }: LayoutProps) {
     return true
   })
 
-  // Sidebar defaults: open on desktop, closed on mobile
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.innerWidth >= MOBILE_BREAKPOINT
-  })
+  // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Collapsed state persisted in localStorage
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(COLLAPSED_KEY) === 'true'
-  })
-
-  // Track window resize to auto-show/hide sidebar
-  useEffect(() => {
-    let resizeTimer: ReturnType<typeof setTimeout>
-
-    const handleResize = () => {
-      clearTimeout(resizeTimer)
-      resizeTimer = setTimeout(() => {
-        const isDesktop = window.innerWidth >= MOBILE_BREAKPOINT
-        setSidebarOpen(isDesktop)
-      }, 150)
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => {
-      clearTimeout(resizeTimer)
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [])
+  useModalFocus(sidebarOpen)
+  const openSearch = () => { setSidebarOpen(false); setCommandPaletteOpen(true) }
 
   // Global Ctrl+K / Cmd+K keyboard shortcut for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
+        setSidebarOpen(false)
         setCommandPaletteOpen(prev => !prev)
       }
     }
@@ -277,47 +252,47 @@ export default function Layout({ children }: LayoutProps) {
   }, [])
 
   const closeSidebar = useCallback(() => {
-    if (window.innerWidth < MOBILE_BREAKPOINT) {
-      setSidebarOpen(false)
-    }
+    setSidebarOpen(false)
   }, [])
 
-  const toggleCollapse = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem(COLLAPSED_KEY, String(next))
-      return next
-    })
-  }, [])
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [sidebarOpen])
 
   // File upload handler: navigate to dashboard with the new session_id
   const handleFileUploaded = useCallback(
     (sessionId: string) => {
       navigate(`/?session_id=${sessionId}`)
-      if (window.innerWidth < MOBILE_BREAKPOINT) {
+      if (sidebarOpen) {
         setSidebarOpen(false)
       }
     },
-    [navigate],
+    [navigate, sidebarOpen],
   )
 
   return (
-    <div className={`layout ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
+    <div className="layout orbit-layout">
       <Header
         onToggleSidebar={toggleSidebar}
         sidebarOpen={sidebarOpen}
-        onCommandPalette={() => setCommandPaletteOpen(true)}
+        onCommandPalette={openSearch}
       />
 
       <div className="layout-content">
         {/* Sidebar */}
         <Sidebar
           isOpen={sidebarOpen}
-          collapsed={sidebarCollapsed}
+          collapsed={false}
           onClose={closeSidebar}
           onFileUploaded={handleFileUploaded}
-          onToggleCollapse={toggleCollapse}
-          onSearch={() => setCommandPaletteOpen(true)}
+          onSearch={openSearch}
         />
 
         {/* Mobile overlay backdrop */}
@@ -354,8 +329,8 @@ export default function Layout({ children }: LayoutProps) {
         onClose={() => setCommandPaletteOpen(false)}
       />
       <nav className="mobile-bottom-nav" aria-label="ניווט מהיר">
-        {[{to:'/',text:'דשבורד',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}
-        <button onClick={toggleSidebar}><Menu size={20}/><span>עוד</span></button>
+        {[{to:'/',text:'סקירה',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}
+        <button onClick={toggleSidebar}><Menu size={20}/><span>תפריט</span></button>
       </nav>
 
       {/* Background-AI progress pill — visible while the automatic

@@ -1,4 +1,5 @@
 import { defaultMonth } from '../utils/defaultMonth'
+import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
 import { categoryColor } from '../utils/chartPalette'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -759,7 +760,7 @@ export default function Dashboard() {
     [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, user],
   )
 
-  const monthExpensePie = useMemo(() => {
+  const monthExpensePie = useMemo<MonthLegendItem[]>(() => {
     if (!monthOverview) return []
     return monthOverview.categories
       .filter((item) => item.expenses > 0)
@@ -767,7 +768,8 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value)
   }, [monthOverview])
 
-  const monthChartData = monthExpensePie.length > 7 ? [...monthExpensePie.slice(0,6), {name:'יתר הקטגוריות',value:monthExpensePie.slice(6).reduce((sum,item)=>sum+item.value,0)}] : monthExpensePie
+  const [showAllMonthCategories, setShowAllMonthCategories] = useState(false)
+  const monthChartData = groupMonthCategories(monthExpensePie)
 
   // After the local bank-sync tool writes a fresh snapshot to Supabase, load it
   // through the normal restore path (same flow as a manual upload).
@@ -857,8 +859,8 @@ export default function Dashboard() {
       <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
       <PageHeader
-        title="דשבורד"
-        subtitle="סקירה כללית של ההוצאות וההכנסות שלך"
+        title="מרכז הבקרה של הכסף שלך"
+        subtitle="סקירה חודשית של ההוצאות, ההכנסות ומה שהשתנה"
         icon={LayoutDashboard}
         actions={<label className="dashboard-month-control">חודש לתצוגה
           <select aria-label="חודש לתצוגה" value={selectedMonth || ''} onChange={e => setSelectedMonth(e.target.value)}>
@@ -1012,15 +1014,16 @@ export default function Dashboard() {
                     <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
                       <div><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
                       <div className="month-pie-legend">
-                        {monthExpensePie.map((item) => {
+                        {(showAllMonthCategories ? monthExpensePie : monthChartData).map((item) => {
                           const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
-                          return <button type="button" onClick={() => handleCategoryCardClick(item.name)} key={item.name} className="month-pie-legend-row">
+                          return <button type="button" onClick={() => item.aggregate ? setShowAllMonthCategories(true) : handleCategoryCardClick(item.name)} key={`${item.aggregate ? "group" : "category"}:${item.name}`} className="month-pie-legend-row">
                             <span className="month-pie-color" style={{background:categoryColor(item.name)}} />
                             <span className="month-pie-name">{item.name}</span>
                             <span className="month-pie-share"><i style={{width:`${pct}%`}}/></span><span className="month-pie-percent">{pct.toFixed(0)}%</span>
                             <strong>{formatCurrency(item.value)}</strong>
                           </button>
                         })}
+                        {monthExpensePie.length > 7 && <button className="month-legend-expand" onClick={() => setShowAllMonthCategories(v => !v)}>{showAllMonthCategories ? 'הצג פחות' : `כל ${monthExpensePie.length} הקטגוריות`}</button>}
                       </div>
                     </div>
                   </Card>
@@ -1860,4 +1863,4 @@ export default function Dashboard() {
       />
     </div>
   )
-                                           }
+                  }

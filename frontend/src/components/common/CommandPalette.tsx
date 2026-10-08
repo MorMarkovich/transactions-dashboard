@@ -14,6 +14,7 @@ import {
   PiggyBank,
   Sun,
   Moon,
+  X,
 } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
 
@@ -45,15 +46,15 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
 
   const commands: CommandItem[] = useMemo(
     () => [
-      { id: 'dashboard', label: 'דשבורד', icon: <LayoutDashboard size={18} />, action: () => navigate(`/${sessionQuery}`), keywords: ['dashboard', 'דשבורד', 'ראשי', 'בית'], group: 'ניווט' },
+      { id: 'dashboard', label: 'סקירה', icon: <LayoutDashboard size={18} />, action: () => navigate(`/${sessionQuery}`), keywords: ['dashboard', 'סקירה', 'דשבורד', 'ראשי', 'בית'], group: 'ניווט' },
       { id: 'transactions', label: 'עסקאות', icon: <Receipt size={18} />, action: () => navigate(`/transactions${sessionQuery}`), keywords: ['transactions', 'עסקאות', 'רשימה'], group: 'ניווט' },
       { id: 'monthly', label: 'השוואת חודשים', icon: <CalendarRange size={18} />, action: () => navigate(`/monthly${sessionQuery}`), keywords: ['monthly', 'פילוח', 'חודשי', 'חודשים', 'השוואה'], group: 'ניווט' },
       { id: 'trends', label: 'מגמות', icon: <TrendingUp size={18} />, action: () => navigate(`/trends${sessionQuery}`), keywords: ['trends', 'מגמות', 'גרפים'], group: 'ניווט' },
       { id: 'merchants', label: 'בתי עסק', icon: <Store size={18} />, action: () => navigate(`/merchants${sessionQuery}`), keywords: ['merchants', 'בתי עסק', 'חנויות'], group: 'ניווט' },
       { id: 'budget', label: 'תקציב', icon: <Target size={18} />, action: () => navigate(`/budget${sessionQuery}`), keywords: ['budget', 'תקציב', 'יעד', 'מגבלה'], group: 'ניווט' },
       { id: 'income', label: 'הכנסות', icon: <Wallet size={18} />, action: () => navigate(`/income${sessionQuery}`), keywords: ['income', 'הכנסות'], group: 'ניווט' },
-      { id: 'savings', label: 'יעדי חיסכון', icon: <PiggyBank size={18} />, action: () => navigate(`/savings${sessionQuery}`), keywords: ['savings', 'חיסכון', 'יעדים', 'חסכון'], group: 'ניווט' },
-      { id: 'data', label: 'ניהול נתונים', icon: <Database size={18} />, action: () => navigate(`/data-management${sessionQuery}`), keywords: ['data', 'נתונים', 'ניהול', 'management'], group: 'ניווט' },
+      { id: 'savings', label: 'חיסכון', icon: <PiggyBank size={18} />, action: () => navigate(`/savings${sessionQuery}`), keywords: ['savings', 'חיסכון', 'יעדים', 'חסכון'], group: 'ניווט' },
+      { id: 'data', label: 'ניהול מידע', icon: <Database size={18} />, action: () => navigate(`/data-management${sessionQuery}`), keywords: ['data', 'מידע', 'נתונים', 'ניהול', 'management'], group: 'ניווט' },
       { id: 'theme', label: theme === 'dark' ? 'מצב בהיר' : 'מצב כהה', icon: theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />, action: () => { toggleTheme(); onClose() }, keywords: ['theme', 'dark', 'light', 'כהה', 'בהיר', 'מצב'], group: 'פעולות' },
     ],
     [navigate, sessionQuery, theme, toggleTheme, onClose],
@@ -104,6 +105,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
           }
           break
         case 'Escape':
+          e.stopPropagation()
           e.preventDefault()
           onClose()
           break
@@ -149,12 +151,18 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            role="dialog"
+            aria-label="חיפוש עמוד או פעולה"
+            aria-modal="true"
             style={{
               position: 'fixed',
-              top: '20%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '100%',
+              top: '12%',
+              maxHeight: '75dvh',
+              overflowY: 'auto',
+              left: 0,
+              right: 0,
+              marginInline: 'auto',
+              width: 'calc(100% - 32px)',
               maxWidth: '520px',
               zIndex: 100001,
               direction: 'rtl',
@@ -190,6 +198,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                   placeholder="חפש עמוד או פעולה..."
                   style={{
                     flex: 1,
+                    minWidth: 0,
                     background: 'transparent',
                     border: 'none',
                     outline: 'none',
@@ -199,7 +208,8 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                     direction: 'rtl',
                   }}
                 />
-                <kbd
+                <button className="command-close" onClick={onClose} aria-label="סגור חיפוש"><X size={18}/></button>
+                <kbd className="command-escape"
                   style={{
                     padding: '2px 6px',
                     fontSize: '0.6875rem',
@@ -218,7 +228,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               <div
                 ref={listRef}
                 style={{
-                  maxHeight: '320px',
+                  maxHeight: 'min(320px, 45dvh)',
                   overflowY: 'auto',
                   padding: '8px',
                 }}
@@ -236,7 +246,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                   </div>
                 ) : (
                   filteredCommands.map((cmd, idx) => (
-                    <div
+                    <button type="button" className="command-result"
                       key={cmd.id}
                       onClick={() => { cmd.action(); onClose() }}
                       onMouseEnter={() => setSelectedIndex(idx)}
@@ -280,7 +290,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                         </p>
                       </div>
                       {idx === selectedIndex && (
-                        <kbd
+                        <kbd className="command-keyboard-hint"
                           style={{
                             padding: '2px 6px',
                             fontSize: '0.625rem',
@@ -294,7 +304,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                           Enter &#8629;
                         </kbd>
                       )}
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -311,9 +321,9 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                   color: 'var(--text-muted)',
                 }}
               >
-                <span>&#8593;&#8595; ניווט</span>
-                <span>&#8629; בחירה</span>
-                <span>ESC סגירה</span>
+                <span className="command-keyboard-hint">&#8593;&#8595; ניווט</span>
+                <span className="command-keyboard-hint">&#8629; בחירה</span>
+                <span className="command-keyboard-hint">ESC סגירה</span><span className="command-touch-hint">לחצו על תוצאה כדי לפתוח עמוד</span>
               </div>
             </div>
           </motion.div>

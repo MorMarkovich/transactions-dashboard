@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Bookmark, Trash2, Wallet, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowLeft, Bookmark, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
 import type { MonthOverviewData } from '../../services/types'
 import { transactionsApi } from '../../services/api'
 import { previousMonth, spendingChange, categoryChanges } from '../../utils/monthComparison'
@@ -55,19 +55,17 @@ export default function MonthlyPulse(p: Props) {
   return <section className="monthly-pulse" aria-label="תמונת מצב חודשית">
     <div className="pulse-first-row" aria-busy={p.loading}>
       <div className="pulse-spending">
-        <div className="pulse-heading"><div><span className="eyebrow">תמונת מצב חודשית</span><h2>{p.month ? monthLabel(p.month) : 'בחרו חודש'}</h2></div><Wallet size={22}/></div>
-        <span className="pulse-label">הוצאות בתקופה שנבחרה</span>
+        <div className="pulse-heading"><span className="eyebrow">{p.month ? monthLabel(p.month) : 'בחרו חודש'}</span></div>
+        <span className="pulse-label">הוצאות החודש</span>
         <strong className="pulse-focal">{current ? <bdi dir="ltr">{formatCurrency(current.total_expenses)}</bdi> : p.loading ? 'טוען...' : 'לא זמין'}</strong>
-        <div className="pulse-context"><span>{current ? `${current.transaction_count} עסקאות` : 'הנתונים מתעדכנים'}</span><span>{p.dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'} · {p.owner === 'joint' ? 'משותף' : p.owner || 'כולם'}</span></div>
+        <div className="pulse-context"><span>{current ? `${current.transaction_count} עסקאות` : 'הנתונים מתעדכנים'}</span><span className="pulse-basis">{change?.percent != null && <bdi className={change.amount > 0 ? 'amount-negative' : 'amount-positive'} dir="ltr">{change.amount > 0 ? '+' : ''}{change.percent.toFixed(1)}%</bdi>}{change?.percent != null && <span aria-hidden="true"> · </span>}{p.dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'} · {p.owner === 'joint' ? 'משותף' : p.owner || 'כולם'}</span></div>
       </div>
-      <div className="pulse-side">
-        <div><span>הכנסות שנקלטו</span><strong><bdi dir="ltr">{current ? formatCurrency(current.total_income) : '-'}</bdi></strong><small>{current?.total_income === 0 ? 'לא נקלטו הכנסות בסינון הזה' : 'לפי הנתונים בדשבורד'}</small></div>
-        <div><span>הכנסות פחות הוצאות</span><strong className={net < 0 ? 'amount-negative' : 'amount-positive'}><bdi dir="ltr">{current ? formatCurrency(net, true) : '-'}</bdi></strong><small>לא יתרת חשבון הבנק</small></div>
-      </div>
+      <div className="pulse-income orbit-kpi"><span className="orbit-kpi-overline">תמונת מצב חודשית</span><span>הכנסות שנקלטו</span><strong><bdi dir="ltr">{current ? formatCurrency(current.total_income) : '-'}</bdi></strong><small>{current?.total_income === 0 ? 'לא נקלטו הכנסות בסינון הזה' : 'לפי הנתונים בדשבורד'}</small></div>
+        <div className="pulse-net orbit-kpi"><span className="orbit-kpi-overline">סיכום החודש</span><span>הכנסות פחות הוצאות</span><strong className={net < 0 ? 'amount-negative' : 'amount-positive'}><bdi dir="ltr">{current ? formatCurrency(net, true) : '-'}</bdi></strong><small>לא יתרת חשבון הבנק</small></div>
     </div>
     <div className="pulse-comparison">
       <div className="comparison-title"><span>לעומת {priorMonth ? monthLabel(priorMonth) : 'החודש הקודם'}</span>{change && (change.amount > 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>)}</div>
-      {!current && !p.loading ? <p>נתוני החודש אינם זמינים. נסו לרענן את הדף.</p> : !current || status === 'loading' ? <p>טוען השוואה...</p> : status === 'error' ? <p>ההשוואה אינה זמינה כרגע</p> : !change ? <p>אין עסקאות בחודש הקודם להשוואה</p> : <div className="comparison-summary"><strong>{change.amount === 0 ? 'ללא שינוי בהוצאות' : `הוצאות ${change.amount > 0 ? 'גבוהות' : 'נמוכות'}${change.percent !== null ? ` ב-${ltrIsolate(`${Math.abs(change.percent).toFixed(1)}%`)}` : ''}`}</strong><span><bdi dir="ltr">{formatCurrency(change.amount, true)}</bdi> שינוי בסכום ההוצאות</span></div>}
+      {!current && !p.loading ? <p>נתוני החודש אינם זמינים. נסו לרענן את הדף.</p> : !current || status === 'loading' ? <p>טוען השוואה...</p> : status === 'error' ? <p>ההשוואה אינה זמינה כרגע</p> : !change ? <p>אין עסקאות בחודש הקודם להשוואה</p> : <div className={`comparison-summary ${change.amount > 0 ? 'comparison-up' : 'comparison-down'}`}><strong>{change.amount === 0 ? 'ללא שינוי בהוצאות' : `הוצאות ${change.amount > 0 ? 'גבוהות' : 'נמוכות'}${change.percent !== null ? ` ב-${ltrIsolate(`${Math.abs(change.percent).toFixed(1)}%`)}` : ''}`}</strong><span><bdi dir="ltr">{formatCurrency(change.amount, true)}</bdi> שינוי בסכום ההוצאות</span></div>}
       <details className="coverage-details"><summary>על ההשוואה</summary><p className="coverage-note">השוואת החודשים כפי שנקלטו, לא תחזית ולא השוואה לאותו יום בחודש. חודש נוכחי או עתידי עשוי להיות חלקי. כל הסינונים חלים גם על החודש הקודם.</p></details>
       {changes.length > 0 && <div className={`category-movers ${expandedChanges ? 'expanded' : ''}`}><span className="eyebrow">שינוי לפי קטגוריה לעומת {priorMonth ? monthLabel(priorMonth) : 'החודש הקודם'}</span>{changes.map(c => <button key={c.name} onClick={() => p.onCategory(c.name)}><span>{c.name}</span><span className="mover-delta">{c.amount > 0 ? 'עלייה' : 'ירידה'} <bdi dir="ltr">{formatCurrency(c.amount, true)}</bdi></span><span className="mover-bar"><i style={{width:`${Math.max(5, Math.abs(c.amount) / Math.max(...changes.map(x => Math.abs(x.amount))) * 100)}%`, background:c.amount > 0 ? 'var(--danger)' : 'var(--success)'}}/></span><ArrowLeft size={14}/></button>)}{changes.length > 3 && <button className="movers-expand" onClick={()=>setExpandedChanges(v=>!v)}>{expandedChanges ? 'הצג פחות' : 'כל השינויים'}</button>}</div>}
       <button className="pulse-ledger-link" onClick={p.onTransactions}>לכל העסקאות <ArrowLeft size={16}/></button>

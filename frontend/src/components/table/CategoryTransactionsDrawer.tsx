@@ -461,7 +461,7 @@ export default function CategoryTransactionsDrawer({
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          padding: '10px 14px',
+                          padding: '8px 12px',
                           background: isSelected ? 'var(--accent-muted)' : 'var(--glass-bg)',
                           borderRadius: 'var(--radius-md, 8px)',
                           border: isSelected ? '1px solid var(--accent)' : '1px solid var(--glass-border)',
@@ -607,7 +607,7 @@ export default function CategoryTransactionsDrawer({
                                 }}
                               >
                                 <Edit2 size={12} />
-                                {isEditing ? 'בטל' : 'שנה קטגוריה'}
+                                <span>{isEditing ? 'בטל' : 'שנה קטגוריה'}</span>
                               </button>
                             )}
                           </div>

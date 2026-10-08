@@ -115,7 +115,7 @@ interface InfoCardProps {
 function InfoCard({ icon, iconBg, label, value, index }: InfoCardProps) {
   return (
     <motion.div custom={index} initial="hidden" animate="visible" variants={cardVariants}>
-      <Card className="glass-card" hover>
+      <Card className="glass-card orbit-info-card" hover>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
@@ -536,7 +536,7 @@ export default function DataManagement() {
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  STORAGE OVERVIEW CARDS                                        */}
       {/* ═══════════════════════════════════════════════════════════════ */}
-      <div
+      <div className="orbit-storage-overview"
         style={{
           display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',

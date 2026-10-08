@@ -1,190 +1,35 @@
-import { Sun, Moon, Menu, X, CreditCard, Search } from 'lucide-react'
+import { Sun, Moon, Menu, X, Search, Orbit } from 'lucide-react'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 
-// ─── Types ────────────────────────────────────────────────────────────
 interface HeaderProps {
   onToggleSidebar?: () => void
   sidebarOpen?: boolean
   onCommandPalette?: () => void
 }
-
-// Detect Mac so we show the correct keyboard shortcut label
-const isMac =
-  typeof navigator !== 'undefined' &&
-  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-
+export const ORBIT_NAV = [
+  {to:'/',label:'סקירה'}, {to:'/transactions',label:'עסקאות'},
+  {to:'/monthly',label:'השוואת חודשים'}, {to:'/trends',label:'מגמות'},
+  {to:'/merchants',label:'בתי עסק'}, {to:'/budget',label:'תקציב'},
+  {to:'/income',label:'הכנסות'}, {to:'/savings',label:'חיסכון'},
+  {to:'/data-management',label:'ניהול מידע'},
+]
 export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette }: HeaderProps) {
   const { theme, toggleTheme } = useTheme()
-
-  return (
-    <header
-      className="app-topbar"
-      style={{
-        height: 'var(--header-height, 64px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 var(--space-lg)',
-        background: 'var(--glass-bg)',
-        backdropFilter: 'blur(var(--glass-blur, 16px))',
-        WebkitBackdropFilter: 'blur(var(--glass-blur, 16px))',
-        borderBottom: '1px solid var(--glass-border)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 'var(--z-sticky, 20)',
-        direction: 'rtl',
-        gap: 'var(--space-md)',
-        flexShrink: 0,
-      }}
-    >
-      {/* ─── Right side: hamburger (mobile) + title ─── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-md)',
-          minWidth: 0,
-        }}
-      >
-        {/* Mobile hamburger button */}
-        <button
-          onClick={onToggleSidebar}
-          aria-label={sidebarOpen ? 'סגור תפריט' : 'פתח תפריט'}
-          className="header-hamburger"
-          style={{
-            display: 'none',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'all 150ms ease',
-            flexShrink: 0,
-          }}
-        >
-          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
-
-        {/* App title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', minWidth: 0 }}>
-          <span title="מנתח עסקאות — ניתוח חכם של הוצאות כרטיס אשראי" style={{ flexShrink: 0, display: 'inline-flex' }}>
-            <CreditCard
-              size={24}
-              style={{ color: 'var(--accent)' }}
-            />
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 'var(--text-xl)',
-                fontWeight: 800,
-                background: 'var(--gradient-primary)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                lineHeight: 1.3,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              מנתח עסקאות
-            </h1>
-            <p
-              className="header-subtitle"
-              style={{
-                margin: 0,
-                fontSize: 'var(--text-xs)',
-                color: 'var(--text-muted)',
-                fontWeight: 400,
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                display: 'block',
-              }}
-            >
-              ניתוח חכם של הוצאות כרטיס אשראי
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Center: search bar ─── */}
-      <div
-        onClick={() => onCommandPalette?.()}
-        className="header-search-bar"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 16px',
-          fontSize: 'var(--text-sm)',
-          color: 'var(--text-muted)',
-          background: 'var(--bg-input)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          cursor: 'pointer',
-          transition: 'all 150ms ease',
-          maxWidth: '320px',
-          flex: 1,
-          minWidth: '120px',
-        }}
-      >
-        <Search size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
-        <span style={{ flex: 1 }}>חיפוש...</span>
-        <kbd
-          style={{
-            fontSize: '0.65rem',
-            padding: '2px 6px',
-            borderRadius: '4px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            color: 'var(--text-muted)',
-            fontFamily: 'var(--font-mono, monospace)',
-            flexShrink: 0,
-          }}
-        >
-          {isMac ? '⌘K' : 'Ctrl+K'}
-        </kbd>
-      </div>
-
-      {/* ─── Left side: notifications + theme toggle ─── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-sm)',
-          flexShrink: 0,
-        }}
-      >
-        {/* Notifications */}
-
-
-        {/* Theme toggle */}
-        <button
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
-          className="header-icon-btn"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-card)',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-            transition: 'all 150ms ease',
-          }}
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-      </div>
-
-    </header>
-  )
+  const [params] = useSearchParams()
+  const session = params.get('session_id')
+  const href = (to: string) => session ? `${to}?${new URLSearchParams({session_id:session})}` : to
+  return <header className="app-topbar orbit-topbar">
+    <NavLink to={href('/')} className="orbit-brand" aria-label="ORBIT - סקירה">
+      <Orbit size={27}/><strong dir="ltr">ORBIT</strong><span>התמונה הפיננסית שלך</span>
+    </NavLink>
+    <nav className="orbit-nav" aria-label="ניווט ראשי">
+      {ORBIT_NAV.map(({to,label})=><NavLink key={to} to={href(to)} end={to==='/'}>{label}</NavLink>)}
+    </nav>
+    <div className="orbit-tools">
+      <button onClick={onCommandPalette} aria-label="חיפוש" title="חיפוש (Ctrl+K / ⌘K)"><Search size={18}/></button>
+      <button onClick={toggleTheme} aria-label={theme==='dark'?'מעבר למצב בהיר':'מעבר למצב כהה'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button>
+      <button onClick={onToggleSidebar} aria-label={sidebarOpen?'סגור תפריט':'פתח תפריט'} aria-expanded={sidebarOpen}>{sidebarOpen?<X size={18}/>:<Menu size={18}/>}</button>
+    </div>
+  </header>
 }
