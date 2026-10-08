@@ -84,8 +84,29 @@ export default function AdvancedFilters({
     })
   }, [search, category, startDate, endDate, minAmount, maxAmount, onFilterChange])
 
+  const [rangeNote, setRangeNote] = useState('')
   const handleApply = () => {
-    emitFilters()
+    const notes: string[] = []
+    let mn = minAmount, mx = maxAmount, sd = startDate, ed = endDate
+    if (mn !== '' && mx !== '' && Number(mn) > Number(mx)) {
+      ;[mn, mx] = [mx, mn]
+      setMinAmount(mn); setMaxAmount(mx)
+      notes.push('טווח הסכומים היה הפוך - החלפנו בין המינימום למקסימום')
+    }
+    if (sd && ed && sd > ed) {
+      ;[sd, ed] = [ed, sd]
+      setStartDate(sd); setEndDate(ed)
+      notes.push('טווח התאריכים היה הפוך - החלפנו בין תאריך ההתחלה לסיום')
+    }
+    setRangeNote(notes.join(' · '))
+    onFilterChange({
+      search: search || undefined,
+      category: category || undefined,
+      startDate: sd || undefined,
+      endDate: ed || undefined,
+      minAmount: mn !== '' ? Number(mn) : undefined,
+      maxAmount: mx !== '' ? Number(mx) : undefined,
+    })
   }
 
   const handleReset = () => {
@@ -353,6 +374,10 @@ export default function AdvancedFilters({
                   />
                 </div>
               </div>
+
+              {rangeNote && (
+                <div role="status" style={{ fontSize: '0.75rem', color: 'var(--warning, #f5a524)' }}>{rangeNote}</div>
+              )}
 
               {/* Apply button */}
               <div className="advanced-filter-actions" style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>

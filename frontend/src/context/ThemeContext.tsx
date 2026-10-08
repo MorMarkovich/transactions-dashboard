@@ -33,7 +33,12 @@ function getInitialTheme(): Theme {
 }
 
 function applyTheme(theme: Theme): void {
-  document.documentElement.setAttribute('data-theme', theme)
+  const root = document.documentElement
+  // Freeze transitions while the theme flips so surfaces never get stuck mid-fade
+  // (stale card backgrounds with new text colours).
+  root.classList.add('theme-switching')
+  root.setAttribute('data-theme', theme)
+  window.setTimeout(() => root.classList.remove('theme-switching'), 120)
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

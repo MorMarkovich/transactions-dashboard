@@ -1056,7 +1056,12 @@ def get_transactions(
     if subcategory and 'קטגוריה_משנה' in df.columns:
         df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
     if search:
-        df = df[df['תיאור'].str.contains(search, case=False, na=False, regex=False)]
+        _m = df['תיאור'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה' in df.columns:
+            _m = _m | df['קטגוריה'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה_משנה' in df.columns:
+            _m = _m | df['קטגוריה_משנה'].fillna('').astype(str).str.contains(search, case=False, na=False, regex=False)
+        df = df[_m]
     if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
         if min_amount is not None:
             df = df[df['סכום_מוחלט'] >= min_amount]
@@ -1100,7 +1105,7 @@ def get_transactions(
     if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not expenses_df.empty:
         cat_group = expenses_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
         cat_group = cat_group.sort_values('sum', ascending=False).head(10)
-        cat_total = cat_group['sum'].sum()
+        cat_total = expenses_df['סכום_מוחלט'].sum()  # share of ALL filtered expenses, not just the top 10
         for _, row in cat_group.iterrows():
             category_breakdown.append({
                 "name": str(row['קטגוריה']),

@@ -364,17 +364,16 @@ export default function Layout({ children }: LayoutProps) {
               <button className="ui-btn" onClick={() => window.location.reload()}>נסה שוב</button>
             </div>
           ) : (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+            // No exit animation: an exit that never completes (rapid route changes, aborted fetches)
+            // used to leave the page wrapper stuck at opacity 0.
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }}
+            >
+              {children}
+            </motion.div>
           )}
         </main>
       </div>

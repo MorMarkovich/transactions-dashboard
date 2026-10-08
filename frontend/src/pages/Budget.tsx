@@ -79,6 +79,7 @@ export default function Budget() {
   // Data
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
   const [donutData, setDonutData] = useState<RawDonutData | null>(null)
+  const [allCategoryTotals, setAllCategoryTotals] = useState<{ name: string; total: number }[]>([])
   const [loading, setLoading] = useState(false)
 
   // Budget goals
@@ -96,12 +97,14 @@ export default function Budget() {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [metricsRes, donutRes] = await Promise.all([
+        const [metricsRes, donutRes, snapshotRes] = await Promise.all([
           transactionsApi.getMetrics(sessionId, signal),
           transactionsApi.getDonutChartV2(sessionId, signal),
+          transactionsApi.getCategorySnapshot(sessionId, signal),
         ])
         setMetrics(metricsRes)
         setDonutData(donutRes)
+        setAllCategoryTotals((snapshotRes?.categories ?? []).map((c) => ({ name: c.name, total: c.total })))
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         console.error('Error loading budget data:', err)
@@ -119,17 +122,18 @@ export default function Budget() {
     if (donutData?.categories) {
       donutData.categories.forEach((c) => map.set(c.name, c.value))
     }
+    // The donut only holds the top 10; the snapshot has every category
+    allCategoryTotals.forEach((c) => { if (!map.has(c.name)) map.set(c.name, c.total) })
     return map
-  }, [donutData])
+  }, [donutData, allCategoryTotals])
 
   // Available categories for new goals
   const availableCategories = useMemo(() => {
-    if (!donutData?.categories) return []
+    // Every spending category (the donut only has the top 10 plus "אחר")
+    const names = allCategoryTotals.length > 0 ? allCategoryTotals.map((c) => c.name) : (donutData?.categories ?? []).map((c) => c.name)
     const usedCategories = new Set(goals.map((g) => g.category))
-    return donutData.categories
-      .map((c) => c.name)
-      .filter((name) => !usedCategories.has(name))
-  }, [donutData, goals])
+    return names.filter((name) => !usedCategories.has(name))
+  }, [donutData, goals, allCategoryTotals])
 
   // Budget summary
   const budgetSummary = useMemo(() => {
@@ -379,6 +383,7 @@ export default function Budget() {
                   קטגוריה
                 </label>
                 <select
+                  aria-label="קטגוריה"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   style={{
@@ -413,6 +418,7 @@ export default function Budget() {
                   value={newLimit}
                   onChange={(e) => setNewLimit(e.target.value)}
                   placeholder="0"
+                  aria-label="תקציב (₪)"
                   style={{
                     width: '100%',
                     height: '40px',
@@ -429,7 +435,7 @@ export default function Budget() {
                 />
               </div>
 
-              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit}>
+              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit || Number(newLimit) <= 0}>
                 הוסף
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
