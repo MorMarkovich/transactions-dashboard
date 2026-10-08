@@ -453,7 +453,7 @@ export default function Transactions() {
             <strong>סינון קטגוריות</strong>
             <span>הבחירה נשמרת גם במעבר בין מסכים</span>
           </div>
-          {(category || subcategories.length) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+          {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
           <label>
@@ -468,7 +468,7 @@ export default function Transactions() {
             <MultiSelect options={subcategoryMap[category] ?? []} value={subcategories} onChange={setSubcategories} placeholder="כל תתי-הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
           </label>
         </div>
-        {(category || subcategories.length) && <div className="active-filter-summary">מציג: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
+        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">מציג: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </section>
 
       <AdvancedFilters
