@@ -507,7 +507,7 @@ export default function Transactions() {
       />
 
       {/* ── Quick Date Filter Chips ───────────────────────────────────── */}
-      <div className="filter-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+      <div className="filter-chips date-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
         {DATE_CHIPS.map((chip) => (
           <button
             key={chip.key}
