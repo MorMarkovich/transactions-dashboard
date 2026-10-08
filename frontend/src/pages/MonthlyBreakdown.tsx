@@ -12,6 +12,7 @@ import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
+import { categoryColor } from '../utils/chartPalette'
 import DonutChart from '../components/charts/DonutChart'
 import MultiSelect from '../components/ui/MultiSelect'
 import BarChart from '../components/charts/BarChart'
@@ -42,10 +43,7 @@ function formatMonthLabel(mmYYYY: string): string {
 }
 
 // Same palette as DonutChart so the legend dots match the pie slices.
-const PIE_COLORS = [
-  '#818cf8', '#34d399', '#f87171', '#fbbf24', '#38bdf8',
-  '#a78bfa', '#f6ad55', '#68d391', '#fc8181', '#63b3ed', '#94a3b8',
-]
+
 
 // Cap pie slices so it stays readable; the rest are grouped into "אחר".
 const MAX_PIE_SLICES = 10
@@ -450,7 +448,7 @@ export default function MonthlyBreakdown() {
           >
             <DonutChart data={pieData.slices} total={pieData.total} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {pieData.slices.map((slice, i) => (
+              {pieData.slices.map((slice) => (
                 <div
                   key={slice.name}
                   onClick={slice.name === 'אחר' ? undefined : () => setSelectedCategory((current) => current === slice.name ? null : slice.name)}
@@ -465,9 +463,9 @@ export default function MonthlyBreakdown() {
                     background: selectedCategory === slice.name ? 'var(--accent-muted)' : 'transparent',
                   }}
                 >
-                  <span className="category-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                  <span className="category-dot" style={{ background: categoryColor(slice.name), flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.8125rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {get_icon(slice.name)} {slice.name}
+                    {slice.name}
                   </span>
                   <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', flexShrink: 0 }}>
                     {slice.pct.toFixed(1)}%
@@ -493,9 +491,9 @@ export default function MonthlyBreakdown() {
             <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 'var(--space-lg)', alignItems: 'center' }}>
               <DonutChart data={subcategoryPieData.slices} total={subcategoryPieData.total} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {subcategoryPieData.slices.map((slice, index) => (
+                {subcategoryPieData.slices.map((slice) => (
                   <div key={slice.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px' }}>
-                    <span className="category-dot" style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                    <span className="category-dot" style={{ background: categoryColor(slice.name) }} />
                     <span style={{ flex: 1 }}>{slice.name}</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>{slice.pct.toFixed(1)}%</span>
                     <strong style={{ fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(slice.value)}</strong>
