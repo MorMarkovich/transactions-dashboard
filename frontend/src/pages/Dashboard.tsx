@@ -1094,7 +1094,7 @@ export default function Dashboard() {
               <Search size={13} style={{ color: 'var(--text-muted)', position: 'absolute', right: '8px', pointerEvents: 'none' }} />
               <input
                 type="text"
-                placeholder="חיפוש קטגוריה או בית עסק..."
+                placeholder="חיפוש קטגוריה או בית עסק..." aria-label="חיפוש קטגוריה או בית עסק"
                 value={snapshotSearch}
                 onChange={(e) => setSnapshotSearch(e.target.value)}
                 style={{
