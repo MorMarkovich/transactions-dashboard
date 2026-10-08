@@ -1323,6 +1323,7 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
                     {/* Exclude button */}
                     <button
+                      className="category-hide-btn"
                       onClick={(e) => { e.stopPropagation(); setSnapshotExcluded(prev => new Set([...prev, cat.name])) }}
                       title={`הסתר ${cat.name}`}
                       style={{

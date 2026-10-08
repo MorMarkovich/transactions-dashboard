@@ -338,6 +338,8 @@ export default function Layout({ children }: LayoutProps) {
       <AnimatePresence>
         {aiStatus && (
           <motion.div
+            className="ai-status-pill"
+            role="status"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
