@@ -134,10 +134,6 @@ export default function Login() {
     setLoading(false)
   }
 
-  const handleGuest = () => {
-    navigate('/')
-  }
-
   // Set browser tab title
   useEffect(() => {
     document.title = 'התחברות | מנתח עסקאות'
@@ -338,16 +334,6 @@ export default function Login() {
                   >
                     {'\u05E6\u05D5\u05E8 \u05D7\u05E9\u05D1\u05D5\u05DF \u05D7\u05D3\u05E9'}
                   </Button>
-
-                  <button
-                    type="button"
-                    onClick={handleGuest}
-                    className="w-full mt-3 py-2 text-sm flex items-center justify-center gap-1 transition-colors"
-                    style={{ color: 'var(--text-muted)' }}
-                    aria-label={'\u05D4\u05DE\u05E9\u05DA \u05DB\u05D0\u05D5\u05E8\u05D7'}
-                  >
-                    {'\u05D4\u05DE\u05E9\u05DA \u05DB\u05D0\u05D5\u05E8\u05D7'}
-                  </button>
                 </form>
               )}
 
