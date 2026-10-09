@@ -108,6 +108,14 @@ STANDING_ORDER_KEYWORDS = [
     'הוראת קבע', 'הו"ק', 'הוק', 'standing order', 'הוראות קבע',
 ]
 
+# Internal transfers between the household's own accounts. Mor and Shelly share
+# ONE joint Discount account, so a Bit "withdrawal to the bank account"
+# ("...ביט משיכה לחשבון בנק") is the user moving their own money into that
+# account: neither income nor an expense. Restore drops these rows so no view
+# counts them. Bit payments to OTHER people or businesses are ordinary
+# expenses and are NOT matched here (they are classified by recipient).
+INTERNAL_TRANSFER_PATTERN = r'ביט\s*משיכה\s*לחשבון'
+
 # Keywords that indicate a credit-card bill payment in a bank statement.
 # When the user uploads BOTH a bank file and a credit-card file, these
 # transactions represent the lump-sum payment to the card company and
@@ -496,7 +504,6 @@ _EXACT_WORD_KEYWORDS: dict[str, list[str]] = {
     'אוכל': ['food', 'פוד'],
     'הוצאות משתנות': ['דן'],
     'קניות': ['ace', 'גולף', 'golf', 'פוקס', 'fox'],
-    'העברת כספים': ['ביט', 'bit'],
     'חוגים וספורט': ['gym'],
     'טיפוח': ['ספא', 'spa'],
 }
