@@ -42,6 +42,7 @@ import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
+import { canUseBankSync } from '../lib/bankSyncAccess'
 import { useDashboardFilters } from '../context/FilterContext'
 import type {
   MetricsData,
@@ -91,6 +92,7 @@ export default function Dashboard() {
   const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
   const { setNotifications } = useAppNotifications()
   const { user } = useAuth()
+  const bankSyncEnabled = canUseBankSync(user?.email)
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
@@ -838,23 +840,25 @@ export default function Dashboard() {
     return (
       <>
         <EmptyState
-          icon="🏦"
-          title={'חברו את חשבונות הבנק והאשראי'}
-          text={'סנכרנו את העסקאות ישירות מהבנקים וחברות האשראי — בלי להעלות קבצים ידנית.'}
+          icon={bankSyncEnabled ? '🏦' : '📂'}
+          title={bankSyncEnabled ? 'חברו את חשבונות הבנק והאשראי' : 'מתחילים: מעלים קובץ'}
+          text={bankSyncEnabled
+            ? 'סנכרנו את העסקאות ישירות מהבנקים וחברות האשראי — בלי להעלות קבצים ידנית.'
+            : 'העלו קובץ תנועות מהבנק או מחברת האשראי (xlsx, csv או pdf) דרך תפריט הצד, ותקבלו תמונה מלאה של ההוצאות וההכנסות.'}
         />
 
-        {/* Primary action — pull transactions straight from the banks */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-lg)' }}>
+        {/* Primary action — pull transactions straight from the banks (owner only) */}
+        {bankSyncEnabled && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-lg)' }}>
           <div style={{ width: '100%', maxWidth: '320px' }}>
             <RefreshFromBanks onSynced={handleBankSynced} />
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', margin: 0, textAlign: 'center' }}>
             דורש את כלי הסנכרון המקומי שרץ במחשב שלך · אפשר גם להעלות קובץ מהסרגל הצדי
           </p>
-        </div>
+        </div>}
 
         <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
-          <div className="feature-card"><div className="feature-icon">🔄</div><div className="feature-title">סנכרון אוטומטי</div><div className="feature-desc">לאומי, דיסקונט, MAX וישראכרט — ישירות לדאשבורד</div></div>
+          <div className="feature-card"><div className="feature-icon">🔄</div><div className="feature-title">{bankSyncEnabled ? 'סנכרון אוטומטי' : 'העלאת קבצים'}</div><div className="feature-desc">{bankSyncEnabled ? 'לאומי, דיסקונט, MAX וישראכרט — ישירות לדאשבורד' : 'קבצי אקסל, CSV ו-PDF מהבנק ומחברות האשראי'}</div></div>
           <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי חכם של קטגוריות לכל עסקה</div></div>
           <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים ותובנות מיידיות</div></div>
         </div>
