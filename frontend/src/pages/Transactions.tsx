@@ -81,6 +81,8 @@ export default function Transactions() {
   const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
 
   // Data state
+  // On phones the search and the transaction list come first; the summary and category analysis sit below, collapsed.
+  const [analysisOpen] = useState(() => !window.matchMedia('(max-width: 640px)').matches)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [total, setTotal] = useState(0)
   const [serverTotalAmount, setServerTotalAmount] = useState(0)
@@ -322,6 +324,8 @@ export default function Transactions() {
         icon={Receipt}
       />
 
+      <details className="tx-analysis" open={analysisOpen}>
+        <summary>סיכום וניתוח לפי קטגוריה</summary>
       {/* ── Primary Stats Row ─────────────────────────────────────────── */}
       <div className="orbit-transaction-metrics">
       <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-sm)' }}>
@@ -472,6 +476,8 @@ export default function Transactions() {
           </div>
         </div>
       )}
+
+      </details>
 
       <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
         <div className="dashboard-filter-heading">
