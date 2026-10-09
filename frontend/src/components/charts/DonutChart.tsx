@@ -132,6 +132,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
       <ResponsiveContainer width="100%" height={isCompact ? 240 : 280}>
         <PieChart accessibilityLayer={false}>
           <Pie
+            rootTabIndex={-1}
             data={data}
             dataKey="value"
             nameKey="name"

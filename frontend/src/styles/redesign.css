@@ -337,3 +337,10 @@ html, body { overflow-anchor: none; }
   .tx-analysis > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; font-weight: 600; }
 }
 @media (min-width: 641px) { .tx-analysis > summary { display: none; } }
+@media (max-width: 767px) {
+  .orbit-layout .sidebar-close-btn, .orbit-layout .sidebar-signout-btn { width: 44px; height: 44px; }
+  .orbit-layout .bank-sync-btn { min-height: 44px; }
+  .orbit-tools button { min-width: 44px; min-height: 44px; }
+  .main-content .ui-btn, .main-content a.ui-btn, .main-content button, .main-content summary, .main-content [role="button"] { min-height: 44px; }
+  .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .main-content select { min-height: 44px; }
+}
