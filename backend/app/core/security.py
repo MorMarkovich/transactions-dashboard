@@ -78,7 +78,7 @@ def _rate_limit(user_id: str, bucket: str, limit: int, window_seconds: int) -> N
         retry_after = max(1, int(window_seconds - (now - events[0])))
         raise HTTPException(
             status_code=429,
-            detail="Too many requests. Please try again later.",
+            detail="יותר מדי פעולות בזמן קצר. נסו שוב בעוד כמה דקות.",
             headers={"Retry-After": str(retry_after)},
         )
     events.append(now)
@@ -146,7 +146,7 @@ async def authorize_api_request(
         _rate_limit(user_id, "ai", 60, 3600)
         if user_id in _active_ai_users:
             _current_user.reset(context_token)
-            raise HTTPException(status_code=429, detail="An AI operation is already running")
+            raise HTTPException(status_code=429, detail="פעולת סיווג חכם כבר רצה. נסו שוב בעוד רגע.")
         _active_ai_users.add(user_id)
 
     try:
