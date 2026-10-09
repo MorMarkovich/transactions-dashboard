@@ -341,6 +341,6 @@ html, body { overflow-anchor: none; }
   .orbit-layout .sidebar-close-btn, .orbit-layout .sidebar-signout-btn { width: 44px; height: 44px; }
   .orbit-layout .bank-sync-btn { min-height: 44px; }
   .orbit-tools button { min-width: 44px; min-height: 44px; }
-  .main-content .ui-btn, .main-content a.ui-btn { min-height: 44px; }
+  .main-content .ui-btn, .main-content a.ui-btn, .main-content button, .main-content summary, .main-content [role="button"] { min-height: 44px; }
   .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .main-content select { min-height: 44px; }
 }
