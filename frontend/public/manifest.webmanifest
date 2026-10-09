@@ -1,0 +1,26 @@
+{
+  "name": "ORBIT - התמונה הפיננסית שלך",
+  "short_name": "ORBIT",
+  "description": "ניתוח הוצאות והכנסות מקבצי בנק ואשראי",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090B12",
+  "theme_color": "#090B12",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

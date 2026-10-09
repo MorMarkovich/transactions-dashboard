@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useAuth } from '../../lib/AuthContext'
+import { canUseBankSync } from '../../lib/bankSyncAccess'
 import { RefreshCw, Landmark, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 /**
@@ -39,6 +41,7 @@ interface RefreshFromBanksProps {
 }
 
 export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
+  const { user } = useAuth()
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   const ensureToken = (forcePrompt = false): string | null => {
@@ -107,6 +110,8 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
   }
 
   const syncing = status.kind === 'syncing'
+
+  if (!canUseBankSync(user?.email)) return null
 
   return (
     <div className="bank-sync">
