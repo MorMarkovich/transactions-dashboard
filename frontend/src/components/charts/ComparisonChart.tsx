@@ -151,6 +151,7 @@ const ComparisonChart: React.FC<ComparisonChartProps> = React.memo(function Comp
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
+        accessibilityLayer={false}
         data={chartData}
         margin={{
           top: 8,
