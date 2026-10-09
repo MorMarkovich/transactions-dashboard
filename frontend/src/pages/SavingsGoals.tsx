@@ -486,14 +486,14 @@ export default function SavingsGoals() {
                   >
                     צבע
                   </label>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {PRESET_COLORS.map((color) => (
                       <button
                         key={color}
                         onClick={() => setNewColor(color)}
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 44,
+                          height: 44,
                           borderRadius: '50%',
                           background: color,
                           border:
