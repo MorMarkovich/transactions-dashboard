@@ -115,8 +115,15 @@ function useChartLabels(pathname: string) {
         el.setAttribute('data-a11y', '1')
       })
     }
-    const timers = [600, 1800, 4000].map((ms) => window.setTimeout(label, ms))
-    return () => timers.forEach(window.clearTimeout)
+    label()
+    // Charts mount whenever their data arrives (can be many seconds on a cold session): keep labeling.
+    let pending = 0
+    const observer = new MutationObserver(() => {
+      window.clearTimeout(pending)
+      pending = window.setTimeout(label, 150)
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => { observer.disconnect(); window.clearTimeout(pending) }
   }, [pathname])
 }
 
