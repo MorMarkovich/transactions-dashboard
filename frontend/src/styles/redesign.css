@@ -93,7 +93,7 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
 .orbit-layout .app-topbar {display:flex !important;}
 .orbit-topbar {position:sticky;top:0;z-index:30;min-height:86px;display:flex;gap:24px;align-items:center;padding:18px 32px;border-bottom:1px solid var(--border);background:var(--bg-primary);}
 .orbit-brand {display:flex;align-items:center;gap:10px;color:var(--accent);text-decoration:none;white-space:nowrap;flex-shrink:0;}
-.orbit-brand strong {font:800 23px Arial,sans-serif;letter-spacing:1px;}
+.orbit-brand strong {font:800 26px Heebo,Arial,sans-serif;letter-spacing:0;}
 .orbit-brand>span {font-size:12px;color:var(--text-muted);margin-inline-start:6px;}
 .orbit-nav {display:flex;align-items:center;justify-content:center;gap:18px;flex:1;min-width:0;}
 .orbit-nav a {font-size:12px;white-space:nowrap;color:var(--text-muted);text-decoration:none;padding:12px 0;position:relative;}
@@ -346,3 +346,14 @@ html, body { overflow-anchor: none; }
   .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .main-content select { min-height: 44px; }
 }
 .view-state-line { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:var(--text-secondary); }
+
+/* Category-card hide control (desktop): a small button parked in the bottom-left
+   corner, clear of the amount, and revealed on card hover or keyboard focus.
+   The old 36px touch-target minimum made it a big disc over the amount. On touch
+   and narrow screens the existing mobile rules above still apply. */
+@media(min-width:1024px) { .studio-category .category-hide-btn {width:24px !important;height:24px !important;min-width:24px !important;min-height:24px !important;top:auto !important;bottom:0 !important;left:0 !important;} }
+@media(min-width:1024px) and (hover:hover) and (pointer:fine) {
+  .studio-category .category-hide-btn {opacity:0 !important;}
+  .studio-category:hover .category-hide-btn, .studio-category:focus-within .category-hide-btn {opacity:.75 !important;}
+  .studio-category .category-hide-btn:hover, .studio-category .category-hide-btn:focus-visible {opacity:1 !important;}
+}
