@@ -156,3 +156,24 @@ def test_invalid_override_category_ignored():
     row = _rows(sid)[1]
     assert row["קטגוריה"] == "אוכל"  # catalog still governs
     assert row["_locked"] is False
+
+
+# ── Internal transfers: Bit withdrawal into the joint account is dropped ──
+def test_bit_withdrawal_to_account_is_dropped_but_payments_and_cash_stay():
+    rows = [
+        {"id": 1, "תאריך": "2026-09-03", "סכום": 2421,
+         "תיאור": "העברה ממור מרקוביץ חשבון ב.הפועלים-ביט משיכה לחשבון בנק", "קטגוריה": "העברת כספים"},
+        {"id": 2, "תאריך": "2026-10-01", "סכום": 700,
+         "תיאור": "העברה משלי מרקוביץ' חשבון ב.הפועלים-ביט משיכה לחשבון הבנק", "קטגוריה": "העברת כספים"},
+        {"id": 3, "תאריך": "2026-09-05", "סכום": -120, "תיאור": "ביט - דני כהן", "קטגוריה": "שונות"},
+        {"id": 4, "תאריך": "2026-09-07", "סכום": -400, "תיאור": "משיכת מזומן ללא כרטיס", "קטגוריה": "משיכת מזומן"},
+    ]
+    resp = client.post("/api/restore-session", json={"transactions": rows})
+    assert resp.status_code == 200, resp.text
+    j = resp.json()
+    assert j["internal_transfers_removed"] == 2
+    txns = client.get("/api/transactions", params={"sessionId": j["session_id"], "page_size": 100}).json()["transactions"]
+    descs = {t["תיאור"] for t in txns}
+    assert descs == {"ביט - דני כהן", "משיכת מזומן ללא כרטיס"}
+    bit = next(t for t in txns if t["תיאור"] == "ביט - דני כהן")
+    assert bit["קטגוריה"] != "העברת כספים"

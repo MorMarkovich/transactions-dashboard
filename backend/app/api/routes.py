@@ -27,7 +27,7 @@ from ..services.data_processor import (
     compute_txn_keys, txn_fingerprint, locked_mask, apply_category_migration,
 )
 from ..core.constants import (
-    CREDIT_CARD_PAYMENT_KEYWORDS, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
+    CREDIT_CARD_PAYMENT_KEYWORDS, INTERNAL_TRANSFER_PATTERN, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
     CATEGORY_ICONS, SUBCATEGORY_ICONS, get_subcategory_catalog,
     AI_CATEGORY, AI_SUBCATEGORY, AI_SUBCATEGORIZE_SKIP, migrate_category,
 )
@@ -618,6 +618,14 @@ def restore_session(body: RestoreSessionRequest):
                 if cc_payments_removed > 0:
                     df = df[~cc_payment_mask].reset_index(drop=True)
 
+        # ── Remove internal transfers (Bit withdrawal into the joint account) ──
+        internal_transfers_removed = 0
+        if has_desc:
+            internal_mask = df['תיאור'].astype(str).str.contains(INTERNAL_TRANSFER_PATTERN, regex=True, na=False)
+            internal_transfers_removed = int(internal_mask.sum())
+            if internal_transfers_removed > 0:
+                df = df[~internal_mask].reset_index(drop=True)
+
         # ── Backfill billing date for legacy bank rows ──
         # Pre-value-date-fix bank uploads still have תאריך_חיוב = NaT.
         # Coalesce them with תאריך so all rows show up consistently in
@@ -700,6 +708,8 @@ def restore_session(body: RestoreSessionRequest):
             removed_parts.append(f"{duplicates_removed} כפילויות")
         if cc_payments_removed > 0:
             removed_parts.append(f"{cc_payments_removed} חיובי כרטיס אשראי כפולים")
+        if internal_transfers_removed > 0:
+            removed_parts.append(f"{internal_transfers_removed} העברות פנימיות")
         if removed_parts:
             msg += f" (הוסרו: {', '.join(removed_parts)})"
 
@@ -709,6 +719,7 @@ def restore_session(body: RestoreSessionRequest):
             "transaction_count": len(df),
             "duplicates_removed": duplicates_removed,
             "cc_payments_removed": cc_payments_removed,
+            "internal_transfers_removed": internal_transfers_removed,
             "ai_categorized": ai_categorized,
             "message": msg,
         }

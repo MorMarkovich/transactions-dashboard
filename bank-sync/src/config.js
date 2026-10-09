@@ -1,7 +1,7 @@
 // Loads NON-secret runtime config from .env. Secrets (bank passwords, Supabase
 // login, sync token) come from the OS keychain — never from here.
 import 'dotenv/config'
-import { SUPPORTED } from './providers.js'
+import { SUPPORTED, ACTIVE_PROVIDERS } from './providers.js'
 import { parseOwnerKeywords } from './owner.js'
 
 function list(value, fallback) {
@@ -20,7 +20,7 @@ export const config = {
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
   ]),
-  providers: list(process.env.PROVIDERS, SUPPORTED).filter((p) => SUPPORTED.includes(p)),
+  providers: list(process.env.PROVIDERS, ACTIVE_PROVIDERS).filter((p) => SUPPORTED.includes(p)),
   // Limit a sync to specific account keys (comma-separated, e.g. "isracard-2").
   // Empty = all accounts. Lets you re-pull one card without logging into the
   // others — avoids anti-bot rate limits when two cards share a provider.

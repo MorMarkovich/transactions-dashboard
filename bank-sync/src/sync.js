@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { config, assertConfig } from './config.js'
 import { getJSON, credKey, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
-import { PROVIDER_LABELS } from './providers.js'
+import { PROVIDER_LABELS, isRetiredAccount } from './providers.js'
 import { scrapeProvider } from './scrape.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { buildRuleMap } from './categorize.js'
@@ -59,7 +59,12 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
   const byProvider = {}
   const errors = {}
 
-  const accounts = await resolveAccounts()
+  const allAccounts = await resolveAccounts()
+  // Retired sources (e.g. the closed MAX card) are never scraped and never
+  // reported as failed; their historical rows are kept even on a fresh resync.
+  const retired = allAccounts.filter(isRetiredAccount)
+  const accounts = allAccounts.filter((a) => !isRetiredAccount(a))
+  if (retired.length) log(`מקורות לא פעילים (לא נסרקים, ההיסטוריה נשמרת): ${retired.map((a) => a.label || a.key).join(', ')}`)
   let prevProvider = null
   for (const acct of accounts) {
     const credentials = await getJSON(credKey(acct.key))
@@ -117,6 +122,7 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
         .filter((a) => errors[a.key])
         .map((a) => a.label || PROVIDER_LABELS[a.provider] || a.provider),
     )
+    for (const a of retired) failedLabels.add(a.label || PROVIDER_LABELS[a.provider] || a.provider)
     baseRows = (existing || []).filter((t) => failedLabels.has(t['_source_file']))
     if (baseRows.length) {
       log(`שומר ${baseRows.length} עסקאות קיימות מחשבונות שנכשלו (${[...failedLabels].join(', ')}) כדי לא למחוק אותן`)
