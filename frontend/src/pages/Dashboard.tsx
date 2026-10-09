@@ -33,6 +33,9 @@ import CategoryManagerModal, { type ManagerCategory } from '../components/catego
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import EmptyState from '../components/common/EmptyState'
 import RefreshFromBanks from '../components/common/RefreshFromBanks'
+import OnboardingWizard from '../components/common/OnboardingWizard'
+import { buildSampleTransactions } from '../lib/sampleData'
+import { isSampleActive, markSampleSession, clearSampleSession } from '../lib/sampleMode'
 import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
@@ -835,6 +838,21 @@ export default function Dashboard() {
     }
   }
 
+  // Onboarding: load fictional transactions into an in-memory session. Nothing
+  // is saved to the account (see lib/sampleMode), and a reload drops it.
+  const handleLoadSample = async () => {
+    const res = await transactionsApi.restoreSession(buildSampleTransactions())
+    if (!res.success || !res.session_id) throw new Error('sample failed')
+    markSampleSession(res.session_id)
+    navigate(`/?session_id=${res.session_id}`)
+  }
+
+  const exitSample = () => {
+    clearSampleSession()
+    localStorage.removeItem('transactions-dashboard:last-session')
+    navigate('/')
+  }
+
   // ── No session ────────────────────────────────────────────────────
   if (!sessionId) {
     return (
@@ -857,11 +875,15 @@ export default function Dashboard() {
           </p>
         </div>}
 
+        {bankSyncEnabled ? (
         <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
           <div className="feature-card"><div className="feature-icon">🔄</div><div className="feature-title">{bankSyncEnabled ? 'סנכרון אוטומטי' : 'העלאת קבצים'}</div><div className="feature-desc">{bankSyncEnabled ? 'לאומי, דיסקונט, MAX וישראכרט — ישירות לדאשבורד' : 'קבצי אקסל, CSV ו-PDF מהבנק ומחברות האשראי'}</div></div>
           <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי חכם של קטגוריות לכל עסקה</div></div>
           <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים ותובנות מיידיות</div></div>
         </div>
+        ) : (
+          <OnboardingWizard onLoadSample={handleLoadSample} />
+        )}
       </>
     )
   }
@@ -898,6 +920,19 @@ export default function Dashboard() {
   // ── Main view ──────────────────────────────────────────────────────
   return (
     <div className="studio-dashboard" style={{ direction: 'rtl', position: 'relative' }}>
+      {isSampleActive() && (
+        <div role="status" className="sample-banner" style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)',
+          padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-lg)',
+          border: '1px solid var(--accent)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)',
+        }}>
+          <span style={{ color: 'var(--text-primary)' }}>אלה נתוני דוגמה. הם לא נשמרים בחשבון שלכם.</span>
+          <button type="button" onClick={exitSample} style={{
+            minHeight: 40, padding: '0 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
+            background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', maxWidth: '100%',
+          }}>מעבר להעלאת קובץ משלכם</button>
+        </div>
+      )}
       {/* Mesh gradient background */}
       <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
