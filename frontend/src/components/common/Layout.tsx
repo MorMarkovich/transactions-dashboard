@@ -70,6 +70,7 @@ function useScrollMemory(pathname: string) {
     let tries = 0
     let release = 0
     let lastSet: number | null = null
+    let lastHeightSeen = document.documentElement.scrollHeight
     const finish = () => {
       window.clearInterval(id)
       release = window.setTimeout(() => { suspended.current = false }, 200)
@@ -78,9 +79,12 @@ function useScrollMemory(pathname: string) {
     // If something else moved the scroll (the user), stop instead of fighting it.
     const id = window.setInterval(() => {
       tries += 1
-      if (lastSet !== null && Math.abs(window.scrollY - lastSet) > 4) { finish(); return }
+      const height = document.documentElement.scrollHeight
+      // A scroll change while the page height changed is a clamp, not the user.
+      if (lastSet !== null && height === lastHeightSeen && Math.abs(window.scrollY - lastSet) > 4) { finish(); return }
       window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
       lastSet = window.scrollY
+      lastHeightSeen = document.documentElement.scrollHeight
       if (Math.abs(window.scrollY - y) < 4 || tries > 125) finish()
     }, 80)
     return () => { window.clearInterval(id); window.clearTimeout(release) }
