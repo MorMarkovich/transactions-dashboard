@@ -34,8 +34,6 @@ export default function Input({
   const inputId = externalId ?? generatedId
   const errorId = error ? `${inputId}-error` : undefined
 
-  const isEmailType = type === 'email' || type === 'url' || type === 'tel'
-
   return (
     <div className={`ui-input-wrapper ${className}`} style={{ width: '100%' }}>
       {label && (
@@ -60,8 +58,8 @@ export default function Input({
               position: 'absolute',
               top: '50%',
               transform: 'translateY(-50%)',
-              right: isEmailType ? 'auto' : '12px',
-              left: isEmailType ? '12px' : 'auto',
+              right: '12px',
+              left: 'auto',
               color: 'var(--text-muted)',
               display: 'inline-flex',
               alignItems: 'center',
@@ -88,10 +86,12 @@ export default function Input({
             borderRadius: '8px',
             color: 'var(--text-primary)',
             fontFamily: "'Heebo', sans-serif",
-            direction: isEmailType ? 'ltr' : 'rtl',
-            textAlign: isEmailType ? 'left' : ('right' as const),
-            paddingRight: icon && !isEmailType ? iconPaddingMap[size] : sizeStyles[size].padding?.toString().split(' ')[1],
-            paddingLeft: icon && isEmailType ? iconPaddingMap[size] : sizeStyles[size].padding?.toString().split(' ')[1],
+            // Every field is RTL (placeholder, icon and text on the right),
+            // email/url/tel included, so a form never mixes alignments.
+            direction: 'rtl',
+            textAlign: 'right' as const,
+            paddingRight: icon ? iconPaddingMap[size] : sizeStyles[size].padding?.toString().split(' ')[1],
+            paddingLeft: sizeStyles[size].padding?.toString().split(' ')[1],
             outline: 'none',
             transition: 'all 0.2s ease',
             ...style,
