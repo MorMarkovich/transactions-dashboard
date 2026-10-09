@@ -7,7 +7,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null }>
+  signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
 }
@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
+      if (error.message.toLowerCase().includes('not confirmed')) return { error: 'יש לאשר את כתובת המייל (הקישור נשלח אליכם) לפני ההתחברות' }
       if (error.message.includes('Invalid')) return { error: 'מייל או סיסמה שגויים' }
       return { error: error.message }
     }
@@ -47,15 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: name } }
+      options: { data: { full_name: name }, emailRedirectTo: window.location.origin }
     })
     if (error) {
       if (error.message.includes('already')) return { error: 'המייל כבר רשום' }
       return { error: error.message }
     }
-    return { error: null }
+    // With "Confirm email" enabled Supabase returns the user but no session,
+    // and for an already-registered address an obfuscated user with no
+    // identities. With it disabled a session comes back and the user is
+    // signed straight in. Handle all three.
+    if (!data.session && data.user && (data.user.identities?.length ?? 1) === 0) {
+      return { error: 'המייל כבר רשום' }
+    }
+    return { error: null, needsConfirmation: !data.session }
   }
 
   const signOut = async () => {
