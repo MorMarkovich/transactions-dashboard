@@ -474,7 +474,7 @@ export default function SavingsGoals() {
                 </div>
 
                 {/* Color picker */}
-                <div style={{ flex: '0 0 auto' }}>
+                <div style={{ flex: '0 1 auto', minWidth: 0, maxWidth: '100%' }}>
                   <label
                     style={{
                       fontSize: '0.75rem',
