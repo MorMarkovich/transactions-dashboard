@@ -105,15 +105,21 @@ export default function Login() {
     }
     setLoading(true)
     setError('')
-    const { error: err } = await signUp(email, password, name)
+    const { error: err, needsConfirmation } = await signUp(email, password, name)
     if (err) {
       setError(err)
       setLoading(false)
       return
     }
-    setSuccess('\u05E0\u05E8\u05E9\u05DE\u05EA \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4! \u05D1\u05D3\u05D5\u05E7 \u05D0\u05EA \u05D4\u05DE\u05D9\u05D9\u05DC')
     setLoading(false)
-    setTimeout(() => switchPage('login'), 2500)
+    if (needsConfirmation) {
+      // Stay on the register page with a persistent instruction: the account
+      // only works after the emailed link is opened.
+      setSuccess(`שלחנו מייל אימות אל ${email}. לחצו על הקישור במייל כדי להפעיל את החשבון, ואז התחברו. (בדקו גם בספאם)`)
+      return
+    }
+    // Confirmation is off: a session already exists and the app redirects.
+    setSuccess('נרשמת בהצלחה!')
   }
 
   const handleReset = async (e: React.FormEvent) => {
