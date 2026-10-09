@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase';
 import type { Income } from './types';
+import { guardSampleWrites } from '../lib/sampleMode';
 
-export const supabaseApi = {
+const rawSupabaseApi = {
   // ─── Incomes ──────────────────────────────────────────────────────────
 
   getIncomes: async (userId: string): Promise<Income[]> => {
@@ -429,3 +430,7 @@ export const supabaseApi = {
     };
   },
 };
+
+// While the in-memory sample session is on screen, every write is a no-op so
+// demo data can never reach the signed-in user's saved data.
+export const supabaseApi = guardSampleWrites(rawSupabaseApi);

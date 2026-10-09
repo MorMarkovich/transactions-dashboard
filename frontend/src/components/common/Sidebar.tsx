@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -29,6 +29,8 @@ import RefreshFromBanks from './RefreshFromBanks'
 import { useAuth } from '../../lib/AuthContext'
 import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
+import { clearSampleSession } from '../../lib/sampleMode'
+import { UPLOAD_FILES_EVENT, UPLOAD_STATE_EVENT, type UploadState } from './OnboardingWizard'
 import './Sidebar.css'
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -179,6 +181,7 @@ export default function Sidebar({
           if (removedParts.length > 0) {
             setUploadStatus(`הוסרו: ${removedParts.join(', ')}`)
           }
+          clearSampleSession()
           saveToSupabase(allTransactions)
           onFileUploaded?.(merged.session_id)
         } else {
@@ -239,6 +242,21 @@ export default function Sidebar({
       setIsDragging(false)
     }
   }
+
+  // Uploads started from the onboarding wizard on the dashboard page.
+  useEffect(() => {
+    const onFiles = (e: Event) => {
+      const files = (e as CustomEvent<File[]>).detail
+      if (files?.length && !uploading) handleUploadFiles(files)
+    }
+    window.addEventListener(UPLOAD_FILES_EVENT, onFiles)
+    return () => window.removeEventListener(UPLOAD_FILES_EVENT, onFiles)
+  })
+
+  // Mirror upload progress so the wizard can show it (the sidebar is hidden on mobile).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent<UploadState>(UPLOAD_STATE_EVENT, { detail: { uploading, status: uploadStatus, error } }))
+  }, [uploading, uploadStatus, error])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
