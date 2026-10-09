@@ -331,3 +331,9 @@ html, body { overflow-anchor: none; }
 .month-pie-percent{text-align:center;font-variant-numeric:tabular-nums;}
 .month-pie-legend-row{grid-template-columns:7px minmax(70px,1fr) 34px 96px !important;}
 .update-bar { position:sticky; top:0; z-index:40; display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap; margin:0 0 12px; padding:8px 14px; border:1px solid var(--border-accent, var(--border)); border-radius:12px; background:var(--accent-muted, rgba(104,244,211,.12)); color:var(--text-primary); font-size:13px; }
+@media (max-width: 640px) {
+  .transactions-page { display: flex; flex-direction: column; }
+  .tx-analysis { order: 10; margin-top: 16px; }
+  .tx-analysis > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; padding: 0 14px; border: 1px solid var(--border); border-radius: 12px; font-weight: 600; }
+}
+@media (min-width: 641px) { .tx-analysis > summary { display: none; } }
