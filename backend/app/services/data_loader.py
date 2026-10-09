@@ -7,9 +7,35 @@ from typing import Dict
 from .isracard_pdf_parser import parse_isracard_pdf
 
 
+def _read_csv_rows(file_path: str) -> pd.DataFrame:
+    """Read a CSV of unknown encoding/delimiter, tolerating title lines and ragged rows."""
+    import csv
+    import io
+    raw = open(file_path, 'rb').read()
+    text = None
+    for encoding in ('utf-8-sig', 'windows-1255', 'iso-8859-8'):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise ValueError("Could not read CSV file with any encoding")
+    sample = text[:4096]
+    try:
+        delimiter = csv.Sniffer().sniff(sample, delimiters=',;\t|').delimiter
+    except csv.Error:
+        delimiter = ','
+    rows = [r for r in csv.reader(io.StringIO(text), delimiter=delimiter) if any(c.strip() for c in r)]
+    if not rows:
+        raise ValueError("Empty CSV file")
+    width = max(len(r) for r in rows)
+    return pd.DataFrame([r + [''] * (width - len(r)) for r in rows])
+
+
 def load_transaction_file(file_path: str) -> pd.DataFrame:
     """Load transaction file (Excel, CSV, or Isracard PDF)"""
-    if file_path.endswith('.pdf'):
+    if file_path.lower().endswith('.pdf'):
         # Isracard exports statements as PDF (Excel export isn't offered for
         # all card types). Parse into a DataFrame, then re-emit as the raw
         # positional layout the rest of the pipeline (clean_dataframe →
@@ -22,7 +48,7 @@ def load_transaction_file(file_path: str) -> pd.DataFrame:
         rows = [[''] * len(header), header] + parsed.values.tolist()
         return pd.DataFrame(rows)
 
-    if file_path.endswith('.xlsx') or file_path.endswith('.xls'):
+    if file_path.lower().endswith(('.xlsx', '.xls')):
         # Try to load all sheets and combine
         excel_file = None
         try:
@@ -64,16 +90,8 @@ def load_transaction_file(file_path: str) -> pd.DataFrame:
                     pass
             raise ValueError(f"Error loading Excel file: {str(e)}")
     
-    elif file_path.endswith('.csv'):
-        # Try different encodings
-        encodings = ['utf-8', 'utf-8-sig', 'windows-1255', 'iso-8859-8']
-        for encoding in encodings:
-            try:
-                df = pd.read_csv(file_path, encoding=encoding, header=None)
-                return df
-            except (UnicodeDecodeError, pd.errors.EmptyDataError):
-                continue
-        raise ValueError("Could not read CSV file with any encoding")
-    
+    elif file_path.lower().endswith('.csv'):
+        return _read_csv_rows(file_path)
+
     else:
         raise ValueError(f"Unsupported file format: {file_path}")
