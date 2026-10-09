@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import { useModalFocus } from '../../hooks/useModalFocus'
 import Sidebar from './Sidebar'
+import { getSampleSessionId } from '../../lib/sampleMode'
 import CommandPalette from './CommandPalette'
 import { LayoutDashboard, Receipt, CalendarRange, Menu } from 'lucide-react'
 import Skeleton from '../ui/Skeleton'
@@ -226,7 +227,7 @@ export default function Layout({ children }: LayoutProps) {
   // Auto-restore last session from Supabase when user logs in with no active session
   useEffect(() => {
     const urlSession = searchParams.get('session_id')
-    if (urlSession && !urlSession.includes('::')) localStorage.setItem(LAST_SESSION_KEY, urlSession)
+    if (urlSession && !urlSession.includes('::') && urlSession !== getSampleSessionId()) localStorage.setItem(LAST_SESSION_KEY, urlSession)
     if (!user || hasTriedRestore.current) return
     hasTriedRestore.current = true
     // A link without ?session_id (bookmark, address bar) reuses the last
