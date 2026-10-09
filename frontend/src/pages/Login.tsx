@@ -142,8 +142,8 @@ export default function Login() {
 
   // Set browser tab title
   useEffect(() => {
-    document.title = 'התחברות | מנתח עסקאות'
-    return () => { document.title = 'מנתח עסקאות' }
+    document.title = 'התחברות | פנקס'
+    return () => { document.title = 'פנקס' }
   }, [])
 
   // ---- Render -------------------------------------------------------------
@@ -189,7 +189,7 @@ export default function Login() {
               className="text-3xl font-extrabold mb-3"
               style={{ color: 'var(--text-primary)' }}
             >
-              {'\u05DE\u05E0\u05EA\u05D7 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA'}
+              {'\u05E4\u05E0\u05E7\u05E1'}
             </h1>
             <p
               className="text-base leading-relaxed mb-8"
@@ -246,7 +246,7 @@ export default function Login() {
               className="text-lg sm:text-xl font-extrabold"
               style={{ color: 'var(--text-primary)' }}
             >
-              {'\u05DE\u05E0\u05EA\u05D7 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA'}
+              {'\u05E4\u05E0\u05E7\u05E1'}
             </span>
           </div>
 
