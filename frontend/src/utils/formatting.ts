@@ -71,3 +71,8 @@ export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength).trimEnd() + '...'
 }
+
+/** Show the owner "joint" in Hebrew everywhere ("ישראכרט (joint)" -> "ישראכרט (משותף)"). */
+export function hebOwner(text: string | null | undefined): string {
+  return (text ?? '').replace(/\bjoint\b/gi, 'משותף')
+}
