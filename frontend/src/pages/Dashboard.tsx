@@ -919,20 +919,21 @@ export default function Dashboard() {
 
   // ── Main view ──────────────────────────────────────────────────────
   return (
+    <>
+    {isSampleActive() && (
+      <div role="status" className="sample-banner" style={{
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)',
+        padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-lg)',
+        border: '1px solid var(--accent)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)',
+      }}>
+        <span style={{ color: 'var(--text-primary)' }}>אלה נתוני דוגמה. הם לא נשמרים בחשבון שלכם.</span>
+        <button type="button" onClick={exitSample} style={{
+          minHeight: 40, padding: '0 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
+          background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', maxWidth: '100%',
+        }}>מעבר להעלאת קובץ משלכם</button>
+      </div>
+    )}
     <div className="studio-dashboard" style={{ direction: 'rtl', position: 'relative' }}>
-      {isSampleActive() && (
-        <div role="status" className="sample-banner" style={{
-          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)',
-          padding: 'var(--space-md) var(--space-lg)', marginBottom: 'var(--space-lg)',
-          border: '1px solid var(--accent)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)',
-        }}>
-          <span style={{ color: 'var(--text-primary)' }}>אלה נתוני דוגמה. הם לא נשמרים בחשבון שלכם.</span>
-          <button type="button" onClick={exitSample} style={{
-            minHeight: 40, padding: '0 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
-            background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', maxWidth: '100%',
-          }}>מעבר להעלאת קובץ משלכם</button>
-        </div>
-      )}
       {/* Mesh gradient background */}
       <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
@@ -1977,5 +1978,6 @@ export default function Dashboard() {
         onAddSubcategory={addCustomSubcategory}
       />
     </div>
+    </>
   )
                   }
