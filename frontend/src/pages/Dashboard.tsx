@@ -1051,7 +1051,7 @@ export default function Dashboard() {
                       הרכב ההוצאות - {formatMonthLabel(monthOverview.month)}
                     </div>
                     <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
-                      <div><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
+                      <div data-chart-label={`הרכב ההוצאות - ${formatMonthLabel(monthOverview.month)}`}><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
                       <div className="month-pie-legend">
                         {(showAllMonthCategories ? monthExpensePie : monthChartData).map((item) => {
                           const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
@@ -1796,14 +1796,15 @@ export default function Dashboard() {
               {/* Monthly burn-down progress bar */}
               {forecast && forecast.avg_monthly > 0 && (() => {
                 const last30Total = velocity.rolling_30day * 30
-                const burnPct = Math.min((last30Total / forecast.avg_monthly) * 100, 100)
+                const burnRatio = (last30Total / forecast.avg_monthly) * 100
+                const burnPct = Math.min(burnRatio, 100)
                 const isOver = last30Total > forecast.avg_monthly
                 return (
                   <div style={{ marginTop: '14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', cursor: 'help' }} title="סך ההוצאות ב-30 הימים האחרונים (ממוצע יומי כפול 30) מול ממוצע ההוצאות החודשי. לא קשור ליעדי התקציב.">הוצאות 30 יום מול ממוצע חודשי</span>
                       <span style={{ fontSize: '0.6875rem', fontWeight: 600, color: isOver ? 'var(--danger)' : 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                        {burnPct.toFixed(0)}%
+                        {burnRatio.toFixed(0)}%
                       </span>
                     </div>
                     <div style={{ height: '6px', borderRadius: '3px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
