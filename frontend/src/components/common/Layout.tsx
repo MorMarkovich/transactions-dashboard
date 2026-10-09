@@ -44,55 +44,46 @@ function useScrollMemory(pathname: string) {
     currentPath.current = pathname
   }, [pathname])
   useEffect(() => {
-    let raf = 0
     let lastHeight = document.documentElement.scrollHeight
-    const onScroll = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const height = document.documentElement.scrollHeight
-        const shrank = height < lastHeight - 40
-        const atBottom = window.scrollY >= height - window.innerHeight - 2
-        lastHeight = height
-        // A page that got shorter (list reloading) clamps scroll; that is not the user's position.
-        if (suspended.current || (shrank && atBottom)) return
-        scrollPositions.set(currentPath.current, window.scrollY)
-      })
+    const record = () => {
+      const height = document.documentElement.scrollHeight
+      const shrank = height < lastHeight - 40
+      const atBottom = window.scrollY >= height - window.innerHeight - 2
+      lastHeight = height
+      // A page that got shorter (list reloading) clamps scroll; that is not the user's position.
+      if (suspended.current || (shrank && atBottom)) return
+      scrollPositions.set(currentPath.current, window.scrollY)
     }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
+    // Scroll events can be delayed or dropped (hidden tab, busy frame), so also snapshot the
+    // position right before any navigation starts, while the old page is still on screen.
+    window.addEventListener('scroll', record, { passive: true })
+    document.addEventListener('click', record, true)
+    window.addEventListener('popstate', record)
+    return () => {
+      window.removeEventListener('scroll', record)
+      document.removeEventListener('click', record, true)
+      window.removeEventListener('popstate', record)
+    }
   }, [])
   useEffect(() => {
     const y = scrollPositions.get(pathname) ?? 0
     let tries = 0
     let release = 0
-    let stopped = false
+    let lastSet: number | null = null
     const finish = () => {
-      stopped = true
       window.clearInterval(id)
-      window.removeEventListener('wheel', cancel)
-      window.removeEventListener('touchstart', cancel)
-      window.removeEventListener('keydown', cancel)
       release = window.setTimeout(() => { suspended.current = false }, 200)
     }
-    // The user took over: stop fighting their scroll.
-    const cancel = () => { if (!stopped) finish() }
     // Wait for a short page to grow (data still loading) before giving up: up to ~10s.
+    // If something else moved the scroll (the user), stop instead of fighting it.
     const id = window.setInterval(() => {
       tries += 1
-      if (y > 0) window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      if (lastSet !== null && Math.abs(window.scrollY - lastSet) > 4) { finish(); return }
+      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      lastSet = window.scrollY
       if (Math.abs(window.scrollY - y) < 4 || tries > 125) finish()
     }, 80)
-    window.addEventListener('wheel', cancel, { passive: true })
-    window.addEventListener('touchstart', cancel, { passive: true })
-    window.addEventListener('keydown', cancel)
-    return () => {
-      stopped = true
-      window.clearInterval(id)
-      window.removeEventListener('wheel', cancel)
-      window.removeEventListener('touchstart', cancel)
-      window.removeEventListener('keydown', cancel)
-      window.clearTimeout(release)
-    }
+    return () => { window.clearInterval(id); window.clearTimeout(release) }
   }, [pathname])
 }
 
