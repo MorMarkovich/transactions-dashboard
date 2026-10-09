@@ -826,7 +826,6 @@ export default function DataManagement() {
                     onChange={(e) => setIncAmount(e.target.value)}
                     min="0"
                     step="0.01"
-                    style={{ direction: 'ltr', textAlign: 'left' }}
                   />
                   <Select
                     label="סוג הכנסה"
