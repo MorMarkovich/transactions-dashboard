@@ -5,6 +5,13 @@ export const SUPPORTED = ['leumi', 'discount', 'max', 'isracard']
 // Bank (עו"ש) accounts vs credit cards. Used to set the `_is_bank_row` marker
 // the dashboard's restore step relies on to strip lump-sum card payments.
 export const BANK_PROVIDERS = ['leumi', 'discount']
+// Retired sources: the card was closed. Historical rows stay in the snapshot,
+// but the source is never scraped and never counts as a stale/failed source.
+export const RETIRED_PROVIDERS = ['max']
+export const isRetiredAccount = (acct) =>
+  Boolean(acct && (acct.inactive === true || RETIRED_PROVIDERS.includes(acct.provider)))
+export const ACTIVE_PROVIDERS = SUPPORTED.filter((p) => !RETIRED_PROVIDERS.includes(p))
+
 export const CARD_PROVIDERS = ['max', 'isracard']
 
 export const PROVIDER_LABELS = {
