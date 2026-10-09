@@ -45,10 +45,17 @@ function useScrollMemory(pathname: string) {
   }, [pathname])
   useEffect(() => {
     let raf = 0
+    let lastHeight = document.documentElement.scrollHeight
     const onScroll = () => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
-        if (!suspended.current) scrollPositions.set(currentPath.current, window.scrollY)
+        const height = document.documentElement.scrollHeight
+        const shrank = height < lastHeight - 40
+        const atBottom = window.scrollY >= height - window.innerHeight - 2
+        lastHeight = height
+        // A page that got shorter (list reloading) clamps scroll; that is not the user's position.
+        if (suspended.current || (shrank && atBottom)) return
+        scrollPositions.set(currentPath.current, window.scrollY)
       })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -58,13 +65,34 @@ function useScrollMemory(pathname: string) {
     const y = scrollPositions.get(pathname) ?? 0
     let tries = 0
     let release = 0
-    const finish = () => { release = window.setTimeout(() => { suspended.current = false }, 200) }
+    let stopped = false
+    const finish = () => {
+      stopped = true
+      window.clearInterval(id)
+      window.removeEventListener('wheel', cancel)
+      window.removeEventListener('touchstart', cancel)
+      window.removeEventListener('keydown', cancel)
+      release = window.setTimeout(() => { suspended.current = false }, 200)
+    }
+    // The user took over: stop fighting their scroll.
+    const cancel = () => { if (!stopped) finish() }
+    // Wait for a short page to grow (data still loading) before giving up: up to ~10s.
     const id = window.setInterval(() => {
       tries += 1
-      window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
-      if (Math.abs(window.scrollY - y) < 4 || tries > 50) { window.clearInterval(id); finish() }
+      if (y > 0) window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      if (Math.abs(window.scrollY - y) < 4 || tries > 125) finish()
     }, 80)
-    return () => { window.clearInterval(id); window.clearTimeout(release) }
+    window.addEventListener('wheel', cancel, { passive: true })
+    window.addEventListener('touchstart', cancel, { passive: true })
+    window.addEventListener('keydown', cancel)
+    return () => {
+      stopped = true
+      window.clearInterval(id)
+      window.removeEventListener('wheel', cancel)
+      window.removeEventListener('touchstart', cancel)
+      window.removeEventListener('keydown', cancel)
+      window.clearTimeout(release)
+    }
   }, [pathname])
 }
 
@@ -74,6 +102,8 @@ function useChartLabels(pathname: string) {
     const label = () => {
       document.querySelectorAll<HTMLElement>('.recharts-wrapper:not([data-a11y])').forEach((el) => {
         let name = 'תרשים'
+        const explicit = el.closest<HTMLElement>('[data-chart-label]')?.dataset.chartLabel
+        if (explicit) { el.setAttribute('role', 'img'); el.setAttribute('aria-label', `תרשים: ${explicit}`); el.setAttribute('data-a11y', '1'); return }
         let node: HTMLElement | null = el
         for (let i = 0; i < 6 && node; i += 1) {
           const header = node.parentElement?.querySelector<HTMLElement>('.section-header-v2, h2, h3')
