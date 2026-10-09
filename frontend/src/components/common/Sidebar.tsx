@@ -269,7 +269,7 @@ export default function Sidebar({
 
   return (
     <aside role={isOpen ? "dialog" : undefined} aria-modal={isOpen ? true : undefined} aria-label="תפריט ניהול וניווט" tabIndex={-1} className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong dir="ltr">ORBIT</strong><small>התמונה הפיננסית שלך</small></div>}</div>
+      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong>פנקס</strong><small>התמונה הפיננסית שלך</small></div>}</div>
       <div className="studio-sidebar-tools"><button onClick={onSearch} aria-label="חיפוש"><Search size={18}/>{!collapsed && <span>חיפוש <kbd dir="ltr">⌘ K</kbd></span>}</button><button onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
       {/* ─── Close button (mobile only) ─── */}
       <button
