@@ -177,6 +177,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   return (
     <div dir="ltr"><ResponsiveContainer width="100%" height={computedHeight}>
       <BarChart
+        accessibilityLayer={false}
         data={data}
         layout="vertical"
         margin={{ top: 8, right: 8, left: 4, bottom: 8 }}

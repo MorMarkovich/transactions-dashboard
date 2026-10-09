@@ -144,6 +144,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   return (
     <div dir="ltr"><ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
       <AreaChart
+        accessibilityLayer={false}
         data={data}
         margin={isCompact ? { top: 12, right: 12, left: 12, bottom: 12 } : { top: 12, right: 20, left: 12, bottom: 12 }}
       >

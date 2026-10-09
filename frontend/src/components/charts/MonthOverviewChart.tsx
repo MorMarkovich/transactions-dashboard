@@ -128,6 +128,7 @@ const MonthOverviewChart: React.FC<MonthOverviewChartProps> = React.memo(functio
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart
+        accessibilityLayer={false}
         data={data}
         margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 48 : 8 }}
       >

@@ -152,6 +152,7 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart
+        accessibilityLayer={false}
         data={chartData}
         margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 44 : 8 }}
       >
