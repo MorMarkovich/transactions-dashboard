@@ -361,7 +361,7 @@ export default function CategoryTransactionsDrawer({
                     {category}
                   </h3>
                   <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {month || 'כל התקופה'} · {transactions.length === 1 ? 'עסקה אחת' : `${transactions.length} עסקאות`}
+                    {month || 'כל התקופה'} · {loading ? 'טוען…' : transactions.length === 1 ? 'עסקה אחת' : `${transactions.length} עסקאות`}
                   </p>
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function CategoryTransactionsDrawer({
                     direction: 'ltr',
                   }}
                 >
-                  {formatCurrency(total)}
+                  {loading ? '…' : formatCurrency(total)}
                 </p>
               </div>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -468,7 +468,7 @@ export default function CategoryTransactionsDrawer({
                 <input
                   value={transactionQuery}
                   onChange={(event) => setTransactionQuery(event.target.value)}
-                  placeholder={category === 'שונות' ? 'חיפוש עסקה לסיווג מהיר...' : 'חיפוש לפי שם עסקה, קטגוריה או תת-קטגוריה...'}
+                  placeholder={category === 'שונות' ? 'חיפוש עסקה לסיווג' : 'חיפוש עסקה או קטגוריה'}
                   aria-label="חיפוש עסקאות לסיווג"
                   style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-family)', fontSize: '0.8rem' }}
                 />
@@ -646,7 +646,7 @@ export default function CategoryTransactionsDrawer({
                               <button
                                 className="category-change-btn"
                                 onClick={() => setEditingId(isEditing ? null : tx.id ?? null)}
-                                aria-label={isEditing ? 'בטל עריכה' : 'ערוך קטגוריה'}
+                                aria-label={`${isEditing ? 'בטל עריכה' : 'ערוך קטגוריה'}: ${tx.תיאור ?? ''} ${tx.תאריך ?? ''}`.trim()}
                                 disabled={isSaving}
                                 style={{
                                   display: 'flex',

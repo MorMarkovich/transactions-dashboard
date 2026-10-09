@@ -72,6 +72,7 @@ export default function CategoryMonthlyComparison({
             <button
               key={mode}
               onClick={() => setDisplay(mode)}
+              aria-pressed={display === mode}
               style={{
                 padding: '5px 14px',
                 fontSize: '0.8125rem',
@@ -99,6 +100,7 @@ export default function CategoryMonthlyComparison({
               <button
                 key={m}
                 onClick={() => toggleMonth(m)}
+                aria-pressed={on}
                 style={{
                   padding: '3px 9px',
                   fontSize: '0.75rem',
