@@ -33,7 +33,7 @@ export default function OnboardingWizard({ onLoadSample }: Props) {
   const send = (files: File[]) => {
     const ok = files.filter((f) => ACCEPT.test(f.name))
     if (ok.length === 0) {
-      setState({ uploading: false, status: '', error: 'הקובץ צריך להיות xlsx, csv או pdf' })
+      setState({ uploading: false, status: '', error: 'הקובץ צריך להיות xlsx, xls, csv או pdf' })
       return
     }
     window.dispatchEvent(new CustomEvent(UPLOAD_FILES_EVENT, { detail: ok }))

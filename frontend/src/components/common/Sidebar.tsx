@@ -85,6 +85,20 @@ const SUPPORTED_FORMATS = [
   { label: 'CSV', variant: 'default' as const },
 ]
 
+/** User-facing Hebrew message for a failed upload. Server details are shown only when already Hebrew. */
+function uploadErrorMessage(err: unknown): string {
+  const e = err as { response?: { status?: number; data?: { detail?: unknown } }; code?: string }
+  const detail = e?.response?.data?.detail
+  if (typeof detail === 'string' && /[\u0590-\u05FF]/.test(detail)) return detail
+  const status = e?.response?.status
+  if (!e?.response) return 'אין חיבור לשרת. בדקו את החיבור לאינטרנט ונסו שוב.'
+  if (status === 401) return 'ההתחברות פגה. התחברו מחדש ונסו שוב.'
+  if (status === 413) return 'הקובץ גדול מדי. אפשר להעלות קבצים עד 20MB.'
+  if (status === 429) return 'יותר מדי ניסיונות בזמן קצר. נסו שוב בעוד דקה.'
+  if (status && status >= 500) return 'משהו השתבש בשרת. נסו שוב בעוד רגע.'
+  return 'לא הצלחנו להעלות את הקובץ. ודאו שזה קובץ תנועות (xlsx, xls, csv או pdf) ונסו שוב.'
+}
+
 export default function Sidebar({
   isOpen,
   collapsed = false,
@@ -191,9 +205,7 @@ export default function Sidebar({
         setError('לא נמצאו עסקאות בקבצים')
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: unknown } } }
-      const detail = axiosErr?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'שגיאה בהעלאת הקובץ')
+      setError(uploadErrorMessage(err))
     } finally {
       setUploading(false)
       setUploadStatus('מעלה קובץ...')

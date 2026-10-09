@@ -156,9 +156,9 @@ def _validate_xlsx_archive(file_path: str) -> None:
             members = archive.infolist()
             expanded_size = sum(member.file_size for member in members)
             if len(members) > 10_000 or expanded_size > MAX_XLSX_UNCOMPRESSED_BYTES:
-                raise HTTPException(status_code=413, detail="Spreadsheet expands beyond the safe processing limit")
+                raise HTTPException(status_code=413, detail="קובץ האקסל גדול או מורכב מדי לעיבוד. נסו לייצא טווח תאריכים קצר יותר.")
     except zipfile.BadZipFile as exc:
-        raise HTTPException(status_code=400, detail="Invalid Excel file") from exc
+        raise HTTPException(status_code=400, detail="לא הצלחנו לפתוח את קובץ האקסל. ודאו שהקובץ לא פגום ושהוא בפורמט xlsx או xls.") from exc
 
 
 @router.post("/upload")
@@ -169,14 +169,14 @@ async def upload_file(file: UploadFile = File(...)):
         safe_name = os.path.basename(file.filename or "upload")
         suffix = os.path.splitext(safe_name)[1].lower()
         if suffix not in ALLOWED_UPLOAD_SUFFIXES:
-            raise HTTPException(status_code=400, detail="Unsupported file format")
+            raise HTTPException(status_code=400, detail="סוג הקובץ לא נתמך. אפשר להעלות קבצי xlsx, xls, csv או pdf.")
 
         # Save file temporarily
-        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{safe_name}")
+        file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{uuid.uuid4().hex[:6]}{suffix}")
         with open(file_path, "wb") as f:
             content = await file.read(MAX_UPLOAD_BYTES + 1)
             if len(content) > MAX_UPLOAD_BYTES:
-                raise HTTPException(status_code=413, detail="Uploaded file is too large")
+                raise HTTPException(status_code=413, detail="הקובץ גדול מדי. אפשר להעלות קבצים עד 20MB, נסו לייצא טווח תאריכים קצר יותר.")
             f.write(content)
 
         if suffix == ".xlsx":
@@ -204,7 +204,7 @@ async def upload_file(file: UploadFile = File(...)):
                     pass
             raise HTTPException(
                 status_code=400,
-                detail=f"Required columns not found. Found columns: {list(df_clean.columns)}"
+                detail="לא זיהינו בקובץ עמודות של תאריך, תיאור וסכום. ודאו שזה ייצוא תנועות מהבנק או מחברת האשראי, ושהשורה הראשונה בטבלה היא שורת הכותרות."
             )
 
         # Process data
@@ -219,7 +219,7 @@ async def upload_file(file: UploadFile = File(...)):
                     os.remove(file_path)
                 except:
                     pass
-            raise HTTPException(status_code=400, detail="No valid transactions found")
+            raise HTTPException(status_code=400, detail="הקובץ נקרא, אבל לא נמצאו בו עסקאות תקינות. ודאו שזה קובץ תנועות מהבנק או מחברת האשראי.")
         
         # Create session
         session_id = str(uuid.uuid4())
@@ -261,8 +261,15 @@ async def upload_file(file: UploadFile = File(...)):
                 os.remove(file_path)
             except:
                 pass
-        logger.exception("Transaction upload failed")
-        raise HTTPException(status_code=500, detail="Failed to process uploaded file") from e
+        logger.exception("Transaction upload failed (%s)", suffix)
+        if isinstance(e, ValueError) or suffix == ".pdf":
+            msg = str(e)
+            if suffix == ".pdf" or "PDF" in msg:
+                detail = "לא הצלחנו לקרוא עסקאות מקובץ ה-PDF. כרגע נתמכים דפי פירוט של ישראכרט. לשאר הבנקים והכרטיסים העלו קובץ אקסל (xlsx) או csv."
+            else:
+                detail = "לא הצלחנו לקרוא את הקובץ. ודאו שזה קובץ תנועות מהבנק או מחברת האשראי (xlsx, xls, csv) ושהוא לא פגום."
+            raise HTTPException(status_code=400, detail=detail) from e
+        raise HTTPException(status_code=500, detail="משהו השתבש בעיבוד הקובץ. נסו שוב בעוד רגע, ואם זה חוזר נסו לייצא את הקובץ מחדש.") from e
 
 
 class CategoryRule(BaseModel):
