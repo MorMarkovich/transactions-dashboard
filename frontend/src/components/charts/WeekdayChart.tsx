@@ -111,6 +111,7 @@ const WeekdayChart: React.FC<WeekdayChartProps> = React.memo(function WeekdayCha
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
+        accessibilityLayer={false}
         data={data}
         margin={{
           top: 8,
