@@ -121,6 +121,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   return (
     <div dir="ltr"><ResponsiveContainer width="100%" height={chartHeight}>
       <RechartsBarChart
+        accessibilityLayer={false}
         data={data}
         margin={{
           top: 8,
