@@ -926,7 +926,7 @@ export default function DataManagement() {
                 <div className="glass-card" style={{ padding: '32px 16px', textAlign: 'center' }}>
                   <Wallet size={32} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
                   <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                    אין הכנסות שמורות. הוסף הכנסה משמאל.
+                    אין הכנסות שמורות. הוסיפו הכנסה בטופס.
                   </p>
                 </div>
               )}
