@@ -53,6 +53,13 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => void reloadIfNewBuild(), 5 * 60_000)
 void reloadIfNewBuild()
 
+// PWA: app-shell service worker, production builds only (see public/sw.js).
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
