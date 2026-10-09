@@ -39,7 +39,15 @@ export default function Login() {
 
   const [page, setPage] = useState<Page>('login')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => {
+    try {
+      if (sessionStorage.getItem('transactions-dashboard:session-expired')) {
+        sessionStorage.removeItem('transactions-dashboard:session-expired')
+        return 'ההתחברות פגה. יש להתחבר מחדש.'
+      }
+    } catch { /* ignore */ }
+    return ''
+  })
   const [success, setSuccess] = useState('')
 
   // Form fields
