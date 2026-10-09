@@ -309,6 +309,13 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _row_looks_like_header(row) -> bool:
+    """True when the first row already holds the column titles (no title lines above)."""
+    keywords = ['תאריך', 'שם בית העסק', 'סכום', 'קטגוריה', 'תיאור', 'חיוב', 'עסקה', 'Date', 'Amount', 'זכות', 'חובה', 'תנועה', 'ערך']
+    values = [str(v).strip() for v in row.tolist() if pd.notna(v)]
+    return sum(1 for k in keywords if any(k in v for v in values)) >= 3
+
+
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """ניקוי והכנת ה-DataFrame"""
     if df.empty:
@@ -317,7 +324,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # זיהוי שורת כותרת
     header_row = detect_header_row(df)
     
-    if header_row > 0:
+    if header_row > 0 or _row_looks_like_header(df.iloc[0]):
         # הגדרת הכותרות
         df.columns = df.iloc[header_row].tolist()
         df = df.iloc[header_row + 1:].reset_index(drop=True)
