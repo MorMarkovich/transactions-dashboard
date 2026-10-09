@@ -130,7 +130,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   return (
     <div style={{ position: 'relative' }}>
       <ResponsiveContainer width="100%" height={isCompact ? 240 : 280}>
-        <PieChart>
+        <PieChart accessibilityLayer={false}>
           <Pie
             data={data}
             dataKey="value"
