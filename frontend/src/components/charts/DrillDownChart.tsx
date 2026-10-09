@@ -364,6 +364,7 @@ const DrillDownChart: React.FC<DrillDownChartProps> = React.memo(function DrillD
         >
           <ResponsiveContainer width="100%" height={height}>
             <BarChart
+              accessibilityLayer={false}
               data={bars}
               margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 48 : 8 }}
               onClick={(state) => {
