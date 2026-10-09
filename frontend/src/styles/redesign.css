@@ -340,8 +340,8 @@ html, body { overflow-anchor: none; }
 @media (max-width: 767px) {
   .orbit-layout .sidebar-close-btn, .orbit-layout .sidebar-signout-btn { width: 44px; height: 44px; }
   .orbit-layout .bank-sync-btn { min-height: 44px; }
-  .orbit-tools button { min-width: 44px; min-height: 44px; }
-  .main-content .ui-btn, .main-content a.ui-btn, .main-content button, .main-content summary, .main-content [role="button"] { min-height: 44px; }
+  .orbit-layout .orbit-tools button { min-width: 44px !important; min-height: 44px !important; width: auto; }
+  .main-content .ui-btn, .main-content a.ui-btn, .main-content button:not(.multi-select-chips button):not(.category-hide-btn):not([role="option"]), .main-content summary, .main-content [role="button"] { min-height: 44px !important; }
   .main-content input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .main-content select { min-height: 44px; }
 }
 .view-state-line { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:0 0 12px; font-size:12px; color:var(--text-secondary); }
