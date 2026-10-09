@@ -908,6 +908,23 @@ export default function Dashboard() {
         </label>}
       />
 
+      {selectedMonth && (
+        <div className="view-state-line" data-testid="view-state" role="status">
+          <span>
+            מוצג: {formatMonthLabel(selectedMonth)} · {dateType === 'billing' ? 'לפי תאריך חיוב' : 'לפי תאריך עסקה'} · {selectedOwner ? (selectedOwner === 'joint' ? 'משותף' : selectedOwner) : 'כל הבעלים'} · {category ? [category, ...subcategories].join(' / ') : 'כל הקטגוריות'}
+          </span>
+          {(dateType !== 'billing' || selectedOwner || category || subcategories.length > 0) && (
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={() => { setDateType('billing'); setSelectedOwner(null); clearFilters() }}
+            >
+              אפס לברירת מחדל
+            </button>
+          )}
+        </div>
+      )}
+
       <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
         overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
         category={category} subcategories={subcategories} refreshKey={refreshKey}
