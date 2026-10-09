@@ -20,8 +20,8 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
   const session = params.get('session_id')
   const href = (to: string) => session ? `${to}?${new URLSearchParams({session_id:session})}` : to
   return <header className="app-topbar orbit-topbar">
-    <NavLink to={href('/')} className="orbit-brand" aria-label="ORBIT - סקירה">
-      <Orbit size={27}/><strong dir="ltr">ORBIT</strong><span>התמונה הפיננסית שלך</span>
+    <NavLink to={href('/')} className="orbit-brand" aria-label="פנקס - סקירה">
+      <Orbit size={27}/><strong>פנקס</strong><span>התמונה הפיננסית שלך</span>
     </NavLink>
     <nav className="orbit-nav" aria-label="ניווט ראשי">
       {ORBIT_NAV.map(({to,label})=><NavLink key={to} to={href(to)} end={to==='/'}>{label}</NavLink>)}
