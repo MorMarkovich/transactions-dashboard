@@ -87,6 +87,19 @@ export const supabaseApi = {
     }
   },
 
+  /** Server timestamp of the newest saved snapshot (null when none). */
+  getLatestSnapshotAt: async (userId: string): Promise<string | null> => {
+    const { data, error } = await supabase
+      .from('saved_transactions')
+      .select('created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return (data[0].created_at as string) ?? null;
+  },
+
   getLatestTransactions: async (userId: string): Promise<unknown[] | null> => {
     const { data, error } = await supabase
       .from('saved_transactions')

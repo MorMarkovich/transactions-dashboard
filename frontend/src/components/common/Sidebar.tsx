@@ -126,6 +126,8 @@ export default function Sidebar({
     if (!user || !transactions.length) return
     supabaseApi.deleteAllTransactions(user.id)
       .then(() => supabaseApi.saveTransactions(user.id, transactions))
+      .then(() => supabaseApi.getLatestSnapshotAt(user.id))
+      .then((at) => { if (at) localStorage.setItem('transactions-dashboard:snapshot-seen', at) })
       .catch(e => console.error('Failed to save to Supabase:', e))
   }
 

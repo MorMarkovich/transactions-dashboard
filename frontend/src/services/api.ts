@@ -128,6 +128,37 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// A 401 means the access token was rejected (expired, revoked, or never
+// attached). Refresh the Supabase session once and replay the request; if the
+// session cannot be refreshed, sign out so the user lands on the login page
+// with a clear message instead of a raw status code.
+export const SESSION_EXPIRED_KEY = 'transactions-dashboard:session-expired';
+let refreshing: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!refreshing) {
+    refreshing = supabase.auth.refreshSession()
+      .then(({ data, error }) => (error ? null : data.session?.access_token ?? null))
+      .catch(() => null)
+      .finally(() => { refreshing = null; });
+  }
+  return refreshing;
+}
+
+api.interceptors.response.use(undefined, async (error) => {
+  const config = error?.config as (InternalAxiosRequestConfig & { _authRetried?: boolean }) | undefined;
+  if (error?.response?.status !== 401 || !config || config._authRetried) throw error;
+  config._authRetried = true;
+  const token = await refreshAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+    return api.request(config);
+  }
+  try { sessionStorage.setItem(SESSION_EXPIRED_KEY, '1'); } catch { /* ignore */ }
+  await supabase.auth.signOut().catch(() => undefined);
+  throw error;
+});
+
 export const transactionsApi = {
   /**
    * List the distinct owners (people) present in the session, for the

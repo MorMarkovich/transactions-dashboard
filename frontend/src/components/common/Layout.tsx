@@ -25,6 +25,20 @@ interface LayoutProps {
 // back button) returns to the same place instead of the top.
 const scrollPositions = new Map<string, number>()
 const LAST_SESSION_KEY = 'transactions-dashboard:last-session'
+// created_at of the Supabase snapshot this device's session was built from. When
+// another device (or a bank refresh) saves a newer snapshot, this device rebuilds
+// instead of showing older numbers.
+const SNAPSHOT_SEEN_KEY = 'transactions-dashboard:snapshot-seen'
+const isNewer = (a: string | null, b: string | null) => {
+  if (!a) return false
+  if (!b) return true
+  return new Date(a).getTime() > new Date(b).getTime()
+}
+const formatStamp = (iso: string | null) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
+}
 
 function useScrollMemory(pathname: string) {
   // Own scroll restoration, including back/forward (the browser's automatic restore fires
@@ -140,6 +154,7 @@ export default function Layout({ children }: LayoutProps) {
     return true
   })
   const [restoreFailed, setRestoreFailed] = useState(false)
+  const [snapshotAt, setSnapshotAt] = useState<string | null>(() => localStorage.getItem(SNAPSHOT_SEEN_KEY))
 
   // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -172,6 +187,7 @@ export default function Layout({ children }: LayoutProps) {
     const sessionId = urlSession || rememberedSession
 
     const doRestore = (attempt = 0) => {
+      const snapshotAtPromise = supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
       // Load saved transactions AND user-defined category rules in parallel,
       // then pass both to /restore-session so the rules are applied during
       // re-categorization.
@@ -213,6 +229,9 @@ export default function Layout({ children }: LayoutProps) {
         })
         .then(response => {
           if (response?.success && response.session_id) {
+            snapshotAtPromise.then((at) => {
+              if (at) { localStorage.setItem(SNAPSHOT_SEEN_KEY, at); setSnapshotAt(at) }
+            })
             // Preserve current page path when restoring session
             const currentPath = window.location.pathname
             navigate(`${currentPath}?session_id=${response.session_id}`, { replace: true })
@@ -249,8 +268,15 @@ export default function Layout({ children }: LayoutProps) {
     // session_id causes 404s across the whole app.
     setSessionValidating(true)
     transactionsApi.getMetrics(sessionId)
-      .then(() => {
-        // Session is valid — allow children to render
+      .then(async () => {
+        // Session is valid, but another device (or a bank refresh) may have saved
+        // newer data since this one was built.
+        const latest = await supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
+        if (isNewer(latest, localStorage.getItem(SNAPSHOT_SEEN_KEY))) {
+          doRestore()
+          return
+        }
+        setSnapshotAt(localStorage.getItem(SNAPSHOT_SEEN_KEY))
         if (rememberedSession) {
           navigate(`${window.location.pathname}?session_id=${rememberedSession}`, { replace: true })
         }
@@ -437,6 +463,9 @@ export default function Layout({ children }: LayoutProps) {
               </span>
               <button type="button" className="ui-btn" onClick={clearFilters}>נקה סינון</button>
             </div>
+          )}
+          {!sessionValidating && snapshotAt && formatStamp(snapshotAt) && (
+            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}</div>
           )}
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
