@@ -46,3 +46,8 @@ backend/debug_log.txt
 test_*.py
 !backend/tests/test_*.py
 reproduce_*.py
+
+# PWA icons generated from SVG by frontend's prebuild hook
+frontend/public/icon-192.png
+frontend/public/icon-512.png
+frontend/public/icon-maskable-512.png
