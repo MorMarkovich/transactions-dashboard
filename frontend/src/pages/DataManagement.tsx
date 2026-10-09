@@ -39,7 +39,7 @@ import Modal from '../components/ui/Modal'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import { ToastContainer, useToast } from '../components/ui/Toast'
-import { formatCurrency, formatDate, formatNumber } from '../utils/formatting'
+import { formatCurrency, formatDate, formatNumber, hebOwner } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
 
 /* ------------------------------------------------------------------ */
@@ -601,7 +601,7 @@ export default function DataManagement() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                         <FileSpreadsheet size={16} style={{ color: '#0ea5e9', flexShrink: 0 }} />
                         <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {file.name}
+                          {hebOwner(file.name)}
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -634,7 +634,7 @@ export default function DataManagement() {
                       size="sm"
                       onClick={() => handleDeleteFile(file.name)}
                       disabled={deletingFile === file.name}
-                      title={`מחק ${file.name}`}
+                      title={`מחק ${hebOwner(file.name)}`}
                       style={{ flexShrink: 0 }}
                     >
                       {deletingFile === file.name ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
