@@ -24,6 +24,53 @@ interface LayoutProps {
 // Remember how far each page was scrolled so tapping back to it (tab bar,
 // back button) returns to the same place instead of the top.
 const scrollPositions = new Map<string, number>()
+
+const HASH_RE = /\/assets\/index-([A-Za-z0-9_-]+)\.js/
+
+/** Build id of the code this tab is running (hash of the entry bundle). */
+function runningBuild(): string {
+  const el = document.querySelector('script[type="module"][src*="/assets/index-"]') as HTMLScriptElement | null
+  const m = el?.getAttribute('src')?.match(HASH_RE)
+  return m?.[1] ?? ''
+}
+
+async function deployedBuild(): Promise<string> {
+  const res = await fetch('/', { cache: 'no-store', headers: { Accept: 'text/html' } })
+  if (!res.ok) return ''
+  return (await res.text()).match(HASH_RE)?.[1] ?? ''
+}
+
+const CHECK_EVERY_MS = 10 * 60 * 1000
+
+/** True when the deployed build differs from the one this (possibly long-open) tab runs. */
+function useNewVersionAvailable(): boolean {
+  const [stale, setStale] = useState(false)
+  useEffect(() => {
+    const mine = runningBuild()
+    if (!mine) return
+    let alive = true
+    let last = 0
+    const check = async () => {
+      if (document.visibilityState === 'hidden' || Date.now() - last < 30_000) return
+      last = Date.now()
+      try {
+        const live = await deployedBuild()
+        if (alive && live && live !== mine) setStale(true)
+      } catch { /* offline: try again later */ }
+    }
+    const timer = setInterval(check, CHECK_EVERY_MS)
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => {
+      alive = false
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [])
+  return stale
+}
+
 const LAST_SESSION_KEY = 'transactions-dashboard:last-session'
 // created_at of the Supabase snapshot this device's session was built from. When
 // another device (or a bank refresh) saves a newer snapshot, this device rebuilds
@@ -154,6 +201,7 @@ export default function Layout({ children }: LayoutProps) {
     return true
   })
   const [restoreFailed, setRestoreFailed] = useState(false)
+  const newVersion = useNewVersionAvailable()
   const [snapshotAt, setSnapshotAt] = useState<string | null>(() => localStorage.getItem(SNAPSHOT_SEEN_KEY))
 
   // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
@@ -455,6 +503,12 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main content area */}
         <main className="main-content">
+          {newVersion && (
+            <div className="update-bar" role="status">
+              <span>גרסה חדשה זמינה</span>
+              <button type="button" className="ui-btn" onClick={() => window.location.reload()}>רענון</button>
+            </div>
+          )}
           {!sessionValidating && activeCategory && (
             <div className="active-filter-banner" role="status">
               <span>
@@ -465,7 +519,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           )}
           {!sessionValidating && snapshotAt && formatStamp(snapshotAt) && (
-            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}</div>
+            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}{runningBuild() ? ` · גרסה ${runningBuild().slice(0, 8)}` : ''}</div>
           )}
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
