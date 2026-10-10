@@ -41,6 +41,7 @@ import PageHeader from '../components/common/PageHeader'
 import { ToastContainer, useToast } from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatNumber, hebOwner } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
+import DeleteAccount from '../components/account/DeleteAccount'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -1058,6 +1059,7 @@ export default function DataManagement() {
                 מחק את כל העסקאות
               </Button>
             </div>
+            <DeleteAccount />
           </div>
         </CollapsibleSection>
       </motion.div>
@@ -1174,4 +1176,4 @@ const summaryBoxStyle: React.CSSProperties = {
   background: 'var(--glass-bg)',
   borderRadius: '8px',
   border: '1px solid var(--glass-border)',
-}
+                  }
