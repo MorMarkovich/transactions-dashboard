@@ -3106,6 +3106,9 @@ def get_weekly_summary(sessionId: str = Query(...)):
         if week_df.empty:
             return {"total": 0, "count": 0, "top_category": ""}
         total = abs(week_df["סכום"].sum())
+        
+        total = float(total)
+
         count = len(week_df)
         top_cat = ""
         if "קטגוריה" in week_df.columns:
