@@ -48,7 +48,7 @@ export default function Login() {
     } catch { /* ignore */ }
     return ''
   })
-  const [success, setSuccess] = useState('')
+  const [success, setSuccess] = useState(() => new URLSearchParams(window.location.search).get('account_deleted') === '1' ? 'החשבון והנתונים שלו נמחקו.' : '')
 
   // Form fields
   const [email, setEmail] = useState('')
@@ -308,6 +308,7 @@ export default function Login() {
                   </button>
 
                   {error && <ErrorMsg text={error} />}
+                  {success && <SuccessMsg text={success} />}
 
                   <div style={{ marginTop: '1.25rem' }}>
                     <Button
