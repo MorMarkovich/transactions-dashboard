@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
 const Login = lazy(() => import('./pages/Login'))
+const Privacy = lazy(() => import('./pages/Privacy'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Trends = lazy(() => import('./pages/Trends'))
@@ -97,6 +98,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
         <Route path="/monthly" element={<ProtectedPage><MonthlyBreakdown /></ProtectedPage>} />
