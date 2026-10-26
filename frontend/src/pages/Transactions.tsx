@@ -9,7 +9,7 @@ import MultiSelect from '../components/ui/MultiSelect'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
-import { categoryColor } from '../utils/chartPalette'
+import { useCategoryColor } from '../hooks/useCategoryColor'
 import { formatCurrency, formatNumber, formatPercent, formatDate } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
 import { useDashboardFilters } from '../context/FilterContext'
@@ -78,6 +78,7 @@ const DATE_CHIPS: DateChip[] = [
 // ---------------------------------------------------------------------------
 export default function Transactions() {
   const [searchParams] = useSearchParams()
+  const categoryColor = useCategoryColor()
   const sessionId = searchParams.get('session_id')
   const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
 
