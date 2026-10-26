@@ -74,6 +74,39 @@ const formatTsFull = (ts: number): string => {
   return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`
 }
 
+const TICK_DAY_MS = 24 * 60 * 60 * 1000
+const NICE_STEPS_MS = [1, 2, 3, 7, 14, 30, 61, 91, 182, 365, 732, 1827].map((d) => d * TICK_DAY_MS)
+
+/**
+ * Sparse, collision-free time ticks snapped to ACTUAL data timestamps.
+ * tickCount alone lets recharts crowd labels in dense regions; here the step
+ * is a nice day-unit chosen so at most maxTicks fit, each chosen tick sits on
+ * a real point, and kept ticks are always >= 60% of the step apart.
+ * First and last data timestamps are always included.
+ */
+export const sparseTimeTicks = (tsValues: number[], maxTicks: number): number[] => {
+  if (!tsValues.length) return []
+  const min = Math.min(...tsValues)
+  const max = Math.max(...tsValues)
+  const range = max - min
+  if (range <= 0) return [min]
+  const step = NICE_STEPS_MS.find((st) => range / st <= Math.max(maxTicks - 1, 1)) ?? NICE_STEPS_MS[NICE_STEPS_MS.length - 1]
+  const nearest = (t: number) => tsValues.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a))
+  const picked: number[] = [min]
+  for (let t = min + step; t < max; t += step) {
+    const n = nearest(t)
+    if (n - picked[picked.length - 1] >= step * 0.6 && max - n >= step * 0.3 && !picked.includes(n)) {
+      picked.push(n)
+    }
+  }
+  if (max - picked[picked.length - 1] < step * 0.3 && picked.length > 1) {
+    picked[picked.length - 1] = max
+  } else if (picked[picked.length - 1] !== max) {
+    picked.push(max)
+  }
+  return picked
+}
+
 /* ------------------------------------------------------------------ */
 /*  Gradient definition                                                */
 /* ------------------------------------------------------------------ */
@@ -164,6 +197,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   // not equispaced categorical slots (which put tick labels under the wrong cursor).
   const timedData = data.map((d) => ({ ...d, ts: parseDateTs(d.label) }))
   const hasValidTs = timedData.every((d) => Number.isFinite(d.ts))
+  const timeTicks = hasValidTs ? sparseTimeTicks(timedData.map((d) => d.ts), isCompact ? 4 : 7) : undefined
 
   if (!data.length) {
     return (
@@ -195,7 +229,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
             scale="time"
             domain={['dataMin', 'dataMax']}
             tickFormatter={formatTsTick}
-            tickCount={isCompact ? 4 : 7}
+            ticks={timeTicks}
             tick={{
               fill: 'var(--text-secondary)',
               fontSize: isCompact ? 10 : 12,
