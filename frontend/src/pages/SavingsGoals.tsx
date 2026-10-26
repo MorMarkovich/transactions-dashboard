@@ -541,7 +541,7 @@ export default function SavingsGoals() {
       {goals.length === 0 ? (
         <Card className="glass-card" padding="lg">
           <div style={{ textAlign: 'center', padding: 'var(--space-lg)' }}>
-            <PiggyBank size={48} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
+            <PiggyBank size={48} style={{ color: 'var(--text-muted)', marginBottom: '12px', display: 'block', marginInline: 'auto' }} />
             <p
               style={{
                 color: 'var(--text-secondary)',
