@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CategoryMonthlyComparisonData } from '../../services/types'
 import { formatCurrency } from '../../utils/formatting'
-import { categoryColor } from '../../utils/chartPalette'
+import { useCategoryColor } from '../../hooks/useCategoryColor'
 import { currentMonthKey, monthKeyNum } from '../../utils/formatting'
 
 interface CategoryMonthlyComparisonProps {
@@ -27,6 +27,7 @@ export default function CategoryMonthlyComparison({
   onCategoryClick,
 }: CategoryMonthlyComparisonProps) {
   const [display, setDisplay] = useState<'amount' | 'pct'>('amount')
+  const categoryColor = useCategoryColor()
   // Which months to show (default all). Always keep at least one selected.
   const [selectedMonths, setSelectedMonths] = useState<Set<string> | null>(null)
 
