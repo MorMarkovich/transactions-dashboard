@@ -1,6 +1,6 @@
 import { defaultMonth } from '../utils/defaultMonth'
 import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
-import { categoryColor, categoryColorMap } from '../utils/chartPalette'
+import { categoryColor } from '../utils/chartPalette'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -814,10 +814,6 @@ export default function Dashboard() {
 
   const [showAllMonthCategories, setShowAllMonthCategories] = useState(false)
   const monthChartData = groupMonthCategories(monthExpensePie)
-  // One palette map per rendered set so donut slices and legend dots can never
-  // disagree (hash-colliding names walk to free slots; see chartPalette).
-  const monthPieColors = useMemo(() => categoryColorMap(monthChartData.map((d) => d.name)), [monthChartData])
-  const monthFullColors = useMemo(() => categoryColorMap(monthExpensePie.map((d) => d.name)), [monthExpensePie])
 
   // After the local bank-sync tool writes a fresh snapshot to Supabase, load it
   // through the normal restore path (same flow as a manual upload).
@@ -1112,12 +1108,12 @@ export default function Dashboard() {
                       הרכב ההוצאות - {formatMonthLabel(monthOverview.month)}
                     </div>
                     <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
-                      <div data-chart-label={`הרכב ההוצאות - ${formatMonthLabel(monthOverview.month)}`}><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:monthPieColors[item.name] ?? categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
+                      <div data-chart-label={`הרכב ההוצאות - ${formatMonthLabel(monthOverview.month)}`}><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
                       <div className="month-pie-legend">
                         {(showAllMonthCategories ? monthExpensePie : monthChartData).map((item) => {
                           const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
                           return <button type="button" onClick={() => item.aggregate ? setShowAllMonthCategories(true) : handleCategoryCardClick(item.name)} key={`${item.aggregate ? "group" : "category"}:${item.name}`} className="month-pie-legend-row">
-                            <span className="month-pie-color" style={{background:(showAllMonthCategories ? monthFullColors : monthPieColors)[item.name] ?? categoryColor(item.name)}} />
+                            <span className="month-pie-color" style={{background:categoryColor(item.name)}} />
                             <span className="month-pie-name">{item.name}</span>
                             <span className="month-pie-share"><i style={{width:`${pct}%`}}/></span><span className="month-pie-percent">{pct.toFixed(0)}%</span>
                             <strong>{formatCurrency(item.value)}</strong>
