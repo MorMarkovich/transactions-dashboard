@@ -9,6 +9,7 @@ import MultiSelect from '../components/ui/MultiSelect'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
+import { categoryColor } from '../utils/chartPalette'
 import { formatCurrency, formatNumber, formatPercent, formatDate } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
 import { useDashboardFilters } from '../context/FilterContext'
@@ -356,10 +357,8 @@ export default function Transactions() {
             <div className="stat-label">{formatNumber(stats.incomeCount)} הכנסות</div>
           </div>
         </div>
-      </div>
-
-      {/* ── Secondary Stats Row ───────────────────────────────────────── */}
-      <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-md)' }}>
+      {/* ── Secondary stats flow in the SAME grid, so tablet/desktop columns
+          don't restart with staggered empty cells ── */}
         <div className="stat-card-compact glass-card">
           <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
             <Calculator size={18} color="#fff" />
@@ -463,7 +462,7 @@ export default function Transactions() {
                             width: `${cat.percent}%`,
                             height: '100%',
                             borderRadius: '3px',
-                            background: `hsl(${220 + idx * 30}, 70%, 60%)`,
+                            background: categoryColor(cat.name),
                             transition: 'width 0.3s ease',
                           }} />
                         </div>

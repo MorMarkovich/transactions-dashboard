@@ -450,7 +450,7 @@ export default function Budget() {
       {goals.length === 0 ? (
         <Card className="glass-card" padding="lg">
           <div style={{ textAlign: 'center', padding: 'var(--space-lg)' }}>
-            <Target size={48} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
+            <Target size={48} style={{ color: 'var(--text-muted)', marginBottom: '12px', display: 'block', marginInline: 'auto' }} />
             <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 500 }}>
               עדיין לא הגדרת יעדי תקציב
             </p>

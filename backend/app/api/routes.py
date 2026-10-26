@@ -1121,12 +1121,12 @@ def get_transactions(
         max_transaction = {"description": str(max_row.get('תיאור', '')), "amount": round(_sanitize(float(max_row['סכום_מוחלט'])), 2)}
         min_transaction = {"description": str(min_row.get('תיאור', '')), "amount": round(_sanitize(float(min_row['סכום_מוחלט'])), 2)}
 
-    # Category breakdown (top 10)
+    # Category breakdown (all categories, sorted by total desc)
     category_breakdown = []
     if 'קטגוריה' in df.columns and 'סכום_מוחלט' in df.columns and not expenses_df.empty:
         cat_group = expenses_df.groupby('קטגוריה')['סכום_מוחלט'].agg(['sum', 'count']).reset_index()
-        cat_group = cat_group.sort_values('sum', ascending=False).head(10)
-        cat_total = expenses_df['סכום_מוחלט'].sum()  # share of ALL filtered expenses, not just the top 10
+        cat_group = cat_group.sort_values('sum', ascending=False)
+        cat_total = expenses_df['סכום_מוחלט'].sum()  # share of ALL filtered expenses
         for _, row in cat_group.iterrows():
             category_breakdown.append({
                 "name": str(row['קטגוריה']),

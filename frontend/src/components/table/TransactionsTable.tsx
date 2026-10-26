@@ -38,6 +38,14 @@ const TableRow = memo(function TableRow({
   return (
     <tr
       onClick={() => onClick?.(tx)}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onClick) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick(tx)
+        }
+      }}
       style={{ cursor: onClick ? 'pointer' : undefined, ...style }}
     >
       <td className="col-date">{formatDate(tx.תאריך)}</td>
@@ -150,13 +158,26 @@ function SortHeader({
   sortDir: SortDir
   onSort: (field: SortField) => void
 }) {
+  const ariaSort =
+    sortField === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined
   return (
-    <th
-      scope="col"
-      onClick={() => onSort(field)}
-      style={{ cursor: 'pointer', userSelect: 'none' }}
-    >
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+    <th scope="col" aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={() => onSort(field)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          color: 'inherit',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
         {label}
         <ArrowUpDown
           size={12}
@@ -166,7 +187,7 @@ function SortHeader({
             transition: 'opacity 0.15s, transform 0.15s',
           }}
         />
-      </span>
+      </button>
     </th>
   )
 }

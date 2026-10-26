@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CategoryMonthlyComparisonData } from '../../services/types'
 import { formatCurrency } from '../../utils/formatting'
 import { categoryColor } from '../../utils/chartPalette'
+import { currentMonthKey, monthKeyNum } from '../../utils/formatting'
 
 interface CategoryMonthlyComparisonProps {
   data: CategoryMonthlyComparisonData
@@ -178,8 +179,13 @@ export default function CategoryMonthlyComparison({
                 {months.map((m) => {
                   const cell = cat.months[m] ?? { amount: 0, pct_of_month: 0, delta_abs: 0, delta_pct: 0 }
                   const { primary, secondary } = cellText(cell.amount, cell.pct_of_month)
-                  const up = cell.delta_abs > 0.5
-                  const down = cell.delta_abs < -0.5
+                  // No trend arrow on empty cells, and none on the in-progress
+                  // or future month: its delta vs a full month is misleading.
+                  const mk = monthKeyNum(m), ck = monthKeyNum(currentMonthKey())
+                  const partialOrFuture = mk !== null && ck !== null && mk >= ck
+                  const showDelta = cell.amount > 0 && !partialOrFuture
+                  const up = showDelta && cell.delta_abs > 0.5
+                  const down = showDelta && cell.delta_abs < -0.5
                   return (
                     <td
                       key={m}

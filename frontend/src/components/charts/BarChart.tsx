@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { niceCeil } from '../../utils/formatting'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -121,7 +122,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   return (
     <div dir="ltr"><ResponsiveContainer width="100%" height={chartHeight}>
       <RechartsBarChart
-        accessibilityLayer={false}
+        accessibilityLayer
         data={data}
         margin={{
           top: 8,
@@ -152,12 +153,15 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           axisLine={{ stroke: 'var(--border)' }}
           angle={needsRotation ? -35 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
+          tickMargin={needsRotation ? 10 : 8}
           height={needsRotation ? (isCompact ? 58 : 70) : 30}
-          interval="preserveStartEnd"
+          interval={needsRotation ? 0 : 'preserveStartEnd'}
           padding={{ left: 6, right: isCompact ? 14 : 6 }}
         />
 
         <YAxis
+          domain={[0, (dataMax: number) => niceCeil(dataMax)]}
+          tickCount={5}
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',

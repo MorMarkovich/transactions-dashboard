@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Activity, Hash, Calculator } from 'lucide-react'
 import { motion } from 'framer-motion'
 import LineChart from '../components/charts/LineChart'
+import { currentMonthKey } from '../utils/formatting'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
@@ -52,7 +53,7 @@ const STAT_CARDS: StatCard[] = [
   },
   {
     key: 'transaction_count',
-    label: '\u05DE\u05E1\u05E4\u05E8 \u05E2\u05E1\u05E7\u05D0\u05D5\u05EA',
+    label: '\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05D4\u05D5\u05E6\u05D0\u05D4',
     icon: <Hash size={18} color="#fff" />,
     gradient: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea 0%, #764ba2 100%))',
     getNumericValue: (s) => s.transaction_count,
@@ -203,7 +204,7 @@ export default function Trends() {
         <span>{'\u05DE\u05D2\u05DE\u05EA \u05DE\u05D0\u05D6\u05DF \u05DE\u05E6\u05D8\u05D1\u05E8'}</span>
       </div>
       <Card className="glass-card" padding="md">
-        <LineChart data={lineChartData} height={300} />
+        <LineChart data={lineChartData} height={300} name="יתרה" />
       </Card>
 
       {/* ── Monthly Comparison Table ─────────────────────────────────── */}
@@ -234,7 +235,11 @@ export default function Trends() {
                         {formatCurrency(Math.abs(row.amount))}
                       </td>
                       <td data-label={'\u05E9\u05D9\u05E0\u05D5\u05D9'}>
-                        {row.change_pct !== null ? (
+                        {row.month === currentMonthKey() ? (
+                          <Badge variant="default" size="sm">
+                            {'\u05D7\u05D5\u05D3\u05E9 \u05D7\u05DC\u05E7\u05D9'}
+                          </Badge>
+                        ) : row.change_pct !== null ? (
                           <Badge
                             variant={row.change_pct >= 0 ? 'danger' : 'success'}
                             size="sm"

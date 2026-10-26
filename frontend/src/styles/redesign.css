@@ -218,7 +218,17 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
  --category-0:#087c66; --category-1:#236ac2; --category-2:#a23b99;
  --category-3:#a35817; --category-4:#727c19; --category-5:#bb3553;
  --category-6:#426d85; --category-7:#7160bd; --category-8:#506d80;
+ --category-9:#1a9e63; --category-10:#a37c06; --category-11:#e03131;
+ --category-12:#0c8599; --category-13:#7048e8; --category-14:#d9480f;
+ --category-15:#e64980; --category-16:#0b7285; --category-17:#a08428;
+ --category-18:#5f6b7a; --category-19:#6c7a89;
 }
+
+/* Charts: mouse/tap focus must not paint the browser's default rectangle
+   (black in light theme, white in dark) around sectors/bars/plot; keyboard
+   users keep a visible themed ring via :focus-visible. */
+.recharts-wrapper *:focus { outline: none; }
+.recharts-wrapper *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 
 /* ── Mobile QA fixes (phones ≤767px) ───────────────────────────── */
 .income-source-name {display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;}

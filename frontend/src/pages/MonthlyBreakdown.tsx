@@ -19,7 +19,7 @@ import BarChart from '../components/charts/BarChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyComparison'
 import { get_icon } from '../utils/constants'
-import { formatCurrency } from '../utils/formatting'
+import { currentMonthKey, formatCurrency, monthKeyNum } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { useDashboardFilters } from '../context/FilterContext'
 import type {
@@ -242,10 +242,12 @@ export default function MonthlyBreakdown() {
 
   const categoryBars = useMemo(() => {
     if (!comparison || !categoryRow) return []
-    return comparison.months.map((m) => ({
-      label: m,
-      value: categoryRow.months[m]?.amount ?? 0,
-    }))
+    return [...comparison.months]
+      .sort((a, b) => (monthKeyNum(a) ?? 0) - (monthKeyNum(b) ?? 0))
+      .map((m) => ({
+        label: m,
+        value: categoryRow.months[m]?.amount ?? 0,
+      }))
   }, [comparison, categoryRow])
 
   const categoryStats = useMemo(() => {
@@ -451,9 +453,21 @@ export default function MonthlyBreakdown() {
               {formatMonthLabel(pieMonth)}
             </span>
           )}
+          {pieMonth && monthKeyNum(pieMonth) !== null && monthKeyNum(pieMonth)! > (monthKeyNum(currentMonthKey()) ?? 0) && (
+            <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--border)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              חודש עתידי
+            </span>
+          )}
+          {pieMonth === currentMonthKey() && (
+            <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--border)', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              חודש חלקי
+            </span>
+          )}
         </div>
-        <div className="month-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
-          {comparison.months.map((m) => monthChip(m, m === pieMonth, () => setPieMonth(m)))}
+        <div className="month-strip" dir="ltr" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
+          {[...comparison.months]
+            .sort((a, b) => (monthKeyNum(a) ?? 0) - (monthKeyNum(b) ?? 0))
+            .map((m) => monthChip(m, m === pieMonth, () => setPieMonth(m)))}
         </div>
         <Card className="glass-card" padding="md">
           <div
@@ -468,8 +482,11 @@ export default function MonthlyBreakdown() {
             <DonutChart data={pieData.slices} total={pieData.total} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {pieData.slices.map((slice) => (
-                <div
+                <button
                   key={slice.name}
+                  type="button"
+                  disabled={slice.name === 'אחר'}
+                  aria-pressed={selectedCategory === slice.name}
                   onClick={slice.name === 'אחר' ? undefined : () => setSelectedCategory((current) => current === slice.name ? null : slice.name)}
                   title={slice.name === 'אחר' ? undefined : 'הצגת הקטגוריה לאורך זמן'}
                   style={{
@@ -479,6 +496,10 @@ export default function MonthlyBreakdown() {
                     cursor: slice.name === 'אחר' ? 'default' : 'pointer',
                     padding: '4px 8px',
                     borderRadius: 'var(--radius-sm)',
+                    border: 'none',
+                    width: '100%',
+                    textAlign: 'start',
+                    font: 'inherit',
                     background: selectedCategory === slice.name ? 'var(--accent-muted)' : 'transparent',
                   }}
                 >
@@ -492,7 +513,7 @@ export default function MonthlyBreakdown() {
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', direction: 'ltr', flexShrink: 0 }}>
                     {formatCurrency(slice.value)}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -593,7 +614,7 @@ export default function MonthlyBreakdown() {
                 </div>
               )}
             </div>
-            <BarChart data={categoryBars} height={280} reversed />
+            <BarChart data={categoryBars} height={280} color={categoryColor(categoryRow.name)} />
           </Card>
         )}
       </motion.div>
@@ -640,8 +661,10 @@ export default function MonthlyBreakdown() {
             )}
           </div>
           {/* Month selector pills */}
-          <div className="month-strip" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
-            {industryMonthly.months.map((m) =>
+          <div className="month-strip" dir="ltr" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: 'var(--space-sm)' }}>
+            {[...industryMonthly.months]
+              .sort((a, b) => (monthKeyNum(a) ?? 0) - (monthKeyNum(b) ?? 0))
+              .map((m) =>
               monthChip(m, selectedComparisonMonths.has(m), () => setSelectedComparisonMonths(prev => {
                 const next = new Set(prev)
                 if (next.has(m)) {

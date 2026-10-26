@@ -111,9 +111,12 @@ interface CustomTickProps {
 function MerchantTick({ x, y, payload }: CustomTickProps) {
   // Keep the tail: cheque/reference numbers differ only at the end
   const label = payload.value.length > 18 ? payload.value.slice(0, 9) + '…' + payload.value.slice(-7) : payload.value
+  // With orientation="right" recharts hands us the LEFT edge of the reserved
+  // label band; anchor at its right edge so text stays inside the band and
+  // never under the bars.
   return (
     <text
-      x={x}
+      x={x + 112}
       y={y}
       dy={4}
       textAnchor="end"
@@ -177,7 +180,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   return (
     <div dir="ltr"><ResponsiveContainer width="100%" height={computedHeight}>
       <BarChart
-        accessibilityLayer={false}
+        accessibilityLayer
         data={data}
         layout="vertical"
         margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
@@ -203,6 +206,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
 
         <XAxis
           type="number"
+          domain={[0, 'dataMax']}
           tickFormatter={formatAxisShekel}
           tick={{
             fill: 'var(--text-secondary)',
