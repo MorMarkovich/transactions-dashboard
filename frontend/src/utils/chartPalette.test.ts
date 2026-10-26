@@ -71,8 +71,12 @@ describe('categoryColorMap - collision-resolved set colors', () => {
     expect(new Set([map['פארם'], map['ביטוח'], map['מנויים ושירותים']]).size).toBe(3)
   })
 
-  it('is deterministic for the same ordered list and agrees per surface', () => {
-    const names = ['ביטוח', 'מנויים ושירותים', 'תרופות', 'וטרינר']
+  it('depends only on the SET of names: any input order gives the same map', () => {
+    const names = ['ביטוח', 'מנויים ושירותים', 'תרופות', 'וטרינר', 'פארם']
+    const reversed = [...names].reverse()
+    const rotated = [...names.slice(2), ...names.slice(0, 2)]
+    expect(categoryColorMap(reversed)).toEqual(categoryColorMap(names))
+    expect(categoryColorMap(rotated)).toEqual(categoryColorMap(names))
     expect(categoryColorMap(names)).toEqual(categoryColorMap(names))
   })
 
