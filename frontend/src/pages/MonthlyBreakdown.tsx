@@ -238,6 +238,10 @@ export default function MonthlyBreakdown() {
 
   const subColorMap = useMemo(() => categoryColorMap(subcategoryPieData.slices.map((s) => s.name)), [subcategoryPieData])
 
+  // Same registry-backed map for the single-category bar, so a custom
+  // category keeps its donut/table color here too.
+  const barColorMap = useMemo(() => categoryColorMap((comparison?.categories ?? []).map((c) => c.name)), [comparison])
+
   // ── Bars: the selected category's spend in every month ─────────────
   const categoryRow = useMemo(
     () => comparison?.categories.find((c) => c.name === selectedCategory) ?? null,
@@ -618,7 +622,7 @@ export default function MonthlyBreakdown() {
                 </div>
               )}
             </div>
-            <BarChart data={categoryBars} height={280} color={categoryColor(categoryRow.name)} />
+            <BarChart data={categoryBars} height={280} color={barColorMap[categoryRow.name] ?? categoryColor(categoryRow.name)} />
           </Card>
         )}
       </motion.div>
