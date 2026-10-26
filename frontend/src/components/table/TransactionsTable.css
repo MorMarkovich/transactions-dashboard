@@ -95,6 +95,12 @@
     display: none;
   }
 
+  /* The structural wrapper must vanish with the desktop table, or it renders
+     as an empty 2px bordered artifact above the mobile card list. */
+  .table-card:has(> .transactions-desktop-table-wrap) {
+    display: none;
+  }
+
   .transactions-mobile-sort {
     display: flex;
     align-items: center;

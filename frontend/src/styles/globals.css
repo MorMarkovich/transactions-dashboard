@@ -336,6 +336,42 @@ video {
     font-size: 0.875rem;
 }
 
+
+/* Rounded enclosure for scrollable tables: border/radius/bg live on the
+   wrapper; the square scroller is inset 24px top+bottom so BOTH scrollbar
+   orientations clear the 22px corner curve (structural fix, not pseudo-margin). */
+.table-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+}
+.table-card > .table-scroll {
+    margin: 24px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+
+/* Nested inside a padding-less glass Card (Trends): the Card is already the
+   rounded enclosure, so the wrapper stays invisible - single border. */
+.glass-card.p-0 > .table-card {
+    border: 0;
+    background: transparent;
+}
+
+/* Category-monthly comparison: 12px radius enclosure, horizontal scrollbar
+   lifted 16px off the bottom edge. */
+.cmc-scroll-wrap {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+.cmc-scroll-wrap > .cmc-scroll {
+    margin-bottom: 16px;
+}
+
 .table-scroll {
     max-height: 540px;
     overflow-y: auto;
@@ -353,6 +389,15 @@ video {
         overflow-y: visible;
         border: 0;
         background: transparent;
+    }
+
+    .table-card:has(.mobile-stack-table) {
+        border: 0;
+        background: transparent;
+    }
+
+    .table-card:has(.mobile-stack-table) > .table-scroll {
+        margin: 0;
     }
 
     .mobile-stack-table {

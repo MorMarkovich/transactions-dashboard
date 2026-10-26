@@ -214,6 +214,7 @@ export default function Trends() {
             <span>{'\u05D4\u05E9\u05D5\u05D5\u05D0\u05D4 \u05D7\u05D5\u05D3\u05E9\u05D9\u05EA'}</span>
           </div>
           <Card className="glass-card" padding="none">
+            <div className="table-card">
             <div className="table-scroll">
               <table
                 className="transactions-table mobile-stack-table"
@@ -261,6 +262,7 @@ export default function Trends() {
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           </Card>
         </>
