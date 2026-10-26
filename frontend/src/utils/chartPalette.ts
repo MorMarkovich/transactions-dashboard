@@ -51,60 +51,38 @@ const known: Record<string, number> = {
   'הוראות קבע': 18,
   'אחר': 19,
 }
-function hashSlot(name: string): number {
+export function categoryColor(name: string): string {
+  const knownIdx = known[name]
+  if (knownIdx !== undefined) return `var(--category-${knownIdx}, ${colors[knownIdx]})`
+  return customColor(name)
+}
+
+// Unknown names (custom categories, subcategory names) get a color from an
+// EXTENDED custom space, separate from the 20 pinned canonical slots: a muted
+// pastel band (saturation ~40%, lightness ~84%) the vivid canonical palette
+// never occupies. Pure deterministic function of the NAME - same color in
+// every view, subset, ordering and session, with no registry and no
+// persistence. Distinctness among custom names is best-effort by golden-angle
+// hue dispersion, not guaranteed for arbitrary name sets; the known colliding
+// pair from production (ביטוח / מנויים ושירותים) is covered by tests.
+function customColor(name: string): string {
+  const h = hashSlotRaw(name)
+  const hue = (h * 137.508) % 360
+  return hslToHex(hue, 40, 84)
+}
+
+function hashSlotRaw(name: string): number {
   let hash = 0
   for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) >>> 0
-  return hash % colors.length
-}
-export function categoryColor(name: string): string {
-  const idx = known[name] ?? hashSlot(name)
-  return `var(--category-${idx}, ${colors[idx]})`
+  return hash
 }
 
-// Collision-resolved colors for names rendered together (donut, legend,
-// stacked chart, table). Canonical names always keep their pinned slot.
-// Unknown names (custom categories, subcategory names) resolve once and are
-// remembered in a session registry: the first resolution wins and every later
-// view reuses it, so a capped pie, the uncapped stacked chart and the table
-// all show the SAME color for the same unknown name, regardless of which
-// subset each view renders or the order the views are visited. Registrations
-// are unique among unknowns while slots last, so two unknown names never
-// share a color in any view. The palette has exactly as many slots as
-// canonical pins, so an unknown necessarily shares a slot with some canonical
-// category; if that canonical co-renders in the same view, the unknown is
-// re-walked for THAT view only (registry unchanged) to keep the view
-// distinct - the one case where a name can differ between views.
-const registry = new Map<string, string>()
-const slotOf = (css: string): number => Number(/category-(\d+)/.exec(css)![1])
-
-export function categoryColorMap(names: readonly string[]): Record<string, string> {
-  const out: Record<string, string> = {}
-  const usedInView = new Set<number>()
-  for (const name of names) {
-    if (known[name] !== undefined) {
-      usedInView.add(known[name])
-      out[name] = `var(--category-${known[name]}, ${colors[known[name]]})`
-    }
-  }
-  const usedGlobal = new Set<number>([...registry.values()].map(slotOf))
-  const unknowns = [...new Set(names.filter((n) => known[n] === undefined))].sort()
-  for (const name of unknowns) {
-    const registered = registry.get(name)
-    let idx = registered !== undefined ? slotOf(registered) : hashSlot(name)
-    let guard = 0
-    while ((usedInView.has(idx) || (registered === undefined && usedGlobal.has(idx))) && guard < colors.length) {
-      idx = (idx + 1) % colors.length
-      guard++
-    }
-    // guard exhausted: every slot taken in this view - accept the collision,
-    // the visible label disambiguates (same fallback as before this fix).
-    const css = `var(--category-${idx}, ${colors[idx]})`
-    if (registered === undefined) {
-      registry.set(name, css)
-      usedGlobal.add(idx)
-    }
-    usedInView.add(idx)
-    out[name] = css
-  }
-  return out
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100
+  l /= 100
+  const k = (n: number) => (n + h / 30) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))
+  const t = (x: number) => Math.round(255 * x).toString(16).padStart(2, '0')
+  return (`#${t(f(0))}${t(f(8))}${t(f(4))}`).toUpperCase()
 }
