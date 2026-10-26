@@ -3,13 +3,16 @@ import { render, screen } from '@testing-library/react'
 import DonutChart from './DonutChart'
 import { ltrIsolate } from '../../utils/formatting'
 
-const captured = vi.hoisted(() => ({ tooltip: {} as Record<string, unknown> }))
+const captured = vi.hoisted(() => ({ tooltip: {} as Record<string, unknown>, fills: [] as (string | undefined)[] }))
 vi.mock('../../hooks/useMediaQuery', () => ({ default: () => false }))
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Pie: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Cell: () => null,
+  Cell: (props: { fill?: string }) => {
+    captured.fills.push(props.fill)
+    return null
+  },
   Tooltip: (props: Record<string, unknown>) => {
     captured.tooltip = props
     const Content = props.content as React.ComponentType<Record<string, unknown>>
@@ -39,5 +42,19 @@ describe('donut hover overlay', () => {
     render(<DonutChart data={[]} total={0} />)
     expect(screen.getByText('אין נתונים להצגה')).toBeInTheDocument()
     expect(screen.queryByTestId('tooltip')).not.toBeInTheDocument()
+  })
+})
+
+describe('donut slice colors', () => {
+  beforeEach(() => { captured.fills = [] })
+  it('gives colliding unknown sub-category names distinct slice colors', () => {
+    render(<DonutChart data={[{ name: 'ביטוח', value: 100 }, { name: 'מנויים ושירותים', value: 50 }]} total={150} />)
+    expect(captured.fills).toHaveLength(2)
+    expect(captured.fills[0]).toBeTruthy()
+    expect(captured.fills[0]).not.toBe(captured.fills[1])
+  })
+  it('keeps canonical category slices on their canonical colors', () => {
+    render(<DonutChart data={[{ name: 'אוכל', value: 100 }, { name: 'בילויים', value: 50 }]} total={150} />)
+    expect(captured.fills).toEqual(['var(--category-7, #B2ADEE)', 'var(--category-11, #FF6B6B)'])
   })
 })
