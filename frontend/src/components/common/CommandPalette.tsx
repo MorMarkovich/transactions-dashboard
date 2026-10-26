@@ -271,6 +271,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                   // left edge in RTL).
                   paddingInlineEnd: '14px',
                   scrollbarGutter: 'stable',
+                  // Structural corner clearance: the list is flush with the
+                  // panel's bottom edge, so inset the scroller clear of the
+                  // panel's 24px bottom corner curve.
+                  marginBottom: 26,
                 }}
               >
                 {filteredCommands.length === 0 ? (
