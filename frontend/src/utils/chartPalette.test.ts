@@ -80,6 +80,28 @@ describe('categoryColorMap - collision-resolved set colors', () => {
     expect(categoryColorMap(names)).toEqual(categoryColorMap(names))
   })
 
+  it('capped pie subset and uncapped stacked/table views give shared unknown names the SAME color', () => {
+    const universe = ['פארם', 'אוכל', 'ביטוח', 'מנויים ושירותים', 'וטרינר', 'כלבים', 'חתולים', 'תוכים', 'אוגרים', 'נמרים', 'זירלים', 'דגים']
+    const capped = categoryColorMap(universe.slice(0, 10)) // pie caps at 10 slices
+    const full = categoryColorMap(universe) // stacked chart / table render all
+    for (const n of universe.slice(0, 10)) expect(capped[n], n).toBe(full[n])
+    // Discovery order (subset page visited first, then full page) also agrees.
+    const fresh = ['זבובים', 'יתושים', 'פרעושים']
+    const subsetFirst = categoryColorMap(fresh.slice(0, 2))
+    const fullAfter = categoryColorMap(fresh)
+    expect(fullAfter['זבובים']).toBe(subsetFirst['זבובים'])
+    expect(fullAfter['יתושים']).toBe(subsetFirst['יתושים'])
+  })
+
+  it('keeps the view distinct when a registered unknown meets its slot-twin canonical', () => {
+    // ביטוח registered at slot 10 above; פארם owns slot 10 canonically.
+    const map = categoryColorMap(['פארם', 'ביטוח'])
+    expect(map['פארם']).toBe(categoryColor('פארם'))
+    expect(map['ביטוח']).not.toBe(map['פארם'])
+    // Other views without פארם still show the registered color.
+    expect(categoryColorMap(['ביטוח'])['ביטוח']).toBe(categoryColorMap(['ביטוח', 'מנויים ושירותים'])['ביטוח'])
+  })
+
   it('leaves canonical-only sets identical to categoryColor', () => {
     const names = ['אוכל', 'בילויים', 'טכנולוגיה']
     const map = categoryColorMap(names)
