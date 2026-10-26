@@ -5,6 +5,7 @@
 //  • /sync requires a secret token (x-sync-token) stored in the OS keychain.
 //  • Origin allow-list + strict CORS — a random website cannot trigger a sync.
 import express from 'express'
+import { syncJsonParser, safeRequestError } from './request-body.js'
 import { safeErrorCode, safeError } from './safe-errors.js'
 import { config, assertConfig } from './config.js'
 import { getSecret, SYNC_TOKEN_KEY } from './secrets.js'
@@ -48,7 +49,7 @@ export async function main() {
 
   let syncing = false
   const app = express()
-  app.use(express.json({ limit: '256kb' }))
+  app.use(syncJsonParser())
 
   app.options('/sync', (req, res) => { applyCors(req, res); res.sendStatus(204) })
 
@@ -82,6 +83,8 @@ export async function main() {
       syncing = false
     }
   })
+
+  app.use(safeRequestError)
 
   app.listen(config.port, HOST, () => {
     console.log(`bank-sync listening on http://${HOST}:${config.port}`)
