@@ -51,3 +51,39 @@ test('darwin falls back to the system path when Chrome is nowhere installed', as
     Object.defineProperty(process, 'platform', { value: 'linux' })
   }
 })
+
+// --- sync outcome / exit semantics (src/sync.js pure helpers) ---
+
+import { computeSyncOutcome, exitCodeForResult } from '../src/outcome.js'
+
+test('all accounts failed -> success:false, failed counted, exit code 1', () => {
+  const { success, scraped, failed } = computeSyncOutcome({}, { discount: 'Chrome not found', isracard: 'Chrome not found' })
+  assert.equal(success, false)
+  assert.equal(scraped, 0)
+  assert.equal(failed, 2)
+  assert.equal(exitCodeForResult({ success }), 1)
+})
+
+test('partial failure -> success:true, failed counted, exit code 0', () => {
+  const { success, scraped, failed } = computeSyncOutcome({ discount: 55 }, { isracard: 'blocked' })
+  assert.equal(success, true)
+  assert.equal(scraped, 1)
+  assert.equal(failed, 1)
+  assert.equal(exitCodeForResult({ success }), 0)
+})
+
+test('all accounts succeeded -> success:true, failed 0, exit code 0', () => {
+  const { success, scraped, failed } = computeSyncOutcome({ discount: 55, isracard: 362 }, {})
+  assert.equal(success, true)
+  assert.equal(scraped, 2)
+  assert.equal(failed, 0)
+  assert.equal(exitCodeForResult({ success }), 0)
+})
+
+test('no accounts configured -> vacuously successful, exit code 0', () => {
+  const { success, scraped, failed } = computeSyncOutcome({}, {})
+  assert.equal(success, true)
+  assert.equal(scraped, 0)
+  assert.equal(failed, 0)
+  assert.equal(exitCodeForResult({ success }), 0)
+})
