@@ -9,7 +9,7 @@ import MultiSelect from '../components/ui/MultiSelect'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
-import { categoryColor } from '../utils/chartPalette'
+import { categoryColor, categoryColorMap } from '../utils/chartPalette'
 import { formatCurrency, formatNumber, formatPercent, formatDate } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
 import { useDashboardFilters } from '../context/FilterContext'
@@ -96,6 +96,7 @@ export default function Transactions() {
   const [maxTransaction, setMaxTransaction] = useState<{ description: string; amount: number } | null>(null)
   const [minTransaction, setMinTransaction] = useState<{ description: string; amount: number } | null>(null)
   const [categoryBreakdown, setCategoryBreakdown] = useState<{ name: string; total: number; count: number; percent: number }[]>([])
+  const categoryBreakdownColors = useMemo(() => categoryColorMap(categoryBreakdown.map((c) => c.name)), [categoryBreakdown])
   const [dateFrom, setDateFrom] = useState<string | null>(null)
   const [dateTo, setDateTo] = useState<string | null>(null)
   const [categories, setCategories] = useState<string[]>([])
@@ -462,7 +463,7 @@ export default function Transactions() {
                             width: `${cat.percent}%`,
                             height: '100%',
                             borderRadius: '3px',
-                            background: categoryColor(cat.name),
+                            background: categoryBreakdownColors[cat.name] ?? categoryColor(cat.name),
                             transition: 'width 0.3s ease',
                           }} />
                         </div>
