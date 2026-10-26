@@ -1,12 +1,12 @@
 // Runs israeli-bank-scrapers for one provider. Credentials are passed in by the
 // caller (read from the OS keychain) and never logged.
 import { existsSync } from 'node:fs'
-import { createScraper, CompanyTypes } from 'israeli-bank-scrapers'
+import { assertSafeDebugEnvironment, runScraperSafely, safeError } from './safe-errors.js'
 
 // Map our provider ids to israeli-bank-scrapers CompanyTypes.
 // NOTE: MAX was historically `leumiCard`; current versions expose `max`.
 // We resolve defensively so a version bump doesn't silently break it.
-function companyId(provider) {
+function companyId(provider, CompanyTypes) {
   const direct = CompanyTypes[provider]
   if (direct) return direct
   if (provider === 'max') return CompanyTypes.max || CompanyTypes.leumiCard
@@ -20,6 +20,10 @@ function companyId(provider) {
  * @returns {Promise<object[]>} raw scraper transactions (flattened across accounts)
  */
 export async function scrapeProvider(provider, credentials, { monthsBack = 3, showBrowser = false, executablePath = '', keepBrowserOpen = false, failureScreenshotPath = '', timeout = 120000, navigationRetryCount = 2, combineInstallments = false, additionalTransactionInformation = false } = {}) {
+  assertSafeDebugEnvironment()
+  let dependency
+  try { dependency = await import('israeli-bank-scrapers') } catch { throw safeError('BANK_SCRAPE_FAILED') }
+  const { createScraper, CompanyTypes } = dependency
   const startDate = new Date()
   startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setDate(1)
@@ -35,7 +39,7 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
   }
 
   const scraper = createScraper({
-    companyId: companyId(provider),
+    companyId: companyId(provider, CompanyTypes),
     startDate,
     combineInstallments,
     // Isracard/Amex only: fetch each transaction's extra details (incl. the
@@ -51,14 +55,11 @@ export async function scrapeProvider(provider, credentials, { monthsBack = 3, sh
     navigationRetryCount,
     ...(launchPath ? { executablePath: launchPath } : {}),
     ...(keepBrowserOpen ? { skipCloseBrowser: true } : {}),
-    ...(failureScreenshotPath ? { storeFailureScreenShotPath: failureScreenshotPath } : {}),
+    // Banking failure screenshots may contain financial/account data. Off.
+
   })
 
-  const result = await scraper.scrape(credentials)
-  if (!result.success) {
-    const reason = [result.errorType, result.errorMessage].filter(Boolean).join(': ')
-    throw new Error(reason || 'scrape failed')
-  }
+  const result = await runScraperSafely(scraper, credentials)
 
   const txns = []
   for (const account of result.accounts || []) {
