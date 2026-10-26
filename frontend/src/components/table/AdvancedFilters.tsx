@@ -207,6 +207,7 @@ export default function AdvancedFilters({
               fontSize: '0.875rem',
               fontFamily: 'var(--font-family)',
               appearance: 'none',
+              backgroundImage: 'none',
               cursor: 'pointer',
               direction: 'rtl',
             }}
