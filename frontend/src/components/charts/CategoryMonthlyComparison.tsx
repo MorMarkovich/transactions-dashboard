@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import type { CategoryMonthlyComparisonData } from '../../services/types'
 import { formatCurrency } from '../../utils/formatting'
-import { categoryColor, categoryColorMap } from '../../utils/chartPalette'
+import { categoryColor } from '../../utils/chartPalette'
 import { currentMonthKey, monthKeyNum } from '../../utils/formatting'
 
 interface CategoryMonthlyComparisonProps {
@@ -30,7 +30,6 @@ export default function CategoryMonthlyComparison({
   // Which months to show (default all). Always keep at least one selected.
   const [selectedMonths, setSelectedMonths] = useState<Set<string> | null>(null)
 
-  const colorMap = useMemo(() => categoryColorMap(data.categories.map((c) => c.name)), [data.categories])
   const months = useMemo(() => {
     if (!selectedMonths) return data.months
     const filtered = data.months.filter((m) => selectedMonths.has(m))
@@ -174,7 +173,7 @@ export default function CategoryMonthlyComparison({
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{marginInlineEnd:8,display:'inline-block',width:6,height:6,borderRadius:'50%',background:colorMap[cat.name] ?? categoryColor(cat.name)}}/>
+                  <span style={{marginInlineEnd:8,display:'inline-block',width:6,height:6,borderRadius:'50%',background:categoryColor(cat.name)}}/>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{cat.name}</span>
                 </td>
                 {months.map((m) => {
