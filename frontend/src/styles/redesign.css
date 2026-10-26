@@ -217,11 +217,11 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
 [data-theme="light"] {
  --category-0:#087c66; --category-1:#236ac2; --category-2:#a23b99;
  --category-3:#a35817; --category-4:#727c19; --category-5:#bb3553;
- --category-6:#426d85; --category-7:#7160bd; --category-8:#506d80;
+ --category-6:#426d85; --category-7:#7160bd; --category-8:#759B50;
  --category-9:#1a9e63; --category-10:#a37c06; --category-11:#e03131;
  --category-12:#0c8599; --category-13:#7048e8; --category-14:#d9480f;
  --category-15:#e64980; --category-16:#0b7285; --category-17:#a08428;
- --category-18:#5f6b7a; --category-19:#6c7a89;
+ --category-18:#5f6b7a; --category-19:#7E4444; --category-20:#371D87;
 }
 
 /* Charts: mouse/tap focus must not paint the browser's default rectangle
