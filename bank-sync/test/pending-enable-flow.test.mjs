@@ -1,0 +1,10 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {enablePendingForAccount} from '../src/pending-enable-flow.js'
+const userId='11111111-1111-4111-8111-111111111111',account={provider:'isracard',key:'isracard-2'},cards=[{cardSuffix:'1234',companyCode:'11',isPartner:false}]
+function fake(){const calls=[];return{calls,account,userId,client:{auth:{getUser:async()=>({data:{user:{id:userId}}})}},credentials:{},options:{},approveDiscovery:async()=>{calls.push('approve-discovery');return true},discover:async(p,c,o)=>{calls.push('discovery');assert.equal(o.pendingDiscovery,true);return{transactions:['never saved'],pending:{success:true,cards}}},chooseCard:async()=>0,approveBinding:async b=>{calls.push('approve-enable');assert.equal(b.enabled,false);return true},writeAccount:async next=>{calls.push('write');assert.equal(next.pending.enabled,true)}}}
+test('explicit discovery and second enable approval before writing binding; no sync',async()=>{const f=fake();assert.equal((await enablePendingForAccount(f)).enabled,true);assert.deepEqual(f.calls,['approve-discovery','discovery','approve-enable','write'])})
+test('discovery refusal causes no issuer call',async()=>{const f=fake();f.approveDiscovery=async()=>false;assert.equal((await enablePendingForAccount(f)).enabled,false);assert.deepEqual(f.calls,[])})
+test('enable refusal never writes binding',async()=>{const f=fake();f.approveBinding=async()=>false;assert.equal((await enablePendingForAccount(f)).enabled,false);assert.deepEqual(f.calls,['approve-discovery','discovery'])})
+test('failed or ambiguous same-session discovery fails closed',async()=>{for(const pending of [{success:false,cards:[]},{success:true,cards:[cards[0],cards[0]]}]){const f=fake();f.discover=async()=>({pending});await assert.rejects(enablePendingForAccount(f));assert.equal(f.calls.includes('write'),false)}})
+test('wrong dashboard owner fails before issuer work',async()=>{const f=fake();f.client.auth.getUser=async()=>({data:{user:{id:'other'}}});await assert.rejects(enablePendingForAccount(f));assert.deepEqual(f.calls,[])})

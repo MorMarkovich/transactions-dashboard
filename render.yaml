@@ -19,3 +19,6 @@ services:
         value: https://transactions-dashboard-bfxn.onrender.com
       - key: VITE_AUTO_AI
         value: "true"
+      # Pending migration and schema checks passed before enabling this release.
+      - key: VITE_PENDING_APPROVALS
+        value: "true"

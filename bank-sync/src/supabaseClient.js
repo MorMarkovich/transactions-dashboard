@@ -1,6 +1,7 @@
 // Signs into Supabase AS THE USER (email/password) with the anon key, so every
 // read/write respects RLS — exactly like the dashboard. The service_role key is
 // never used. Writes are insert-only snapshots (never deletes / moves money).
+import { safeError } from './safe-errors.js'
 import { createClient } from '@supabase/supabase-js'
 
 export async function signIn(url, anonKey, email, password) {
@@ -8,7 +9,7 @@ export async function signIn(url, anonKey, email, password) {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error(`Supabase login failed: ${error.message}`)
+  if (error) throw safeError('SUPABASE_AUTH_FAILED')
   return { supabase, userId: data.user.id }
 }
 
@@ -20,7 +21,7 @@ export async function getLatestSnapshot(supabase, userId) {
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
-  if (error) throw new Error(`read snapshot failed: ${error.message}`)
+  if (error) throw safeError('SUPABASE_READ_FAILED')
   const row = data && data[0]
   return row && Array.isArray(row.data) ? row.data : []
 }
@@ -42,7 +43,7 @@ export async function insertSnapshot(supabase, userId, transactions) {
     .insert({ user_id: userId, data: transactions })
     .select('id')
     .single()
-  if (error) throw new Error(`write snapshot failed: ${error.message}`)
+  if (error) throw safeError('SUPABASE_WRITE_FAILED')
   return data?.id
 }
 
@@ -56,7 +57,7 @@ export async function deleteOtherSnapshots(supabase, userId, keepId, keepRecent 
     .select('id')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-  if (selErr) throw new Error(`cleanup of old snapshots failed: ${selErr.message}`)
+  if (selErr) throw safeError('SUPABASE_CLEANUP_FAILED')
   const ids = (data || []).map((r) => r.id)
   const keep = new Set([keepId, ...ids.slice(0, Math.max(0, keepRecent))].filter((v) => v != null))
   const toDelete = ids.filter((id) => !keep.has(id))
@@ -66,5 +67,5 @@ export async function deleteOtherSnapshots(supabase, userId, keepId, keepRecent 
     .delete()
     .eq('user_id', userId)
     .in('id', toDelete)
-  if (error) throw new Error(`cleanup of old snapshots failed: ${error.message}`)
+  if (error) throw safeError('SUPABASE_CLEANUP_FAILED')
 }

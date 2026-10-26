@@ -1,0 +1,21 @@
+.pending-approvals { position: relative; margin-block: var(--space-lg, 24px); padding: clamp(16px, 3vw, 28px); border: 1px solid var(--border); border-radius: var(--radius-lg, 16px); background: var(--bg-card); color: var(--text-primary); }
+.pending-approvals header, .pending-approvals h2 { display: flex; align-items: center; gap: 10px; }
+.pending-approvals header { justify-content: space-between; flex-wrap: wrap; }
+.pending-approvals h2 { margin: 0; font-size: 1.2rem; }
+.pending-approvals h3 { font-size: 1rem; margin-block: 8px; }
+.pending-approvals button { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; }
+.pending-approvals button:focus-visible, .pending-approvals summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.pending-approvals button:disabled { opacity: .6; cursor: wait; }
+.pending-note, .pending-observed { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
+.pending-card { border-block-start: 1px solid var(--border); padding-block-start: 14px; margin-block-start: 20px; }
+.pending-warning { border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; line-height: 1.6; }
+.pending-state { color: var(--text-secondary); font-size: .9rem; }
+.pending-rows { list-style: none; padding: 0; margin: 0; }
+.pending-rows li { display: flex; align-items: start; justify-content: space-between; gap: 16px; border-block-end: 1px solid var(--border); padding-block: 12px; }
+.pending-merchant { min-width: 0; overflow-wrap: anywhere; }
+.pending-merchant small { display: block; color: var(--text-secondary); margin-block-start: 4px; font-size: .8rem; }
+.pending-amount { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pending-unresolved { margin-block-start: 16px; }
+.pending-unresolved summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
+.pending-unresolved p { line-height: 1.6; }
+@media (max-width: 400px) { .pending-rows li { gap: 8px; font-size: .9rem; } }

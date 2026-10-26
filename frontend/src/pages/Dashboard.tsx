@@ -2,6 +2,7 @@ import { defaultMonth } from '../utils/defaultMonth'
 import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
 import { useCategoryColor } from '../hooks/useCategoryColor'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
+import PendingApprovals from '../components/dashboard/PendingApprovals'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
@@ -965,6 +966,9 @@ export default function Dashboard() {
         onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
         onCategory={handleCategoryCardClick}
         onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
+
+      {import.meta.env.VITE_PENDING_APPROVALS === 'true' && user && !isSampleActive() &&
+        <PendingApprovals key={user.id} userId={user.id} refreshKey={refreshKey}/>}
 
       <details className="dashboard-filter-bar" aria-label="סינון קטגוריות"><summary><SlidersHorizontal size={16}/> סינון ומיקוד <span>{category || 'כל הקטגוריות'}{subcategories.length ? ` · ${subcategories.length} תתי-קטגוריות` : ''}</span></summary>
         <div className="dashboard-filter-heading">

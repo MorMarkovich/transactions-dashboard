@@ -3,7 +3,12 @@
 // keychain. Supports multiple accounts per provider (e.g. two Isracard cards).
 // `npm run setup -- --clear` (or `npm run secrets:clear`) wipes everything.
 import readline from 'node:readline'
+import {withLocalSyncLock} from './local-sync-lock.js'
 import crypto from 'node:crypto'
+import {invalidatePendingBinding} from './pending-binding.js'
+import {signIn} from './supabaseClient.js'
+import {config} from './config.js'
+import {safeError,safeErrorCode} from './safe-errors.js'
 import { SUPPORTED, PROVIDER_LABELS, PROVIDER_FIELDS, makeAccountKey } from './providers.js'
 import { JOINT } from './owner.js'
 import {
@@ -53,8 +58,28 @@ async function collectCreds(rl, provider) {
   return creds
 }
 
+async function invalidateBeforeChange(account) {
+  if(!account?.pending)return
+  const auth=await getJSON(SUPABASE_AUTH_KEY)
+  if(!auth?.email||!auth?.password)throw safeError('PENDING_INVALIDATION_REQUIRED')
+  const {supabase,userId}=await signIn(config.supabaseUrl,config.supabaseAnonKey,auth.email,auth.password)
+  try{await invalidatePendingBinding(supabase,account,userId)}catch{throw safeError('PENDING_INVALIDATION_FAILED')}finally{await supabase.auth.signOut({scope:'local'})}
+}
 async function main() {
+  if(process.argv.includes('--emergency-local-wipe')){
+    const rl=readline.createInterface({input:process.stdin,output:process.stdout})
+    let answer
+    try{answer=await ask(rl,'WARNING: clears local credentials only. Cloud pending data is NOT invalidated and may still appear current until the 24-hour age limit. A durable remote-invalidation debt is retained locally. Type LOCAL WIPE to continue: ')}finally{rl.close()}
+    if(answer!=='LOCAL WIPE')return
+    const {recordPendingInvalidationDebt}=await import('./pending-invalidation-debt.js')
+    const debt=await recordPendingInvalidationDebt(await getAccounts())
+    if(debt.unresolvedArchive)console.log(`WARNING: older debt was NOT cleared. Marker: ${debt.warningPath}. Review sibling .quarantine-* files under the original authenticated owner before manually clearing the marker.`)
+    await clearAll()
+    console.log('Local credentials cleared. Remote pending data was NOT invalidated; retained debt requires later authenticated cleanup. Rebinding creates a fresh source scope.')
+    return
+  }
   if (process.argv.includes('--clear')) {
+    for(const account of await getAccounts())await invalidateBeforeChange(account)
     await clearAll()
     console.log('✓ All stored secrets cleared from the keychain.')
     return
@@ -87,6 +112,9 @@ async function main() {
       acct.label = labelFor(acct.provider, acct.owner)
       if (await askYesNo(rl, '  Update the login (e.g. new password) for this account?')) {
         const creds = await collectCreds(rl, acct.provider)
+        await invalidateBeforeChange(acct)
+        delete acct.pending
+        await setAccounts(accounts) // remove binding before replacing any credential
         await setJSON(credKey(acct.key), creds)
         console.log('  ✓ login updated.')
       }
@@ -113,6 +141,12 @@ async function main() {
   console.log('Supabase login — the SAME email/password you use for the dashboard.')
   const email = await ask(rl, '  Email: ')
   const password = await ask(rl, '  Password (hidden): ', { hidden: true })
+  // A changed dashboard login must not leave old-account observations current.
+  const oldAuth=await getJSON(SUPABASE_AUTH_KEY)
+  if(oldAuth?.email!==email||oldAuth?.password!==password){
+    for(const account of accounts){await invalidateBeforeChange(account);delete account.pending}
+    await setAccounts(accounts)
+  }
   await setJSON(SUPABASE_AUTH_KEY, { email, password })
   console.log('  ✓ Supabase login saved.\n')
 
@@ -138,4 +172,4 @@ async function main() {
   console.log('(Re-running setup keeps the same token. To rotate it, run `npm run secrets:clear` first.)')
 }
 
-main().catch((e) => { console.error('setup failed:', e.message); process.exit(1) })
+withLocalSyncLock(main).catch((e) => { console.error('setup failed:',safeErrorCode(e,'SYNC_SETUP_REQUIRED')); process.exit(1) })
