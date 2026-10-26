@@ -102,7 +102,9 @@ export default function NotificationCenter({
               left: 0,
               width: '320px',
               maxHeight: '400px',
-              overflowY: 'auto',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
               background: 'var(--glass-bg-hover, var(--bg-elevated))',
               backdropFilter: 'blur(16px)',
               WebkitBackdropFilter: 'blur(16px)',
@@ -156,7 +158,10 @@ export default function NotificationCenter({
               </div>
             </div>
 
-            {/* Notification list */}
+            {/* Notification list - structural corner clearance: the panel
+                clips to its 22px radius, the scroller is inset from the
+                bottom edge so its thumb never reaches the corner curve. */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginBottom: 24 }}>
             {notifications.length === 0 ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                 אין התראות חדשות
@@ -192,6 +197,7 @@ export default function NotificationCenter({
                 </div>
               ))
             )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
