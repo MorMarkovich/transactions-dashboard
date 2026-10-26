@@ -5,7 +5,10 @@ http.createServer((req, res) => {
   const mode = req.headers['x-synthetic-mode'] || 'ok'
   if (req.method !== 'POST') return json(501, { error: 'unmodelled' })
   if (req.url.endsWith('/GetCardList')) {
-    if (req.body.companyCode !== 11 || req.body.cardSuffixLength !== 4) return json(400, { error: 'invalid_contract' })
+    if (mode === 'discovery-auth') return json(401, { error: 'synthetic-private' })
+    if (mode === 'discovery-rate') return json(429, { error: 'synthetic-private' })
+    if (mode === 'discovery-partial') return json(200, { isSuccess: true, data: { private: 'synthetic-private' } })
+    if (req.body.companyCode !== '99' || req.body.cardSuffixLength !== 4) return json(400, { error: 'invalid_contract' })
     return json(200, { isSuccess: true, errorCode: '0', data: { cardsList: [{ cardSuffix: '1234', companyCode: '11', isPartner: false, isActive: true, cardChargeNext: { period: 'Next', billingDate: mode === 'rollover' ? '15/12/2026' : '15/11/2026' } }] } })
   }
   if (!req.url.endsWith('/GetTransactionsList')) return json(501, { error: 'unmodelled' })

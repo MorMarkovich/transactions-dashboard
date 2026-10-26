@@ -15,6 +15,18 @@ skipped to keep this run local and unauthenticated. The storage mock covers wire
 responses and CAS conflicts, not RLS, Postgres concurrency or account deletion.
 
 ## Observations
+2026-10-27 combined-list fix: PASS, 10 scenarios; issuer and snapshots each served
+17 requests, no silent member. GetCardList now requires string `99`, matching the
+authenticated issuer UI. The existing collector/store completed the synthetic
+pending path; separate binding tests cover exact per-card tuple selection.
+2026-10-27 transition-fix run: PASS, 10 scenarios; both members served 17 requests.
+The issuer fixture now requires the official string GetCardList company code.
+Separate offline lifecycle tests cover page navigation, redirects and deadlines;
+the HTTP simulation does not establish live browser session compatibility.
+2026-10-26 diagnostic-fix run: PASS, 10 HTTP scenarios; issuer and snapshots each
+served 17 requests. Discovery 401, 429 and malformed-envelope failures now reach
+the public boundary as distinct fixed codes, with one request each and no binding
+or snapshot writes. No member was silent; no real issuer was used in this run.
 2026-10-26 local CLI 1.73.0 run: PASS, 7 scenarios; both members served requests.
 14 issuer calls covered four approvals, 429, HTML challenge, partial data, explicit
 empty and rollover. The actual store retained stale rows, retained unresolved

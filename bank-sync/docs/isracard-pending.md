@@ -1,4 +1,4 @@
-# Pending approvals: local implementation, not activated in production
+# Pending approvals
 
 ## What changed
 The posted scraper reads monthly posted transactions, not the separate approvals
@@ -14,10 +14,35 @@ an install/startup side effect. Credential replacement first invalidates the old
 binding; failed invalidation stops the change.
 
 ## Contract and retention
-The contract comes from the supplied 2026-10-26 continuation. It was not checked
-against an authenticated issuer session in this fix. Only PENDING_ENDPOINTS' two
+The initial contract came from the supplied 2026-10-26 continuation and was
+verified against an authorized issuer session on 2026-10-27. Only PENDING_ENDPOINTS' two
 exact routes are allowed. Redirects, challenges, oversized/unknown responses fail
 closed; no retries. Both requests share a 25-second outer budget.
+
+2026-10-27 compatibility correction: scraper 6.9.0 leaves the authenticated page
+on `digital.isracard.co.il`; pending requests target `web.isracard.co.il`. The
+hook now follows the normal `/transactions` page in that same browser session
+before reading pending data, with a separate 15-second outer deadline. It stops
+on authentication redirects, HTTP errors or an unexpected origin. It does not
+copy cookies, weaken browser protections or change the login implementation.
+The official transactions bundle (SHA256
+`236f9f87e7ec470b4a8b8f63d48831dab74e02efd1b8478718c183034a435a64`)
+uses a string company code for GetCardList and a numeric code for transaction
+requests. The transport and synthetic fixtures now preserve that distinction.
+Discovery failures retain fixed diagnostic codes through the CLI boundary.
+The user's authenticated browser request on 2026-10-27 confirmed GetCardList uses
+the combined string code `99`; its response carries each card's actual company
+(`11` or `77`). Discovery and collection now use one combined-list request and
+still match the complete company/partner/suffix tuple. Real pending row field
+types and the selected Next billing period were inspected in that same browser;
+no cookies, authentication headers or raw responses were exported.
+An explicitly authorized pending-only run then completed discovery, binding,
+collection and authenticated database readback successfully. The owned browser
+and local lock were cleaned up. Posted snapshots and other issuer accounts were
+outside that run's write/contact scope. Private live counts and values remain in
+the local task report, not repository fixtures. This correction must also be
+installed in the local bank-sync tool: deploying the dashboard alone does not
+update the local scraper.
 
 Scope comes from the discovered Next billing period. Identity contains the native
 location, string sequence and string timestamp plus scope. No matching by amount,
@@ -76,18 +101,18 @@ on two fresh disposable loopback databases, using synthetic users and rows only.
 Tests cover RLS, direct-write denial, concurrent CAS and quota, malformed payloads,
 unchanged posted data, account deletion and both write/delete lock orders. The
 second run uses the same prepare/verify split as the new CI database job.
-All 222 bank-sync tests, 165 frontend tests, frontend lint and the full production
-build (including icon generation) passed under Node 24.19.0. Docker itself is not
-available on this Mac; the image build and hosted CI remain unexecuted.
+The initial release passed 222 bank-sync tests, 165 frontend tests, frontend lint
+and the full production build under Node 24.19.0. All eight hosted CI jobs,
+including the container build, passed for release commit `40fc9da`.
 
-Read-only production metadata confirms PostgreSQL 17.6 and that the pending table,
-RPC and private schema do not yet exist. No personal rows were queried. The
-Docker build now forwards VITE_PENDING_APPROVALS; it remains false by default.
+The approved additive migration was applied as 20261026211104. RLS, grants,
+cascade and the unchanged deletion-function hash were verified. The dashboard
+was deployed with VITE_PENDING_APPROVALS=true and checked live. Authorized local
+bindings and pending-only observations subsequently completed with authenticated
+database readback. Original historical missing purchases are not inferred from
+today's pending counts.
 
-The additive production migration was subsequently approved and applied as
-20261026211104. RLS, grants, cascade and the unchanged deletion-function hash were
-verified. Remaining activation: deployment with the display flag, explicit local
-binding and one authorized real observation. No bank operation was performed.
-The four real missing purchases
-have not been recovered or fabricated. See `release-2026-10-26.md` for the exact
-release order, rollback and verification boundaries.
+This compatibility correction passes 231 bank-sync tests and all ten local
+Postman HTTP simulation scenarios. Live issuer evidence is recorded separately
+from synthetic fixtures. See `release-2026-10-26.md` for the initial release
+order, rollback and verification boundaries.

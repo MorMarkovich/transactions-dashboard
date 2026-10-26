@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {boundedIssuerPost,createPendingSessionTransport,attachPendingSessionHook} from '../src/isracard-pending-session.js'
 import {PENDING_ENDPOINTS} from '../src/isracard-pending-collector.js'
-const request={url:PENDING_ENDPOINTS.cards,method:'POST',body:{companyCode:11,cardSuffixLength:4}}
+import {preparePendingPage} from '../src/isracard-pending-session.js'
+const request={url:PENDING_ENDPOINTS.cards,method:'POST',body:{companyCode:'99',cardSuffixLength:4}}
 const response=(overrides={})=>({status:200,ok:true,redirected:false,url:request.url,headers:new Headers({'content-type':'application/json'}),body:new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('{"isSuccess":true}'));c.close()}}),...overrides})
 async function withFetch(fake,fn){const prior=globalThis.fetch;globalThis.fetch=fake;try{return await fn()}finally{globalThis.fetch=prior}}
 test('bounded callback sends fixed POST credentials only to issuer, redirect error, abort signal',()=>withFetch(async(url,init)=>{assert.equal(url,request.url);assert.equal(init.method,'POST');assert.equal(init.redirect,'error');assert.equal(init.credentials,'include');assert.ok(init.signal);return response()},async()=>assert.equal((await boundedIssuerPost(request)).ok,true)))
@@ -21,7 +22,7 @@ const cardList={isSuccess:true,errorCode:'0',data:{cardsList:[{...target,isActiv
 const approvals={isSuccess:true,errorCode:'0',data:{approvals:{approvedTransactions:[],totalEstimatedAmount:0},currentTransactionsList:null,israelAbroadVouchers:null}}
 test('same-session lifecycle preserves exact posted object, collects before terminate, no extra login',async()=>{
  const events=[];const posted={success:true,accounts:[{txns:[{date:'unchanged'}]}]}
- const scraper={page:{evaluate:async(fn,arg)=>{events.push(arg.url);return{ok:true,payload:arg.url===PENDING_ENDPOINTS.cards?cardList:approvals}}},fetchData:async()=>{events.push('posted');return posted},terminate:async()=>events.push('terminate')}
+ const scraper={page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async(fn,arg)=>{events.push(arg.url);return{ok:true,payload:arg.url===PENDING_ENDPOINTS.cards?cardList:approvals}}},fetchData:async()=>{events.push('posted');return posted},terminate:async()=>events.push('terminate')}
  const original=scraper.fetchData;const hook=attachPendingSessionHook(scraper,target)
  assert.equal(await scraper.fetchData(),posted);await scraper.terminate()
  assert.deepEqual(events,['posted',PENDING_ENDPOINTS.cards,PENDING_ENDPOINTS.transactions,'terminate'])
@@ -29,15 +30,15 @@ test('same-session lifecycle preserves exact posted object, collects before term
  hook.detach();assert.equal(scraper.fetchData,original)
 })
 test('posted failure never accesses session',async()=>{
- let n=0;const posted={success:false};const scraper={fetchData:async()=>posted,terminate:async()=>{},page:{evaluate:async()=>{n++}}}
+ let n=0;const posted={success:false};const scraper={fetchData:async()=>posted,terminate:async()=>{},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>{n++}}}
  const hook=attachPendingSessionHook(scraper,target);assert.equal(await scraper.fetchData(),posted);assert.equal(n,0);assert.equal(hook.getResult().success,false)
 })
 test('pending transport failure does not change posted result or terminate cleanup',async()=>{
- let closed=false;const posted={success:true,accounts:[]};const scraper={fetchData:async()=>posted,terminate:async()=>{closed=true},page:{evaluate:async()=>{throw Error('PRIVATE')}}}
+ let closed=false;const posted={success:true,accounts:[]};const scraper={fetchData:async()=>posted,terminate:async()=>{closed=true},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>{throw Error('PRIVATE')}}}
  const hook=attachPendingSessionHook(scraper,target);assert.equal(await scraper.fetchData(),posted);await scraper.terminate();assert.equal(closed,true);assert.equal(hook.getResult().success,false);assert.equal(JSON.stringify(hook.getResult()).includes('PRIVATE'),false)
 })
 test('original extraction throw retains existing cleanup ownership and no pending attempt',async()=>{
- let n=0;const scraper={fetchData:async()=>{throw Error('posted failed')},terminate:async()=>{},page:{evaluate:async()=>{n++}}};attachPendingSessionHook(scraper,target);await assert.rejects(scraper.fetchData());assert.equal(n,0)
+ let n=0;const scraper={fetchData:async()=>{throw Error('posted failed')},terminate:async()=>{},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>{n++}}};attachPendingSessionHook(scraper,target);await assert.rejects(scraper.fetchData());assert.equal(n,0)
 })
 test('incompatible lifecycle rejected offline',()=>assert.throws(()=>attachPendingSessionHook({scrape:()=>{}},target)))
 
@@ -52,13 +53,13 @@ test('outer deadline releases never-settling renderer evaluation and prohibits n
 })
 test('hung pending evaluate still returns exact posted object and permits normal cleanup',async()=>{
  let closed=false;const posted={success:true,accounts:[]}
- const scraper={fetchData:async()=>posted,terminate:async()=>{closed=true},page:{evaluate:()=>new Promise(()=>{})}}
+ const scraper={fetchData:async()=>posted,terminate:async()=>{closed=true},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:()=>new Promise(()=>{})}}
  const hook=attachPendingSessionHook(scraper,target,{outerTimeoutMs:10})
  assert.equal(await scraper.fetchData(),posted);await scraper.terminate();assert.equal(closed,true)
  assert.equal(hook.getResult().error,'pending_outer_timeout')
 })
 test('fixed rate limit diagnostic survives transport and hook without raw payload',async()=>{
- const scraper={fetchData:async()=>({success:true}),terminate:async()=>{},page:{evaluate:async()=>({ok:false,code:'pending_rate_limited',message:'PRIVATE'})}}
+ const scraper={fetchData:async()=>({success:true}),terminate:async()=>{},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>({ok:false,code:'pending_rate_limited',message:'PRIVATE'})}}
  const hook=attachPendingSessionHook(scraper,target);await scraper.fetchData();assert.equal(hook.getResult().error,'pending_rate_limited');assert.equal(JSON.stringify(hook.getResult()).includes('PRIVATE'),false)
 })
 test('arbitrary page diagnostic is never reflected',async()=>{
@@ -74,7 +75,7 @@ test('outer budget covers pair of calls together, not a fresh timeout per call',
  const second=assert.rejects(transport(request),{code:'pending_outer_timeout'});t.mock.timers.tick(10);await second;assert.equal(calls,2)
 })
 test('second call fixed auth failure survives collector, no raw response',async()=>{
- let calls=0;const scraper={fetchData:async()=>({success:true}),terminate:async()=>{},page:{evaluate:async()=>++calls===1?{ok:true,payload:cardList}:{ok:false,code:'pending_auth_required',message:'PRIVATE'}}}
+ let calls=0;const scraper={fetchData:async()=>({success:true}),terminate:async()=>{},page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>++calls===1?{ok:true,payload:cardList}:{ok:false,code:'pending_auth_required',message:'PRIVATE'}}}
  const hook=attachPendingSessionHook(scraper,target);await scraper.fetchData();assert.equal(hook.getResult().error,'pending_auth_required')
 })
 
@@ -82,6 +83,49 @@ test('detach removes override when original fetchData inherited',()=>{const prot
 test('detach restores exact own-property descriptor',()=>{const scraper={terminate:async()=>{}};const fn=async()=>({success:true});Object.defineProperty(scraper,'fetchData',{value:fn,writable:true,enumerable:false,configurable:true});const before=Object.getOwnPropertyDescriptor(scraper,'fetchData');const hook=attachPendingSessionHook(scraper,target);hook.detach();assert.deepEqual(Object.getOwnPropertyDescriptor(scraper,'fetchData'),before)})
 test('discovery hook returns only exact allowlisted card tuple fields in same scraper session',async()=>{
  const {attachPendingDiscoveryHook}=await import('../src/isracard-pending-session.js')
- const events=[],scraper={fetchData:async()=>({success:true}),page:{evaluate:async(_,r)=>{events.push(r);return{ok:true,payload:{isSuccess:true,errorCode:'0',data:{cardsList:[{cardSuffix:r.body.companyCode===11?'1234':'5678',companyCode:r.body.companyCode,isPartner:false,PRIVATE:'never returned'}]}}}}}}
- const original=scraper.fetchData,hook=attachPendingDiscoveryHook(scraper);await scraper.fetchData();assert.equal(events.length,2);assert.deepEqual(hook.getResult(),{success:true,cards:[{cardSuffix:'1234',companyCode:'11',isPartner:false},{cardSuffix:'5678',companyCode:'77',isPartner:false}]});hook.detach();assert.equal(scraper.fetchData,original)
+ const events=[],scraper={fetchData:async()=>({success:true}),page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async(_,r)=>{events.push(r);assert.equal(r.body.companyCode,'99');return{ok:true,payload:{isSuccess:true,errorCode:'0',data:{cardsList:[{cardSuffix:'1234',companyCode:'11',isPartner:false,PRIVATE:'never returned'},{cardSuffix:'5678',companyCode:'77',isPartner:false}]}}}}}}
+ const original=scraper.fetchData,hook=attachPendingDiscoveryHook(scraper);await scraper.fetchData();assert.equal(events.length,1);assert.deepEqual(hook.getResult(),{success:true,cards:[{cardSuffix:'1234',companyCode:'11',isPartner:false},{cardSuffix:'5678',companyCode:'77',isPartner:false}]});hook.detach();assert.equal(scraper.fetchData,original)
 })
+test('discovery preserves fixed failure reasons with one request and no retry',async()=>{
+ const {attachPendingDiscoveryHook}=await import('../src/isracard-pending-session.js')
+ for(const [code,expected] of [['pending_auth_required','pending_auth_required'],['pending_rate_limited','pending_rate_limited'],['PRIVATE','pending_session_failed']]){
+  let calls=0
+  const scraper={fetchData:async()=>({success:true}),page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>{calls++;return{ok:false,code,message:'PRIVATE'}}}}
+  const hook=attachPendingDiscoveryHook(scraper);await scraper.fetchData()
+  assert.deepEqual(hook.getResult(),{success:false,cards:[],error:expected});assert.equal(calls,1)
+ }
+})
+test('malformed discovery discards partial card results and exposes no raw data',async()=>{
+ const {attachPendingDiscoveryHook}=await import('../src/isracard-pending-session.js')
+ let calls=0
+ const scraper={fetchData:async()=>({success:true}),page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async()=>{calls++;return{ok:true,payload:{isSuccess:true,data:{cardsList:[cardList.data.cardsList[0],{PRIVATE:'secret'}]}}}}}}
+ const hook=attachPendingDiscoveryHook(scraper);await scraper.fetchData()
+ assert.deepEqual(hook.getResult(),{success:false,cards:[],error:'pending_contract_unsupported'});assert.equal(calls,1)
+})
+test('legacy session navigates once to the normal issuer transactions page before pending requests',async()=>{
+ let current='https://digital.isracard.co.il/personalarea/Login';const events=[]
+ const posted={success:true,accounts:[]}
+ const scraper={fetchData:async()=>posted,terminate:async()=>{},page:{url:()=>current,
+  goto:async(url,options)=>{events.push('navigate');assert.equal(url,'https://web.isracard.co.il/transactions');assert.equal(options.timeout,15000);current=url;return{status:()=>200}},
+  evaluate:async(_,request)=>{events.push(request.url);if(request.url===PENDING_ENDPOINTS.cards)assert.equal(request.body.companyCode,'99');return{ok:true,payload:request.url===PENDING_ENDPOINTS.cards?cardList:approvals}},
+ }}
+ const hook=attachPendingSessionHook(scraper,target);assert.equal(await scraper.fetchData(),posted)
+ assert.equal(hook.getResult().success,true);assert.deepEqual(events,['navigate',PENDING_ENDPOINTS.cards,PENDING_ENDPOINTS.transactions])
+})
+test('navigation failure never calls the pending API and leaves posted completion intact',async()=>{
+ for(const [status,url,error] of [[401,'https://web.isracard.co.il/transactions','pending_auth_required'],[403,'https://web.isracard.co.il/transactions','pending_auth_required'],[429,'https://web.isracard.co.il/transactions','pending_rate_limited'],[200,'https://digital.isracard.co.il/personalarea/Login','pending_auth_required']]){
+  let current='https://digital.isracard.co.il/personalarea/Login',calls=0
+  const posted={success:true,accounts:[]},scraper={fetchData:async()=>posted,terminate:async()=>{},page:{url:()=>current,goto:async()=>{calls++;current=url;return{status:()=>status}},evaluate:async()=>{throw Error('must not request')}}}
+  const hook=attachPendingSessionHook(scraper,target);assert.equal(await scraper.fetchData(),posted)
+  assert.equal(hook.getResult().error,error);assert.equal(calls,1)
+ }
+})
+test('unrecognized page origin cannot trigger navigation or requests',async()=>{
+ await assert.rejects(preparePendingPage({url:()=>'https://untrusted.invalid/transactions',goto:async()=>{throw Error('must not navigate')}}),{code:'pending_session_failed'})
+})
+test('hung page transition is bounded independently of browser timeout',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout']})
+ const pending=assert.rejects(preparePendingPage({url:()=>'https://digital.isracard.co.il/personalarea/Login',goto:()=>new Promise(()=>{})}),{code:'pending_outer_timeout'})
+ t.mock.timers.tick(15000);await pending
+})
+test('numeric discovery company does not match the official string contract',()=>withFetch(async()=>{throw Error('must not fetch')},async()=>assert.equal((await boundedIssuerPost({...request,body:{companyCode:11,cardSuffixLength:4}})).code,'pending_request_rejected')))
