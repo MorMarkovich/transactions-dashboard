@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import type { IndustryMonthlyData } from '../../services/types'
 import useMediaQuery from '../../hooks/useMediaQuery'
-import { categoryColor, categoryColorMap } from '../../utils/chartPalette'
+import { categoryColor } from '../../utils/chartPalette'
 
 interface IndustryMonthlyChartProps {
   data: IndustryMonthlyData
@@ -139,8 +139,6 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
     )
   }
 
-  const seriesColors = categoryColorMap(data.series.map((s) => s.name))
-
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart
@@ -151,8 +149,8 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
         <defs>
           {data.series.map((s, i) => (
             <linearGradient key={s.name} id={`industGrad${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={seriesColors[s.name] ?? categoryColor(s.name)} stopOpacity={0.95} />
-              <stop offset="100%" stopColor={seriesColors[s.name] ?? categoryColor(s.name)} stopOpacity={0.65} />
+              <stop offset="0%" stopColor={categoryColor(s.name)} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={categoryColor(s.name)} stopOpacity={0.65} />
             </linearGradient>
           ))}
         </defs>
