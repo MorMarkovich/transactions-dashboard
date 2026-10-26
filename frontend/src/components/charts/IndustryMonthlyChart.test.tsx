@@ -5,11 +5,22 @@ import { categoryColor } from '../../utils/chartPalette'
 import type { IndustryMonthlyData } from '../../services/types'
 
 vi.mock('../../hooks/useMediaQuery', () => ({ default: () => false }))
+const captured: { barData: Record<string, unknown>[]; xAxisProps: Record<string, unknown> } = {
+  barData: [],
+  xAxisProps: {},
+}
+
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children, data }: { children: React.ReactNode; data: Record<string, unknown>[] }) => {
+    captured.barData = data
+    return <div>{children}</div>
+  },
   Bar: () => null,
-  XAxis: () => null,
+  XAxis: (props: Record<string, unknown>) => {
+    captured.xAxisProps = props
+    return null
+  },
   YAxis: () => null,
   CartesianGrid: () => null,
   Tooltip: () => null,
@@ -51,5 +62,76 @@ describe('IndustryMonthlyChart category colors', () => {
     ]
     const colors = names.map((n) => categoryColor(n))
     expect(new Set(colors).size).toBe(names.length)
+  })
+})
+
+describe('IndustryMonthlyChart month axis', () => {
+  it('renders months oldest-first even when the API returns them unsorted', () => {
+    const unsorted: IndustryMonthlyData = {
+      months: ['11/2026', '03/2026', '07/2026'],
+      series: [{ name: 'אוכל', data: [110, 30, 70] }],
+    }
+    render(<IndustryMonthlyChart data={unsorted} />)
+    expect(captured.barData.map((row) => row.month)).toEqual(['03/2026', '07/2026', '11/2026'])
+    // values travel with their month after sorting
+    expect(captured.barData.map((row) => row['אוכל'])).toEqual([30, 70, 110])
+  })
+
+  it('shortens rotated tick labels to MM/YY when more than 6 months show', () => {
+    const many: IndustryMonthlyData = {
+      months: ['01/2026', '02/2026', '03/2026', '04/2026', '05/2026', '06/2026', '07/2026'],
+      series: [{ name: 'אוכל', data: [1, 2, 3, 4, 5, 6, 7] }],
+    }
+    render(<IndustryMonthlyChart data={many} />)
+    const fmt = captured.xAxisProps.tickFormatter as (m: string) => string
+    expect(fmt('03/2026')).toBe('03/26')
+  })
+
+  it('keeps the full MM/YYYY label when rotation is not needed', () => {
+    const few: IndustryMonthlyData = {
+      months: ['05/2026', '06/2026'],
+      series: [{ name: 'אוכל', data: [1, 2] }],
+    }
+    render(<IndustryMonthlyChart data={few} />)
+    const fmt = captured.xAxisProps.tickFormatter as (m: string) => string
+    expect(fmt('06/2026')).toBe('06/2026')
+  })
+})
+
+describe('IndustryMonthlyChart scale and mobile paths', () => {
+  it('keeps month->value mapping correct for 24+ unsorted months', () => {
+    // 26 months across 2025-2027, deliberately shuffled
+    const all: string[] = []
+    for (let y = 2025; y <= 2027; y++) for (let m = 1; m <= 12; m++) all.push(`${String(m).padStart(2, '0')}/${y}`)
+    const months = all.slice(0, 26)
+    const shuffled = [...months].reverse() // worst case: fully reversed
+    const big: IndustryMonthlyData = {
+      months: shuffled,
+      series: [{ name: 'אוכל', data: shuffled.map((_, i) => i + 1) }],
+    }
+    render(<IndustryMonthlyChart data={big} />)
+    expect(captured.barData.map((row) => row.month)).toEqual(months)
+    // each value travels with its month: value for months[k] was 26-k in the shuffled input
+    months.forEach((_, k) => {
+      expect(captured.barData[k]['אוכל']).toBe(26 - k)
+    })
+    // rotation + MM/YY at this scale
+    const fmt = captured.xAxisProps.tickFormatter as (m: string) => string
+    expect(fmt('01/2027')).toBe('01/27')
+  })
+
+  it('mobile list renders months ascending with the matching series values', async () => {
+    vi.resetModules()
+    vi.doMock('../../hooks/useMediaQuery', () => ({ default: () => true }))
+    const { default: MobileChart } = await import('./IndustryMonthlyChart')
+    const data: IndustryMonthlyData = {
+      months: ['11/2026', '03/2026'],
+      series: [{ name: 'אוכל', data: [110, 30] }],
+    }
+    const { container } = render(<MobileChart data={data} />)
+    const titles = [...container.querySelectorAll('.mobile-chart-row-title')].map((el) => el.textContent)
+    expect(titles).toEqual(['03/2026', '11/2026'])
+    const values = [...container.querySelectorAll('.mobile-chart-row-value')].map((el) => el.textContent)
+    expect(values).toEqual(['₪30', '₪110'])
   })
 })

@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import type { IndustryMonthlyData } from '../../services/types'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { monthKeyNum } from '../../utils/formatting'
 import { useCategoryColor } from '../../hooks/useCategoryColor'
 
 interface IndustryMonthlyChartProps {
@@ -91,20 +92,35 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
     )
   }
 
+  // Sort ascending by month ONCE, matching the oldest-first LTR month strips
+  // (backend order is not guaranteed). Both the mobile list and the desktop
+  // chart read from this, so series values keep their month mapping.
+  const order = data.months
+    .map((month, idx) => ({ month, idx, key: monthKeyNum(month) }))
+    .sort((a, b) => (a.key ?? 0) - (b.key ?? 0))
+  const sortedMonths = order.map((o) => o.month)
+  const sortedSeries = data.series.map((series) => ({
+    ...series,
+    data: order.map((o) => series.data[o.idx] ?? 0),
+  }))
+
   // Build recharts data: [{month: "01/2024", "מזון": 1500, "תחבורה": 800, ...}, ...]
-  const chartData = data.months.map((month, idx) => {
+  const chartData = sortedMonths.map((month, idx) => {
     const entry: Record<string, string | number> = { month }
-    for (const series of data.series) {
+    for (const series of sortedSeries) {
       entry[series.name] = series.data[idx] ?? 0
     }
     return entry
   })
 
-  const needsRotation = data.months.length > 6
+  const needsRotation = sortedMonths.length > 6
+  // Rotated labels use the short MM/YY form so they stay readable.
+  const formatMonthTick = (month: string): string =>
+    needsRotation ? month.replace(/^(\d{2})\/\d{2}(\d{2})$/, '$1/$2') : month
 
   if (isCompact) {
-    const monthTotals = data.months.map((month, idx) => {
-      const values = data.series
+    const monthTotals = sortedMonths.map((month, idx) => {
+      const values = sortedSeries
         .map((series) => ({ name: series.name, value: series.data[idx] ?? 0 }))
         .filter((item) => item.value > 0)
         .sort((a, b) => b.value - a.value)
@@ -145,10 +161,10 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
       <BarChart
         accessibilityLayer={false}
         data={chartData}
-        margin={{ top: 8, right: 8, left: 4, bottom: needsRotation ? 44 : 8 }}
+        margin={{ top: 8, right: 8, left: 4, bottom: 8 }}
       >
         <defs>
-          {data.series.map((s, i) => (
+          {sortedSeries.map((s, i) => (
             <linearGradient key={s.name} id={`industGrad${i}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={categoryColor(s.name)} stopOpacity={0.95} />
               <stop offset="100%" stopColor={categoryColor(s.name)} stopOpacity={0.65} />
@@ -158,18 +174,19 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
 
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
 
-        {/* reversed → months read right-to-left chronologically, matching the RTL page */}
+        {/* oldest-first left-to-right, matching the LTR month strips above the chart */}
         <XAxis
           dataKey="month"
-          reversed
+          padding={{ right: 28 }}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontFamily: 'var(--font-family)' }}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
           angle={needsRotation ? -40 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
-          height={needsRotation ? 55 : 30}
+          height={needsRotation ? 40 : 30}
           interval={needsRotation ? 'preserveStartEnd' : 0}
-          minTickGap={needsRotation ? 14 : 0}
+          minTickGap={needsRotation ? 10 : 0}
+          tickFormatter={formatMonthTick}
         />
 
         <YAxis
@@ -189,13 +206,13 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
           iconType="circle"
         />
 
-        {data.series.map((s, i) => (
+        {sortedSeries.map((s, i) => (
           <Bar
             key={s.name}
             dataKey={s.name}
             stackId="a"
             fill={`url(#industGrad${i})`}
-            radius={i === data.series.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+            radius={i === sortedSeries.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
             maxBarSize={52}
             animationDuration={0}
           />

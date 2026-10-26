@@ -1368,13 +1368,13 @@ export default function Dashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>תקופה:</span>
                 <select value={snapshotMonthFrom} onChange={(e) => setSnapshotMonthFrom(e.target.value)}
-                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', paddingInlineEnd: '26px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
                   <option value="">מתחילת התקופה</option>
                   {availableMonths.map((m) => <option key={m.month} value={m.month}>{m.month}</option>)}
                 </select>
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>עד</span>
                 <select value={snapshotMonthTo} onChange={(e) => setSnapshotMonthTo(e.target.value)}
-                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', background: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', paddingInlineEnd: '26px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
                   <option value="">סוף התקופה</option>
                   {availableMonths.map((m) => <option key={m.month} value={m.month}>{m.month}</option>)}
                 </select>

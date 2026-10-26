@@ -51,3 +51,7 @@ reproduce_*.py
 frontend/public/icon-192.png
 frontend/public/icon-512.png
 frontend/public/icon-maskable-512.png
+
+# local env files (never commit)
+.env
+**/.env

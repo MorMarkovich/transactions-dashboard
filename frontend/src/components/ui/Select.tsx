@@ -45,7 +45,7 @@ export default function Select({
           className="ui-select"
           style={{
             width: '100%',
-            padding: '10px 40px 10px 14px',
+            padding: '10px 14px 10px 40px',
             background: 'var(--bg-elevated, #334155)',
             border: '1px solid var(--border-color)',
             borderRadius: '8px',
@@ -56,6 +56,7 @@ export default function Select({
             direction: 'rtl',
             textAlign: 'right',
             appearance: 'none',
+            backgroundImage: 'none',
             outline: 'none',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
