@@ -135,3 +135,27 @@ describe('IndustryMonthlyChart scale and mobile paths', () => {
     expect(values).toEqual(['₪30', '₪110'])
   })
 })
+
+describe('IndustryMonthlyChart CustomTooltip', () => {
+  it('uses series colors for dots (not gradient url fills) and matches legend order', async () => {
+    const { CustomTooltip } = await import('./IndustryMonthlyChart')
+    const { render } = await import('@testing-library/react')
+    const payload = [
+      { name: 'הוצאות שוטפות', value: 320, color: 'url(#industGrad1)' },
+      { name: 'אוכל', value: 900, color: 'url(#industGrad0)' },
+    ]
+    const colorOf = (n: string) => (n === 'אוכל' ? '#AA0001' : '#00BB02')
+    const { container } = render(
+      <CustomTooltip active payload={payload} label="05/2026" colorOf={colorOf} seriesOrder={['אוכל', 'הוצאות שוטפות']} />,
+    )
+    const rows = [...container.querySelectorAll('p')].slice(1, 3)
+    // legend order: אוכל first
+    expect(rows[0].textContent).toContain('אוכל')
+    expect(rows[1].textContent).toContain('הוצאות שוטפות')
+    // dots carry the series color, never the url(#...) gradient fill
+    const dotSpan = rows[0].querySelector('span')!
+    expect(dotSpan.getAttribute('style')).toContain('rgb(170, 0, 1)')
+    expect(dotSpan.getAttribute('style')).not.toContain('url(')
+    expect(container.textContent).toContain('1,220')
+  })
+})

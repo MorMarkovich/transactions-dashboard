@@ -34,11 +34,19 @@ interface CustomTooltipProps {
   active?: boolean
   payload?: TooltipPayload[]
   label?: string
+  // Bar fills are gradients, so payload colors arrive as url(#...) which is not
+  // a usable CSS color - resolve the series color by name instead.
+  colorOf?: (name: string) => string
+  // Legend series order, so tooltip rows read the same way as the legend.
+  seriesOrder?: string[]
 }
 
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+export function CustomTooltip({ active, payload, label, colorOf, seriesOrder }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
   const total = payload.reduce((s, p) => s + (p.value || 0), 0)
+  const rows = seriesOrder
+    ? [...payload].sort((a, b) => seriesOrder.indexOf(a.name) - seriesOrder.indexOf(b.name))
+    : [...payload].reverse()
   return (
     <div
       style={{
@@ -55,10 +63,10 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       <p style={{ color: 'var(--text-primary)', margin: '0 0 8px', fontWeight: 700, fontSize: '0.875rem' }}>
         {label}
       </p>
-      {[...payload].reverse().map((entry) => (
+      {rows.map((entry) => (
         entry.value > 0 && (
           <p key={entry.name} style={{ margin: '2px 0', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-            <span style={{ color: entry.color }}>● {entry.name}</span>
+            <span style={{ color: colorOf ? colorOf(entry.name) : entry.color }}>● {entry.name}</span>
             <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
               ₪{Math.round(entry.value).toLocaleString('he-IL')}
             </span>
@@ -198,7 +206,7 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
           orientation="right"
         />
 
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+        <Tooltip content={<CustomTooltip colorOf={categoryColor} seriesOrder={sortedSeries.map((s) => s.name)} />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
 
         <Legend
           wrapperStyle={{ fontSize: '0.8rem', fontFamily: 'var(--font-family)', paddingTop: '8px' }}
