@@ -266,7 +266,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
           tickLine={false}
           axisLine={false}
           width={isCompact ? 60 : 68}
-          orientation="right"
+          orientation="left"
         />
 
         <Tooltip
