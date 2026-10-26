@@ -85,9 +85,24 @@ export function categoryColor(name: string, theme?: ChartTheme): string {
 // best-effort by golden-angle hue dispersion, not guaranteed for arbitrary
 // name sets; the known colliding pair from production
 // (ביטוח / מנויים ושירותים) is covered by tests.
+// Explicit hue overrides for VERIFIED live collisions the golden-angle hash
+// produced. Same mechanism as the canonical pins above, but kept in custom
+// space because canonical slots 0-21 are fully assigned. Name-keyed by the
+// exact stored string: the override applies to that exact name only, and is
+// stable across views, subsets, ordering and sessions on every page.
+// 'ישראכרט שכ משכורת' hashed to hue 4.9° - 16° and 8/441 RGB from
+// 'בנק פועלים משכורת' (21.3°), shown as adjacent rows in the live income
+// sources card (auditor pixels, dark theme). 200° separates that observed
+// pair in both themes and keeps a >=20 RGB margin from the other top-ranked
+// live sources covered by the tests below; separation from names outside
+// the tested set is not claimed.
+const customHueOverride: Record<string, number> = {
+  'ישראכרט שכ משכורת': 200,
+}
+
 function customColor(name: string, theme: ChartTheme): string {
   const h = hashSlotRaw(name)
-  const hue = (h * 137.508) % 360
+  const hue = customHueOverride[name] ?? (h * 137.508) % 360
   return theme === 'light' ? hslToHex(hue, 45, 38) : hslToHex(hue, 40, 84)
 }
 
