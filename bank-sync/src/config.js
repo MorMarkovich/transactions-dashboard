@@ -1,6 +1,7 @@
 // Loads NON-secret runtime config from .env. Secrets (bank passwords, Supabase
 // login, sync token) come from the OS keychain — never from here.
 import 'dotenv/config'
+import { safeError } from './safe-errors.js'
 import { SUPPORTED, ACTIVE_PROVIDERS } from './providers.js'
 import { parseOwnerKeywords } from './owner.js'
 
@@ -68,6 +69,6 @@ export function assertConfig() {
   if (!config.supabaseUrl) missing.push('SUPABASE_URL')
   if (!config.supabaseAnonKey) missing.push('SUPABASE_ANON_KEY')
   if (missing.length) {
-    throw new Error(`Missing config in .env: ${missing.join(', ')}. Copy .env.example to .env and fill it in.`)
+    throw safeError('SYNC_CONFIG_REQUIRED')
   }
 }

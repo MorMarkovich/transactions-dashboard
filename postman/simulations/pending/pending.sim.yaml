@@ -1,0 +1,9 @@
+simulation: pinkas-pending-offline
+routing: path
+mocks:
+  - name: issuer
+    routeKey: issuer
+    path: postman/mocks/issuer/config.yaml
+  - name: snapshots
+    routeKey: snapshots
+    path: postman/mocks/snapshots/config.yaml

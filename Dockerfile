@@ -1,5 +1,5 @@
 # ── Stage 1: Build the React frontend ────────────────────────────────────────
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Install dependencies first (cached layer)
@@ -12,9 +12,11 @@ COPY frontend/ ./
 ARG VITE_SUPABASE_URL=""
 ARG VITE_SUPABASE_ANON_KEY=""
 ARG VITE_AUTO_AI="true"
+ARG VITE_PENDING_APPROVALS="false"
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 ENV VITE_AUTO_AI=$VITE_AUTO_AI
+ENV VITE_PENDING_APPROVALS=$VITE_PENDING_APPROVALS
 
 RUN npm run build
 

@@ -27,6 +27,7 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'syncing' }
   | { kind: 'success'; message: string }
+  | { kind: 'warning'; message: string }
   | { kind: 'error'; message: string }
 
 function getToken(): string | null {
@@ -85,8 +86,13 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
       }
 
       if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        setStatus({ kind: 'error', message: text?.slice(0, 140) || `הסנכרון נכשל (${res.status}).` })
+        const failure = await res.json().catch(() => ({}))
+        const message = failure.error === 'BANK_CLEANUP_REQUIRED'
+          ? 'האיסוף נעצר. לא ניתן לוודא שתהליך הדפדפן נסגר; נדרשת בדיקה מקומית לפני ניסיון נוסף.'
+          : failure.error === 'SYNC_LOCAL_LOCKED'
+            ? 'הסנכרון נעול בעקבות תהליך פעיל או ניסיון קודם שלא הסתיים. נדרשת בדיקה מקומית.'
+            : `הסנכרון נכשל (${res.status}).`
+        setStatus({ kind: 'error', message })
         return
       }
 
@@ -98,7 +104,12 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
         ? `סונכרנו ${added} עסקאות חדשות${Number.isFinite(total) ? ` (סה"כ ${total})` : ''}.`
         : 'הסנכרון הושלם.'
 
-      setStatus({ kind: 'success', message })
+      const partial = Object.keys(payload.errors ?? {}).length > 0
+      const pendingUnverified = Object.values(payload.pendingStatuses ?? {}).some(value => value !== 'pending_observed')
+      setStatus({ kind: partial || pendingUnverified ? 'warning' : 'success', message: message +
+        (partial ? ' חלק מהחשבונות לא עודכנו.' : '') +
+        (pendingUnverified ? ' לא ניתן לאמת את עדכון העסקאות הממתינות.' : '') })
+      window.dispatchEvent(new Event('bank-sync-completed'))
       await onSynced?.()
     } catch {
       // fetch() rejects on network failure / CORS / server down.
@@ -137,7 +148,7 @@ export default function RefreshFromBanks({ onSynced }: RefreshFromBanksProps) {
           <span>{status.message}</span>
         </div>
       )}
-      {status.kind === 'error' && (
+      {(status.kind === 'error' || status.kind === 'warning') && (
         <div className="bank-sync-status bank-sync-status--err" role="alert">
           <AlertCircle size={13} />
           <span>{status.message}</span>

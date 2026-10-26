@@ -14,7 +14,9 @@
     "golden": "node src/golden.js",
     "serve": "node src/server.js",
     "test": "node --test",
-    "secrets:clear": "node src/setup.js --clear"
+    "secrets:clear": "node src/setup.js --clear",
+    "pending:setup": "node src/pending-setup.js",
+    "pending:cleanup": "node src/pending-debt-cleanup.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
@@ -25,10 +27,12 @@
   },
   "overrides": {
     "israeli-bank-scrapers": {
-      "puppeteer": "25.9.0"
-    }
+      "puppeteer": "25.16.0"
+    },
+    "body-parser": "1.20.9",
+    "zod": "4.6.6"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.22.2"
   }
 }

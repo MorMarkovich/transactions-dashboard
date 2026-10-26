@@ -1,0 +1,7 @@
+version: 1
+name: issuer
+default: default.js
+interceptRequests: true
+scenarios:
+  - name: default
+    path: default.js

@@ -1,0 +1,7 @@
+{
+  "name": "pinkas-pending-db-validation",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node verify.mjs" },
+  "dependencies": { "pg": "8.23.1" }
+}
