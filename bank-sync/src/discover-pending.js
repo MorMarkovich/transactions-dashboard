@@ -12,9 +12,15 @@
 //   a request listener, and only to the verified service-handler path
 //   (/services/ProxyRequestHandler.ashx on *.isracard.co.il).
 // - This script never types, reads, or stores credentials, and never
-//   performs a bank login. Credential requests are never inspected: only
-//   service-handler requests are looked at, and auth-family endpoint names
-//   (login/otp/validate/...) are excluded even there.
+//   performs a bank login. No request listener exists during login (Phase 1),
+//   so login traffic is never observed. In Phase 2, non-service-handler
+//   requests are dropped by URL before their bodies are touched; for
+//   service-handler requests the reqName token is extracted in memory and
+//   nothing else is retained (bodies are scanned transiently, never kept).
+//   Auth-family endpoint names (login/otp/validate/...) are excluded even so.
+//   If an auth call re-uses the service path mid-session (e.g. token
+//   refresh), its body would be scanned transiently like any other - only
+//   the endpoint name can be retained, never the credentials in it.
 // - Output is ONLY endpoint-shaped service names + counts. No URLs with
 //   parameters, no headers, no cookies, no request/response bodies, no
 //   amounts, no payees. Numeric-only and secret-shaped values are rejected.
@@ -118,7 +124,11 @@ export class ReqNameRecorder {
     if (!isServiceEndpoint(url)) return
     if (this.#requestsSeen >= MAX_REQUESTS) { this.#truncated = true; return }
     this.#requestsSeen++
-    for (const n of extractReqNamesFromUrl(url)) { if (!this.#add(n)) break }
+    // Prefer the URL's reqName. Only when the URL carries none do we look at
+    // the body - and the body is scanned for the token in memory and discarded.
+    const fromUrl = extractReqNamesFromUrl(url)
+    for (const n of fromUrl) { if (!this.#add(n)) break }
+    if (fromUrl.length > 0) return
     for (const n of extractReqNamesFromPostData(url, postData)) { if (!this.#add(n)) break }
   }
 
@@ -194,7 +204,12 @@ async function main() {
     if (windowClosed) { await cleanup(); console.log('RESULT: WINDOW_CLOSED_BEFORE_LOGIN_CONFIRMED'); process.exit(2) }
 
     page.on('request', (req) => {
-      try { recorder.handleRequest({ url: req.url(), postData: req.postData() }) } catch { /* ignore single-request errors */ }
+      try {
+        // Gate on the URL first: req.postData() is never invoked for
+        // non-service-handler requests, so their bodies are never read.
+        if (!isServiceEndpoint(req.url())) return
+        recorder.handleRequest({ url: req.url(), postData: req.postData() })
+      } catch { /* ignore single-request errors */ }
     })
     console.log('PHASE 2: now open the transactions view (including the pending/approved section).')
     console.log('When it is on screen, come back here and press Enter.')
