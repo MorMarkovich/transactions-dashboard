@@ -65,19 +65,20 @@ export function categoryColor(name: string): string {
 // one stacked chart). Canonical names always keep their slot. Unknown names
 // keep their hash slot when free, otherwise walk forward to the next slot
 // unused within this set - two unknown names never share a color, and an
-// unknown name never takes a canonical sibling's slot. Assignment follows
-// input order, so every surface rendering the same ordered list agrees.
+// unknown name never takes a canonical sibling's slot. Unknown names are
+// assigned in sorted order, so the mapping depends only on the SET of names:
+// every surface rendering the same names agrees, regardless of input order.
 export function categoryColorMap(names: readonly string[]): Record<string, string> {
   const used = new Set<number>()
-  for (const name of names) {
-    if (known[name] !== undefined) used.add(known[name])
-  }
   const out: Record<string, string> = {}
   for (const name of names) {
     if (known[name] !== undefined) {
+      used.add(known[name])
       out[name] = `var(--category-${known[name]}, ${colors[known[name]]})`
-      continue
     }
+  }
+  const unknowns = [...new Set(names.filter((n) => known[n] === undefined))].sort()
+  for (const name of unknowns) {
     let idx = hashSlot(name)
     while (used.has(idx)) idx = (idx + 1) % colors.length
     used.add(idx)
