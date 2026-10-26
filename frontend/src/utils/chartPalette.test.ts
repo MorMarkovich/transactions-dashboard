@@ -113,4 +113,29 @@ describe('custom (unknown) category colors - extended pastel space', () => {
     expect(categoryColor('ביטוח')).not.toContain('var(--category-')
     expect(categoryColor('הוצאות שוטפות')).toContain('var(--category-')
   })
+
+  it('accepts an explicit theme that overrides the DOM attribute', () => {
+    const root = document.documentElement
+    try {
+      root.dataset.theme = 'dark'
+      expect(categoryColor('ביטוח', 'light')).not.toBe(categoryColor('ביטוח', 'dark'))
+      expect(categoryColor('ביטוח', 'dark')).toBe(categoryColor('ביטוח'))
+      root.dataset.theme = 'light'
+      expect(categoryColor('ביטוח', 'light')).toBe(categoryColor('ביטוח'))
+      expect(categoryColor('ביטוח', 'dark')).not.toBe(categoryColor('ביטוח'))
+      // Canonical names ignore the theme parameter entirely (CSS vars adapt).
+      expect(categoryColor('אוכל', 'light')).toBe(categoryColor('אוכל', 'dark'))
+    } finally {
+      root.dataset.theme = 'dark'
+    }
+  })
+
+  it('resolves the colliding pair distinctly in BOTH explicit themes', () => {
+    for (const t of ['light', 'dark'] as const) {
+      const a = categoryColor('ביטוח', t)
+      const b = categoryColor('מנויים ושירותים', t)
+      expect(a).not.toBe(b)
+      expect(dist(a, b)).toBeGreaterThan(40)
+    }
+  })
 })
