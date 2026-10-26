@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import React from 'react'
 import { render, screen } from '@testing-library/react'
-import LineChart from './LineChart'
+import LineChart, { sparseTimeTicks } from './LineChart'
 
 const captured = vi.hoisted(() => ({ area: {} as Record<string, unknown>, tooltip: {} as Record<string, unknown>, chart: {} as Record<string, unknown>, xaxis: {} as Record<string, unknown> }))
 vi.mock('../../hooks/useMediaQuery', () => ({ default: () => false }))
@@ -62,6 +62,19 @@ describe('LineChart', () => {
     render(<LineChart data={[{ label: 'סתם תווית', value: 100 }]} />)
     expect(captured.xaxis.dataKey).toBe('label')
     expect(captured.xaxis.type).not.toBe('number')
+  })
+
+  it('sparseTimeTicks keeps a collision-free gap and both ends', () => {
+    const d = (day: number, month: number) => Date.UTC(2026, month - 1, day)
+    const dense = [1, 3, 4, 9, 11, 13, 16, 20, 21, 27, 29].map((x) => d(x, 6))
+    const sparseRest = [d(30, 7), d(8, 10), d(19, 10), d(26, 10)]
+    const ticks = sparseTimeTicks([...dense, ...sparseRest], 7)
+    expect(ticks[0]).toBe(d(1, 6))
+    expect(ticks[ticks.length - 1]).toBe(d(26, 10))
+    expect(ticks.length).toBeLessThanOrEqual(7)
+    for (let i = 1; i < ticks.length; i++) {
+      expect(ticks[i] - ticks[i - 1]).toBeGreaterThanOrEqual(18 * 24 * 60 * 60 * 1000)
+    }
   })
 
   it('tooltip labels the series and preserves negative sign', () => {
