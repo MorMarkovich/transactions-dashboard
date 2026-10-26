@@ -51,12 +51,41 @@ const known: Record<string, number> = {
   'הוראות קבע': 18,
   'אחר': 19,
 }
-function hashSlot(name: string): number {
+export function categoryColor(name: string): string {
+  const knownIdx = known[name]
+  if (knownIdx !== undefined) return `var(--category-${knownIdx}, ${colors[knownIdx]})`
+  return customColor(name)
+}
+
+// Unknown names (custom categories, subcategory names) get a color from an
+// EXTENDED custom space, kept visually separate from the pinned canonical
+// palette in BOTH themes: pastel (l=84%) in dark mode where canonicals are
+// vivid mid-tones, muted deep (l=38%) in light mode where canonicals are
+// saturated mid-darks. Pure deterministic function of the NAME plus the
+// active theme - same color in every view, subset, ordering and session,
+// with no registry and no persistence. Distinctness among custom names is
+// best-effort by golden-angle hue dispersion, not guaranteed for arbitrary
+// name sets; the known colliding pair from production
+// (ביטוח / מנויים ושירותים) is covered by tests.
+function customColor(name: string): string {
+  const h = hashSlotRaw(name)
+  const hue = (h * 137.508) % 360
+  const isLight = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'
+  return isLight ? hslToHex(hue, 45, 38) : hslToHex(hue, 40, 84)
+}
+
+function hashSlotRaw(name: string): number {
   let hash = 0
   for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) >>> 0
-  return hash % colors.length
+  return hash
 }
-export function categoryColor(name: string): string {
-  const idx = known[name] ?? hashSlot(name)
-  return `var(--category-${idx}, ${colors[idx]})`
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100
+  l /= 100
+  const k = (n: number) => (n + h / 30) % 12
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))
+  const t = (x: number) => Math.round(255 * x).toString(16).padStart(2, '0')
+  return (`#${t(f(0))}${t(f(8))}${t(f(4))}`).toUpperCase()
 }

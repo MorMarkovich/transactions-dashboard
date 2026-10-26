@@ -40,14 +40,6 @@ describe('canonical category palette', () => {
     expect(slot('יתר הקטגוריות')).toBe(8)
   })
 
-  it('unknown names fall back deterministically into palette range', () => {
-    const a = categoryColor('קטגוריה חדשה לגמרי')
-    expect(a).toBe(categoryColor('קטגוריה חדשה לגמרי'))
-    const s = /var\(--category-(\d+)/.exec(a)
-    expect(Number(s![1])).toBeGreaterThanOrEqual(0)
-    expect(Number(s![1])).toBeLessThan(20)
-  })
-
   it('colliding categories in the auditor report are now distinct', () => {
     const pairs: [string, string][] = [
       ['הוצאות שוטפות', 'פארם'],
@@ -56,5 +48,69 @@ describe('canonical category palette', () => {
       ['בילויים', 'טכנולוגיה'],
     ]
     for (const [a, b] of pairs) expect(slot(a), `${a} vs ${b}`).not.toBe(slot(b))
+  })
+})
+
+describe('custom (unknown) category colors - extended pastel space', () => {
+  const PALETTE = [
+    '#50F1CD', '#519AFB', '#DD73D5', '#FFB773', '#D5E36E', '#F77995', '#79A5BC',
+    '#B2ADEE', '#7891A3', '#3DD68C', '#FFD43B', '#FF6B6B', '#4CC9F0', '#9775FA',
+    '#E8590C', '#F783AC', '#15AABF', '#E9C46A', '#8D99AE', '#94A3B8',
+  ]
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const dist = (a: string, b: string) => {
+    const [x1, y1, z1] = rgb(a), [x2, y2, z2] = rgb(b)
+    return Math.hypot(x1 - x2, y1 - y2, z1 - z2)
+  }
+
+  it('is a pure function of the name: stable across views, subsets, order and reloads', () => {
+    for (const n of ['ביטוח', 'מנויים ושירותים', 'קטגוריה חדשה לגמרי']) {
+      expect(categoryColor(n)).toBe(categoryColor(n))
+    }
+  })
+
+  it('resolves the production-colliding pair ביטוח / מנויים ושירותים to clearly distinct colors', () => {
+    const a = categoryColor('ביטוח'), b = categoryColor('מנויים ושירותים')
+    expect(a).not.toBe(b)
+    expect(dist(a, b)).toBeGreaterThan(40)
+  })
+
+  it('never lands on or near any canonical palette color (unknown vs canonical co-render)', () => {
+    for (const n of ['ביטוח', 'מנויים ושירותים', 'סטרימינג', 'שכר דירה', 'קטגוריה חדשה לגמרי']) {
+      const c = categoryColor(n)
+      expect(c).toMatch(/^#[0-9A-F]{6}$/)
+      for (const p of PALETTE) {
+        expect(dist(c, p), `${n} vs ${p}`).toBeGreaterThan(40)
+      }
+    }
+  })
+
+  it('adapts to the light theme: deeper muted band, pair still distinct, off the light canonical palette', () => {
+    const root = document.documentElement
+    root.dataset.theme = 'light'
+    try {
+      const a = categoryColor('ביטוח'), b = categoryColor('מנויים ושירותים')
+      expect(a).not.toBe(b)
+      expect(dist(a, b)).toBeGreaterThan(40)
+      // Theme-adaptive: same name, different band per theme.
+      expect(a).not.toBe(categoryColor.bind(null) && (() => { root.dataset.theme = 'dark'; const d = categoryColor('ביטוח'); root.dataset.theme = 'light'; return d })())
+      const LIGHT_PALETTE = [
+        '#087C66', '#236AC2', '#A23B99', '#A35817', '#727C19', '#BB3553', '#426D85',
+        '#7160BD', '#506D80', '#1A9E63', '#A37C06', '#E03131', '#0C8599', '#7048E8',
+        '#D9480F', '#E64980', '#0B7285', '#A08428', '#5F6B7A', '#6C7A89',
+      ]
+      // Never an exact/near duplicate of a light canonical color (floor locks out identity).
+      for (const n of ['ביטוח', 'מנויים ושירותים', 'סטרימינג', 'שכר דירה', 'קטגוריה חדשה לגמרי']) {
+        const c = categoryColor(n)
+        for (const p of LIGHT_PALETTE) expect(dist(c, p), `${n} vs ${p}`).toBeGreaterThan(10)
+      }
+    } finally {
+      root.dataset.theme = 'dark'
+    }
+  })
+
+  it('does not use the canonical var(--category-N) slots', () => {
+    expect(categoryColor('ביטוח')).not.toContain('var(--category-')
+    expect(categoryColor('הוצאות שוטפות')).toContain('var(--category-')
   })
 })
