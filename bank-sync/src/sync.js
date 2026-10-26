@@ -158,7 +158,13 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  return { success: true, fresh, added, enriched, shifted, total: merged.length, byProvider, errors }
+  // Truthful outcome: a sync only counts as successful when at least one
+  // account actually scraped. All-accounts-failed used to report
+  // success: true (e.g. a broken Chrome path) and look healthy.
+  const scraped = Object.keys(byProvider).length
+  const failed = Object.keys(errors).length
+  const success = scraped > 0 || scraped + failed === 0
+  return { success, fresh, added, enriched, shifted, total: merged.length, byProvider, failed, errors }
 }
 
 // Token check helper shared with the server (constant-time compare).
@@ -174,11 +180,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const fresh = process.argv.includes('--fresh')
   runSync((m) => console.log('•', m), { fresh })
     .then((r) => {
-      console.log('\n✓ Sync complete:', JSON.stringify(r, null, 2))
+      console.log(`\n${r.success ? '✓' : '✗'} Sync complete:`, JSON.stringify(r, null, 2))
       if (config.keepBrowserOpen) {
         console.log('\n(KEEP_BROWSER_OPEN=true — the browser window is left open for inspection. Press Ctrl+C here when done.)')
       } else {
-        process.exit(0)
+        process.exit(r.success ? 0 : 1)
       }
     })
     .catch((e) => {
