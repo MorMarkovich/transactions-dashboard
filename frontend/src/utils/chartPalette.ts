@@ -58,17 +58,20 @@ export function categoryColor(name: string): string {
 }
 
 // Unknown names (custom categories, subcategory names) get a color from an
-// EXTENDED custom space, separate from the 20 pinned canonical slots: a muted
-// pastel band (saturation ~40%, lightness ~84%) the vivid canonical palette
-// never occupies. Pure deterministic function of the NAME - same color in
-// every view, subset, ordering and session, with no registry and no
-// persistence. Distinctness among custom names is best-effort by golden-angle
-// hue dispersion, not guaranteed for arbitrary name sets; the known colliding
-// pair from production (ביטוח / מנויים ושירותים) is covered by tests.
+// EXTENDED custom space, kept visually separate from the pinned canonical
+// palette in BOTH themes: pastel (l=84%) in dark mode where canonicals are
+// vivid mid-tones, muted deep (l=38%) in light mode where canonicals are
+// saturated mid-darks. Pure deterministic function of the NAME plus the
+// active theme - same color in every view, subset, ordering and session,
+// with no registry and no persistence. Distinctness among custom names is
+// best-effort by golden-angle hue dispersion, not guaranteed for arbitrary
+// name sets; the known colliding pair from production
+// (ביטוח / מנויים ושירותים) is covered by tests.
 function customColor(name: string): string {
   const h = hashSlotRaw(name)
   const hue = (h * 137.508) % 360
-  return hslToHex(hue, 40, 84)
+  const isLight = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'
+  return isLight ? hslToHex(hue, 45, 38) : hslToHex(hue, 40, 84)
 }
 
 function hashSlotRaw(name: string): number {
