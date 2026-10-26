@@ -22,7 +22,7 @@ const KNOWN = [
   'טיסות ותיירות', 'הוצאות שוטפות', 'תרופות וטיפולים', 'פארם', 'בילויים', 'אוכל',
   'קניות', 'טיפוח', 'חוגים וספורט', 'אירועים ומתנות', 'טכנולוגיה', 'הוצאות משתנות',
   'סושי', 'העברת כספים', 'העברה להשקעות', 'משיכת מזומן', 'הוראות קבע', 'שונות',
-  'יתר הקטגוריות', 'אחר', 'סטרימינג',
+  'יתר הקטגוריות', 'אחר', 'סטרימינג', 'פרילנס',
 ]
 
 function slot(name: string): number {
@@ -166,6 +166,12 @@ describe('repinned slots (collision fixes)', () => {
     expect(dist(fallbackHex('סטרימינג'), categoryColor('דלק', 'dark'))).toBeGreaterThan(100)
     // stability: pinned mapping is a pure function, identical on every call
     expect(categoryColor('סטרימינג')).toBe(categoryColor('סטרימינג'))
+  })
+
+  it('pins פרילנס off its hash collision with משכורת (income sources stay distinguishable)', () => {
+    expect(categoryColor('פרילנס')).toContain('var(--category-21')
+    expect(categoryColor('משכורת')).not.toContain('var(--category-')
+    expect(dist(fallbackHex('פרילנס'), categoryColor('משכורת', 'dark'))).toBeGreaterThan(70)
   })
 
   it('breaks the slate cluster: every canonical dark pair is at least 24 RGB apart', () => {

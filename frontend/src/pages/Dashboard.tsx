@@ -78,13 +78,6 @@ function formatMonthLabel(mmYYYY: string): string {
   return `${HEBREW_MONTHS[mm] ?? mm} ${yyyy}`
 }
 
-// Legend colors for the income-sources list — same order as DonutChart's
-// palette so the dots match the pie slices.
-const INCOME_COLORS = [
-  '#818cf8', '#34d399', '#f87171', '#fbbf24', '#38bdf8',
-  '#a78bfa', '#f6ad55', '#68d391', '#fc8181', '#63b3ed', '#94a3b8',
-]
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -1691,9 +1684,9 @@ export default function Dashboard() {
               padding: 'var(--space-5)',
             }}
           >
-            {incomeSources.sources.map((s, i) => {
+            {incomeSources.sources.map((s) => {
               const pct = incomeSources.total > 0 ? (s.value / incomeSources.total) * 100 : 0
-              const color = INCOME_COLORS[i % INCOME_COLORS.length]
+              const color = categoryColor(s.name)
               return (
                 <div key={s.name}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '6px', minWidth: 0 }}>
