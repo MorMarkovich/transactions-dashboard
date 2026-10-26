@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { categoryColor } from './chartPalette'
+import { categoryColor, categoryColorMap } from './chartPalette'
 
 // The full known taxonomy (mirrors backend/app/core/constants.py) + aggregation buckets.
 const KNOWN = [
@@ -56,5 +56,29 @@ describe('canonical category palette', () => {
       ['בילויים', 'טכנולוגיה'],
     ]
     for (const [a, b] of pairs) expect(slot(a), `${a} vs ${b}`).not.toBe(slot(b))
+  })
+})
+
+describe('categoryColorMap - collision-resolved set colors', () => {
+  it('gives two unknown names hashing to the same slot DISTINCT colors (ביטוח / מנויים ושירותים)', () => {
+    const map = categoryColorMap(['ביטוח', 'מנויים ושירותים'])
+    expect(map['ביטוח']).not.toBe(map['מנויים ושירותים'])
+  })
+
+  it('never moves a canonical category, even when an unknown name hashes onto its slot', () => {
+    const map = categoryColorMap(['פארם', 'ביטוח', 'מנויים ושירותים']) // פארם owns slot 10
+    expect(map['פארם']).toBe(categoryColor('פארם'))
+    expect(new Set([map['פארם'], map['ביטוח'], map['מנויים ושירותים']]).size).toBe(3)
+  })
+
+  it('is deterministic for the same ordered list and agrees per surface', () => {
+    const names = ['ביטוח', 'מנויים ושירותים', 'תרופות', 'וטרינר']
+    expect(categoryColorMap(names)).toEqual(categoryColorMap(names))
+  })
+
+  it('leaves canonical-only sets identical to categoryColor', () => {
+    const names = ['אוכל', 'בילויים', 'טכנולוגיה']
+    const map = categoryColorMap(names)
+    for (const n of names) expect(map[n]).toBe(categoryColor(n))
   })
 })
