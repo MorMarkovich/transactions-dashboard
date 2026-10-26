@@ -153,8 +153,8 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
           axisLine={{ stroke: 'var(--border)' }}
           angle={needsRotation ? -35 : 0}
           textAnchor={needsRotation ? 'end' : 'middle'}
-          tickMargin={needsRotation ? 10 : 8}
-          height={needsRotation ? (isCompact ? 58 : 70) : 30}
+          tickMargin={needsRotation ? 18 : 8}
+          height={needsRotation ? (isCompact ? 66 : 78) : 30}
           interval={needsRotation ? 0 : 'preserveStartEnd'}
           padding={{ left: 6, right: isCompact ? 14 : 6 }}
         />
