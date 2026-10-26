@@ -13,7 +13,8 @@ const colors = [
   '#F77995', // 5  rose
   '#79A5BC', // 6  steel blue
   '#B2ADEE', // 7  lavender
-  '#7891A3', // 8  gray-blue (aggregation bucket)
+  '#99BA78', // 8  olive (aggregation bucket) - was #7891A3 gray-blue, which sat in the slate cluster with slots 6/18/19 (min RGB dist 15-27)
+
   '#3DD68C', // 9  green
   '#FFD43B', // 10 yellow
   '#FF6B6B', // 11 red
@@ -24,7 +25,8 @@ const colors = [
   '#15AABF', // 16 deep cyan
   '#E9C46A', // 17 sand
   '#8D99AE', // 18 slate
-  '#94A3B8', // 19 light slate (other bucket)
+  '#BB8181', // 19 warm taupe (other bucket) - was #94A3B8 light slate, which collided with slot 18 (RGB dist 16/441)
+  '#6742D7', // 20 violet - pinned for סטרימינג: the golden-angle hash put it 18/441 from דלק in dark
 ]
 // Slot per known category. Mirrors backend/app/core/constants.py taxonomy
 // (CATEGORY_ICONS) plus the aggregation buckets. Keep in sync when the
@@ -50,6 +52,8 @@ const known: Record<string, number> = {
   'העברה להשקעות': 17,
   'הוראות קבע': 18,
   'אחר': 19,
+  // Pinned custom category: hash-slot collision with דלק (dark dist 18/441).
+  'סטרימינג': 20,
 }
 export type ChartTheme = 'light' | 'dark'
 
