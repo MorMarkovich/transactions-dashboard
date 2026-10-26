@@ -4,12 +4,65 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 3 * * 1'
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      bank-sync: ${{ steps.filter.outputs.bank-sync }}
+      backend: ${{ steps.filter.outputs.backend }}
+      container: ${{ steps.filter.outputs.container }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            bank-sync:
+              - 'bank-sync/**'
+            backend:
+              - 'backend/**'
+            container:
+              - 'Dockerfile'
+              - 'render.yaml'
+              - 'backend/**'
+              - 'frontend/**'
+            e2e:
+              - 'e2e/**'
+              - 'frontend/**'
+              - 'backend/**'
+            workflows:
+              - '.github/workflows/**'
+
+  workflow-lint:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pyyaml
+      - run: python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]; print('workflow YAML OK')"
+
   frontend:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -28,6 +81,8 @@ jobs:
       - run: npm run build
 
   e2e:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:54321
@@ -55,6 +110,8 @@ jobs:
           retention-days: 7
 
   backend:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,12 +128,16 @@ jobs:
       - run: pytest -q
 
   container:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.container == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker build --tag transactions-dashboard:ci .
 
   bank-sync:
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.bank-sync == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
