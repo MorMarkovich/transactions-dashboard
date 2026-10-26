@@ -5,7 +5,7 @@ import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import EmptyState from '../components/common/EmptyState'
-import { categoryColor } from '../utils/chartPalette'
+import { useCategoryColor } from '../hooks/useCategoryColor'
 import BarChart from '../components/charts/BarChart'
 import { transactionsApi } from '../services/api'
 import type { IncomeAnalysisData, IncomeTransactionDetail } from '../services/types'
@@ -13,6 +13,7 @@ import { formatCurrency, formatDate, hebOwner } from '../utils/formatting'
 
 export default function Income() {
   const [params] = useSearchParams(); const sessionId = params.get('session_id')
+  const categoryColor = useCategoryColor()
   const [data,setData]=useState<IncomeAnalysisData|null>(null); const [loading,setLoading]=useState(false)
   const [month,setMonth]=useState(''); const [source,setSource]=useState(''); const [category,setCategory]=useState(''); const [search,setSearch]=useState('')
   const [selected,setSelected]=useState<IncomeTransactionDetail|null>(null)
