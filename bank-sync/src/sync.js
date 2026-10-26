@@ -12,6 +12,7 @@ import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { buildRuleMap } from './categorize.js'
 import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+import { computeSyncOutcome, exitCodeForResult } from './outcome.js'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -158,12 +159,7 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  // Truthful outcome: a sync only counts as successful when at least one
-  // account actually scraped. All-accounts-failed used to report
-  // success: true (e.g. a broken Chrome path) and look healthy.
-  const scraped = Object.keys(byProvider).length
-  const failed = Object.keys(errors).length
-  const success = scraped > 0 || scraped + failed === 0
+  const { success, failed } = computeSyncOutcome(byProvider, errors)
   return { success, fresh, added, enriched, shifted, total: merged.length, byProvider, failed, errors }
 }
 
@@ -184,7 +180,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       if (config.keepBrowserOpen) {
         console.log('\n(KEEP_BROWSER_OPEN=true — the browser window is left open for inspection. Press Ctrl+C here when done.)')
       } else {
-        process.exit(r.success ? 0 : 1)
+        process.exit(exitCodeForResult(r))
       }
     })
     .catch((e) => {
