@@ -1,6 +1,6 @@
-import { categoryColor } from '../../utils/chartPalette'
+import { categoryColorMap } from '../../utils/chartPalette'
 import { ltrIsolate } from '../../utils/formatting'
-import React, { useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import {
   PieChart,
   Pie,
@@ -112,6 +112,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   total,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const colorMap = useMemo(() => categoryColorMap(data.map((d) => d.name)), [data])
   const tooltipContent = useCallback(
     (props: { active?: boolean; payload?: PayloadEntry[] }) => (
       <ChartTooltip {...props} total={total} />
@@ -145,7 +146,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
             labelLine={false}
           >
             {data.map((entry, idx) => (
-              <Cell key={idx} fill={categoryColor(entry.name)} stroke="var(--bg-card)" strokeWidth={1} />
+              <Cell key={idx} fill={colorMap[entry.name]} stroke="var(--bg-card)" strokeWidth={1} />
             ))}
           </Pie>
 
