@@ -61,28 +61,50 @@ export function categoryColor(name: string): string {
   return `var(--category-${idx}, ${colors[idx]})`
 }
 
-// Collision-resolved colors for a set of names rendered together (one donut,
-// one stacked chart). Canonical names always keep their slot. Unknown names
-// keep their hash slot when free, otherwise walk forward to the next slot
-// unused within this set - two unknown names never share a color, and an
-// unknown name never takes a canonical sibling's slot. Unknown names are
-// assigned in sorted order, so the mapping depends only on the SET of names:
-// every surface rendering the same names agrees, regardless of input order.
+// Collision-resolved colors for names rendered together (donut, legend,
+// stacked chart, table). Canonical names always keep their pinned slot.
+// Unknown names (custom categories, subcategory names) resolve once and are
+// remembered in a session registry: the first resolution wins and every later
+// view reuses it, so a capped pie, the uncapped stacked chart and the table
+// all show the SAME color for the same unknown name, regardless of which
+// subset each view renders or the order the views are visited. Registrations
+// are unique among unknowns while slots last, so two unknown names never
+// share a color in any view. The palette has exactly as many slots as
+// canonical pins, so an unknown necessarily shares a slot with some canonical
+// category; if that canonical co-renders in the same view, the unknown is
+// re-walked for THAT view only (registry unchanged) to keep the view
+// distinct - the one case where a name can differ between views.
+const registry = new Map<string, string>()
+const slotOf = (css: string): number => Number(/category-(\d+)/.exec(css)![1])
+
 export function categoryColorMap(names: readonly string[]): Record<string, string> {
-  const used = new Set<number>()
   const out: Record<string, string> = {}
+  const usedInView = new Set<number>()
   for (const name of names) {
     if (known[name] !== undefined) {
-      used.add(known[name])
+      usedInView.add(known[name])
       out[name] = `var(--category-${known[name]}, ${colors[known[name]]})`
     }
   }
+  const usedGlobal = new Set<number>([...registry.values()].map(slotOf))
   const unknowns = [...new Set(names.filter((n) => known[n] === undefined))].sort()
   for (const name of unknowns) {
-    let idx = hashSlot(name)
-    while (used.has(idx)) idx = (idx + 1) % colors.length
-    used.add(idx)
-    out[name] = `var(--category-${idx}, ${colors[idx]})`
+    const registered = registry.get(name)
+    let idx = registered !== undefined ? slotOf(registered) : hashSlot(name)
+    let guard = 0
+    while ((usedInView.has(idx) || (registered === undefined && usedGlobal.has(idx))) && guard < colors.length) {
+      idx = (idx + 1) % colors.length
+      guard++
+    }
+    // guard exhausted: every slot taken in this view - accept the collision,
+    // the visible label disambiguates (same fallback as before this fix).
+    const css = `var(--category-${idx}, ${colors[idx]})`
+    if (registered === undefined) {
+      registry.set(name, css)
+      usedGlobal.add(idx)
+    }
+    usedInView.add(idx)
+    out[name] = css
   }
   return out
 }
