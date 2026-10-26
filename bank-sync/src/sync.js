@@ -12,6 +12,7 @@ import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { buildRuleMap } from './categorize.js'
 import { applyIncomeMonthShift } from './income.js'
 import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+import { computeSyncOutcome, exitCodeForResult } from './outcome.js'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -158,7 +159,8 @@ export async function runSync(log = () => {}, { fresh = false } = {}) {
     log('אין שינויים — לא נשמר snapshot חדש.')
   }
 
-  return { success: true, fresh, added, enriched, shifted, total: merged.length, byProvider, errors }
+  const { success, failed } = computeSyncOutcome(byProvider, errors)
+  return { success, fresh, added, enriched, shifted, total: merged.length, byProvider, failed, errors }
 }
 
 // Token check helper shared with the server (constant-time compare).
@@ -174,11 +176,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const fresh = process.argv.includes('--fresh')
   runSync((m) => console.log('•', m), { fresh })
     .then((r) => {
-      console.log('\n✓ Sync complete:', JSON.stringify(r, null, 2))
+      console.log(`\n${r.success ? '✓' : '✗'} Sync complete:`, JSON.stringify(r, null, 2))
       if (config.keepBrowserOpen) {
         console.log('\n(KEEP_BROWSER_OPEN=true — the browser window is left open for inspection. Press Ctrl+C here when done.)')
       } else {
-        process.exit(0)
+        process.exit(exitCodeForResult(r))
       }
     })
     .catch((e) => {
