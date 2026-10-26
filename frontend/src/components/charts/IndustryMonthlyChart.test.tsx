@@ -49,7 +49,7 @@ describe('IndustryMonthlyChart category colors', () => {
       'בילויים', 'קניות', 'טיפוח', 'אירועים ומתנות', 'טכנולוגיה', 'סושי',
       'העברה להשקעות', 'הוראות קבע',
     ]
-    const colors = names.map(categoryColor)
+    const colors = names.map((n) => categoryColor(n))
     expect(new Set(colors).size).toBe(names.length)
   })
 })
