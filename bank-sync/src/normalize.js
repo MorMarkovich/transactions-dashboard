@@ -82,6 +82,16 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
     '_owner': detectOwner(baseDesc, acct.owner, ownerKeywords),
   }
 
+  // Provider-supplied status + stable identifier (Asmachta / operation
+  // number), kept only when the scraper actually supplied them. A missing
+  // status is NOT proof the transaction posted, so no default is invented.
+  if (raw.status === 'pending' || raw.status === 'completed') {
+    txn._status = raw.status
+  }
+  if (raw.identifier !== undefined && raw.identifier !== null && raw.identifier !== '') {
+    txn._identifier = String(raw.identifier)
+  }
+
   // Billing date — credit cards only.
   if (!bankRow && raw.processedDate) {
     const pd = new Date(raw.processedDate)
@@ -107,9 +117,39 @@ export function txnKey(t) {
 export function mergeSnapshots(existing, fresh) {
   const merged = [...(existing || [])]
   const byKey = new Map(merged.map((t) => [txnKey(t), t]))
+  // Authoritative identity index: provider + issuer identifier (Asmachta /
+  // operation number). Reconciliation keys on this, not the fuzzy
+  // date|amount|description key, which can't tell a reposted charge from two
+  // legitimate identical purchases.
+  const identityOf = (t) => (t._provider && t._identifier ? `${t._provider}|${t._identifier}` : null)
+  const byIdentity = new Map()
+  for (const t of merged) {
+    const id = identityOf(t)
+    if (id && !byIdentity.has(id)) byIdentity.set(id, t)
+  }
   let added = 0
   let enriched = 0
   for (const t of fresh) {
+    const id = identityOf(t)
+    if (id && byIdentity.has(id)) {
+      // Same provider-issued identifier = same transaction, by definition.
+      // Pending -> posted flip only when the provider now marks it completed;
+      // an absent fresh status proves nothing, so ambiguity is retained.
+      const match = byIdentity.get(id)
+      let changed = false
+      if (match._status === 'pending' && t._status === 'completed') {
+        match._status = 'completed'
+        changed = true
+      }
+      for (const [field, val] of Object.entries(t)) {
+        if (match[field] === undefined || match[field] === null) {
+          match[field] = val
+          changed = true
+        }
+      }
+      if (changed) enriched++
+      continue
+    }
     const k = txnKey(t)
     const existingRow = byKey.get(k)
     if (existingRow) {
@@ -126,6 +166,7 @@ export function mergeSnapshots(existing, fresh) {
       continue
     }
     byKey.set(k, t)
+    if (id) byIdentity.set(id, t)
     merged.push(t)
     added++
   }
