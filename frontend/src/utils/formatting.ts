@@ -76,3 +76,26 @@ export function truncateText(text: string, maxLength: number): string {
 export function hebOwner(text: string | null | undefined): string {
   return (text ?? '').replace(/\bjoint\b/gi, 'משותף')
 }
+
+/** Round a chart axis maximum up to a "nice" 1/1.2/1.5/2/2.5/3/4/5/6/8/10 × 10^n value. */
+export function niceCeil(v: number): number {
+  if (!Number.isFinite(v) || v <= 0) return 1
+  const p = Math.pow(10, Math.floor(Math.log10(v)))
+  const d = v / p
+  for (const step of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) {
+    if (d <= step) return step * p
+  }
+  return 10 * p
+}
+
+/** Numeric key for an 'MM/YYYY' month label; null when it does not parse. */
+export function monthKeyNum(month: string): number | null {
+  const m = /^(0[1-9]|1[0-2])\/(\d{4})$/.exec(month)
+  if (!m) return null
+  return Number(m[2]) * 12 + Number(m[1])
+}
+
+/** Current calendar month as 'MM/YYYY' in the user's timezone. */
+export function currentMonthKey(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-GB', { month: '2-digit', year: 'numeric', timeZone: 'Asia/Jerusalem' }).format(now)
+}
