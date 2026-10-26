@@ -223,6 +223,15 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                 value={formatDate(transaction.תאריך)}
               />
 
+              {/* Billing date (when the card issuer supplies one) */}
+              {transaction.תאריך_חיוב && (
+                <DetailRow
+                  icon={<Calendar size={16} />}
+                  label="תאריך חיוב"
+                  value={formatDate(transaction.תאריך_חיוב)}
+                />
+              )}
+
               {/* Category */}
               {transaction.קטגוריה && (
                 <DetailRow
