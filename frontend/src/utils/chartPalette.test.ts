@@ -85,6 +85,30 @@ describe('custom (unknown) category colors - extended pastel space', () => {
     }
   })
 
+  it('adapts to the light theme: deeper muted band, pair still distinct, off the light canonical palette', () => {
+    const root = document.documentElement
+    root.dataset.theme = 'light'
+    try {
+      const a = categoryColor('ביטוח'), b = categoryColor('מנויים ושירותים')
+      expect(a).not.toBe(b)
+      expect(dist(a, b)).toBeGreaterThan(40)
+      // Theme-adaptive: same name, different band per theme.
+      expect(a).not.toBe(categoryColor.bind(null) && (() => { root.dataset.theme = 'dark'; const d = categoryColor('ביטוח'); root.dataset.theme = 'light'; return d })())
+      const LIGHT_PALETTE = [
+        '#087C66', '#236AC2', '#A23B99', '#A35817', '#727C19', '#BB3553', '#426D85',
+        '#7160BD', '#506D80', '#1A9E63', '#A37C06', '#E03131', '#0C8599', '#7048E8',
+        '#D9480F', '#E64980', '#0B7285', '#A08428', '#5F6B7A', '#6C7A89',
+      ]
+      // Never an exact/near duplicate of a light canonical color (floor locks out identity).
+      for (const n of ['ביטוח', 'מנויים ושירותים', 'סטרימינג', 'שכר דירה', 'קטגוריה חדשה לגמרי']) {
+        const c = categoryColor(n)
+        for (const p of LIGHT_PALETTE) expect(dist(c, p), `${n} vs ${p}`).toBeGreaterThan(10)
+      }
+    } finally {
+      root.dataset.theme = 'dark'
+    }
+  })
+
   it('does not use the canonical var(--category-N) slots', () => {
     expect(categoryColor('ביטוח')).not.toContain('var(--category-')
     expect(categoryColor('הוצאות שוטפות')).toContain('var(--category-')
