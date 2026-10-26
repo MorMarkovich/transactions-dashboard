@@ -267,6 +267,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                   maxHeight: 'min(320px, 45dvh)',
                   overflowY: 'auto',
                   padding: '8px',
+                  // Keep rows clear of the overlay scrollbar (drawn on the
+                  // left edge in RTL).
+                  paddingInlineEnd: '14px',
+                  scrollbarGutter: 'stable',
                 }}
               >
                 {filteredCommands.length === 0 ? (
