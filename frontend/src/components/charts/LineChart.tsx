@@ -237,6 +237,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
               direction:'ltr', unicodeBidi:'isolate',
             }}
             tickLine={false}
+            tickMargin={8}
             axisLine={{ stroke: 'var(--border)' }}
           />
         ) : (
@@ -250,6 +251,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
               direction:'ltr', unicodeBidi:'isolate',
             }}
             tickLine={false}
+            tickMargin={8}
             axisLine={{ stroke: 'var(--border)' }}
             interval="preserveStartEnd"
           />
