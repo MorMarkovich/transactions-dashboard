@@ -7,7 +7,7 @@ const cards={isSuccess:true,errorCode:'0',data:{cardsList:[{...target,isActive:t
 const approvals={isSuccess:true,errorCode:'0',data:{approvals:{approvedTransactions:[],totalEstimatedAmount:0},currentTransactionsList:null,israelAbroadVouchers:null}}
 function fake({pendingFailure=false,postedFailure=false}={}){
  const events=[];const posted={date:'2026-10-25',description:'unchanged',chargedAmount:-10};let options
- const scraper={page:{evaluate:async(_,request)=>{events.push(request.url);if(pendingFailure)throw Error('PRIVATE');return{ok:true,payload:request.url===PENDING_ENDPOINTS.cards?cards:approvals}}},
+ const scraper={page:{url:()=>'https://web.isracard.co.il/transactions',evaluate:async(_,request)=>{events.push(request.url);if(pendingFailure)throw Error('PRIVATE');return{ok:true,payload:request.url===PENDING_ENDPOINTS.cards?cards:approvals}}},
  fetchData:async()=>{events.push('posted');return postedFailure?{success:false,errorType:'ACCOUNT_BLOCKED',errorMessage:'PRIVATE'}:{success:true,accounts:[{txns:[posted]}]}},
  terminate:async()=>events.push('terminate'),
  async scrape(){events.push('login');const result=await this.fetchData();await this.terminate();return result}}

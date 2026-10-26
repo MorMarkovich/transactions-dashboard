@@ -8,3 +8,16 @@ test('discovery refusal causes no issuer call',async()=>{const f=fake();f.approv
 test('enable refusal never writes binding',async()=>{const f=fake();f.approveBinding=async()=>false;assert.equal((await enablePendingForAccount(f)).enabled,false);assert.deepEqual(f.calls,['approve-discovery','discovery'])})
 test('failed or ambiguous same-session discovery fails closed',async()=>{for(const pending of [{success:false,cards:[]},{success:true,cards:[cards[0],cards[0]]}]){const f=fake();f.discover=async()=>({pending});await assert.rejects(enablePendingForAccount(f));assert.equal(f.calls.includes('write'),false)}})
 test('wrong dashboard owner fails before issuer work',async()=>{const f=fake();f.client.auth.getUser=async()=>({data:{user:{id:'other'}}});await assert.rejects(enablePendingForAccount(f));assert.deepEqual(f.calls,[])})
+test('discovery diagnostics survive the public safe boundary without writes or retries',async()=>{
+ const {safeErrorCode}=await import('../src/safe-errors.js')
+ for(const [error,code] of [['pending_auth_required','BANK_PENDING_AUTH_REQUIRED'],['pending_rate_limited','BANK_PENDING_RATE_LIMITED'],['pending_outer_timeout','BANK_PENDING_TIMEOUT'],['pending_contract_unsupported','BANK_PENDING_CONTRACT_UNSUPPORTED'],['PRIVATE','BANK_PENDING_DISCOVERY_UNAVAILABLE']]){
+  const f=fake();let attempts=0
+  f.discover=async()=>{attempts++;return{pending:{success:false,cards:[],error,message:'PRIVATE'}}}
+  await assert.rejects(enablePendingForAccount(f),err=>safeErrorCode(err)===code)
+  assert.equal(attempts,1);assert.deepEqual(f.calls,['approve-discovery'])
+ }
+})
+test('successful empty discovery is distinct from a rejected request and never writes',async()=>{
+ const f=fake();f.discover=async()=>({pending:{success:true,cards:[]}})
+ await assert.rejects(enablePendingForAccount(f),{code:'BANK_PENDING_NO_CARDS'});assert.deepEqual(f.calls,['approve-discovery'])
+})
