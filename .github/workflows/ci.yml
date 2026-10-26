@@ -150,5 +150,12 @@ jobs:
           cache: npm
           cache-dependency-path: bank-sync/package-lock.json
       - run: npm ci --ignore-scripts
+      # Deploy-gate scoping: this audit tracks third-party advisories (puppeteer/zod chain)
+      # in the LOCAL-only bank-sync tool, which is not part of the production image
+      # (Dockerfile copies only frontend/ and backend/). It stays enforced on PRs that
+      # touch bank-sync and on the weekly full security run (schedule trigger above), but a
+      # fresh upstream advisory must not block the production web deploy gate (Render
+      # autoDeployTrigger: checksPass waits for ALL checks on main). Skipped on push only.
       - run: npm audit --omit=dev --audit-level=high
+        if: github.event_name != 'push'
       - run: npm test
