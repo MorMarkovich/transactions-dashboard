@@ -1,6 +1,6 @@
 import { defaultMonth } from '../utils/defaultMonth'
 import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
-import { categoryColor } from '../utils/chartPalette'
+import { useCategoryColor } from '../hooks/useCategoryColor'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -90,6 +90,7 @@ const INCOME_COLORS = [
 // ---------------------------------------------------------------------------
 export default function Dashboard() {
   const [searchParams] = useSearchParams()
+  const categoryColor = useCategoryColor()
   const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
   const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()

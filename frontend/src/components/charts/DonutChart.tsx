@@ -1,4 +1,4 @@
-import { categoryColor } from '../../utils/chartPalette'
+import { useCategoryColor } from '../../hooks/useCategoryColor'
 import { ltrIsolate } from '../../utils/formatting'
 import React, { useCallback } from 'react'
 import {
@@ -112,6 +112,7 @@ const DonutChart: React.FC<DonutChartProps> = React.memo(function DonutChart({
   total,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const categoryColor = useCategoryColor()
   const tooltipContent = useCallback(
     (props: { active?: boolean; payload?: PayloadEntry[] }) => (
       <ChartTooltip {...props} total={total} />

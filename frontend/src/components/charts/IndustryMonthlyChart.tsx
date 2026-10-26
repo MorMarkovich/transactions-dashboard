@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import type { IndustryMonthlyData } from '../../services/types'
 import useMediaQuery from '../../hooks/useMediaQuery'
-import { categoryColor } from '../../utils/chartPalette'
+import { useCategoryColor } from '../../hooks/useCategoryColor'
 
 interface IndustryMonthlyChartProps {
   data: IndustryMonthlyData
@@ -81,6 +81,7 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
   height = 320,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const categoryColor = useCategoryColor()
 
   if (!data.months.length || !data.series.length) {
     return (

@@ -12,7 +12,7 @@ import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
-import { categoryColor } from '../utils/chartPalette'
+import { useCategoryColor } from '../hooks/useCategoryColor'
 import DonutChart from '../components/charts/DonutChart'
 import MultiSelect from '../components/ui/MultiSelect'
 import BarChart from '../components/charts/BarChart'
@@ -53,6 +53,7 @@ const MAX_PIE_SLICES = 10
 // ---------------------------------------------------------------------------
 export default function MonthlyBreakdown() {
   const [searchParams] = useSearchParams()
+  const categoryColor = useCategoryColor()
   const sessionId = searchParams.get('session_id')
   const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
 

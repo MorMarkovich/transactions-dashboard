@@ -87,13 +87,14 @@ describe('custom (unknown) category colors - extended pastel space', () => {
 
   it('adapts to the light theme: deeper muted band, pair still distinct, off the light canonical palette', () => {
     const root = document.documentElement
+    const prevTheme = root.dataset.theme
     root.dataset.theme = 'light'
     try {
       const a = categoryColor('ביטוח'), b = categoryColor('מנויים ושירותים')
       expect(a).not.toBe(b)
       expect(dist(a, b)).toBeGreaterThan(40)
       // Theme-adaptive: same name, different band per theme.
-      expect(a).not.toBe(categoryColor.bind(null) && (() => { root.dataset.theme = 'dark'; const d = categoryColor('ביטוח'); root.dataset.theme = 'light'; return d })())
+      expect(a).not.toBe(categoryColor('ביטוח', 'dark'))
       const LIGHT_PALETTE = [
         '#087C66', '#236AC2', '#A23B99', '#A35817', '#727C19', '#BB3553', '#426D85',
         '#7160BD', '#506D80', '#1A9E63', '#A37C06', '#E03131', '#0C8599', '#7048E8',
@@ -105,12 +106,40 @@ describe('custom (unknown) category colors - extended pastel space', () => {
         for (const p of LIGHT_PALETTE) expect(dist(c, p), `${n} vs ${p}`).toBeGreaterThan(10)
       }
     } finally {
-      root.dataset.theme = 'dark'
+      if (prevTheme === undefined) delete root.dataset.theme
+      else root.dataset.theme = prevTheme
     }
   })
 
   it('does not use the canonical var(--category-N) slots', () => {
     expect(categoryColor('ביטוח')).not.toContain('var(--category-')
     expect(categoryColor('הוצאות שוטפות')).toContain('var(--category-')
+  })
+
+  it('accepts an explicit theme that overrides the DOM attribute', () => {
+    const root = document.documentElement
+    const prevTheme = root.dataset.theme
+    try {
+      root.dataset.theme = 'dark'
+      expect(categoryColor('ביטוח', 'light')).not.toBe(categoryColor('ביטוח', 'dark'))
+      expect(categoryColor('ביטוח', 'dark')).toBe(categoryColor('ביטוח'))
+      root.dataset.theme = 'light'
+      expect(categoryColor('ביטוח', 'light')).toBe(categoryColor('ביטוח'))
+      expect(categoryColor('ביטוח', 'dark')).not.toBe(categoryColor('ביטוח'))
+      // Canonical names ignore the theme parameter entirely (CSS vars adapt).
+      expect(categoryColor('אוכל', 'light')).toBe(categoryColor('אוכל', 'dark'))
+    } finally {
+      if (prevTheme === undefined) delete root.dataset.theme
+      else root.dataset.theme = prevTheme
+    }
+  })
+
+  it('resolves the colliding pair distinctly in BOTH explicit themes', () => {
+    for (const t of ['light', 'dark'] as const) {
+      const a = categoryColor('ביטוח', t)
+      const b = categoryColor('מנויים ושירותים', t)
+      expect(a).not.toBe(b)
+      expect(dist(a, b)).toBeGreaterThan(40)
+    }
   })
 })

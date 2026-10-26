@@ -51,10 +51,21 @@ const known: Record<string, number> = {
   'הוראות קבע': 18,
   'אחר': 19,
 }
-export function categoryColor(name: string): string {
+export type ChartTheme = 'light' | 'dark'
+
+function currentTheme(): ChartTheme {
+  return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'
+    ? 'light'
+    : 'dark'
+}
+
+// theme defaults to the live DOM attribute for non-React callers; React
+// consumers should use useCategoryColor, which passes the ThemeContext theme
+// explicitly so colors recompute the moment the theme toggles.
+export function categoryColor(name: string, theme?: ChartTheme): string {
   const knownIdx = known[name]
   if (knownIdx !== undefined) return `var(--category-${knownIdx}, ${colors[knownIdx]})`
-  return customColor(name)
+  return customColor(name, theme ?? currentTheme())
 }
 
 // Unknown names (custom categories, subcategory names) get a color from an
@@ -67,11 +78,10 @@ export function categoryColor(name: string): string {
 // best-effort by golden-angle hue dispersion, not guaranteed for arbitrary
 // name sets; the known colliding pair from production
 // (ביטוח / מנויים ושירותים) is covered by tests.
-function customColor(name: string): string {
+function customColor(name: string, theme: ChartTheme): string {
   const h = hashSlotRaw(name)
   const hue = (h * 137.508) % 360
-  const isLight = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'
-  return isLight ? hslToHex(hue, 45, 38) : hslToHex(hue, 40, 84)
+  return theme === 'light' ? hslToHex(hue, 45, 38) : hslToHex(hue, 40, 84)
 }
 
 function hashSlotRaw(name: string): number {
