@@ -72,8 +72,14 @@ test('service-path capture from URL query and post body', () => {
 
 test('no params, bodies, or secret-like values leak into the report', () => {
   const rec = new ReqNameRecorder()
+  // URL token present: body is not consulted at all.
   rec.handleRequest({
     url: SVC + '?reqName=CardsTransactionsList&card=458012345678&secret=hunter2',
+    postData: 'reqName=FutureTransactionsBlock&id=987654321&pin=4242',
+  })
+  // No URL token: body token extracted in memory, other fields never retained.
+  rec.handleRequest({
+    url: SVC + '?card=458012345678',
     postData: 'reqName=FutureTransactionsBlock&id=987654321&pin=4242&reqName=a1b2c3d4e5f67890',
   })
   const r = rec.report()
