@@ -12,7 +12,7 @@ import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
-import { categoryColor, categoryColorMap } from '../utils/chartPalette'
+import { categoryColor } from '../utils/chartPalette'
 import DonutChart from '../components/charts/DonutChart'
 import MultiSelect from '../components/ui/MultiSelect'
 import BarChart from '../components/charts/BarChart'
@@ -222,8 +222,6 @@ export default function MonthlyBreakdown() {
   }, [comparison, pieMonth])
 
 
-  const pieColorMap = useMemo(() => categoryColorMap(pieData.slices.map((s) => s.name)), [pieData])
-
   const subcategoryPieData = useMemo(() => {
     if (!subcategoryMonthly || !pieMonth) return { slices: [] as { name: string; value: number; pct: number }[], total: 0 }
     const monthIndex = subcategoryMonthly.months.indexOf(pieMonth)
@@ -235,12 +233,6 @@ export default function MonthlyBreakdown() {
     const total = items.reduce((sum, item) => sum + item.value, 0)
     return { slices: items.map((item) => ({ ...item, pct: total ? item.value / total * 100 : 0 })), total }
   }, [subcategoryMonthly, pieMonth])
-
-  const subColorMap = useMemo(() => categoryColorMap(subcategoryPieData.slices.map((s) => s.name)), [subcategoryPieData])
-
-  // Same registry-backed map for the single-category bar, so a custom
-  // category keeps its donut/table color here too.
-  const barColorMap = useMemo(() => categoryColorMap((comparison?.categories ?? []).map((c) => c.name)), [comparison])
 
   // ── Bars: the selected category's spend in every month ─────────────
   const categoryRow = useMemo(
@@ -511,7 +503,7 @@ export default function MonthlyBreakdown() {
                     background: selectedCategory === slice.name ? 'var(--accent-muted)' : 'transparent',
                   }}
                 >
-                  <span className="category-dot" style={{ background: pieColorMap[slice.name] ?? categoryColor(slice.name), flexShrink: 0 }} />
+                  <span className="category-dot" style={{ background: categoryColor(slice.name), flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0, fontSize: '0.8125rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {slice.name}
                   </span>
@@ -541,7 +533,7 @@ export default function MonthlyBreakdown() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {subcategoryPieData.slices.map((slice) => (
                   <div key={slice.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px' }}>
-                    <span className="category-dot" style={{ background: subColorMap[slice.name] ?? categoryColor(slice.name) }} />
+                    <span className="category-dot" style={{ background: categoryColor(slice.name) }} />
                     <span style={{ flex: 1 }}>{slice.name}</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>{slice.pct.toFixed(1)}%</span>
                     <strong style={{ fontFamily: 'var(--font-mono)', direction: 'ltr' }}>{formatCurrency(slice.value)}</strong>
@@ -622,7 +614,7 @@ export default function MonthlyBreakdown() {
                 </div>
               )}
             </div>
-            <BarChart data={categoryBars} height={280} color={barColorMap[categoryRow.name] ?? categoryColor(categoryRow.name)} />
+            <BarChart data={categoryBars} height={280} color={categoryColor(categoryRow.name)} />
           </Card>
         )}
       </motion.div>
