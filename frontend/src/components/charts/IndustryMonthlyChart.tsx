@@ -177,6 +177,7 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
         {/* oldest-first left-to-right, matching the LTR month strips above the chart */}
         <XAxis
           dataKey="month"
+          padding={{ right: 28 }}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontFamily: 'var(--font-family)' }}
           tickLine={false}
           axisLine={{ stroke: 'var(--border)' }}
