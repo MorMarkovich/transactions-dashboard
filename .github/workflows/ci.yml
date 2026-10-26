@@ -156,6 +156,11 @@ jobs:
       # touch bank-sync and on the weekly full security run (schedule trigger above), but a
       # fresh upstream advisory must not block the production web deploy gate (Render
       # autoDeployTrigger: checksPass waits for ALL checks on main). Skipped on push only.
-      - run: npm audit --omit=dev --audit-level=high
+      - id: audit
+        run: npm audit --omit=dev --audit-level=high
         if: github.event_name != 'push'
+      # Surface test results even when the known advisory fails the audit step:
+      # the audit step's failure still fails the job, and tests are skipped
+      # when checkout/setup/install itself failed (no meaningful run possible).
       - run: npm test
+        if: success() || steps.audit.outcome == 'failure'
