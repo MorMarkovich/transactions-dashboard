@@ -189,3 +189,43 @@ describe('repinned slots (collision fixes)', () => {
     expect(min).toBeGreaterThan(27)
   })
 })
+
+describe('custom hue overrides (verified live collisions)', () => {
+  const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const dist = (a: string, b: string) => {
+    const [x1, y1, z1] = rgb(a), [x2, y2, z2] = rgb(b)
+    return Math.hypot(x1 - x2, y1 - y2, z1 - z2)
+  }
+  // exact strings as stored in the live income rows (auditor DOM read);
+  // hashing these exact strings reproduces the auditor's independently
+  // measured prod colors (#E7D1C6 / #E7C9C6 dark), confirming them
+  // byte-for-byte. Only the tested names are claimed, not the full live set.
+  const BANK = 'בנק פועלים משכורת'
+  const ISRACARD = 'ישראכרט שכ משכורת'
+
+  it('separates the verified adjacent salary pair in BOTH themes', () => {
+    expect(dist(categoryColor(ISRACARD, 'dark'), categoryColor(BANK, 'dark'))).toBeGreaterThan(40)
+    expect(dist(categoryColor(ISRACARD, 'light'), categoryColor(BANK, 'light'))).toBeGreaterThan(100)
+  })
+
+  it('leaves the colliding neighbor on its original hash color', () => {
+    expect(categoryColor(BANK, 'dark')).toBe('#E7D1C6')
+    expect(categoryColor(BANK, 'light')).toBe('#8D5435')
+  })
+
+  it('override lands on the chosen custom-space hues, staying off canonical slots', () => {
+    expect(categoryColor(ISRACARD, 'dark')).toBe('#C6DCE7')
+    expect(categoryColor(ISRACARD, 'light')).toBe('#356F8D')
+    expect(categoryColor(ISRACARD)).not.toContain('var(--category-')
+    // stability: pure function of the name, identical on every call
+    expect(categoryColor(ISRACARD, 'dark')).toBe(categoryColor(ISRACARD, 'dark'))
+  })
+
+  it('override keeps a >=20 RGB margin from the other tested top-ranked live sources', () => {
+    const live = ['ישראכרט מש משכורת', BANK, 'העברות לקרדיט', 'ישראכרט', 'אייר חיפה', 'מקס איט פי', 'BOOKING COM HOTEL']
+    for (const other of live) {
+      expect(dist(categoryColor(ISRACARD, 'dark'), categoryColor(other, 'dark'))).toBeGreaterThan(20)
+      expect(dist(categoryColor(ISRACARD, 'light'), categoryColor(other, 'light'))).toBeGreaterThan(20)
+    }
+  })
+})
