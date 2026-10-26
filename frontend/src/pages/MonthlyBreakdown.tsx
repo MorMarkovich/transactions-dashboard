@@ -614,7 +614,7 @@ export default function MonthlyBreakdown() {
                 </div>
               )}
             </div>
-            <BarChart data={categoryBars} height={280} />
+            <BarChart data={categoryBars} height={280} color={categoryColor(categoryRow.name)} />
           </Card>
         )}
       </motion.div>
