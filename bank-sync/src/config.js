@@ -1,12 +1,28 @@
 // Loads NON-secret runtime config from .env. Secrets (bank passwords, Supabase
 // login, sync token) come from the OS keychain — never from here.
 import 'dotenv/config'
+import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { SUPPORTED, ACTIVE_PROVIDERS } from './providers.js'
 import { parseOwnerKeywords } from './owner.js'
 
 function list(value, fallback) {
   if (!value) return fallback
   return value.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
+// Standard macOS Chrome install locations: system-wide first, then the
+// per-user ~/Applications (Chrome's per-user install lands there).
+const MAC_CHROME_CANDIDATES = [
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  `${homedir()}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+]
+
+function discoverChromePath() {
+  if (process.platform !== 'darwin') return ''
+  // Fall back to the system path when neither exists so the scrape error
+  // message still names a concrete location to check.
+  return MAC_CHROME_CANDIDATES.find((p) => existsSync(p)) || MAC_CHROME_CANDIDATES[0]
 }
 
 export const config = {
@@ -28,11 +44,10 @@ export const config = {
   monthsBack: Number(process.env.MONTHS_BACK) || 3,
   showBrowser: String(process.env.SHOW_BROWSER || '').toLowerCase() === 'true',
   // Use an already-installed Chrome instead of the (often broken on Apple
-  // Silicon) bundled Chromium. Defaults to the standard macOS Chrome path.
-  chromePath: process.env.CHROME_PATH
-    || (process.platform === 'darwin'
-      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-      : ''),
+  // Silicon) bundled Chromium. CHROME_PATH (env or .env) always wins;
+  // otherwise probe the standard macOS locations and use the first that
+  // exists.
+  chromePath: process.env.CHROME_PATH || discoverChromePath(),
   // Debug: leave the scraper's browser window open after it finishes/fails so
   // you can see what the bank showed. Use with `npm run sync` only.
   keepBrowserOpen: String(process.env.KEEP_BROWSER_OPEN || '').toLowerCase() === 'true',
