@@ -190,22 +190,22 @@ describe('repinned slots (collision fixes)', () => {
   })
 })
 
-describe('custom hue overrides (verified live collisions)', () => {
+describe('custom color overrides (observed collisions)', () => {
   const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
   const dist = (a: string, b: string) => {
     const [x1, y1, z1] = rgb(a), [x2, y2, z2] = rgb(b)
     return Math.hypot(x1 - x2, y1 - y2, z1 - z2)
   }
-  // exact strings as stored in the live income rows (auditor DOM read);
-  // hashing these exact strings reproduces the auditor's independently
-  // measured prod colors (#E7D1C6 / #E7C9C6 dark), confirming them
-  // byte-for-byte. Only the tested names are claimed, not the full live set.
+  // Existing exact-name override and its original neighbor. The ordered
+  // regression below uses anonymous equivalents for every other observed row.
   const BANK = 'בנק פועלים משכורת'
   const ISRACARD = 'ישראכרט שכ משכורת'
 
-  it('separates the verified adjacent salary pair in BOTH themes', () => {
-    expect(dist(categoryColor(ISRACARD, 'dark'), categoryColor(BANK, 'dark'))).toBeGreaterThan(40)
-    expect(dist(categoryColor(ISRACARD, 'light'), categoryColor(BANK, 'light'))).toBeGreaterThan(100)
+  // Numerical guardrails for this reviewed palette, not perceptual guarantees.
+  // Actual dark/light chart pixels are the visual acceptance check.
+  it('separates the observed salary pair in BOTH themes', () => {
+    expect(dist(categoryColor(ISRACARD, 'dark'), categoryColor(BANK, 'dark'))).toBeGreaterThan(90)
+    expect(dist(categoryColor(ISRACARD, 'light'), categoryColor(BANK, 'light'))).toBeGreaterThan(30)
   })
 
   it('leaves the colliding neighbor on its original hash color', () => {
@@ -214,18 +214,79 @@ describe('custom hue overrides (verified live collisions)', () => {
   })
 
   it('override lands on the chosen custom-space hues, staying off canonical slots', () => {
-    expect(categoryColor(ISRACARD, 'dark')).toBe('#C6DCE7')
-    expect(categoryColor(ISRACARD, 'light')).toBe('#356F8D')
+    expect(categoryColor(ISRACARD, 'dark')).toBe('#E0C36C')
+    expect(categoryColor(ISRACARD, 'light')).toBe('#7E651B')
     expect(categoryColor(ISRACARD)).not.toContain('var(--category-')
     // stability: pure function of the name, identical on every call
     expect(categoryColor(ISRACARD, 'dark')).toBe(categoryColor(ISRACARD, 'dark'))
   })
 
-  it('override keeps a >=20 RGB margin from the other tested top-ranked live sources', () => {
-    const live = ['ישראכרט מש משכורת', BANK, 'העברות לקרדיט', 'ישראכרט', 'אייר חיפה', 'מקס איט פי', 'BOOKING COM HOTEL']
-    for (const other of live) {
-      expect(dist(categoryColor(ISRACARD, 'dark'), categoryColor(other, 'dark'))).toBeGreaterThan(20)
-      expect(dist(categoryColor(ISRACARD, 'light'), categoryColor(other, 'light'))).toBeGreaterThan(20)
+  // Anonymous names chosen to reproduce the observed ordered palette in
+  // BOTH themes. No private source names, amounts, accounts or dates are kept.
+  // Rank 3 is the existing exact-name override; all other rows are the baseline.
+  const observedPalette: [number, string, string, string][] = [
+    [1, 'observed-source-01-608', '#C6E7CD', '#358D4A'],
+    [2, 'observed-source-02-288', '#E7D1C6', '#8D5435'],
+    [4, 'observed-source-04-559', '#C6D2E7', '#35578D'],
+    [5, 'observed-source-05-1086', '#C6E7C7', '#358D39'],
+    [6, 'observed-source-06-2179', '#D4E7C6', '#5B8D35'],
+    [7, 'observed-source-07-44', '#C6E7D1', '#358D52'],
+    [8, 'observed-source-08-391', '#D1C6E7', '#53358D'],
+    [9, 'observed-source-09-62', '#C6CAE7', '#35418D'],
+    [10, 'observed-source-10-748', '#E7C6D1', '#8D3552'],
+    [11, 'observed-source-11-50', '#E7C6D4', '#8D355C'],
+    [12, 'observed-source-12-437', '#E7C6C8', '#8D353C'],
+    [13, 'observed-source-13-132', '#E7DBC6', '#8D6D35'],
+    [14, 'observed-source-14-2135', '#E1C6E7', '#7E358D'],
+    [15, 'observed-source-15-926', '#E6C6E7', '#8A358D'],
+    [16, 'observed-source-16-1079', '#DEE7C6', '#758D35'],
+    [17, 'observed-source-17-2787', '#C7E7C6', '#3A8D35'],
+    [18, 'observed-source-18-1044', '#C6E0E7', '#357B8D'],
+    [19, 'observed-source-19-707', '#C6E7C7', '#358D39'],
+    [20, 'observed-source-20-34', '#E7C6E5', '#8D3589'],
+    [21, 'observed-source-21-134', '#DAC6E7', '#6C358D'],
+    [22, 'observed-source-22-1917', '#DEE7C6', '#768D35'],
+    [23, 'observed-source-23-297', '#C6E5E7', '#35888D'],
+    [24, 'observed-source-24-177', '#E7C6C7', '#8D3538'],
+    [25, 'observed-source-25-248', '#E7E6C6', '#8D8A35'],
+    [26, 'observed-source-26-939', '#C6E7D9', '#358D68'],
+    [27, 'observed-source-27-2872', '#C6E7C6', '#378D35'],
+    [28, 'observed-source-28-2032', '#DDC6E7', '#72358D'],
+    [29, 'observed-source-29-365', '#D0C6E7', '#51358D'],
+    [30, 'observed-source-30-24', '#D9E7C6', '#678D35'],
+    [31, 'observed-source-31-5388', '#E7CFC6', '#8D4C35'],
+    [32, 'observed-source-32-205', '#C9E7C6', '#3F8D35'],
+    [33, 'observed-source-33-2367', '#DBE7C6', '#6D8D35'],
+    [34, 'observed-source-34-23', '#C6E0E7', '#357C8D'],
+    [35, 'observed-source-35-859', '#E4E7C6', '#858D35'],
+    [36, 'observed-source-36-837', '#E7C6CB', '#8D3543'],
+  ]
+
+  it('preserves every other observed mapping with anonymous hash-equivalent names', () => {
+    for (const [, name, dark, light] of observedPalette) {
+      expect(categoryColor(name, 'dark')).toBe(dark)
+      expect(categoryColor(name, 'light')).toBe(light)
     }
+  })
+
+  it('does not introduce a target collision into the complete observed palette', () => {
+    for (const [rank, name, dark, light] of observedPalette) {
+      expect(dist(categoryColor(ISRACARD, 'dark'), dark), `dark rank ${rank}`).toBeGreaterThan(90)
+      expect(dist(categoryColor(ISRACARD, 'light'), light), `light rank ${rank}`).toBeGreaterThan(30)
+      expect(categoryColor(name, 'dark')).toBe(dark)
+      expect(categoryColor(name, 'light')).toBe(light)
+    }
+  })
+
+  it('separates the target from both actual ordered neighbors, including the former hue-200 collision', () => {
+    const neighbors = observedPalette.filter(([rank]) => rank === 2 || rank === 4)
+    expect(neighbors).toHaveLength(2)
+    for (const [, , dark, light] of neighbors) {
+      expect(dist(categoryColor(ISRACARD, 'dark'), dark)).toBeGreaterThan(90)
+      expect(dist(categoryColor(ISRACARD, 'light'), light)).toBeGreaterThan(30)
+    }
+    const formerBlue = observedPalette.find(([rank]) => rank === 4)!
+    expect(dist('#C6DCE7', formerBlue[2])).toBe(10)
+    expect(dist('#356F8D', formerBlue[3])).toBe(24)
   })
 })
