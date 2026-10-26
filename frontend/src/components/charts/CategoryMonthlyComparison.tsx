@@ -31,11 +31,29 @@ export default function CategoryMonthlyComparison({
   // Which months to show (default all). Always keep at least one selected.
   const [selectedMonths, setSelectedMonths] = useState<Set<string> | null>(null)
 
+  // Oldest-first everywhere on this page (strips, chart, this table).
   const months = useMemo(() => {
-    if (!selectedMonths) return data.months
-    const filtered = data.months.filter((m) => selectedMonths.has(m))
-    return filtered.length ? filtered : data.months
+    const base = !selectedMonths ? data.months : data.months.filter((m) => selectedMonths.has(m))
+    const filtered = base.length ? base : data.months
+    return [...filtered].sort((a, b) => (monthKeyNum(a) ?? 0) - (monthKeyNum(b) ?? 0))
   }, [data.months, selectedMonths])
+  // The table flows RTL, so reversed DOM order puts the oldest month on the
+  // left - the same visual direction as the LTR chips row and the chart.
+  const tableMonths = useMemo(() => [...months].reverse(), [months])
+  // Chips always show the FULL sorted list; a deselected month stays visible
+  // (aria-pressed=false) so it can be re-selected.
+  const allMonths = useMemo(
+    () => [...data.months].sort((a, b) => (monthKeyNum(a) ?? 0) - (monthKeyNum(b) ?? 0)),
+    [data.months],
+  )
+
+  // Totals follow the VISIBLE months: a row's total is the sum of its visible
+  // cells, and the grand total is the sum of the visible monthly totals, so the
+  // numbers on screen always add up to what is shown.
+  const visibleGrandTotal = useMemo(
+    () => months.reduce((sum, m) => sum + (data.month_totals[m] ?? 0), 0),
+    [months, data.month_totals],
+  )
 
   const toggleMonth = (m: string) => {
     setSelectedMonths((prev) => {
@@ -95,8 +113,8 @@ export default function CategoryMonthlyComparison({
           </span>
         )}
         {/* Month subset chips */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginInlineStart: 'auto' }}>
-          {data.months.map((m) => {
+        <div dir="ltr" style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginInlineStart: 'auto' }}>
+          {allMonths.map((m) => {
             const on = months.includes(m)
             return (
               <button
@@ -142,7 +160,7 @@ export default function CategoryMonthlyComparison({
               >
                 קטגוריה
               </th>
-              {months.map((m) => (
+              {tableMonths.map((m) => (
                 <th key={m} style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontWeight: 700, fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
                   {m}
                 </th>
@@ -177,7 +195,7 @@ export default function CategoryMonthlyComparison({
                   <span style={{marginInlineEnd:8,display:'inline-block',width:6,height:6,borderRadius:'50%',background:categoryColor(cat.name)}}/>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{cat.name}</span>
                 </td>
-                {months.map((m) => {
+                {tableMonths.map((m) => {
                   const cell = cat.months[m] ?? { amount: 0, pct_of_month: 0, delta_abs: 0, delta_pct: 0 }
                   const { primary, secondary } = cellText(cell.amount, cell.pct_of_month)
                   // No trend arrow on empty cells, and none on the in-progress
@@ -209,8 +227,16 @@ export default function CategoryMonthlyComparison({
                   )
                 })}
                 <td style={{ padding: '8px 12px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{shekel(cat.total)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{cat.pct_of_grand.toFixed(1)}%</div>
+                  {(() => {
+                    const rowTotal = months.reduce((sum, m) => sum + (cat.months[m]?.amount ?? 0), 0)
+                    const pctOfVisible = visibleGrandTotal > 0 ? (rowTotal / visibleGrandTotal) * 100 : 0
+                    return (
+                      <>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{shekel(rowTotal)}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{pctOfVisible.toFixed(1)}%</div>
+                      </>
+                    )
+                  })()}
                 </td>
               </tr>
             ))}
@@ -232,13 +258,13 @@ export default function CategoryMonthlyComparison({
               >
                 סה&quot;כ חודשי
               </td>
-              {months.map((m) => (
+              {tableMonths.map((m) => (
                 <td key={m} style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                   {shekel(data.month_totals[m] ?? 0)}
                 </td>
               ))}
               <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                {shekel(data.grand_total)}
+                {shekel(visibleGrandTotal)}
               </td>
             </tr>
           </tfoot>
