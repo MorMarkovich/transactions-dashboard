@@ -11,22 +11,12 @@ import {
 } from 'recharts'
 import type { IndustryMonthlyData } from '../../services/types'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { categoryColor } from '../../utils/chartPalette'
 
 interface IndustryMonthlyChartProps {
   data: IndustryMonthlyData
   height?: number
 }
-
-const COLORS = [
-  '#818cf8',
-  '#a78bfa',
-  '#34d399',
-  '#fbbf24',
-  '#f87171',
-  '#38bdf8',
-  '#fb923c',
-  '#e879f9',
-]
 
 const formatAxisShekel = (v: number): string => {
   if (v >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
@@ -159,8 +149,8 @@ const IndustryMonthlyChart: React.FC<IndustryMonthlyChartProps> = React.memo(fun
         <defs>
           {data.series.map((s, i) => (
             <linearGradient key={s.name} id={`industGrad${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.95} />
-              <stop offset="100%" stopColor={COLORS[i % COLORS.length]} stopOpacity={0.65} />
+              <stop offset="0%" stopColor={categoryColor(s.name)} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={categoryColor(s.name)} stopOpacity={0.65} />
             </linearGradient>
           ))}
         </defs>
