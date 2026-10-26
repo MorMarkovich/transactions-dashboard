@@ -341,6 +341,7 @@ export default function TransactionsTable({
         ))}
       </div>
 
+      <div className="table-card">
       <div
         ref={scrollContainerRef}
         className="table-scroll transactions-desktop-table-wrap"
@@ -403,6 +404,7 @@ export default function TransactionsTable({
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {/* Pagination */}
