@@ -60,3 +60,28 @@ export function categoryColor(name: string): string {
   const idx = known[name] ?? hashSlot(name)
   return `var(--category-${idx}, ${colors[idx]})`
 }
+
+// Collision-resolved colors for a set of names rendered together (one donut,
+// one stacked chart). Canonical names always keep their slot. Unknown names
+// keep their hash slot when free, otherwise walk forward to the next slot
+// unused within this set - two unknown names never share a color, and an
+// unknown name never takes a canonical sibling's slot. Assignment follows
+// input order, so every surface rendering the same ordered list agrees.
+export function categoryColorMap(names: readonly string[]): Record<string, string> {
+  const used = new Set<number>()
+  for (const name of names) {
+    if (known[name] !== undefined) used.add(known[name])
+  }
+  const out: Record<string, string> = {}
+  for (const name of names) {
+    if (known[name] !== undefined) {
+      out[name] = `var(--category-${known[name]}, ${colors[known[name]]})`
+      continue
+    }
+    let idx = hashSlot(name)
+    while (used.has(idx)) idx = (idx + 1) % colors.length
+    used.add(idx)
+    out[name] = `var(--category-${idx}, ${colors[idx]})`
+  }
+  return out
+}
