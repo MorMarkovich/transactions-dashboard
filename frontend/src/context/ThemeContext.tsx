@@ -18,7 +18,7 @@ interface ThemeContextType {
 const STORAGE_KEY = 'theme'
 const DEFAULT_THEME: Theme = 'dark'
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+export const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 function getInitialTheme(): Theme {
   try {
