@@ -209,3 +209,9 @@ def test_verified_key_rotation_requires_new_usage_check(setup, monkeypatch):
     monkeypatch.setenv('TAVILY_FREE_KEY_SHA256', hashlib.sha256(b'rotated-key').hexdigest())
     agent._reserve_search_credit('https://api.tavily.com', {})
     assert len(calls) == 2
+
+
+def test_foreign_trip_never_uses_business_cache_or_providers(setup, monkeypatch):
+    monkeypatch.setattr(agent.store, 'read_resolved', lambda *a: pytest.fail('Trip cache override'))
+    monkeypatch.setattr(agent, '_request', lambda *a, **k: pytest.fail('Trip lookup'))
+    assert agent.identify('SHINSEGAE DEPARTMENT S SEOUL KR') is None

@@ -186,6 +186,10 @@ def _identify(merchant):
 
 
 def identify(value):
+    from .data_processor import foreign_card_mask
+    import pandas as pd
+    if foreign_card_mask(pd.Series([value])).iat[0]:
+        return None  # Trip policy is already resolved locally; no web lookup.
     merchant = public_merchant(value)
     if not merchant:
         return None

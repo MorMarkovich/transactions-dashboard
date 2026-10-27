@@ -58,7 +58,10 @@ Apply `20261027102401_merchant_identification_cache.sql` before deploying.
 Every result is stored under `(auth.uid(), canonical merchant)` in Supabase.
 Resolved results do not expire automatically and are reused by categorization,
 audit, subcategory selection, dashboard restores and local bank synchronization.
-Manual rules and transaction pins retain precedence.
+Manual rules and transaction pins retain precedence. The existing foreign-card
+trip policy also takes precedence over automatic business identification; those
+descriptors are excluded from web audits. Online-service exemptions still apply,
+and an explicit manual choice can override the trip category.
 
 An atomic claim serializes new lookups through the owner's monthly quota row.
 An in-flight lookup has a 15-minute lease; a late worker cannot overwrite a

@@ -91,3 +91,27 @@ def test_trip_confirmation_pins_the_levi_purchase_only():
     df = routes.sessions[response.json()['session_id']]
     assert df.iloc[0]['קטגוריה'] == 'טיסות ותיירות'
     assert df.iloc[1]['קטגוריה'] == 'קניות'
+
+
+@pytest.mark.parametrize('desc', ['SHINSEGAE DEPARTMENT S SEOUL KR', 'NYUBALLANSEU SINCHONJE SEOUL KR'])
+def test_web_identification_does_not_override_trip_policy(desc, monkeypatch):
+    rule = {'merchant': normalize_merchant(desc), 'category': 'קניות',
+            'subcategory': 'אופנה', 'source': 'ai'}
+    sid, df = restore(desc, [rule], category='טיסות ותיירות', subcategory='שופינג')
+    assert df.iloc[0]['קטגוריה'] == 'טיסות ותיירות'
+    assert df.iloc[0]['קטגוריה_משנה'] == 'שופינג'
+    monkeypatch.setattr(routes, 'audit_merchants', lambda *a, **k: pytest.fail('Trip lookup'))
+    assert client.post('/api/ai-audit', json={'session_id': sid}).json()['audited_count'] == 0
+    edited = client.post('/api/merchants/category', json={'session_id': sid, 'merchant': desc,
+                         'category': 'קניות', 'source': 'ai'})
+    assert edited.json()['affected_count'] == 0
+    assert df.iloc[0]['קטגוריה'] == 'טיסות ותיירות'
+    # An explicit later user decision still has precedence.
+    _, manual = restore(desc, [{**rule, 'source': 'manual'}])
+    assert manual.iloc[0]['קטגוריה'] == 'קניות'
+
+
+def test_foreign_online_service_is_not_forced_into_trip_policy():
+    _, df = restore('PAYPAL *SYNTHETIC SERVICE GB', [
+        {'merchant': 'PAYPAL *SYNTHETIC SERVICE GB', 'category': 'טכנולוגיה', 'source': 'ai'}])
+    assert df.iloc[0]['קטגוריה'] == 'טכנולוגיה'
