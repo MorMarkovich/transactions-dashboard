@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import re
+from time import monotonic
+from threading import Lock
 from urllib.parse import urlsplit
 import httpx
 from fastapi import HTTPException
@@ -29,7 +31,7 @@ def public_merchant(value):
     from .data_processor import normalize_merchant
     name = normalize_merchant(str(value))
     if not name or len(name) > 200 or re.search(
-        r'\d{6,}|@|https?://|העברה|העברת|הע\.|משכורת|חשבון|הלוואה|חיוב|יתרת|שיקים|משיכת|קבלת תשלום', name
+        r'\d{6,}|@|https?://|העברה|העברות|העברת|גביה|גבייה|הע\.|משכורת|חשבון|הלוואה|חיוב|יתרת|שיקים|משיכת|קבלת תשלום', name
     ):
         return None
     return name
@@ -57,6 +59,8 @@ def _base(env, default):
 def _request(method, url, **kwargs):
     try:
         response = httpx.request(method, url, timeout=35, follow_redirects=False, **kwargs)
+        if response.status_code == 429 and url.endswith('/usage'):
+            raise HTTPException(429, 'בדיקת המכסה מוגבלת זמנית; הזיהוי נעצר ללא מעבר לתשלום')
         if response.status_code in (429, 402, 432, 433):
             raise HTTPException(429, 'המכסה החינמית הסתיימה; לא תהיה הפעלה בתשלום')
         if response.status_code in (401, 403):
@@ -70,12 +74,15 @@ def _request(method, url, **kwargs):
         raise HTTPException(503, 'שירות הזיהוי החינמי אינו זמין כרגע') from exc
 
 
-def _identify(merchant):
-    from .ai_categorizer import _CATEGORY_MENU, VALID_CATEGORIES
-    from ..core.constants import get_subcategory_catalog
-    tavily = _base('TAVILY_API_BASE_URL', 'https://api.tavily.com')
-    headers = {'Authorization': f"Bearer {os.environ['TAVILY_API_KEY']}"}
-    usage = _request('GET', tavily + '/usage', headers=headers)
+# Tavily allows only ten /usage calls per ten minutes. This is account-level
+# admission state, not the durable merchant cache. The current deployment runs
+# one Uvicorn worker; its lock prevents simultaneous refreshes across requests.
+_SEARCH_CHECK_TTL = 600
+_search_checks = {}
+_search_check_lock = Lock()
+
+
+def _free_search_remaining(usage):
     account = usage.get('account', {})
     if not isinstance(account, dict):
         account = {}
@@ -93,6 +100,40 @@ def _identify(merchant):
     if (type(account.get('plan_usage')) is not int or
             not 0 <= account['plan_usage'] < account['plan_limit']):
         raise HTTPException(429, 'מכסת החיפוש החינמית הסתיימה')
+    return account['plan_limit'] - account['plan_usage']
+
+
+def _reserve_search_credit(tavily, headers):
+    if not configured():
+        raise HTTPException(503, 'החיבור החינמי דורש אימות מחדש')
+    key = (tavily, hashlib.sha256(os.environ['TAVILY_API_KEY'].encode()).hexdigest())
+    with _search_check_lock:
+        now = monotonic()
+        entry = _search_checks.get(key)
+        if entry is None or entry['until'] <= now:
+            # Never reuse expired positive verification after a failed refresh.
+            entry = {'until': now + _SEARCH_CHECK_TTL, 'remaining': 0}
+            _search_checks[key] = entry
+            try:
+                entry['remaining'] = _free_search_remaining(
+                    _request('GET', tavily + '/usage', headers=headers))
+            except HTTPException as exc:
+                entry['error'] = (exc.status_code, exc.detail)
+                raise
+        if 'error' in entry:
+            raise HTTPException(*entry['error'])
+        if entry['remaining'] <= 0:
+            raise HTTPException(429, 'מכסת החיפוש החינמית הסתיימה')
+        # Reserve before sending. Failed/empty searches do not refund credits.
+        entry['remaining'] -= 1
+
+
+def _identify(merchant):
+    from .ai_categorizer import _CATEGORY_MENU, VALID_CATEGORIES
+    from ..core.constants import get_subcategory_catalog
+    tavily = _base('TAVILY_API_BASE_URL', 'https://api.tavily.com')
+    headers = {'Authorization': f"Bearer {os.environ['TAVILY_API_KEY']}"}
+    _reserve_search_credit(tavily, headers)
     response = _request('POST', tavily + '/search', headers=headers, json={
         'query': merchant, 'search_depth': 'basic', 'auto_parameters': False,
         'max_results': 5, 'include_answer': False, 'include_raw_content': False,

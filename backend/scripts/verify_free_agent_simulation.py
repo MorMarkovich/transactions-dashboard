@@ -21,6 +21,7 @@ _current_user.set('00000000-0000-4000-8000-000000000001')
 
 for mode in ['ok', 'empty', 'invented', 'uncertain', 'malformed', 'paid', 'paygo', 'quota']:
     httpx.post(provider+'/scenario', json={'mode': mode}).raise_for_status()
+    agent._search_checks.clear()  # Independent synthetic provider accounts/scenarios.
     name='Synthetic '+mode
     if mode in ('paid', 'paygo', 'quota'):
         try:
@@ -43,3 +44,11 @@ for mode in ['ok', 'empty', 'invented', 'uncertain', 'malformed', 'paid', 'paygo
         agent.subcategorize('אוכל',[{'merchant':name,'total':999999}])
         assert httpx.get(provider+'/calls').json()==first
     print('PASS',mode,first)
+
+# A bulk audit exceeds ten merchants without exceeding /usage's separate limit.
+httpx.post(provider+'/scenario', json={'mode': 'ok'}).raise_for_status()
+agent._search_checks.clear()
+for i in range(12):
+    assert agent.identify('Synthetic bulk '+str(i))
+assert httpx.get(provider+'/calls').json() == {'usage': 1, 'search': 12, 'gemini': 12}
+print('PASS bulk: twelve merchants share one usage check')
