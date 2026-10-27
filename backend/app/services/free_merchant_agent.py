@@ -18,9 +18,11 @@ def enabled():
 
 
 def configured():
-    key = os.environ.get('GEMINI_API_KEY', '')
-    return bool(key and os.environ.get('TAVILY_API_KEY') and
-                hashlib.sha256(key.encode()).hexdigest() == os.environ.get('GEMINI_FREE_KEY_SHA256'))
+    for provider in ('GEMINI', 'TAVILY'):
+        key = os.environ.get(provider + '_API_KEY', '')
+        if not key or hashlib.sha256(key.encode()).hexdigest() != os.environ.get(provider + '_FREE_KEY_SHA256'):
+            return False
+    return True
 
 
 def public_merchant(value):
@@ -75,11 +77,21 @@ def _identify(merchant):
     headers = {'Authorization': f"Bearer {os.environ['TAVILY_API_KEY']}"}
     usage = _request('GET', tavily + '/usage', headers=headers)
     account = usage.get('account', {})
-    if (str(account.get('current_plan', '')).lower() not in {'free', 'researcher'} or
-            account.get('paygo_limit') != 0 or account.get('paygo_usage') != 0 or
-            type(account.get('plan_limit')) is not int or account['plan_limit'] > 1000):
+    if not isinstance(account, dict):
+        account = {}
+    # A verified free account with PAYG disabled returns an explicit null.
+    # Null alone proves nothing: require the key-specific deployment
+    # attestation, a free plan, zero paid usage and remaining free credits.
+    paygo_limit = account.get('paygo_limit')
+    if (not configured() or
+            str(account.get('current_plan', '')).lower() not in {'free', 'researcher'} or
+            'paygo_limit' not in account or
+            not (paygo_limit is None or (type(paygo_limit) is int and paygo_limit == 0)) or
+            type(account.get('paygo_usage')) is not int or account['paygo_usage'] != 0 or
+            type(account.get('plan_limit')) is not int or not 0 < account['plan_limit'] <= 1000):
         raise HTTPException(503, 'החיפוש נעצר: נדרש חשבון חינמי ללא חיוב לפי שימוש')
-    if type(account.get('plan_usage')) is not int or account['plan_usage'] >= account['plan_limit']:
+    if (type(account.get('plan_usage')) is not int or
+            not 0 <= account['plan_usage'] < account['plan_limit']):
         raise HTTPException(429, 'מכסת החיפוש החינמית הסתיימה')
     response = _request('POST', tavily + '/search', headers=headers, json={
         'query': merchant, 'search_depth': 'basic', 'auto_parameters': False,

@@ -13,8 +13,13 @@ required configuration is present; it does not call either provider.
   billing API check. A replacement key needs a new verification. Do not enable
   billing on this project later without revisiting this design.
 - Tavily Researcher/Free account, with pay-as-you-go disabled. The backend
-  checks `/usage` before every new search and refuses paid plans, any paygo
-  allowance or exhausted free credits. It uses `basic`, disables automatic
+  checks `/usage` before every new search and refuses paid plans, positive
+  paygo limits, paid usage or exhausted free credits. Set
+  `TAVILY_FREE_KEY_SHA256` only after verifying this exact key's account is
+  free with PAYG off. The live free account returns `paygo_limit: null`; this
+  value alone does not prove PAYG is disabled. The key-specific attestation
+  records the dashboard verification, just as for Gemini. Do not enable
+  billing or PAYG later without revisiting the configuration. It uses `basic`, disables automatic
   depth selection and requests at most five results. No answer/extraction.
 
 Only normalized merchant descriptors and public search snippets are sent.

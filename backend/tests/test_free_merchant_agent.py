@@ -12,6 +12,7 @@ def setup(monkeypatch):
     monkeypatch.setenv('GEMINI_API_KEY', 'synthetic-gemini')
     monkeypatch.setenv('GEMINI_FREE_KEY_SHA256', hashlib.sha256(b'synthetic-gemini').hexdigest())
     monkeypatch.setenv('TAVILY_API_KEY', 'synthetic-search')
+    monkeypatch.setenv('TAVILY_FREE_KEY_SHA256', hashlib.sha256(b'synthetic-search').hexdigest())
     saved = {}
     monkeypatch.setattr(agent.store, 'read_resolved', lambda m: saved.get(m))
     monkeypatch.setattr(agent.store, 'claim', lambda m: {'status': 'claimed', 'lease_token': 'lease'})
@@ -79,3 +80,50 @@ def test_provider_failure_is_persisted_and_not_guessed(setup, monkeypatch):
 def test_subcategory_does_not_cross_parent_category(setup):
     setup['synthetic store'] = dict(VERDICT)
     assert agent.subcategorize('קניות', [{'merchant': 'Synthetic Store'}]) == []
+
+
+@pytest.mark.parametrize('paygo_limit', [None, 0])
+def test_verified_free_account_accepts_explicit_null_or_zero_limit(setup, monkeypatch, paygo_limit):
+    calls = []
+    def request(method, url, **kwargs):
+        calls.append(url.rsplit('/', 1)[-1])
+        if url.endswith('/usage'):
+            return {'account': {'current_plan': 'Researcher', 'plan_limit': 1000,
+                    'plan_usage': 0, 'paygo_limit': paygo_limit, 'paygo_usage': 0}}
+        assert url.endswith('/search')
+        return {'results': []}
+    monkeypatch.setattr(agent, '_request', request)
+    assert agent.identify('Synthetic Store') is None
+    assert calls == ['usage', 'search']
+
+
+@pytest.mark.parametrize('change', [
+    {'current_plan': 'Bootstrap'}, {'paygo_limit': 100}, {'paygo_usage': 1},
+    {'paygo_limit': '0'}, {'paygo_limit': False}, {'paygo_usage': False},
+    {'plan_limit': 1001}, {'plan_limit': 0}, {'plan_usage': -1},
+    {'plan_usage': None}, {'plan_usage': 1000}, {'missing_paygo_limit': True},
+])
+def test_paid_unknown_or_exhausted_account_stops_before_search(setup, monkeypatch, change):
+    account = {'current_plan': 'Researcher', 'plan_limit': 1000,
+               'plan_usage': 0, 'paygo_limit': None, 'paygo_usage': 0}
+    if 'missing_paygo_limit' in change:
+        account.pop('paygo_limit')
+    else:
+        account.update(change)
+    calls = []
+    def request(method, url, **kwargs):
+        calls.append(url)
+        assert url.endswith('/usage'), 'Search must not run'
+        return {'account': account}
+    monkeypatch.setattr(agent, '_request', request)
+    with pytest.raises(HTTPException):
+        agent.identify('Synthetic Store')
+    assert len(calls) == 1
+
+
+def test_unverified_search_key_stops_before_reservation(setup, monkeypatch):
+    monkeypatch.delenv('TAVILY_FREE_KEY_SHA256')
+    monkeypatch.setattr(agent.store, 'claim', lambda m: pytest.fail('claim'))
+    monkeypatch.setattr(agent, '_request', lambda *a, **kw: pytest.fail('provider call'))
+    with pytest.raises(HTTPException):
+        agent.identify('Synthetic Store')
