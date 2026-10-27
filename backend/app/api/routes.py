@@ -1410,6 +1410,14 @@ class AICategorizeRequest(BaseModel):
     session_id: str
 
 
+@router.get('/ai-status')
+def ai_status():
+    from ..services.free_merchant_agent import enabled, configured
+    free_only = enabled()
+    return {'free_only': free_only, 'configured': configured() if free_only else False,
+            'paid_fallback': False, 'monthly_spend_limit_usd': 0 if free_only else None}
+
+
 @router.post("/ai-categorize")
 def ai_categorize(body: AICategorizeRequest):
     """Run the AI fallback (Claude + web search) on the session's remaining

@@ -161,9 +161,18 @@ const rawSupabaseApi = {
         // Table may not exist yet on older deployments — degrade gracefully.
         throw legacyErr;
       }
-      return legacy || [];
+      return [...(legacy || []), ...await supabaseApi.getIdentifiedMerchantRules(userId)];
     }
-    return data || [];
+    return [...(data || []), ...await supabaseApi.getIdentifiedMerchantRules(userId)];
+  },
+
+  getIdentifiedMerchantRules: async (userId: string): Promise<CategoryRule[]> => {
+    const { data, error } = await supabase.from('merchant_identifications')
+      .select('merchant,result,updated_at').eq('user_id', userId).eq('state', 'resolved');
+    if (error) throw error;
+    return (data || []).filter(row => row.result?.category && row.result?.confidence >= 0.9)
+      .map(row => ({ merchant: row.merchant, category: row.result.category,
+        subcategory: row.result.subcategory || '', source: 'ai' as const, updated_at: row.updated_at }));
   },
 
   /**

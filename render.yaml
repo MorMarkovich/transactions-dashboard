@@ -15,6 +15,15 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: AI_PROVIDER
+        value: gemini-free
+      - key: GEMINI_API_KEY
+        sync: false
+      # Set only after verifying this exact key belongs to an unbilled project.
+      - key: GEMINI_FREE_KEY_SHA256
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
       - key: ALLOWED_ORIGINS
         value: https://transactions-dashboard-bfxn.onrender.com
       - key: VITE_AUTO_AI

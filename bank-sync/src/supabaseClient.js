@@ -32,7 +32,14 @@ export async function getCategoryRules(supabase, userId) {
     .select('merchant, category, subcategory, source, updated_at')
     .eq('user_id', userId)
   if (error) throw safeError('SUPABASE_READ_FAILED')
-  return data || []
+  const { data: identified, error: identificationError } = await supabase
+    .from('merchant_identifications').select('merchant,result,updated_at')
+    .eq('user_id', userId).eq('state', 'resolved')
+  if (identificationError) throw safeError('SUPABASE_READ_FAILED')
+  const cached = (identified || []).filter(row => row.result?.category && row.result?.confidence >= 0.9)
+    .map(row => ({merchant: row.merchant, category: row.result.category,
+      subcategory: row.result.subcategory || '', source: 'ai', updated_at: row.updated_at}))
+  return [...(data || []), ...cached]
 }
 
 export async function getUserCategories(supabase, userId) {

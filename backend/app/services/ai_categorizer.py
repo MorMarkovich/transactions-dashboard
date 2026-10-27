@@ -20,6 +20,7 @@ import re
 import json
 import logging
 from typing import Optional
+from . import free_merchant_agent
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,8 @@ def audit_merchants(items: list[dict], on_progress=None) -> Optional[list[dict]]
     Returns:
         [{index, category, confidence, reason}, ...] or None if AI unavailable.
     """
+    if free_merchant_agent.enabled():
+        return free_merchant_agent.audit(items, on_progress)
     if not items:
         return []
 
@@ -271,6 +274,8 @@ def audit_merchants(items: list[dict], on_progress=None) -> Optional[list[dict]]
 
 def _get_client():
     """Get Anthropic client, returns None if API key not configured."""
+    if os.environ.get('AI_PROVIDER', 'gemini-free') != 'anthropic':
+        return None
     api_key = os.environ.get('ANTHROPIC_API_KEY')
     if not api_key:
         return None
@@ -481,6 +486,8 @@ def categorize_transactions(descriptions: list[str], issuers: Optional[list] = N
     card-company sector (ענף_מקור) is passed to Claude as a hint. Returns a
     dict mapping index → category name, or None if AI is unavailable.
     """
+    if free_merchant_agent.enabled():
+        return free_merchant_agent.categorize(descriptions, on_progress)
     if not descriptions:
         return {}
 
@@ -620,6 +627,8 @@ def suggest_subcategories(category: str, items: list[dict], existing: list[str])
         [{index, subcategory}, ...] (subcategory may be ''), or None if AI is
         unavailable.
     """
+    if free_merchant_agent.enabled():
+        return free_merchant_agent.subcategorize(category, items)
     if not items:
         return []
     client = _get_client()

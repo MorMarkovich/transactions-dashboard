@@ -329,6 +329,16 @@ export default function Layout({ children }: LayoutProps) {
   // silent and confidence is high). A floating pill shows live progress from
   // GET /ai-progress so it's visible that cataloging is running / finished.
   const runAiChain = useCallback(async (sessionId: string, userId: string) => {
+    try {
+      const status = await transactionsApi.aiStatus()
+      if (status.free_only && !status.configured) {
+        setAiStatus({ label: 'זיהוי חינמי — ממתין להשלמת החיבור', done: true })
+        return
+      }
+    } catch {
+      setAiStatus({ label: 'לא ניתן לבדוק את זמינות הזיהוי כרגע', done: true })
+      return
+    }
     let incomplete = false
     const poll = async () => {
       try {
