@@ -1,6 +1,6 @@
 // Turn raw israeli-bank-scrapers transactions into the dashboard's Hebrew-keyed
 // shape (see backend/app/models/transaction.py + data_processor.py).
-import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExempt, VALID_CATEGORIES, migrateCategory } from './categorize.js'
+import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExempt, VALID_CATEGORIES, migrateCategory, ruleSubcategory, normalizeMerchant } from './categorize.js'
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
@@ -50,7 +50,7 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
   }
   // Subcategory (קטגוריה_משנה) derived from the finalized category. The
   // dashboard re-derives this on restore too, so this is parity-only.
-  const subcategory = subcategorize(category, baseDesc)
+  const subcategory = ruleSubcategory(category, baseDesc, ruleMap)
 
   // When installments are split, each monthly charge shares the merchant, date
   // and amount — tag it with n/total so it stays a distinct row (survives dedup)
@@ -169,6 +169,7 @@ export function refreshMiscCategories(txns, ruleMap) {
 
   let changed = 0
   for (const t of txns) {
+    if (t._locked) continue
     const baseDesc = String(t['תיאור'] || '').replace(/\s*\(תשלום \d+\/\d+\)\s*$/, '').trim()
     // Old-taxonomy names in the stored snapshot are migrated in place first —
     // otherwise the validity check below would nuke them all to שונות.
@@ -210,10 +211,12 @@ export function refreshMiscCategories(txns, ruleMap) {
     }
     // An invalid stored category must not survive even when nothing matches —
     // reset it to שונות so the dashboard/AI treat it as uncategorized.
-    if (category === stored) continue
+    const rule = ruleMap?.get(normalizeMerchant(baseDesc))
+    const manual = rule?.source === 'manual' && rule.category === category
+    if (category === stored && (!manual || (t['קטגוריה_משנה'] || '') === (rule.subcategory || ''))) continue
     t['קטגוריה'] = category
     // The old subcategory belonged to the old category — re-derive.
-    t['קטגוריה_משנה'] = category !== 'שונות' ? subcategorize(category, baseDesc) : ''
+    t['קטגוריה_משנה'] = ruleSubcategory(category, baseDesc, ruleMap)
     changed++
   }
   return changed

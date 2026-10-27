@@ -265,7 +265,7 @@ export default function Dashboard() {
         // and remember it locally so pickers offer it immediately.
         if (!ASSIGNABLE_CATEGORIES.includes(newCategory)) {
           addCustomCategory(newCategory)
-          if (user) supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
+          if (user) await supabaseApi.upsertUserCategory(user.id, newCategory)
         }
         if (user && onlyThis && resp.txn_key) {
           // "אל תשנה עסקאות דומות": pin ONLY this transaction — no merchant
@@ -273,18 +273,13 @@ export default function Dashboard() {
           // their own categories, now and on every future restore.
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, newCategory, null)
-            .catch((e) => {
-              console.warn('Failed to persist transaction override:', e)
-            })
         } else if (user && !onlyThis) {
           if (resp.merchant) {
-            await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory).catch((e) => {
-              console.warn('Failed to persist category rule (will retry on next edit):', e)
-            })
+            await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory)
           }
           // A normal edit explicitly unpins the row (back to merchant-rule mode).
           if (resp.txn_key) {
-            supabaseApi.deleteTransactionOverride(user.id, resp.txn_key).catch(() => {})
+            await supabaseApi.deleteTransactionOverride(user.id, resp.txn_key)
           }
         }
       } finally {
@@ -317,15 +312,9 @@ export default function Dashboard() {
           // merchant-wide rule.
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, resp.category, newSubcategory || null)
-            .catch((e) => {
-              console.warn('Failed to persist transaction override:', e)
-            })
         } else if (user && !onlyThis && resp.merchant && resp.category) {
           await supabaseApi
             .upsertCategorySubrule(user.id, resp.merchant, resp.category, newSubcategory)
-            .catch((e) => {
-              console.warn('Failed to persist subcategory rule (will retry on next edit):', e)
-            })
         }
       } finally {
         // Same as handleCategoryChange: refresh in place, don't close.
@@ -348,26 +337,26 @@ export default function Dashboard() {
         const resp = await transactionsApi.bulkUpdateCategory(sessionId, ids, newCategory, newSubcategory, onlyThis)
         if (!ASSIGNABLE_CATEGORIES.includes(newCategory)) {
           addCustomCategory(newCategory)
-          if (user) supabaseApi.upsertUserCategory(user.id, newCategory).catch(() => {})
+          if (user) await supabaseApi.upsertUserCategory(user.id, newCategory)
         }
         if (newSubcategory) addCustomSubcategory(newCategory, newSubcategory)
         if (user) {
           if (onlyThis) {
             // Pin each selected row.
-            await Promise.allSettled(resp.items.map((it) =>
+            await Promise.all(resp.items.map((it) =>
               supabaseApi.upsertTransactionOverride(user.id, it.txn_key, newCategory, newSubcategory),
             ))
           } else {
             // One rule per unique merchant + unpin the selected rows.
             const merchants = Array.from(new Set(resp.items.map((it) => it.merchant).filter(Boolean)))
-            await Promise.allSettled(merchants.map((m) =>
+            await Promise.all(merchants.map((m) =>
               newSubcategory
                 ? supabaseApi.upsertCategorySubrule(user.id, m, newCategory, newSubcategory)
                 : supabaseApi.upsertCategoryRule(user.id, m, newCategory),
             ))
-            Promise.allSettled(resp.items.map((it) =>
+            await Promise.all(resp.items.map((it) =>
               supabaseApi.deleteTransactionOverride(user.id, it.txn_key),
-            )).catch(() => {})
+            ))
           }
         }
       } finally {
@@ -457,7 +446,7 @@ export default function Dashboard() {
     try {
       const [transactions, rules, overrides, customCats, notes] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
-        supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getCategoryRules(user.id),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
         supabaseApi.getTransactionNotes(user.id).catch(() => []),
@@ -817,7 +806,7 @@ export default function Dashboard() {
     try {
       const [transactions, rules, overrides, customCats, notes] = await Promise.all([
         supabaseApi.getLatestTransactions(user.id),
-        supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getCategoryRules(user.id),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
         supabaseApi.getTransactionNotes(user.id).catch(() => []),

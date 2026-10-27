@@ -165,7 +165,8 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'צימר', 'zimmer', 'אכסניה', 'אכסניית', 'trip.com', 'getyourguide',
         'rentalcars', 'נסיעות לחו"ל', 'חבילת נופש', 'בתי מלון',
         'קווי חופשה', 'airbaltic', 'air baltic', 'ניו ויז\'ן טורס',
-        'elal', 'אייר חיפה', 'air haifa', 'etihad', 'airalo',
+        'elal', 'אייר חיפה', 'air haifa', 'etihad', 'airalo', 'maya mobile', 'maxima lt', 'maxima lv',
+        'new yorker lietuva',
         'double tree', 'doubletree', 'hilton', 'kohchang', 'koh chang',
         'railninja', 'rail ninja', 'rajadha', 'olive young', 'lottebaikhoajeom',
     ],
@@ -175,7 +176,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         # brand bills as latin 'primadonna', kept under קניות).
         'פרימדונה',
         # ── Supermarkets & grocery ──
-        'שופרסל', 'רמי לוי', 'מגה', 'יוחננוף', 'אושר עד', 'חצי חינם',
+        'שופרסל', 'merkaza', 'מרכזא', 'רמי לוי', 'מגה', 'יוחננוף', 'אושר עד', 'חצי חינם',
         'ויקטורי', 'טיב טעם', 'פרש מרקט', 'סופר', 'מכולת', 'קרפור',
         'מינימרקט', 'am:pm',
         'קואופ', 'נתיב החסד', 'סטופ מרקט', 'זול ובגדול',
@@ -387,7 +388,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'אייבורי', 'ivory', 'מחשבים',
         'samsung', 'סמסונג', 'dell', 'lenovo',
         'שיאומי', 'xiaomi',
-        'באג', 'מחסני חשמל', 'machsanei', 'שקם אלקטריק', 'shekem',
+        'באג', 'מחסני חשמל', 'טרקלין חשמל', 'ליאור מוצרי חשמל', 'machsanei', 'שקם אלקטריק', 'shekem',
         'idigital', 'איי דיגיטל', 'istore', 'מקסטור', 'last price',
         'לאסט פרייס', 'pc center', 'הום אלקטרוניק', 'ולנשטיין',
         'temu', 'טמו', 'banggood',
@@ -405,7 +406,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'נעליים',
         'primadonna',
         'לורן', 'lauren', 'טומי', 'tommy',
-        'נקסט', 'next', 'gap', 'old navy', 'lacoste', 'לקוסט', 'ralph',
+        'נקסט', 'next', 'gap', 'levi s', 'old navy', 'lacoste', 'לקוסט', 'ralph',
         'massimo', 'מסימו', 'oysho', 'אוישו', 'victoria', 'דלתא', 'delta',
         'reebok', 'ריבוק', 'under armour', 'new balance', 'crocs', 'קרוקס',
         'סקצ\'רס', 'skechers', 'timberland', 'aldo', 'אלדו', 'scoop', 'סקופ',
@@ -429,7 +430,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
         'כלי עבודה', 'ברזל', 'גמיש', 'urban', 'הכל לבית', 'בית וגן',
         'מ. שטרן', 'דקור', 'decor', 'wishlist', 'מיאדרה',
         # discount variety / stock stores — household goods
-        'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock',
+        'סטוק סנטר', 'booom', 'זול סטוק', 'מקס סטוק', 'max stock', 'מיקה מקס', 'כיתן',
     ],
     # ── Personal grooming & beauty ──
     'טיפוח': [
@@ -480,7 +481,7 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     ],
     # ── Sushi the pet: vet, food & treats (was חיות מחמד) ──
     'סושי': [
-        'וטרינר', 'veterinary', 'חיות מחמד', 'חיות',
+        'וטרינר', 'מרפאת חיות', 'מרפאה לחיות', 'veterinary', 'חיות מחמד', 'חיות',
         'פט שופ', 'pet shop', 'pet store',
         'מזון לחיות', 'כלב', 'חתול',
         'אניפט', 'anipet', 'פטלנד', 'petland',
@@ -507,6 +508,9 @@ _EXACT_WORD_KEYWORDS: dict[str, list[str]] = {
     'חוגים וספורט': ['gym'],
     'טיפוח': ['ספא', 'spa'],
 }
+
+# These tokens are brands/words, never arbitrary substrings inside another word.
+BOUNDED_KEYWORDS = frozenset({'gap', 'לגו', 'lego', 'ירק', 'פרי', 'next', 'apple', 'bolt', 'כיתן', 'merkaza', 'מרכזא'})
 
 # Build flat lookup: keyword (lowercase) → category
 for _cat, _keywords in _CATEGORY_KEYWORDS.items():
@@ -769,7 +773,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
         # קניות גדולות first (brand chains), then סופרים קטנים (the
         # neighborhood shops), so a branded branch never falls to the generic
         # מינימרקט/סופרמרקט keywords.
-        'קניות גדולות': ['שופרסל', 'shufersal', 'רמי לוי', 'rami levy',
+        'קניות גדולות': ['merkaza', 'מרכזא', 'שופרסל', 'shufersal', 'רמי לוי', 'rami levy',
                            'ויקטורי', 'victory', 'יינות ביתן', 'טיב טעם',
                            'tiv taam', 'אושר עד', 'osher ad', 'חצי חינם',
                            'יוחננוף', 'yochananof', 'קרפור', 'carrefour',
@@ -795,7 +799,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
         # שונות: whatever nothing above catches.
     },
     'קניות': {
-        'אלקטרוניקה': ['שקם אלקטריק', 'מחסני חשמל', 'באג', 'bug', 'ksp',
+        'אלקטרוניקה': ['שקם אלקטריק', 'מחסני חשמל', 'טרקלין חשמל', 'ליאור מוצרי חשמל', 'באג', 'bug', 'ksp',
                          'אייבורי', 'ivory', 'אלקטרה', 'זאפ', 'שיא החשמל',
                          'idigital', 'איי דיגיטל', 'istore', 'מקסטור',
                          'last price', 'לאסט פרייס', 'samsung', 'סמסונג',
@@ -827,7 +831,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
                          'ורדינון', 'vardinon', 'טמבור', 'tambour', 'נירלט',
                          'צבע', 'כלי עבודה', 'תמי 4', 'tami4', 'דקור',
                          'decor', 'סטוק סנטר', 'booom', 'זול סטוק',
-                         'מקס סטוק', 'max stock', 'זול בשפע',
+                         'מקס סטוק', 'max stock', 'מיקה מקס', 'כיתן', 'זול בשפע',
                          'כלבו חצי חינם'],
     },
     'חוגים וספורט': {
@@ -873,7 +877,7 @@ SUBCATEGORY_KEYWORDS: dict[str, dict[str, list[str]]] = {
                              'autotel', 'אוטוטל', 'car2go', 'ווואש', 'woosh'],
     },
     'סושי': {
-        'וטרינרית וטיפולים': ['וטרינר', 'veterinary', 'פנסיון כלבים',
+        'וטרינרית וטיפולים': ['וטרינר', 'מרפאת חיות', 'מרפאה לחיות', 'veterinary', 'פנסיון כלבים',
                                  'מספרת כלבים', 'אילוף'],
         'אוכל וחטיפים': ['פט שופ', 'pet shop', 'pet store', 'מזון לחיות',
                            'אניפט', 'anipet', 'פטלנד', 'petland', 'וט מרקט',

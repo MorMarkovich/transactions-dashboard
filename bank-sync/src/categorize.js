@@ -13,20 +13,20 @@ const STANDING_ORDER_KEYWORDS = ["הוראת קבע", "הו\"ק", "הוק", "sta
 
 // keyword → category, in priority order. Mirrors _CATEGORY_KEYWORDS.
 const CATEGORY_KEYWORDS = {
-  "טיסות ותיירות": ["booking", "airbnb", "hotels.com", "expedia", "tripadvisor", "hostel", "hotel", "אירביאנבי", "בוקינג", "טיסה", "טיסות", "flight", "airline", "airways", "אל על", "el al", "wizz air", "ryanair", "easyjet", "turkish air", "lufthansa", "aegean", "united airlines", "british airways", "מלון", "מלונות", "resort", "נופש", "vacation", "duty free", "דיוטי פרי", "תיירות", "tourism", "travel", "אטרקציה", "attraction", "דרכון", "passport", "visa fee", "אגודה", "agoda", "kayak", "skyscanner", "הרץ", "hertz", "avis rent", "budget rent", "סיקסט", "sixt", "איסתא", "issta", "אופיר טורס", "ophir tours", "דיזנהויז", "גוליבר", "ארקיע", "arkia", "ישראייר", "israir", "wizzair", "pegasus", "דקה 90", "eldan", "אלדן", "lastminute", "fattal", "פתאל", "isrotel", "ישרוטל", "דן פנורמה", "לאונרדו", "leonardo", "club hotel", "קלאב הוטל", "הרברט סמואל", "רימונים", "צימר", "zimmer", "אכסניה", "אכסניית", "trip.com", "getyourguide", "rentalcars", "נסיעות לחו\"ל", "חבילת נופש", "בתי מלון", "קווי חופשה", "airbaltic", "air baltic", "ניו ויז'ן טורס", "elal", "אייר חיפה", "air haifa", "etihad", "airalo", "double tree", "doubletree", "hilton", "kohchang", "koh chang", "railninja", "rail ninja", "rajadha", "olive young", "lottebaikhoajeom"],
-  "אוכל": ["פרימדונה", "שופרסל", "רמי לוי", "מגה", "יוחננוף", "אושר עד", "חצי חינם", "ויקטורי", "טיב טעם", "פרש מרקט", "סופר", "מכולת", "קרפור", "מינימרקט", "am:pm", "קואופ", "נתיב החסד", "סטופ מרקט", "זול ובגדול", "שפע שוק", "מחסני השוק", "פרשמרקט", "כלבו", "מרקט", "פרי", "ירק", "ירקות", "פירות", "בית הפרי", "ממתק", "ממתקי", "מתוק", "שוקולד", "חלבי", "מאפה", "בשר", "עוף", "דגים", "קצביה", "אטליז", "grocery", "יין", "wine", "אלכוהול", "משקאות", "סיבוס", "cibus", "תן ביס", "pluxee", "פלאקסי", "wolt", "וולט", "10bis", "תנביס", "משלוחה", "משלוחים", "משלוח", "הזמנת אוכל", "delivery", "shufersal", "rami levy", "osher ad", "יינות ביתן", "סופרמרקט", "מרכול", "יש חסד", "יש בשכונה", "ברכל", "קינג סטור", "מחסני מזון", "סופר יהודה", "סופר דוש", "מעדניה", "מאפיית", "מאפיה", "קצביית", "דברי מאפה", "יקב", "גבינות", "בייקרי", "bakery", "מאפייה", "קונדיטוריה", "קונדטוריה", "קונדיטורית", "פטיסרי", "קרואסון", "שוק העיר", "שוק מהדרין", "תנובה", "שטראוס", "יטבתה", "ביכורי השדה", "סלסלת", "7-eleven", "7 eleven", "7-11", "פיצוצי", "פיצוצייה", "פיצוציה", "קיוסק"],
+  "טיסות ותיירות": ["booking", "airbnb", "hotels.com", "expedia", "tripadvisor", "hostel", "hotel", "אירביאנבי", "בוקינג", "טיסה", "טיסות", "flight", "airline", "airways", "אל על", "el al", "wizz air", "ryanair", "easyjet", "turkish air", "lufthansa", "aegean", "united airlines", "british airways", "מלון", "מלונות", "resort", "נופש", "vacation", "duty free", "דיוטי פרי", "תיירות", "tourism", "travel", "אטרקציה", "attraction", "דרכון", "passport", "visa fee", "אגודה", "agoda", "kayak", "skyscanner", "הרץ", "hertz", "avis rent", "budget rent", "סיקסט", "sixt", "איסתא", "issta", "אופיר טורס", "ophir tours", "דיזנהויז", "גוליבר", "ארקיע", "arkia", "ישראייר", "israir", "wizzair", "pegasus", "דקה 90", "eldan", "אלדן", "lastminute", "fattal", "פתאל", "isrotel", "ישרוטל", "דן פנורמה", "לאונרדו", "leonardo", "club hotel", "קלאב הוטל", "הרברט סמואל", "רימונים", "צימר", "zimmer", "אכסניה", "אכסניית", "trip.com", "getyourguide", "rentalcars", "נסיעות לחו\"ל", "חבילת נופש", "בתי מלון", "קווי חופשה", "airbaltic", "air baltic", "ניו ויז'ן טורס", "elal", "אייר חיפה", "air haifa", "etihad", "airalo", "maya mobile", "maxima lt", "maxima lv", "new yorker lietuva", "double tree", "doubletree", "hilton", "kohchang", "koh chang", "railninja", "rail ninja", "rajadha", "olive young", "lottebaikhoajeom"],
+  "אוכל": ["פרימדונה", "שופרסל", "merkaza", "מרכזא", "רמי לוי", "מגה", "יוחננוף", "אושר עד", "חצי חינם", "ויקטורי", "טיב טעם", "פרש מרקט", "סופר", "מכולת", "קרפור", "מינימרקט", "am:pm", "קואופ", "נתיב החסד", "סטופ מרקט", "זול ובגדול", "שפע שוק", "מחסני השוק", "פרשמרקט", "כלבו", "מרקט", "פרי", "ירק", "ירקות", "פירות", "בית הפרי", "ממתק", "ממתקי", "מתוק", "שוקולד", "חלבי", "מאפה", "בשר", "עוף", "דגים", "קצביה", "אטליז", "grocery", "יין", "wine", "אלכוהול", "משקאות", "סיבוס", "cibus", "תן ביס", "pluxee", "פלאקסי", "wolt", "וולט", "10bis", "תנביס", "משלוחה", "משלוחים", "משלוח", "הזמנת אוכל", "delivery", "shufersal", "rami levy", "osher ad", "יינות ביתן", "סופרמרקט", "מרכול", "יש חסד", "יש בשכונה", "ברכל", "קינג סטור", "מחסני מזון", "סופר יהודה", "סופר דוש", "מעדניה", "מאפיית", "מאפיה", "קצביית", "דברי מאפה", "יקב", "גבינות", "בייקרי", "bakery", "מאפייה", "קונדיטוריה", "קונדטוריה", "קונדיטורית", "פטיסרי", "קרואסון", "שוק העיר", "שוק מהדרין", "תנובה", "שטראוס", "יטבתה", "ביכורי השדה", "סלסלת", "7-eleven", "7 eleven", "7-11", "פיצוצי", "פיצוצייה", "פיצוציה", "קיוסק"],
   "בילויים": ["מסעדה", "מסעדת", "קפה ", "בית קפה", "פיצה", "פיצריה", "סושי", "בורגר", "שווארמה", "פלאפל", "חומוס", "מקדונלד", "mcdonald", "דומינו", "domino", "פאפא ג'ונס", "papa john", "ארומה", "aroma", "cofix", "קופיקס", "קפה קפה", "cafe cafe", "לנדוור", "landwer", "רולדין", "roladin", "גרג", "greg", "אספרסו", "espresso", "japanika", "ג'פניקה", "שיפודי", "shipudei", "restaurant", "starbucks", "סטארבקס", "מושלי", "עילאי", "רשי 33", "קייטרינג", "catering", "טאקו", "taco", "kfc", "burger king", "בורגר קינג", "subway", "סאבוויי", "שניצל", "גלידה", "ice cream", "cafe", "rest.", "מזנון", "ביסטרו", "bistro", "בראסרי", "גריל", "grill", "טאבון", "pub", "פאב", "בירה", "beer", "פיצה האט", "pizza hut", "בנדיקט", "benedict", "מוזס", "moses", "אגאדיר", "agadir", "הומבורגר", "גולדה", "goldas", "אניטה", "anita", "מקס ברנר", "max brenner", "גירף", "giraffe", "טוני וספה", "בורגרים", "הבורגר", "שייקסבורגר", "black bar", "בייגל", "bagel", "דונאטס", "donut", "cup o joe", "ארקפה", "arcaffe", "נספרסו", "nespresso", "קפה לואיז", "ולנטינה", "casa", "מקדונלדס", "שקשוקה", "קינוח", "קינוחים", "kermeet", "קרמיט", "המאסטרו", "rosso vino", "סינמה", "cinema", "סינמה סיטי", "yes planet", "הופעה", "כרטיסים", "eventim", "לאן", "leaan", "הצגה", "מופע", "תיאטרון", "גן חיות", "zoo", "יס פלאנט", "רב חן", "רב-חן", "גלובוס מקס", "לב סינמה", "סינמטק", "מוזיאון", "museum", "ספארי", "safari", "לונה פארק", "סופרלנד", "גימבורי", "gymboree", "משחקייה", "אסקייפ", "חדר בריחה", "באולינג", "bowling", "קרטינג", "karting", "פיינטבול", "לייזר טאג", "סקייט", "טוטו", "winner", "ווינר", "מפעל הפיס", "pais", "זאפה", "zappa", "ברבי", "barby", "בלוק", "האנגר", "hangar", "הבימה", "הקאמרי", "בית ליסין", "תיאטרון גשר", "צוותא", "היכל התרבות", "בלאק בוקס", "קולנוע", "מובילנד"],
   "הוצאות משתנות": ["רב קו", "רב-קו", "ravkav", "אגד", "egged", "מטרופולין", "metropoline", "קווים", "kavim", "רכבת ישראל", "israel railways", "מונית", "taxi", "gett", "yango", "יאנגו", "uber", "אוטובוס", "חניה", "חנייה", "parking", "פנגו", "pango", "סלופארק", "cellopark", "cello park", "אי וויי", "iway", "מוסך", "מוסכים", "מוסכי", "garage", "צמיגים", "tires", "רישוי", "רישיון רכב", "אגרה", "כביש 6", "כביש אגרה", "מנהרות", "מנהרת", "tunnel", "רכבת קלה", "הרכבת הקלה", "מטרונית", "דן באב", "autotel", "אוטוטל", "car2go", "sharenow", "באבל דן", "אחוזת חוף", "חניון", "parking lot", "שטיפת רכב", "רחיצת", "car wash", "מכונאי", "פנצ'ר", "גרר", "מצבר", "חלפים", "מכון רישוי", "בדיקת רכב", "ליסינג", "leasing", "אלבר", "albar", "קל אוטו", "אוויס רנט", "אלדן רכב", "ניו קופל", "קרית הרכב", "קריית הרכב", "מרכז הרכב", "תחבורה", "רב-פס", "רב פס", "ווואש", "woosh"],
   "הוצאות שוטפות": ["דלק", "תדלוק", "סונול", "sonol", "דור אלון", "doralon", "delek", "fuel", "חברת החשמל", "חשמל", "ten דלק", "paz", "yellow", "מנטה", "menta", "אלונית", "alonit", "תחנת דלק", "דלקן", "pazomat", "פזומט", "סופרגז", "supergas", "אמישראגז", "amisragas", "פזגז", "דורגז", "אמ.ש.ר.ג", "בלוני גז", "תאגיד החשמל", "דור-ארגמן", "דור ארגמן", "דור-האיצטדיון", "דור -האיצטדיון", "עירייה", "עיריית", "עירית", "ארנונה", "משרד הפנים", "משרד הרישוי", "רשות האוכלוסין", "רשות המיסים", "מס הכנסה", "ביטוח לאומי", "מע\"מ", "אגרת", "קנס", "דוח חניה", "מועצה אזורית", "מועצה מקומית", "תאגיד מים", "מי אביבים", "הגיחון", "מי שבע", "מי רעננה", "מי נע", "מים וביוב", "מי כרמל", "מי רמת גן", "מי לוד", "מי ציונה", "מי גליל", "מי הרצליה", "מי מודיעין", "מי בית שמש", "מי נתניה", "מי אונו", "פלגי מוצקין", "דואר ישראל", "דואר", "רשות מקרקעי", "טאבו", "הוצאה לפועל", "בתי המשפט", "משטרת ישראל", "אגף הגביה", "היטל", "אגרות", "מילגם", "מס במקור", "ניכוי במקור", "תשלום מס", "ביטוח", "insurance", "מגדל ביטוח", "ביטוח רכב", "כלל ביטוח", "הפניקס", "פוליסה", "policy", "איילון חב", "איילון ביטוח", "ביטוח איילון", "איילון פנסיה", "הראל ביטוח", "הראל פנסיה", "הראל השקעות", "מנורה מבטחים", "הכשרה ביטוח", "ביטוח ישיר", "ביטוח חקלאי", "שירביט", "shirbit", "ליברה", "libra", "wobi", "וובי", "9 מיליון", "aig", "איי איי ג'י", "פספורטכרד", "passportcard", "דייויד שילד", "davidshield", "קצין הביטוח", "דמי ביטוח", "גמל", "פנסיה", "השתלמות", "סלקום", "cellcom", "פרטנר", "partner", "הוט מובייל", "hot mobile", "הוט נט", "hot net", "בזק", "bezeq", "פלאפון", "pelephone", "גולן טלקום", "golan telecom", "we4g", "סלולר", "cellular", "רמי לוי תקשורת", "012", "013", "014", "019", "נטוויז'ן", "netvision", "triple c", "אינטרנט רימון", "fiber", "סיבים", "פרי tv", "free telecom", "הוט טלקום", "partner tv", "yes tv", "שכר דירה", "שכירות", "נטפליקס", "netflix", "ספוטיפיי", "spotify", "youtube", "יוטיוב", "disney", "דיסני", "hbo", "prime video", "paramount", "פרמאונט", "apple tv", "audible", "kindle", "televizo", "iptv", "מנוי", "subscription", "membership", "annual fee", "דמי ניהול", "עמלת", "דמי כרטיס", "דמי חבר", "דמי שירות", "דמי טיפול", "patreon", "פטראון", "substack", "linkedin", "לינקדאין", "zoom", "amazon prime", "דמי מנוי", "חידוש מנוי"],
   "תרופות וטיפולים": ["מכבי", "כללית", "מאוחדת", "לאומית", "בית מרקחת", "pharmacy", "רוקח", "רופא", "דוקטור", "doctor", "dr.", "מרפאה", "מרפאת", "clinic", "דנטל", "dental", "שיניים", "רופא שיניים", "אופטיקה", "optic", "משקפיים", "עדשות", "פיזיותרפיה", "physiotherapy", "כירופרקט", "פסיכולוג", "פסיכיאטר", "therapist", "therapy", "בית חולים", "hospital", "תרופות", "medication", "אסותא", "assuta", "הרצליה מדיקל", "איכילוב", "תל השומר", "שיבא", "רמב\"ם", "סורוקה", "הדסה", "בלינסון", "וולפסון", "טרם", "terem", "ביקור רופא", "מוקד רופאים", "נטלי", "natali", "שח\"ל", "femi", "פמי", "מעבדה", "מעבדות", "בדיקות דם", "אופטיקנה", "אופטיק", "הלפרין", "ירדן אופטיק", "erroca", "ארוקה", "אורטופד", "אורתודונט", "שתל שיניים", "יישור שיניים", "דיאטנית", "תזונאי", "נטורופת", "הומאופת", "קוסמטיקה רפואית", "מדיקל", "l.b.y", "lby group"],
   "פארם": ["סופר פארם", "סופר-פארם", "super pharm", "super-pharm", "superpharm", "גוד פארם", "good pharm", "ניו פארם", "new pharm", "פארם", "pharm", "דראגסטור", "drugstore"],
   "טכנולוגיה": ["apple", "אפל", "google", "גוגל", "מיקרוסופט", "microsoft", "steam", "playstation", "xbox", "nintendo", "app store", "חנות אפליקציות", "github", "adobe", "canva", "notion", "dropbox", "icloud", "אייקלאוד", "office 365", "microsoft 365", "אופיס 365", "epic games", "ubisoft", "roblox", "רובלוקס", "twitch", "discord", "גיימינג", "render.com", "digitalocean", "digitalocea", "alldebrid", "browserbase", "browserba"],
-  "קניות": ["באג מולטי", "bug multi", "ksp", "איביי", "ebay", "אמזון", "amazon", "אלי אקספרס", "aliexpress", "ali express", "אייבורי", "ivory", "מחשבים", "samsung", "סמסונג", "dell", "lenovo", "שיאומי", "xiaomi", "באג", "מחסני חשמל", "machsanei", "שקם אלקטריק", "shekem", "idigital", "איי דיגיטל", "istore", "מקסטור", "last price", "לאסט פרייס", "pc center", "הום אלקטרוניק", "ולנשטיין", "temu", "טמו", "banggood", "אלקטרוניק", "electronics", "אודיו", "audio", "זארה", "zara", "h&m", "פול אנד בר", "pull&bear", "מנגו", "mango", "קסטרו", "castro", "אמריקן איגל", "american eagle", "נעלי", "shoes", "בגדי", "רנואר", "renuar", "תמנון", "שילב", "shilav", "טרמינל", "terminal x", "אסוס", "asos", "נייקי", "nike", "אדידס", "adidas", "פומה", "סטרדיווריוס", "stradivarius", "ברשקה", "bershka", "intimissimi", "calzedonia", "נעליים", "primadonna", "לורן", "lauren", "טומי", "tommy", "נקסט", "next", "gap", "old navy", "lacoste", "לקוסט", "ralph", "massimo", "מסימו", "oysho", "אוישו", "victoria", "דלתא", "delta", "reebok", "ריבוק", "under armour", "new balance", "crocs", "קרוקס", "סקצ'רס", "skechers", "timberland", "aldo", "אלדו", "scoop", "סקופ", "גולברי", "golbary", "אדיקה", "adika", "factory 54", "פקטורי 54", "superdry", "tfc", "carter", "תכשיט", "jewelry", "pandora", "פנדורה", "magnolia", "מגנוליה", "fossil", "swarovski", "סברובסקי", "children", "הלבשה", "הנעלה", "אאוטלט", "outlet", "סטוק פקטורי", "pedro pps", "איקאה", "ikea", "הום סנטר", "home center", "ace hardware", "מרכז השיפוצים", "ריהוט", "עצמל\"ה", "home depot", "שיפוצים", "כלי בית", "מצעים", "שטיח", "וילון", "פוקס הום", "fox home", "אלקטרה", "electra", "ביתילי", "bitili", "נעמן", "naaman", "ורדינון", "vardinon", "כספי", "תמי 4", "tami4", "עמינח", "aminach", "הוליווד", "רהיטי", "furniture", "מזרן", "mattress", "דורגל", "טמבור", "tambour", "נירלט", "nirlat", "צבע", "paint", "כלי עבודה", "ברזל", "גמיש", "urban", "הכל לבית", "בית וגן", "מ. שטרן", "דקור", "decor", "wishlist", "מיאדרה", "סטוק סנטר", "booom", "זול סטוק", "מקס סטוק", "max stock"],
+  "קניות": ["באג מולטי", "bug multi", "ksp", "איביי", "ebay", "אמזון", "amazon", "אלי אקספרס", "aliexpress", "ali express", "אייבורי", "ivory", "מחשבים", "samsung", "סמסונג", "dell", "lenovo", "שיאומי", "xiaomi", "באג", "מחסני חשמל", "טרקלין חשמל", "ליאור מוצרי חשמל", "machsanei", "שקם אלקטריק", "shekem", "idigital", "איי דיגיטל", "istore", "מקסטור", "last price", "לאסט פרייס", "pc center", "הום אלקטרוניק", "ולנשטיין", "temu", "טמו", "banggood", "אלקטרוניק", "electronics", "אודיו", "audio", "זארה", "zara", "h&m", "פול אנד בר", "pull&bear", "מנגו", "mango", "קסטרו", "castro", "אמריקן איגל", "american eagle", "נעלי", "shoes", "בגדי", "רנואר", "renuar", "תמנון", "שילב", "shilav", "טרמינל", "terminal x", "אסוס", "asos", "נייקי", "nike", "אדידס", "adidas", "פומה", "סטרדיווריוס", "stradivarius", "ברשקה", "bershka", "intimissimi", "calzedonia", "נעליים", "primadonna", "לורן", "lauren", "טומי", "tommy", "נקסט", "next", "gap", "levi s", "old navy", "lacoste", "לקוסט", "ralph", "massimo", "מסימו", "oysho", "אוישו", "victoria", "דלתא", "delta", "reebok", "ריבוק", "under armour", "new balance", "crocs", "קרוקס", "סקצ'רס", "skechers", "timberland", "aldo", "אלדו", "scoop", "סקופ", "גולברי", "golbary", "אדיקה", "adika", "factory 54", "פקטורי 54", "superdry", "tfc", "carter", "תכשיט", "jewelry", "pandora", "פנדורה", "magnolia", "מגנוליה", "fossil", "swarovski", "סברובסקי", "children", "הלבשה", "הנעלה", "אאוטלט", "outlet", "סטוק פקטורי", "pedro pps", "איקאה", "ikea", "הום סנטר", "home center", "ace hardware", "מרכז השיפוצים", "ריהוט", "עצמל\"ה", "home depot", "שיפוצים", "כלי בית", "מצעים", "שטיח", "וילון", "פוקס הום", "fox home", "אלקטרה", "electra", "ביתילי", "bitili", "נעמן", "naaman", "ורדינון", "vardinon", "כספי", "תמי 4", "tami4", "עמינח", "aminach", "הוליווד", "רהיטי", "furniture", "מזרן", "mattress", "דורגל", "טמבור", "tambour", "נירלט", "nirlat", "צבע", "paint", "כלי עבודה", "ברזל", "גמיש", "urban", "הכל לבית", "בית וגן", "מ. שטרן", "דקור", "decor", "wishlist", "מיאדרה", "סטוק סנטר", "booom", "זול סטוק", "מקס סטוק", "max stock", "מיקה מקס", "כיתן"],
   "טיפוח": ["קוסמטיקה", "cosmetic", "קוסמטיקס", "איפור", "makeup", "מייקאפ", "בשמים", "perfume", "פרפיום", "sephora", "ספורה", "body shop", "laline", "ללין", "lush", "לאש", "kiko", "קיקו", "yves rocher", "איב רושה", "לוריאל", "loreal", "לייף סטייל", "מספרה", "מספרת", "עיצוב שיער", "מעצב שיער", "ברבר", "barber", "מכון יופי", "קוסמטיקאית", "מניקור", "פדיקור", "ציפורניים", "לק ג'ל", "בניית ציפורניים", "הסרת שיער", "שעווה"],
   "חוגים וספורט": ["חדר כושר", "הולמס פלייס", "holmes place", "ספורט", "sport", "כושר", "חוג", "חוגים", "סדנה", "workshop", "בריכה", "שחייה", "swimming", "יוגה", "yoga", "פילאטיס", "pilates", "דקאתלון", "decathlon", "מגה ספורט", "sport5", "אצטדיון", "מכון כושר", "energym", "מאמאנט", "אוניברסיטה", "university", "מכללה", "college", "בית ספר", "school", "גן ילדים", "kindergarten", "שכר לימוד", "tuition", "קורס", "course", "ספרים", "books", "סטימצקי", "steimatzky", "צעצועים", "toys", "צהרון", "מעון", "משפחתון", "גנון", "קייטנה", "מתנ\"ס", "קונסרבטוריון", "שיעור", "מורה פרטי", "אולפן", "ברליץ", "berlitz", "wall street", "udemy", "coursera", "duolingo", "דואולינגו", "מורה לנהיגה", "שיעורי נהיגה", "בית ספר לנהיגה", "אקדמיה", "הטכניון", "ספרי לימוד", "משחקי קופסה", "lego", "לגו", "אקדמיה ל", "הסמכה"],
   "אירועים ומתנות": ["buyme", "buy me", "ביי-מי", "ביי מי", "ביימי", "שוברי מתנה", "שובר מתנה", "gift card", "giftcard", "מתנות", "מתנה"],
   "העברת כספים": ["העברה", "העברה ל", "העברה מ", "העברת כספים", "העברה בנקאית", "paypal", "פייפאל", "paybox", "פייבוקס", "pepper", "פפר", "western union", "ווסטרן יוניון", "moneygram", "מאני גרם", "gmt", "העברת זה\"ב", "wire transfer", "remitly", "wise transfer"],
-  "סושי": ["וטרינר", "veterinary", "חיות מחמד", "חיות", "פט שופ", "pet shop", "pet store", "מזון לחיות", "כלב", "חתול", "אניפט", "anipet", "פטלנד", "petland", "תן לחיות", "פטס", "all4pet", "biopet", "דוקטור בייקר", "אקווריום", "aquarium", "פנסיון כלבים", "מספרת כלבים", "אילוף כלבים", "וט מרקט", "ספידוג", "דוג סנטר"],
+  "סושי": ["וטרינר", "מרפאת חיות", "מרפאה לחיות", "veterinary", "חיות מחמד", "חיות", "פט שופ", "pet shop", "pet store", "מזון לחיות", "כלב", "חתול", "אניפט", "anipet", "פטלנד", "petland", "תן לחיות", "פטס", "all4pet", "biopet", "דוקטור בייקר", "אקווריום", "aquarium", "פנסיון כלבים", "מספרת כלבים", "אילוף כלבים", "וט מרקט", "ספידוג", "דוג סנטר"],
   "משיכת מזומן": ["משיכת מזומן", "משיכת מזומנים", "מזומנים", "כספומט", "atm", "cash withdrawal", "מזומן", "בנקומט"],
 }
 
@@ -40,6 +40,7 @@ const EXACT_WORD_KEYWORDS = {
   "חוגים וספורט": ["gym"],
   "טיפוח": ["ספא", "spa"],
 }
+const BOUNDED_KEYWORDS = new Set(["apple", "bolt", "gap", "lego", "merkaza", "next", "ירק", "כיתן", "לגו", "מרכזא", "פרי"])
 
 // ── AI tools → טכנולוגיה / AI (mirrors constants.AI_OVERRIDE_KEYWORDS) ──
 // Applied as an UNCONDITIONAL override so it wins over the foreign-card and
@@ -531,7 +532,7 @@ const SUBCATEGORY_KEYWORDS = {
     "אטרקציות": ["מוזיאון", "museum", "ספארי", "safari", "גן חיות", "zoo", "לונה פארק", "סופרלנד", "משחקייה", "גימבורי", "gymboree", "חדר בריחה", "אסקייפ", "באולינג", "bowling", "קרטינג", "karting", "פיינטבול", "לייזר טאג"],
   },
   "אוכל": {
-    "קניות גדולות": ["שופרסל", "shufersal", "רמי לוי", "rami levy", "ויקטורי", "victory", "יינות ביתן", "טיב טעם", "tiv taam", "אושר עד", "osher ad", "חצי חינם", "יוחננוף", "yochananof", "קרפור", "carrefour", "מגה בעיר", "זול ובגדול", "נתיב החסד", "ברכל", "פרשמרקט", "freshmarket", "fresh market", "קינג סטור", "מחסני השוק", "שפע שוק", "יש חסד", "יש בשכונה", "מחסני מזון", "קואופ", "סטופ מרקט"],
+    "קניות גדולות": ["merkaza", "מרכזא", "שופרסל", "shufersal", "רמי לוי", "rami levy", "ויקטורי", "victory", "יינות ביתן", "טיב טעם", "tiv taam", "אושר עד", "osher ad", "חצי חינם", "יוחננוף", "yochananof", "קרפור", "carrefour", "מגה בעיר", "זול ובגדול", "נתיב החסד", "ברכל", "פרשמרקט", "freshmarket", "fresh market", "קינג סטור", "מחסני השוק", "שפע שוק", "יש חסד", "יש בשכונה", "מחסני מזון", "קואופ", "סטופ מרקט"],
     "סופרים קטנים": ["מינימרקט", "מיני מרקט", "מכולת", "am:pm", "אי אם פי אם", "סופרמרקט", "supermarket", "מרכול", "פרימדונה", "סיטי מרקט", "שוק העיר", "שוק מהדרין", "פיצוצי", "פיצוצייה", "פיצוציה", "קיוסק", "7-eleven", "7 eleven", "7-11"],
     "שוברי מזון": ["סיבוס", "cibus", "תן ביס", "pluxee", "פלאקסי", "תנביס"],
     "משלוחים": ["wolt", "וולט", "10bis", "משלוחה", "משלוחים", "משלוח", "הזמנת אוכל", "delivery"],
@@ -540,12 +541,12 @@ const SUBCATEGORY_KEYWORDS = {
     "אלכוהול ומשקאות": ["יין", "wine", "אלכוהול", "משקאות", "יקב", "בירה", "beer"],
   },
   "קניות": {
-    "אלקטרוניקה": ["שקם אלקטריק", "מחסני חשמל", "באג", "bug", "ksp", "אייבורי", "ivory", "אלקטרה", "זאפ", "שיא החשמל", "idigital", "איי דיגיטל", "istore", "מקסטור", "last price", "לאסט פרייס", "samsung", "סמסונג", "שיאומי", "xiaomi", "אלקטרוניק", "electronics"],
+    "אלקטרוניקה": ["שקם אלקטריק", "מחסני חשמל", "טרקלין חשמל", "ליאור מוצרי חשמל", "באג", "bug", "ksp", "אייבורי", "ivory", "אלקטרה", "זאפ", "שיא החשמל", "idigital", "איי דיגיטל", "istore", "מקסטור", "last price", "לאסט פרייס", "samsung", "סמסונג", "שיאומי", "xiaomi", "אלקטרוניק", "electronics"],
     "קניות אונליין": ["aliexpress", "עלי אקספרס", "אלי אקספרס", "amazon", "אמזון", "ebay", "איביי", "temu", "טמו", "banggood", "gearbest", "shein", "asos", "אסוס"],
     "אופנה": ["גולף", "golf", "קסטרו", "castro", "פוקס", "fox", "רנואר", "renuar", "זארה", "zara", "h&m", "אייץ אנד אם", "מנגו", "mango", "ברשקה", "bershka", "פול אנד בר", "pull&bear", "pull and bear", "טרמינל", "terminal x", "אורבניקה", "urbanica", "אמריקן איגל", "american eagle", "ריזרבד", "reserved", "הודיס", "hoodies", "טוונטי פור סבן", "twentyfourseven", "delta", "דלתא", "intima", "אינטימה", "נעלי", "shoes", "סקצ", "skechers", "nike", "נייק", "אדידס", "adidas", "new balance", "ניו באלנס", "קרוקס", "crocs", "טימברלנד", "timberland", "סטיב מאדן", "steve madden", "אלדו", "aldo", "to go", "טו גו", "הלבשה", "הנעלה"],
     "תכשיטים ואקססוריז": ["פנדורה", "pandora", "תכשיט", "jewel", "מגנוליה", "magnolia", "אימפרס", "impress", "שעוני", "משקפי", "אופטיק", "optic"],
     "ריהוט": ["איקאה", "ikea", "ריהוט", "רהיטי", "furniture", "מזרן", "mattress", "עמינח", "aminach", "ביתילי", "bitili", "הוליווד"],
-    "דברים לבית": ["הום סנטר", "home center", "ace", "עצמל\"ה", "home depot", "שיפוצים", "כלי בית", "מצעים", "שטיח", "וילון", "פוקס הום", "fox home", "נעמן", "naaman", "ורדינון", "vardinon", "טמבור", "tambour", "נירלט", "צבע", "כלי עבודה", "תמי 4", "tami4", "דקור", "decor", "סטוק סנטר", "booom", "זול סטוק", "מקס סטוק", "max stock", "זול בשפע", "כלבו חצי חינם"],
+    "דברים לבית": ["הום סנטר", "home center", "ace", "עצמל\"ה", "home depot", "שיפוצים", "כלי בית", "מצעים", "שטיח", "וילון", "פוקס הום", "fox home", "נעמן", "naaman", "ורדינון", "vardinon", "טמבור", "tambour", "נירלט", "צבע", "כלי עבודה", "תמי 4", "tami4", "דקור", "decor", "סטוק סנטר", "booom", "זול סטוק", "מקס סטוק", "max stock", "מיקה מקס", "כיתן", "זול בשפע", "כלבו חצי חינם"],
   },
   "חוגים וספורט": {
     "ספורט וכושר": ["חדר כושר", "מכון כושר", "כושר", "הולמס פלייס", "holmes place", "יוגה", "yoga", "פילאטיס", "pilates", "בריכה", "שחייה", "gym", "energym", "ספורט", "sport", "דקאתלון", "decathlon", "מאמאנט"],
@@ -566,7 +567,7 @@ const SUBCATEGORY_KEYWORDS = {
     "מוניות ונסיעות": ["gett", "מונית", "taxi", "yango", "יאנגו", "uber", "autotel", "אוטוטל", "car2go", "ווואש", "woosh"],
   },
   "סושי": {
-    "וטרינרית וטיפולים": ["וטרינר", "veterinary", "פנסיון כלבים", "מספרת כלבים", "אילוף"],
+    "וטרינרית וטיפולים": ["וטרינר", "מרפאת חיות", "מרפאה לחיות", "veterinary", "פנסיון כלבים", "מספרת כלבים", "אילוף"],
     "אוכל וחטיפים": ["פט שופ", "pet shop", "pet store", "מזון לחיות", "אניפט", "anipet", "פטלנד", "petland", "וט מרקט", "all4pet", "biopet", "ספידוג", "דוג סנטר", "תן לחיות"],
   },
 }
@@ -594,6 +595,11 @@ function escapeRegExp(s) {
 
 // Word-boundary match using the same delimiters as the backend:
 // (?:^|[\s\-/])kw(?:$|[\s\-/])
+function keywordMatch(text, kw) {
+  if (!BOUNDED_KEYWORDS.has(kw)) return text.includes(kw)
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(kw)}(?![\\p{L}\\p{N}_])`, 'u').test(text)
+}
+
 function boundaryMatch(text, kw) {
   const re = new RegExp(`(?:^|[\\s\\-/])${escapeRegExp(kw)}(?:$|[\\s\\-/])`)
   return re.test(text)
@@ -642,7 +648,7 @@ function isAiTool(description) {
  *  7. else שונות
  */
 export function categorize(description) {
-  const d = String(description || '').toLowerCase()
+  const d = normalizeMerchant(description)
   // AI-tool override runs first so it wins over the foreign-card early-return,
   // matching the backend where the AI override is applied last (highest prio).
   if (isAiTool(d)) return AI_CATEGORY
@@ -663,7 +669,7 @@ export function categorize(description) {
 
   if (cat === 'שונות') {
     for (const [kw, c] of KEYWORD_ENTRIES) {
-      if (d.includes(kw)) { cat = c; break }
+      if (keywordMatch(d, kw)) { cat = c; break }
     }
   }
   if (cat === 'שונות') {
@@ -687,7 +693,7 @@ export function subcategorize(category, description) {
   const d = String(description || '').toLowerCase()
   for (const [subName, keywords] of Object.entries(submap)) {
     for (const kw of keywords) {
-      if (d.includes(kw.toLowerCase())) return subName
+      if (keywordMatch(d, kw.toLowerCase())) return subName
     }
   }
   return ''
@@ -707,7 +713,7 @@ export function normalizeMerchant(desc) {
   s = s.replace(INSTALLMENT_SUFFIX, '')
   s = s.replace(PROCESSOR_PREFIX, '')
   s = s.replace(/\s+/g, ' ')
-  return s.toLowerCase().trim()
+  return s.toLowerCase().trim().replace(/^bolt euo\d{10,}$/, 'bolt euo')
 }
 
 /**
@@ -720,8 +726,17 @@ export function buildRuleMap(rules, customCategories = []) {
   const custom = new Set(customCategories || [])
   const map = new Map()
   for (const r of rules || []) {
-    const [cat] = migrateCategory(r.category, r.subcategory)
-    map.set(normalizeMerchant(r.merchant), { category: cat, custom })
+    const [cat, migratedSub] = migrateCategory(r.category, r.subcategory)
+    const key = normalizeMerchant(r.merchant)
+    const entry = { category: cat, custom, source: r.source || 'legacy',
+      subcategory: migratedSub !== null ? migratedSub : r.subcategory || '',
+      updatedAt: r.updated_at || '', merchant: r.merchant || '' }
+    if (!key || (!VALID_CATEGORIES.has(cat) && !custom.has(cat))) continue
+    const previous = map.get(key)
+    if (previous?.source === 'manual' && entry.source !== 'manual') continue
+    if (previous?.source === entry.source && (previous.updatedAt > entry.updatedAt
+        || (previous.updatedAt === entry.updatedAt && previous.merchant > entry.merchant))) continue
+    map.set(key, entry)
   }
   return map
 }
@@ -738,8 +753,8 @@ export function applyRules(category, description, ruleMap) {
   // from before the AI override existed) must not pull it out. Mirrors the
   // backend, where apply_ai_tool_override re-runs AFTER rules. Matched by
   // DESCRIPTION (not category — טכנולוגיה also holds non-AI merchants).
-  if (isAiTool(description)) return category
   const entry = ruleMap.get(key)
+  if (isAiTool(description) && entry.source !== 'manual') return category
   const ruled = typeof entry === 'string' ? entry : entry.category
   const custom = typeof entry === 'string' ? new Set() : entry.custom
   // Rule hygiene: only catalog/custom categories may be assigned (no 'אחר').
@@ -748,6 +763,12 @@ export function applyRules(category, description, ruleMap) {
   // (category !== שונות), a conflicting rule is stale (an old AI guess
   // persisted as a rule) and is ignored. Rules decide only merchants the
   // catalog doesn't know. Mirrors the backend restore.
-  if (category !== 'שונות' && category !== ruled) return category
+  if (entry.source !== 'manual' && category !== 'שונות' && category !== ruled) return category
   return ruled
+}
+
+export function ruleSubcategory(category, description, ruleMap) {
+  const entry = ruleMap?.get(normalizeMerchant(description))
+  if (entry?.source === 'manual' && entry.category === category) return entry.subcategory || ''
+  return subcategorize(category, description)
 }

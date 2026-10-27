@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.constants import (  # noqa: E402
     CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
-    _CATEGORY_KEYWORDS, _EXACT_WORD_KEYWORDS,
+    _CATEGORY_KEYWORDS, _EXACT_WORD_KEYWORDS, BOUNDED_KEYWORDS,
     AI_CATEGORY, AI_SUBCATEGORY, AI_OVERRIDE_KEYWORDS,
     FOREIGN_EXEMPT_KEYWORDS, ISSUER_CATEGORY_RULES,
     CATEGORY_ICONS, SUBCATEGORY_KEYWORDS,
@@ -73,6 +73,7 @@ const CATEGORY_KEYWORDS = {js_obj_of_lists(_CATEGORY_KEYWORDS)}
 
 // Short/ambiguous keywords needing word-boundary matching (mirrors _EXACT_WORD_KEYWORDS).
 const EXACT_WORD_KEYWORDS = {js_obj_of_lists(_EXACT_WORD_KEYWORDS)}
+const BOUNDED_KEYWORDS = new Set({js(sorted(BOUNDED_KEYWORDS))})
 
 // ── AI tools → טכנולוגיה / AI (mirrors constants.AI_OVERRIDE_KEYWORDS) ──
 // Applied as an UNCONDITIONAL override so it wins over the foreign-card and
@@ -157,6 +158,11 @@ function escapeRegExp(s) {{
 
 // Word-boundary match using the same delimiters as the backend:
 // (?:^|[\\s\\-/])kw(?:$|[\\s\\-/])
+function keywordMatch(text, kw) {{
+  if (!BOUNDED_KEYWORDS.has(kw)) return text.includes(kw)
+  return new RegExp(`(?<![\\\\p{{L}}\\\\p{{N}}_])${{escapeRegExp(kw)}}(?![\\\\p{{L}}\\\\p{{N}}_])`, 'u').test(text)
+}}
+
 function boundaryMatch(text, kw) {{
   const re = new RegExp(`(?:^|[\\\\s\\\\-/])${{escapeRegExp(kw)}}(?:$|[\\\\s\\\\-/])`)
   return re.test(text)
@@ -205,7 +211,7 @@ function isAiTool(description) {{
  *  7. else שונות
  */
 export function categorize(description) {{
-  const d = String(description || '').toLowerCase()
+  const d = normalizeMerchant(description)
   // AI-tool override runs first so it wins over the foreign-card early-return,
   // matching the backend where the AI override is applied last (highest prio).
   if (isAiTool(d)) return AI_CATEGORY
@@ -226,7 +232,7 @@ export function categorize(description) {{
 
   if (cat === 'שונות') {{
     for (const [kw, c] of KEYWORD_ENTRIES) {{
-      if (d.includes(kw)) {{ cat = c; break }}
+      if (keywordMatch(d, kw)) {{ cat = c; break }}
     }}
   }}
   if (cat === 'שונות') {{
@@ -250,7 +256,7 @@ export function subcategorize(category, description) {{
   const d = String(description || '').toLowerCase()
   for (const [subName, keywords] of Object.entries(submap)) {{
     for (const kw of keywords) {{
-      if (d.includes(kw.toLowerCase())) return subName
+      if (keywordMatch(d, kw.toLowerCase())) return subName
     }}
   }}
   return ''
@@ -270,7 +276,7 @@ export function normalizeMerchant(desc) {{
   s = s.replace(INSTALLMENT_SUFFIX, '')
   s = s.replace(PROCESSOR_PREFIX, '')
   s = s.replace(/\\s+/g, ' ')
-  return s.toLowerCase().trim()
+  return s.toLowerCase().trim().replace(/^bolt euo\\d{{10,}}$/, 'bolt euo')
 }}
 
 /**
@@ -283,8 +289,17 @@ export function buildRuleMap(rules, customCategories = []) {{
   const custom = new Set(customCategories || [])
   const map = new Map()
   for (const r of rules || []) {{
-    const [cat] = migrateCategory(r.category, r.subcategory)
-    map.set(normalizeMerchant(r.merchant), {{ category: cat, custom }})
+    const [cat, migratedSub] = migrateCategory(r.category, r.subcategory)
+    const key = normalizeMerchant(r.merchant)
+    const entry = {{ category: cat, custom, source: r.source || 'legacy',
+      subcategory: migratedSub !== null ? migratedSub : r.subcategory || '',
+      updatedAt: r.updated_at || '', merchant: r.merchant || '' }}
+    if (!key || (!VALID_CATEGORIES.has(cat) && !custom.has(cat))) continue
+    const previous = map.get(key)
+    if (previous?.source === 'manual' && entry.source !== 'manual') continue
+    if (previous?.source === entry.source && (previous.updatedAt > entry.updatedAt
+        || (previous.updatedAt === entry.updatedAt && previous.merchant > entry.merchant))) continue
+    map.set(key, entry)
   }}
   return map
 }}
@@ -301,8 +316,8 @@ export function applyRules(category, description, ruleMap) {{
   // from before the AI override existed) must not pull it out. Mirrors the
   // backend, where apply_ai_tool_override re-runs AFTER rules. Matched by
   // DESCRIPTION (not category — טכנולוגיה also holds non-AI merchants).
-  if (isAiTool(description)) return category
   const entry = ruleMap.get(key)
+  if (isAiTool(description) && entry.source !== 'manual') return category
   const ruled = typeof entry === 'string' ? entry : entry.category
   const custom = typeof entry === 'string' ? new Set() : entry.custom
   // Rule hygiene: only catalog/custom categories may be assigned (no 'אחר').
@@ -311,8 +326,14 @@ export function applyRules(category, description, ruleMap) {{
   // (category !== שונות), a conflicting rule is stale (an old AI guess
   // persisted as a rule) and is ignored. Rules decide only merchants the
   // catalog doesn't know. Mirrors the backend restore.
-  if (category !== 'שונות' && category !== ruled) return category
+  if (entry.source !== 'manual' && category !== 'שונות' && category !== ruled) return category
   return ruled
+}}
+
+export function ruleSubcategory(category, description, ruleMap) {{
+  const entry = ruleMap?.get(normalizeMerchant(description))
+  if (entry?.source === 'manual' && entry.category === category) return entry.subcategory || ''
+  return subcategorize(category, description)
 }}
 """
 

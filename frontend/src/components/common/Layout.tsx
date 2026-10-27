@@ -242,37 +242,17 @@ export default function Layout({ children }: LayoutProps) {
       // re-categorization.
       Promise.all([
         supabaseApi.getLatestTransactions(user.id),
-        supabaseApi.getCategoryRules(user.id).catch(() => []),
+        supabaseApi.getCategoryRules(user.id),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
         supabaseApi.getUserCategories(user.id).catch(() => []),
         supabaseApi.getTransactionNotes(user.id).catch(() => []),
       ])
         .then(([transactions, rules, overrides, customCats, notes]) => {
           if (!transactions || transactions.length === 0) return
-          // Taxonomy migration: rules saved under the OLD category tree are
-          // rewritten to the new one — in memory for this restore, and
-          // best-effort in Supabase so bank-sync sees new names too.
-          const rewrites = rules
-            .map((r) => migrateRule(r))
-            .filter((r): r is NonNullable<typeof r> => !!r)
-          if (rewrites.length) {
-            Promise.allSettled(
-              rewrites.map((r) =>
-                supabaseApi.upsertCategorySubrule(user.id, r.merchant, r.category, r.subcategory || ''),
-              ),
-            ).catch(() => {})
-          }
+          // Translate old names in memory without changing rule provenance.
           const effectiveRules = rules.map((r) => migrateRule(r) ?? r)
           const customNames = customCats.map((c) => c.name)
-          // Rule hygiene: early AI runs persisted junk rules (category 'אחר'),
-          // and rules override the whole categorizer. Purge them at the source
-          // so they also stop reaching bank-sync, and restore with valid ones.
-          const invalid = effectiveRules.filter((r) => !isValidRuleCategory(r.category, customNames))
-          if (invalid.length) {
-            supabaseApi
-              .deleteCategoryRules(user.id, invalid.map((r) => r.merchant))
-              .catch(() => {}) // best-effort; backend ignores them regardless
-          }
+          // Ignore invalid categories without deleting saved user data.
           const validRules = effectiveRules.filter((r) => isValidRuleCategory(r.category, customNames))
           return transactionsApi.restoreSession(transactions, validRules, overrides, customNames, notes)
         })
@@ -349,6 +329,7 @@ export default function Layout({ children }: LayoutProps) {
   // silent and confidence is high). A floating pill shows live progress from
   // GET /ai-progress so it's visible that cataloging is running / finished.
   const runAiChain = useCallback(async (sessionId: string, userId: string) => {
+    let incomplete = false
     const poll = async () => {
       try {
         const p = await transactionsApi.aiProgress(sessionId)
@@ -368,10 +349,10 @@ export default function Layout({ children }: LayoutProps) {
       try {
         const ai = await transactionsApi.aiCategorize(sessionId)
         if (ai.ai_categorized?.length) {
-          supabaseApi.upsertCategoryRules(userId, ai.ai_categorized).catch(() => {})
+          await supabaseApi.upsertAutomaticCategoryRules(userId, ai.ai_categorized)
           window.dispatchEvent(new CustomEvent('ai-categorized'))
         }
-      } catch { /* AI is an enhancement — never block the app on it */ }
+      } catch { incomplete = true }
 
       // 2) subcategories for every category, automatically
       try {
@@ -379,11 +360,11 @@ export default function Layout({ children }: LayoutProps) {
         const assignments = res.assignments ?? []
         for (const a of assignments) {
           await supabaseApi
-            .upsertCategorySubrule(userId, a.merchant, a.category, a.subcategory)
-            .catch(() => {})
+            .upsertAutomaticCategoryRules(userId, [a])
+            .catch(() => { incomplete = true })
         }
         if (assignments.length) window.dispatchEvent(new CustomEvent('ai-categorized'))
-      } catch { /* ignore */ }
+      } catch { incomplete = true }
 
       // 3) exhaustive web verification: every merchant the keyword catalog
       // doesn't govern gets a mandatory web-searched verdict, batch after
@@ -396,25 +377,25 @@ export default function Layout({ children }: LayoutProps) {
         // persistent per-user ledger). Rules are NOT exclusions — most were
         // machine-created (old AI guesses, subcategory splits), i.e. exactly
         // the merchants that need verification.
-        const LEDGER_KEY = `verified-merchants:${userId}`
+        const LEDGER_KEY = `verified-merchants:v2:${userId}`
         let ledger: string[] = []
         try { ledger = JSON.parse(localStorage.getItem(LEDGER_KEY) || '[]') } catch { /* fresh */ }
         let exclude = [...ledger]
         for (let batch = 0; batch < 100; batch++) {
           const res = await transactionsApi.aiAudit(sessionId, exclude)
-          const applicable = (res.proposals ?? []).filter((pr) => pr.confidence >= 0.85)
+          const applicable = (res.proposals ?? []).filter((pr) => pr.confidence >= 0.9 && !pr.catalog_hit)
           for (const pr of applicable) {
             try {
-              await transactionsApi.setMerchantCategory(sessionId, pr.merchant, pr.proposed_category)
+              await transactionsApi.setMerchantCategory(sessionId, pr.merchant, pr.proposed_category, 'ai')
               await supabaseApi
-                .upsertCategoryRule(userId, pr.merchant, pr.proposed_category)
-                .catch(() => {})
-            } catch { /* per-merchant best effort */ }
+                .upsertAutomaticCategoryRules(userId, [{ merchant: pr.merchant, category: pr.proposed_category }])
+                .catch(() => { incomplete = true })
+            } catch { incomplete = true }
           }
           // Pin web-confirmed merchants so they are never re-verified.
           const verified = res.verified ?? []
           if (verified.length) {
-            await supabaseApi.upsertCategoryRules(userId, verified).catch(() => {})
+            await supabaseApi.upsertAutomaticCategoryRules(userId, verified).catch(() => { incomplete = true })
           }
           if (applicable.length || verified.length) {
             window.dispatchEvent(new CustomEvent('ai-categorized'))
@@ -424,7 +405,7 @@ export default function Layout({ children }: LayoutProps) {
           // batches) are retried on the next sweep.
           const gotVerdict = [
             ...verified.map((v) => v.merchant),
-            ...(res.proposals ?? []).map((pr) => pr.merchant),
+
           ]
           if (gotVerdict.length) {
             ledger = Array.from(new Set([...ledger, ...gotVerdict]))
@@ -434,10 +415,10 @@ export default function Layout({ children }: LayoutProps) {
           exclude = exclude.concat(res.audited_merchants || [])
           if (!res.audited_count || !res.remaining) break
         }
-      } catch { /* ignore */ }
+      } catch { incomplete = true }
     } finally {
       if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null }
-      setAiStatus({ label: 'הקיטלוג הסתיים ✓', done: true })
+      setAiStatus({ label: incomplete ? 'חלק מהזיהוי לא הושלם — ננסה שוב בטעינה הבאה' : 'בדיקת העסקאות הסתיימה', done: true })
       setTimeout(() => setAiStatus(null), 6000)
     }
   }, [])

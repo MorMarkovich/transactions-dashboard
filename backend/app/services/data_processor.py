@@ -9,12 +9,13 @@ from typing import Optional
 from ..utils.validators import detect_header_row, parse_dates, clean_amount
 from ..core.constants import (
     CHECK_WITHDRAWAL_KEYWORDS, STANDING_ORDER_KEYWORDS,
-    KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
+    KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS, BOUNDED_KEYWORDS,
     AI_CATEGORY, AI_SUBCATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
     FOREIGN_EXEMPT_KEYWORDS, map_issuer_category,
     CATEGORY_MIGRATION, CATEGORY_PAIR_MIGRATION, migrate_category,
 )
 from .ai_categorizer import categorize_transactions
+from .category_rules import manual_rule_mask
 
 # Pre-compiled AI-override pattern (substring, case-insensitive).
 _AI_OVERRIDE_PATTERN = (
@@ -147,8 +148,15 @@ def normalize_merchant(desc) -> str:
     s = str(desc or '').strip()
     s = _INSTALLMENT_SUFFIX.sub('', s)
     s = _PROCESSOR_PREFIX.sub('', s)
-    s = re.sub(r'\s+', ' ', s)
-    return s.lower().strip()
+    s = re.sub(r'\s+', ' ', s).lower().strip()
+    return re.sub(r'^bolt euo\d{10,}$', 'bolt euo', s)
+
+
+def keyword_hits(text: pd.Series, keyword: str) -> pd.Series:
+    if keyword in BOUNDED_KEYWORDS:
+        pattern = r'(?<![\w])' + re.escape(keyword) + r'(?![\w])'
+        return text.str.contains(pattern, na=False, regex=True)
+    return text.str.contains(keyword, na=False, regex=False)
 
 
 def txn_fingerprint(date, amount, desc) -> str:
@@ -285,7 +293,7 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
     df['קטגוריה_משנה'] = df['קטגוריה_משנה'].fillna('').astype(str)
     cat = df['קטגוריה'].astype(str)
     desc_lower = df['תיאור'].astype(str).str.lower()
-    unlocked = ~locked_mask(df)
+    unlocked = ~locked_mask(df) & ~manual_rule_mask(df)
 
     for parent, submap in SUBCATEGORY_KEYWORDS.items():
         # ALL parent rows, not just empty ones: a seeded keyword hit overrides
@@ -302,7 +310,7 @@ def derive_subcategory(df: pd.DataFrame) -> pd.DataFrame:
             for kw in keywords:
                 if remaining.empty:
                     break
-                hit = remaining.str.contains(kw.lower(), na=False, regex=False)
+                hit = keyword_hits(remaining, kw.lower())
                 if hit.any():
                     df.loc[remaining.index[hit], 'קטגוריה_משנה'] = sub_name
                     remaining = remaining[~hit]
@@ -515,12 +523,12 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # the still-uncategorized rows (cheap even with the ~1000-keyword catalog).
     misc_mask = result['קטגוריה'] == 'שונות'
     if misc_mask.any():
-        remaining = desc_lower[misc_mask]
+        remaining = result.loc[misc_mask, 'תיאור'].map(normalize_merchant)
         # Substring-based keywords (longer, unambiguous)
         for kw, cat in KEYWORD_TO_CATEGORY.items():
             if remaining.empty:
                 break
-            hit = remaining.str.contains(kw, na=False, regex=False)
+            hit = keyword_hits(remaining, kw)
             if hit.any():
                 result.loc[remaining.index[hit], 'קטגוריה'] = cat
                 remaining = remaining[~hit]

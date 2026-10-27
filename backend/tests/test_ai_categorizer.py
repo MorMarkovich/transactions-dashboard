@@ -30,7 +30,10 @@ def _text_response(payload, searched=False):
     blocks = []
     if searched:
         blocks.append(_Block("server_tool_use"))
-        blocks.append(_Block("web_search_tool_result"))
+        result = _Block("web_search_tool_result")
+        result.content = [{"type": "web_search_result", "url": "https://merchant.example/about"}]
+        blocks.append(result)
+        payload = [{"confidence": 0.95, "source_url": "https://merchant.example/about", **item} for item in payload]
     blocks.append(_Block("text", json.dumps(payload, ensure_ascii=False)))
     return _Response(blocks)
 
@@ -105,7 +108,7 @@ def test_search_phase_answer_without_searching_is_discarded(monkeypatch):
     _install(monkeypatch, handler)
     result = categorize_transactions(["בוטיק עלום"])
     assert result == {}
-    assert ai_categorizer._CACHE["בוטיק עלום"] == "שונות"
+    assert "בוטיק עלום" not in ai_categorizer._CACHE
 
 
 def test_search_disabled_leaves_unknowns_uncategorized(monkeypatch):
@@ -158,14 +161,14 @@ def test_audit_merchants_requires_search_and_caches(monkeypatch):
         assert kwargs["system"]  # audit must carry its own system prompt
         assert kwargs["tools"][0]["type"] == "web_search_20250305"  # mandatory
         return _text_response([
-            {"index": 0, "category": "אוכל", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
+            {"index": 0, "category": "אוכל", "confidence": 0.9, "source_url": "https://merchant.example/about", "reason": "רשת סופרמרקטים"},
         ], searched=True)
 
     _install(monkeypatch, handler)
     items = [{"merchant": "שופרסל דיל", "current": "אופנה", "issuer": "מזון", "count": 4, "total": 512.0}]
     out = ai_categorizer.audit_merchants(items)
     assert out == [
-        {"index": 0, "category": "אוכל", "confidence": 0.9, "reason": "רשת סופרמרקטים"},
+        {"index": 0, "category": "אוכל", "confidence": 0.9, "source_url": "https://merchant.example/about", "reason": "רשת סופרמרקטים"},
     ]
     # cached — the second run makes no API call
     out2 = ai_categorizer.audit_merchants(items)
@@ -201,11 +204,8 @@ def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):
             ])
         # phase 2: mandatory search over the unresolved merchants
         assert kwargs["tools"][0]["type"] == "web_search_20250305"
-        return _text_response([
-            {"index": 0, "subcategory": ""},
-            {"index": 1, "subcategory": ""},
-            {"index": 2, "subcategory": "שוקי אוכל"},
-        ], searched=True)
+        sub = "שוקי אוכל" if "עסק ג" in kwargs["messages"][0]["content"] else ""
+        return _text_response([{"index": 0, "subcategory": sub}], searched=True)
 
     _install(monkeypatch, handler)
     out = ai_categorizer.suggest_subcategories(
@@ -226,7 +226,7 @@ def test_suggest_subcategories_two_phase_validates_and_searches(monkeypatch):
     ]
 
 
-def test_suggest_subcategories_unsearched_answers_discarded_and_cached(monkeypatch):
+def test_suggest_subcategories_unsearched_answers_are_retryable(monkeypatch):
     def handler(kwargs):
         if "tools" not in kwargs:
             return _text_response([{"index": 0, "unknown": True}])
@@ -237,11 +237,11 @@ def test_suggest_subcategories_unsearched_answers_discarded_and_cached(monkeypat
     items = [{"merchant": "בוטיק עלום", "count": 1, "total": 100.0}]
     out = ai_categorizer.suggest_subcategories("אופנה", items, [])
     assert out == [{"index": 0, "subcategory": ""}]
-    # The miss is cached: a second run makes NO further API calls.
+    # An unsuccessful search can be retried on the next run.
     calls_before = len(client.messages.calls)
     out2 = ai_categorizer.suggest_subcategories("אופנה", items, [])
     assert out2 == [{"index": 0, "subcategory": ""}]
-    assert len(client.messages.calls) == calls_before
+    assert len(client.messages.calls) == calls_before + 2
 
 
 def test_categorize_passes_issuer_hint(monkeypatch):
@@ -263,4 +263,4 @@ def test_phase2_api_error_keeps_merchant_uncategorized(monkeypatch):
     _install(monkeypatch, handler)
     # No searchless-guess fallback: the merchant stays שונות
     assert categorize_transactions(["עסק לא ידוע"]) == {}
-    assert ai_categorizer._CACHE["עסק לא ידוע"] == "שונות"
+    assert "עסק לא ידוע" not in ai_categorizer._CACHE

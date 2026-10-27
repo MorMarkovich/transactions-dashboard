@@ -75,6 +75,8 @@ export interface RuleLike {
   merchant: string
   category: string
   subcategory?: string | null
+  source?: 'legacy' | 'manual' | 'ai'
+  updated_at?: string | null
 }
 
 /**
@@ -86,12 +88,12 @@ export function migrateRule(rule: RuleLike): RuleLike | null {
   const sub = (rule.subcategory || '').trim()
   const pair = CATEGORY_PAIR_MIGRATION[`${cat}|${sub}`]
   if (pair) {
-    return { merchant: rule.merchant, category: pair[0], subcategory: pair[1] || null }
+    return { ...rule, category: pair[0], subcategory: pair[1] || null }
   }
   const plain = CATEGORY_MIGRATION[cat]
   if (plain) {
     return {
-      merchant: rule.merchant,
+      ...rule,
       category: plain[0],
       subcategory: plain[1] !== null ? plain[1] || null : rule.subcategory ?? null,
     }
