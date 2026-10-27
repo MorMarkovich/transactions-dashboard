@@ -127,3 +127,27 @@ def test_unverified_search_key_stops_before_reservation(setup, monkeypatch):
     monkeypatch.setattr(agent, '_request', lambda *a, **kw: pytest.fail('provider call'))
     with pytest.raises(HTTPException):
         agent.identify('Synthetic Store')
+
+
+@pytest.mark.parametrize('finish_reason', ['STOP', 'MAX_TOKENS'])
+def test_current_free_model_contract_and_complete_json_only(setup, monkeypatch, finish_reason):
+    def request(method, url, **kwargs):
+        if url.endswith('/usage'):
+            return {'account': {'current_plan': 'Researcher', 'plan_limit': 1000,
+                    'plan_usage': 0, 'paygo_limit': None, 'paygo_usage': 0}}
+        if url.endswith('/search'):
+            return {'results': [{'url': VERDICT['source_url'], 'content': 'A supermarket.'}]}
+        assert url.endswith('/v1beta/models/gemini-3.5-flash-lite:generateContent')
+        body = kwargs['json']
+        assert 'tools' not in body
+        assert body['generationConfig']['thinkingConfig'] == {'thinkingLevel': 'minimal'}
+        assert body['generationConfig']['responseMimeType'] == 'application/json'
+        return {'candidates': [{'finishReason': finish_reason, 'content': {'parts': [
+            {'thought': True, 'text': 'Private model reasoning'},
+            {'text': json.dumps(VERDICT)},
+        ]}}]}
+    monkeypatch.setattr(agent, '_request', request)
+    result = agent.identify('Synthetic Store')
+    assert bool(result) == (finish_reason == 'STOP')
+    if result:
+        assert result['category'] == VERDICT['category']

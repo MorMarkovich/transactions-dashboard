@@ -114,11 +114,11 @@ def _identify(merchant):
         '\nנתונים: ' + json.dumps({'merchant': merchant, 'sources': evidence}, ensure_ascii=False)
     )
     gemini = _base('GEMINI_API_BASE_URL', 'https://generativelanguage.googleapis.com')
-    response = _request('POST', gemini + '/v1beta/models/gemini-2.5-flash:generateContent',
+    response = _request('POST', gemini + '/v1beta/models/gemini-3.5-flash-lite:generateContent',
                         headers={'x-goog-api-key': os.environ['GEMINI_API_KEY']}, json={
         'contents': [{'parts': [{'text': prompt}]}],
-        'generationConfig': {'responseMimeType': 'application/json', 'maxOutputTokens': 1024,
-                             'thinkingConfig': {'thinkingBudget': 0}},
+        'generationConfig': {'responseMimeType': 'application/json', 'maxOutputTokens': 4096,
+                             'thinkingConfig': {'thinkingLevel': 'minimal'}},
     })
     candidates = response.get('candidates', [])
     if not candidates or candidates[0].get('finishReason') != 'STOP':
