@@ -7,7 +7,7 @@ required configuration is present; it does not call either provider.
 
 ## Required accounts
 
-- Gemini 2.5 Flash API key from a project with **no linked Cloud Billing**.
+- Gemini 3.5 Flash-Lite API key from a project with **no linked Cloud Billing**.
   Verify that state in AI Studio before setting `GEMINI_FREE_KEY_SHA256` to
   the SHA-256 of that exact key. This is a deployment attestation, not a live
   billing API check. A replacement key needs a new verification. Do not enable
@@ -32,6 +32,15 @@ The confidence estimate is not a measured accuracy percentage.
 Google's integrated Search Grounding is deliberately not used: its documented
 storage/reuse restrictions do not fit a durable merchant lookup database.
 Tavily provides the search evidence separately; raw search bodies are not kept.
+
+## Model compatibility
+
+New Google projects cannot generate with the legacy Gemini 2.5 models even
+when the model metadata endpoint returns HTTP 200. Use `gemini-3.5-flash-lite`
+with `thinkingLevel: minimal`, JSON output and a 4096-token output ceiling.
+The ceiling includes reasoning tokens; incomplete responses are not accepted.
+A live `generateContent` call with the no-billing project verified this contract.
+There is no model fallback or integrated Google Search tool.
 
 ## Persistence and limits
 
@@ -69,6 +78,8 @@ Keys must never enter frontend environment variables, Git, logs or chat.
 
 Sources checked 2026-10-27:
 - https://ai.google.dev/gemini-api/docs/pricing
+- https://ai.google.dev/gemini-api/docs/deprecations
+- https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite
 - https://ai.google.dev/gemini-api/terms
 - https://ai.google.dev/api/generate-content
 - https://docs.tavily.com/documentation/api-credits

@@ -13,10 +13,10 @@ http.createServer((req,res)=>{
   if(mode==='quota')return json(429,{detail:'Quota'})
   return json(200,{results:mode==='empty'?[]:[{url:'https://merchant.example/about',title:'Synthetic grocery',content:'Synthetic grocery is a supermarket.'}]})
  }
- if(req.url.endsWith('/v1beta/models/gemini-2.5-flash:generateContent')){
+ if(req.url.endsWith('/v1beta/models/gemini-3.5-flash-lite:generateContent')){
   calls.gemini++
   const b=req.body
-  if(b.tools||!b.contents?.[0]?.parts?.[0]?.text||b.generationConfig?.thinkingConfig?.thinkingBudget!==0)return json(400,{error:'Unexpected Gemini contract'})
+  if(b.tools||!b.contents?.[0]?.parts?.[0]?.text||b.generationConfig?.thinkingConfig?.thinkingLevel!=='minimal'||'thinkingBudget' in (b.generationConfig?.thinkingConfig||{}))return json(400,{error:'Unexpected Gemini contract'})
   if(mode==='malformed')return json(200,{candidates:[{finishReason:'STOP',content:{parts:[{text:'not json'}]}}]})
   const answer={category:'אוכל',subcategory:'קניות גדולות',confidence:mode==='uncertain'?.4:.95,source_url:mode==='invented'?'https://invented.example':'https://merchant.example/about'}
   return json(200,{candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(answer)}]}}]})
