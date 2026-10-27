@@ -13,7 +13,7 @@ required configuration is present; it does not call either provider.
   billing API check. A replacement key needs a new verification. Do not enable
   billing on this project later without revisiting this design.
 - Tavily Researcher/Free account, with pay-as-you-go disabled. The backend
-  checks `/usage` before every new search and refuses paid plans, positive
+  checks `/usage` at most once per ten minutes per process/key and refuses paid plans, positive
   paygo limits, paid usage or exhausted free credits. Set
   `TAVILY_FREE_KEY_SHA256` only after verifying this exact key's account is
   free with PAYG off. The live free account returns `paygo_limit: null`; this
@@ -32,6 +32,16 @@ The confidence estimate is not a measured accuracy percentage.
 Google's integrated Search Grounding is deliberately not used: its documented
 storage/reuse restrictions do not fit a durable merchant lookup database.
 Tavily provides the search evidence separately; raw search bodies are not kept.
+
+The verified Tavily account check is reused for up to ten minutes because
+`/usage` itself permits only ten requests per ten minutes. Each new search
+atomically reserves one of the verified remaining free credits in that process;
+errors do not refund it. Expiry or key rotation requires a fresh successful check,
+and failed refreshes never reuse stale approval. The current single-worker
+service uses a lock to prevent concurrent refreshes; horizontal scaling requires
+shared account admission state. Provider free-plan enforcement, deployment
+attestations and persistent owner/month quotas remain required. Billing/PAYG
+must remain off; account settings are not checked continuously during this TTL.
 
 ## Model compatibility
 
@@ -83,5 +93,6 @@ Sources checked 2026-10-27:
 - https://ai.google.dev/gemini-api/terms
 - https://ai.google.dev/api/generate-content
 - https://docs.tavily.com/documentation/api-credits
+- https://docs.tavily.com/documentation/rate-limits
 - https://docs.tavily.com/documentation/api-reference/endpoint/usage
 - https://docs.tavily.com/documentation/api-reference/endpoint/search

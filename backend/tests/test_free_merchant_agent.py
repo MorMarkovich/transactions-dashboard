@@ -13,6 +13,7 @@ def setup(monkeypatch):
     monkeypatch.setenv('GEMINI_FREE_KEY_SHA256', hashlib.sha256(b'synthetic-gemini').hexdigest())
     monkeypatch.setenv('TAVILY_API_KEY', 'synthetic-search')
     monkeypatch.setenv('TAVILY_FREE_KEY_SHA256', hashlib.sha256(b'synthetic-search').hexdigest())
+    agent._search_checks.clear()
     saved = {}
     monkeypatch.setattr(agent.store, 'read_resolved', lambda m: saved.get(m))
     monkeypatch.setattr(agent.store, 'claim', lambda m: {'status': 'claimed', 'lease_token': 'lease'})
@@ -40,7 +41,7 @@ def test_cache_still_works_without_provider_keys(setup, monkeypatch):
     assert agent.identify('Synthetic Store')['category'] == 'אוכל'
 
 
-@pytest.mark.parametrize('descriptor', ['העברה לחשבון 123456', 'person@example.org', 'משכורת', 'עסק 123456789'])
+@pytest.mark.parametrize('descriptor', ['העברה לחשבון 123456', 'person@example.org', 'משכורת', 'עסק 123456789', 'העברות לקרדיט', 'ישראכרט גביה'])
 def test_financial_identifiers_are_not_sent(setup, monkeypatch, descriptor):
     monkeypatch.setattr(agent.store, 'read_resolved', lambda m: pytest.fail('lookup'))
     assert agent.identify(descriptor) is None
@@ -151,3 +152,60 @@ def test_current_free_model_contract_and_complete_json_only(setup, monkeypatch, 
     assert bool(result) == (finish_reason == 'STOP')
     if result:
         assert result['category'] == VERDICT['category']
+
+
+FREE_USAGE = {'account': {'current_plan': 'Researcher', 'plan_limit': 1000,
+              'plan_usage': 0, 'paygo_limit': None, 'paygo_usage': 0}}
+
+
+def test_many_concurrent_merchants_share_one_usage_check(setup, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    calls = []
+    monkeypatch.setattr(agent, '_request', lambda *a, **k: calls.append(a[1]) or FREE_USAGE)
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        list(pool.map(lambda _: agent._reserve_search_credit('https://api.tavily.com', {}), range(30)))
+    assert calls == ['https://api.tavily.com/usage']
+    assert list(agent._search_checks.values())[0]['remaining'] == 970
+
+
+def test_last_free_credit_is_reserved_only_once(setup, monkeypatch):
+    calls = []
+    usage = {'account': {**FREE_USAGE['account'], 'plan_usage': 999}}
+    monkeypatch.setattr(agent, '_request', lambda *a, **k: calls.append(a[1]) or usage)
+    agent._reserve_search_credit('https://api.tavily.com', {})
+    with pytest.raises(HTTPException) as caught:
+        agent._reserve_search_credit('https://api.tavily.com', {})
+    assert caught.value.status_code == 429
+    assert len(calls) == 1
+
+
+def test_expired_approval_is_not_reused_after_failed_refresh(setup, monkeypatch):
+    now = [0]
+    monkeypatch.setattr(agent, 'monotonic', lambda: now[0])
+    calls = []
+    def usage(*args, **kwargs):
+        calls.append(args[1])
+        if len(calls) > 1:
+            raise HTTPException(429, 'Temporary rate limit')
+        return FREE_USAGE
+    monkeypatch.setattr(agent, '_request', usage)
+    agent._reserve_search_credit('https://api.tavily.com', {})
+    now[0] = 599
+    agent._reserve_search_credit('https://api.tavily.com', {})
+    now[0] = 600
+    for _ in range(3):
+        with pytest.raises(HTTPException):
+            agent._reserve_search_credit('https://api.tavily.com', {})
+    assert len(calls) == 2
+
+
+def test_verified_key_rotation_requires_new_usage_check(setup, monkeypatch):
+    calls = []
+    monkeypatch.setattr(agent, '_request', lambda *a, **k: calls.append(a[1]) or FREE_USAGE)
+    agent._reserve_search_credit('https://api.tavily.com', {})
+    monkeypatch.setenv('TAVILY_API_KEY', 'rotated-key')
+    with pytest.raises(HTTPException):
+        agent._reserve_search_credit('https://api.tavily.com', {})
+    monkeypatch.setenv('TAVILY_FREE_KEY_SHA256', hashlib.sha256(b'rotated-key').hexdigest())
+    agent._reserve_search_credit('https://api.tavily.com', {})
+    assert len(calls) == 2
