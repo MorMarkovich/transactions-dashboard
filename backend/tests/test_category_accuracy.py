@@ -93,10 +93,11 @@ def test_trip_confirmation_pins_the_levi_purchase_only():
     assert df.iloc[1]['קטגוריה'] == 'קניות'
 
 
+@pytest.mark.parametrize('source', ['ai', 'legacy'])
 @pytest.mark.parametrize('desc', ['SHINSEGAE DEPARTMENT S SEOUL KR', 'NYUBALLANSEU SINCHONJE SEOUL KR'])
-def test_web_identification_does_not_override_trip_policy(desc, monkeypatch):
+def test_web_identification_does_not_override_trip_policy(desc, source, monkeypatch):
     rule = {'merchant': normalize_merchant(desc), 'category': 'קניות',
-            'subcategory': 'אופנה', 'source': 'ai'}
+            'subcategory': 'אופנה', 'source': source}
     sid, df = restore(desc, [rule], category='טיסות ותיירות', subcategory='שופינג')
     assert df.iloc[0]['קטגוריה'] == 'טיסות ותיירות'
     assert df.iloc[0]['קטגוריה_משנה'] == 'שופינג'
@@ -115,3 +116,9 @@ def test_foreign_online_service_is_not_forced_into_trip_policy():
     _, df = restore('PAYPAL *SYNTHETIC SERVICE GB', [
         {'merchant': 'PAYPAL *SYNTHETIC SERVICE GB', 'category': 'טכנולוגיה', 'source': 'ai'}])
     assert df.iloc[0]['קטגוריה'] == 'טכנולוגיה'
+
+
+@pytest.mark.parametrize('desc', ['WWW.SCRAPINGBEE.COM PARIS FR', 'REAL-DEBRID LEVALLOIS-PER FR', 'DP* DODOPAY_APIS DODOPAYMENTS. US'])
+def test_digital_service_legacy_rule_is_not_a_trip(desc):
+    _, df = restore(desc, [{'merchant': desc, 'category': 'הוצאות שוטפות', 'source': 'legacy'}])
+    assert df.iloc[0]['קטגוריה'] == 'הוצאות שוטפות'

@@ -72,9 +72,9 @@ def test_stale_rule_cannot_fight_the_catalog():
 
 def test_rule_still_decides_catalog_unknown_merchant():
     sid = _restore(
-        [{"id": 1, "תאריך": "2026-07-05", "תיאור": "ZZQWX UNKNOWN CO",
+        [{"id": 1, "תאריך": "2026-07-05", "תיאור": "ZZQWX UNKNOWN LTD",
           "קטגוריה": "שונות", "סכום": -50.0}],
-        rules=[{"merchant": "ZZQWX UNKNOWN CO", "category": "אירועים ומתנות"}],
+        rules=[{"merchant": "ZZQWX UNKNOWN LTD", "category": "אירועים ומתנות"}],
     )
     assert _cats(sid)[1]["קטגוריה"] == "אירועים ומתנות"
 

@@ -573,7 +573,7 @@ FOREIGN_EXEMPT_KEYWORDS: list[str] = [
     # Dev/cloud subscriptions billed from abroad (Render/DigitalOcean bill
     # from the US, AllDebrid from FR, …) — recurring services, not trip spend.
     'render.com', 'digitalocean', 'digitalocea', 'alldebrid', 'browserbase',
-    'browserba', 'televizo', 'iptv',
+    'browserba', 'televizo', 'iptv', 'scrapingbee', 'real-debrid', 'dodopay',
 ]
 
 # ── Issuer category (ענף_מקור) → catalog category ───────────────────

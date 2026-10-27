@@ -558,8 +558,8 @@ def restore_session(body: RestoreSessionRequest):
                     if rule_cat and rule_cat not in valid_cats:
                         continue
                     rmask = desc_norm == normalize_merchant(r.merchant)
-                    if r.source == 'ai':
-                        rmask &= ~trip_mask
+                    # Legacy automatic rules must obey the same trip policy.
+                    rmask &= ~trip_mask
                     if not rmask.any():
                         continue
                     if rule_cat:
