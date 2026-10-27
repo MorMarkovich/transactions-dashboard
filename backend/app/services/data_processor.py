@@ -28,6 +28,19 @@ _FOREIGN_EXEMPT_PATTERN = (
 )
 
 
+def foreign_card_mask(descriptions: pd.Series) -> pd.Series:
+    """Existing trip policy, shared by categorization and automatic AI guards."""
+    desc = descriptions.astype(str)
+    mask = (
+        ~desc.str.contains(r'[֐-׿]', regex=True, na=False)
+        & desc.str.contains(r'[A-Za-z]', regex=True, na=False)
+        & desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
+    )
+    if _FOREIGN_EXEMPT_PATTERN:
+        mask &= ~desc.str.lower().str.contains(_FOREIGN_EXEMPT_PATTERN, na=False, regex=True)
+    return mask
+
+
 def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
     """Apply category overrides that run on ALL rows, regardless of any
     pre-existing category. Shared by the upload pipeline (process_data) and the
@@ -51,11 +64,7 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
     if psagot_mask.any():
         df.loc[psagot_mask, 'קטגוריה'] = 'העברה להשקעות'
 
-    foreign_mask = (
-        ~desc.str.contains(r'[֐-׿]', regex=True, na=False)
-        & desc.str.contains(r'[A-Za-z]', regex=True, na=False)
-        & desc.str.contains(r'(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$', regex=True, na=False)
-    )
+    foreign_mask = foreign_card_mask(desc)
     if _FOREIGN_EXEMPT_PATTERN:
         # Online services (Netflix/Spotify/PayPal…) bill from abroad year-round;
         # they are not trip spend, so they keep falling through to the keyword

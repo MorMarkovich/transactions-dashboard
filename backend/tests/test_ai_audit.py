@@ -22,8 +22,9 @@ def _restore(rows):
     return resp.json()["session_id"]
 
 
+# Keep the synthetic company suffix distinct from a foreign country trailer.
 ROWS = [
-    {"id": 1, "תאריך": "2026-06-01", "תיאור": "WRITEO TOOLS CO", "קטגוריה": "שונות", "סכום": -178.0},
+    {"id": 1, "תאריך": "2026-06-01", "תיאור": "WRITEO TOOLS LTD", "קטגוריה": "שונות", "סכום": -178.0},
     {"id": 2, "תאריך": "2026-06-05", "תיאור": "עצמל סטודיו (תשלום 1/3)", "קטגוריה": "שונות", "סכום": -300.0},
     {"id": 3, "תאריך": "2026-07-05", "תיאור": "עצמל סטודיו (תשלום 2/3)", "קטגוריה": "שונות", "סכום": -300.0},
     {"id": 4, "תאריך": "2026-06-07", "תיאור": "שופרסל דיל", "קטגוריה": "שונות", "סכום": -120.0},
@@ -65,7 +66,7 @@ def test_ai_audit_returns_only_disagreements(monkeypatch):
     # Only the disagreement comes back as a proposal.
     assert len(data["proposals"]) == 1
     p = data["proposals"][0]
-    assert p["merchant"] == "WRITEO TOOLS CO"
+    assert p["merchant"] == "WRITEO TOOLS LTD"
     assert p["proposed_category"] == "חשמל ומחשבים"
     assert p["confidence"] == 0.9
 

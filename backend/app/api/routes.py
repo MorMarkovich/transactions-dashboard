@@ -26,7 +26,7 @@ from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
     apply_issuer_category, normalize_merchant, apply_trip_window_heuristic,
-    compute_txn_keys, txn_fingerprint, locked_mask, apply_category_migration,
+    compute_txn_keys, txn_fingerprint, locked_mask, apply_category_migration, foreign_card_mask,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, INTERNAL_TRANSFER_PATTERN, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -534,6 +534,7 @@ def restore_session(body: RestoreSessionRequest):
             # pinned to משיכת מזומן) and must not resurrect the wrong category.
             # The SUBCATEGORY part always applies (manual refinements).
             if body.category_rules:
+                trip_mask = foreign_card_mask(df['תיאור'])
                 # Match rules on the canonical merchant key, not the raw
                 # descriptor: a rule saved from "רהיטים (תשלום 3/12)" must hit
                 # every installment, and "PAYPAL *SPOTIFY" must hit the bare
@@ -557,6 +558,8 @@ def restore_session(body: RestoreSessionRequest):
                     if rule_cat and rule_cat not in valid_cats:
                         continue
                     rmask = desc_norm == normalize_merchant(r.merchant)
+                    if r.source == 'ai':
+                        rmask &= ~trip_mask
                     if not rmask.any():
                         continue
                     if rule_cat:
@@ -1503,7 +1506,8 @@ def ai_audit(body: AIAuditRequest):
     expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
     # Pinned rows ("אל תשנה עסקאות דומות") are the user's explicit word —
     # auditing them would only produce proposals that can't be applied.
-    expenses = expenses[~locked_mask(expenses) & ~manual_rule_mask(expenses)]
+    expenses = expenses[~locked_mask(expenses) & ~manual_rule_mask(expenses)
+                        & ~foreign_card_mask(expenses['תיאור'])]
     if expenses.empty:
         return {"success": True, "proposals": [], "audited_count": 0,
                 "audited_merchants": [], "remaining": 0}
@@ -1649,7 +1653,7 @@ def update_merchant_category(body: UpdateMerchantCategoryRequest):
     # each classified differently).
     mask = mask & ~locked_mask(df)
     if body.source == 'ai':
-        mask &= ~manual_rule_mask(df)
+        mask &= ~manual_rule_mask(df) & ~foreign_card_mask(df['תיאור'])
     if not mask.any():
         return {"success": True, "merchant": body.merchant,
                 "category": new_category, "affected_count": 0}
