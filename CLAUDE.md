@@ -10,10 +10,10 @@ each session so context carries over. **Never put secrets here** (it's committed
 - **Supabase** — `saved_transactions` (JSONB snapshots) + `user_category_rules`; RLS; new-style `sb_publishable_…` anon key. bank-sync and the dashboard both sign in **as the user** with the anon key — **never `service_role`**.
 
 ## Deploy
-- Render free tier, single Docker service, **auto-deploys from `main`**.
-- Backend/frontend changes go live only when merged to `main`. bank-sync changes are pulled locally by the user.
-- Workflow: develop on the session's `claude/…` branch (currently **`claude/dashboard-update-a43etv`**), then fast-forward `main` and push to deploy.
-- `ANTHROPIC_API_KEY` is set on Render (enables the AI categorizer).
+- Render Starter, single Docker service, **auto-deploys from `main` after CI passes**.
+- Backend/frontend changes go live only when merged to `main`. Local bank-sync releases are installed from the same validated tree.
+- Workflow: use a `codex/…` task branch, validate, then merge a reviewed PR with passing CI.
+- `AI_PROVIDER=gemini-free` disables Anthropic and any paid fallback. See `docs/free-merchant-agent.md` for free-account verification, durable identification and quotas. Provider keys are backend-only.
 
 ## Security rules (do not violate)
 - **Never** ask for / accept the user's bank passwords, Supabase login, or sync token. They live only in the OS keychain.

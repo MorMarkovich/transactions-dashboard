@@ -263,6 +263,11 @@ export const transactionsApi = {
    * Live progress of the background AI chain, for the UI meter.
    * stage: idle | categorizing | categorized | subcategorizing | done.
    */
+  aiStatus: async (): Promise<{ free_only: boolean; configured: boolean; paid_fallback: boolean; monthly_spend_limit_usd: number | null }> => {
+    const response = await api.get('/api/ai-status');
+    return response.data;
+  },
+
   aiProgress: async (
     sessionId: string,
   ): Promise<{ stage: string; done: number; total: number; detail: string }> => {

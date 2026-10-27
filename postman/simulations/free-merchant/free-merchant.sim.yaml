@@ -1,0 +1,6 @@
+simulation: pinkas-free-merchant-offline
+routing: path
+mocks:
+  - name: free-merchant
+    routeKey: free-merchant
+    path: postman/mocks/free-merchant/config.yaml

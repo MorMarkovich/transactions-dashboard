@@ -22,6 +22,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 _bearer = HTTPBearer(auto_error=False)
 _current_user: ContextVar[str] = ContextVar("current_user", default="")
+_current_access_token: ContextVar[str] = ContextVar("current_access_token", default="")
+
+
+def current_access_token() -> str:
+    """Request-scoped credential for owner-isolated storage; never cached/logged."""
+    return _current_access_token.get()
 
 _token_cache: dict[str, tuple[str, float]] = {}
 _session_owners: dict[str, tuple[str, float]] = {}
@@ -168,7 +174,11 @@ async def authorize_api_request(
                 # Do not reveal that another user's session exists.
                 raise HTTPException(status_code=404, detail="Session not found")
 
-        yield user_id
+        access_context = _current_access_token.set(credentials.credentials if credentials else '')
+        try:
+            yield user_id
+        finally:
+            _current_access_token.reset(access_context)
     finally:
         if not AUTH_DISABLED and is_ai:
             _active_ai_users.discard(user_id)
