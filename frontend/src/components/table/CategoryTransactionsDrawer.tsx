@@ -85,6 +85,8 @@ export default function CategoryTransactionsDrawer({
   const [pendingCat, setPendingCat] = useState<string | null>(null)
   const [pendingSub, setPendingSub] = useState<string | undefined>(undefined)
   const [noteValue, setNoteValue] = useState('')
+  const [editError, setEditError] = useState(false)
+  const [bulkError, setBulkError] = useState(false)
   // Multi-select mode: pick several transactions, move them together.
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -185,15 +187,18 @@ export default function CategoryTransactionsDrawer({
     const txs = transactions.filter((t) => t.id != null && selectedIds.has(t.id))
     if (!txs.length) return
     setBulkSaving(true)
+    setBulkError(false)
     try {
       await onBulkCategoryChange(txs, bulkCat, bulkSub.trim() || null, bulkOnlyThis)
-    } finally {
-      setBulkSaving(false)
       setSelectMode(false)
       setSelectedIds(new Set())
       setBulkCat(null)
       setBulkSub('')
       setBulkOnlyThis(false)
+    } catch {
+      setBulkError(true)
+    } finally {
+      setBulkSaving(false)
     }
   }, [onBulkCategoryChange, bulkCat, bulkSub, bulkOnlyThis, selectedIds, transactions])
 
@@ -201,6 +206,7 @@ export default function CategoryTransactionsDrawer({
   // staged changes, note prefilled. Deliberately NOT keyed on `transactions`
   // so a background refresh can't wipe a note mid-typing.
   useEffect(() => {
+    setEditError(false)
     setPendingCat(null)
     setPendingSub(undefined)
     setCustomCategory('')
@@ -273,8 +279,8 @@ export default function CategoryTransactionsDrawer({
       const nextCat = (pendingCat ?? curCat).trim()
       const nextSub = pendingSub === undefined ? curSub : pendingSub.trim()
       const nextNote = noteValue.trim()
-      const catChanged = !!nextCat && nextCat !== curCat
-      const subChanged = nextSub !== curSub
+      const catChanged = !!nextCat && (nextCat !== curCat || (editError && pendingCat !== null))
+      const subChanged = nextSub !== curSub || (editError && pendingSub !== undefined)
       const noteChanged = nextNote !== curNote
       if (!catChanged && !subChanged && !noteChanged) {
         setEditingId(null)
@@ -285,12 +291,15 @@ export default function CategoryTransactionsDrawer({
         if (catChanged && onCategoryChange) await onCategoryChange(tx, nextCat, onlyThis)
         if (subChanged && onSubcategoryChange) await onSubcategoryChange(tx, nextSub, onlyThis)
         if (noteChanged && onSaveNote) await onSaveNote(tx, nextNote)
+        setEditingId(null)
+        setEditError(false)
+      } catch {
+        setEditError(true)
       } finally {
         setSavingId(null)
-        setEditingId(null)
       }
     },
-    [category, pendingCat, pendingSub, noteValue, onlyThis, onCategoryChange, onSubcategoryChange, onSaveNote],
+    [category, pendingCat, pendingSub, noteValue, onlyThis, editError, onCategoryChange, onSubcategoryChange, onSaveNote],
   )
 
   return (
@@ -681,7 +690,7 @@ export default function CategoryTransactionsDrawer({
                             ...(subcategoryCatalog[effCat] ?? []),
                             ...(effCat === category ? subOptions : []),
                           ])).filter(Boolean).sort((a, b) => a.localeCompare(b, 'he'))
-                          const dirty =
+                          const dirty = editError ||
                             effCat !== curCat
                             || effSub !== curSub
                             || noteValue.trim() !== (tx.הערות ?? '').trim()
@@ -890,6 +899,7 @@ export default function CategoryTransactionsDrawer({
                                 </div>
                               </div>
                             )}
+                            {editError && <p role="alert" style={{ width: '100%', color: 'var(--danger)' }}>לא הצלחנו לשמור את השינוי. לחצו שוב על שמירה כדי לנסות מחדש.</p>}
                             {onSaveNote && (
                               <div style={{ width: '100%', marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed var(--glass-border)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6, fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700 }}>
@@ -1050,6 +1060,7 @@ export default function CategoryTransactionsDrawer({
                       <Lock size={11} style={{ flexShrink: 0 }} />
                       <span>אל תשנה סיווג של עסקאות דומות — רק העסקאות שסומנו</span>
                     </label>
+                    {bulkError && <p role="alert">לא הצלחנו לשמור את כל השינויים. נסו שוב.</p>}
                     <button
                       onClick={handleBulkSave}
                       disabled={bulkSaving || !bulkCat}

@@ -404,6 +404,8 @@ export interface CategoryRule {
   merchant: string
   category: string
   subcategory?: string | null
+  source?: 'legacy' | 'manual' | 'ai'
+  updated_at?: string | null
 }
 
 export interface IncomeTransactionDetail { id:number; date:string; source:string; amount:number; category:string; subcategory:string; account:string; notes:string; month:string }

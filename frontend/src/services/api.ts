@@ -311,10 +311,11 @@ export const transactionsApi = {
     sessionId: string,
     merchant: string,
     category: string,
+    source: 'manual' | 'ai' = 'manual',
   ): Promise<{ success: boolean; merchant: string; category: string; affected_count: number }> => {
     const response = await api.post<{ success: boolean; merchant: string; category: string; affected_count: number }>(
       '/api/merchants/category',
-      { session_id: sessionId, merchant, category },
+      { session_id: sessionId, merchant, category, source },
     );
     return response.data;
   },

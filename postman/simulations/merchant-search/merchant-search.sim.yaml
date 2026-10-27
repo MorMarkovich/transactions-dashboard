@@ -1,0 +1,6 @@
+simulation: pinkas-merchant-search-offline
+routing: path
+mocks:
+  - name: merchant-search
+    routeKey: merchant-search
+    path: postman/mocks/merchant-search/config.yaml

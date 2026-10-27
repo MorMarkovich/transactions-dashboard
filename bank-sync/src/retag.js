@@ -9,7 +9,7 @@
 // Read+write only against Supabase; no bank logins. Run: `npm run retag`.
 import { config, assertConfig } from './config.js'
 import { getJSON, getAccounts, SUPABASE_AUTH_KEY } from './secrets.js'
-import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+import { signIn, getLatestSnapshot, getCategoryRules, getUserCategories, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 import { detectOwner } from './owner.js'
 import { refreshMiscCategories } from './normalize.js'
 import { buildRuleMap } from './categorize.js'
@@ -45,12 +45,13 @@ async function main() {
   for (const a of accounts) console.log(`  • ${a.label}  [${a.key}] → ${a.owner || '(unset)'}`)
 
   const { supabase, userId } = await signIn(config.supabaseUrl, config.supabaseAnonKey, auth.email, auth.password)
-  const [txns, rules] = await Promise.all([
+  const [txns, rules, customCategories] = await Promise.all([
     getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
+    getUserCategories(supabase, userId),
   ])
   if (!txns.length) { console.log('\nNo transactions to retag.'); return }
-  const ruleMap = buildRuleMap(rules)
+  const ruleMap = buildRuleMap(rules, customCategories)
 
   let changed = 0
   const before = {}

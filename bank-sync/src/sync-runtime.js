@@ -11,7 +11,7 @@ import { scrapeAccountWithPending } from './pending-runtime.js'
 import { normalizeTxn, mergeSnapshots } from './normalize.js'
 import { buildRuleMap } from './categorize.js'
 import { applyIncomeMonthShift } from './income.js'
-import { signIn, getLatestSnapshot, getCategoryRules, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
+import { signIn, getLatestSnapshot, getCategoryRules, getUserCategories, insertSnapshot, deleteOtherSnapshots } from './supabaseClient.js'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -50,11 +50,12 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
   // Always read the existing snapshot. A normal sync merges into it; a fresh
   // resync uses it to PRESERVE rows from accounts that fail to scrape this run
   // (so a temporary block — e.g. Isracard anti-bot — can't wipe good data).
-  const [existing, rules] = await Promise.all([
+  const [existing, rules, customCategories] = await Promise.all([
     getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
+    getUserCategories(supabase, userId),
   ])
-  const ruleMap = buildRuleMap(rules)
+  const ruleMap = buildRuleMap(rules, customCategories)
 
   const freshTxns = []
   const byProvider = {}

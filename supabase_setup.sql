@@ -128,6 +128,8 @@ CREATE TABLE IF NOT EXISTS public.user_category_rules (
 -- Safe to re-run. REQUIRED before deploying the subcategory feature (the
 -- dashboard selects this column when loading rules).
 ALTER TABLE public.user_category_rules ADD COLUMN IF NOT EXISTS subcategory TEXT;
+ALTER TABLE public.user_category_rules ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'legacy'
+    CHECK (source IN ('legacy', 'manual', 'ai'));
 
 ALTER TABLE public.user_category_rules ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view own category rules" ON public.user_category_rules;

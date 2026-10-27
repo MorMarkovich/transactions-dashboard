@@ -29,10 +29,16 @@ export async function getLatestSnapshot(supabase, userId) {
 export async function getCategoryRules(supabase, userId) {
   const { data, error } = await supabase
     .from('user_category_rules')
-    .select('merchant, category')
+    .select('merchant, category, subcategory, source, updated_at')
     .eq('user_id', userId)
-  if (error) return []
+  if (error) throw safeError('SUPABASE_READ_FAILED')
   return data || []
+}
+
+export async function getUserCategories(supabase, userId) {
+  const { data, error } = await supabase.from('user_categories').select('name').eq('user_id', userId)
+  if (error) throw safeError('SUPABASE_READ_FAILED')
+  return (data || []).map((row) => row.name)
 }
 
 // Insert a new snapshot row (insert-only, matching the dashboard's save).

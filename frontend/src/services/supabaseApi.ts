@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
-import type { Income } from './types';
+import type { Income, CategoryRule } from './types';
+import { persistManualRules, persistAutomaticRules } from './categoryRuleStore';
 import { guardSampleWrites } from '../lib/sampleMode';
 
 const rawSupabaseApi = {
@@ -144,22 +145,21 @@ const rawSupabaseApi = {
    */
   getCategoryRules: async (
     userId: string,
-  ): Promise<{ merchant: string; category: string; subcategory?: string | null }[]> => {
+  ): Promise<CategoryRule[]> => {
     const { data, error } = await supabase
       .from('user_category_rules')
-      .select('merchant, category, subcategory')
+      .select('merchant, category, subcategory, source, updated_at')
       .eq('user_id', userId);
     if (error) {
-      // The `subcategory` column may be missing on a deployment that hasn't run
-      // the migration yet. Retry without it so we never silently drop ALL rules.
+      if (!['42703', 'PGRST204'].includes(error.code)) throw error;
+      // Read older schemas without inventing manual provenance.
       const { data: legacy, error: legacyErr } = await supabase
         .from('user_category_rules')
-        .select('merchant, category')
+        .select('merchant, category, subcategory, updated_at')
         .eq('user_id', userId);
       if (legacyErr) {
         // Table may not exist yet on older deployments — degrade gracefully.
-        console.warn('getCategoryRules failed:', legacyErr.message);
-        return [];
+        throw legacyErr;
       }
       return legacy || [];
     }
@@ -170,65 +170,22 @@ const rawSupabaseApi = {
    * Upsert one rule. Called when the user manually changes a transaction's
    * category in the dashboard.
    */
-  upsertCategoryRule: async (
-    userId: string,
-    merchant: string,
-    category: string,
-  ): Promise<void> => {
-    const { error } = await supabase
-      .from('user_category_rules')
-      .upsert(
-        { user_id: userId, merchant, category, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,merchant' },
-      );
-    if (error) throw error;
+  upsertCategoryRule: async (userId: string, merchant: string, category: string): Promise<void> => {
+    await persistManualRules(supabase, userId, [{ merchant, category }]);
   },
 
-  upsertCategoryRules: async (
-    userId: string,
-    rules: { merchant: string; category: string }[],
-  ): Promise<void> => {
-    const rows = rules
-      .filter((r) => r.merchant && r.category)
-      .map((r) => ({
-        user_id: userId,
-        merchant: r.merchant,
-        category: r.category,
-        updated_at: new Date().toISOString(),
-      }));
-    if (rows.length === 0) return;
-    const { error } = await supabase
-      .from('user_category_rules')
-      .upsert(rows, { onConflict: 'user_id,merchant' });
-    if (error) throw error;
+  upsertCategoryRules: async (userId: string, rules: CategoryRule[]): Promise<void> => {
+    await persistManualRules(supabase, userId, rules);
   },
 
-  /**
-   * Upsert a merchant→{category, subcategory} rule. Separate from
-   * upsertCategoryRule (which never touches `subcategory`) so a category-only
-   * edit can't clobber an existing subcategory, and vice-versa. We send the
-   * category alongside because the table's `category` column is NOT NULL.
-   */
   upsertCategorySubrule: async (
-    userId: string,
-    merchant: string,
-    category: string,
-    subcategory: string,
+    userId: string, merchant: string, category: string, subcategory: string,
   ): Promise<void> => {
-    if (!merchant || !category) return;
-    const { error } = await supabase
-      .from('user_category_rules')
-      .upsert(
-        {
-          user_id: userId,
-          merchant,
-          category,
-          subcategory: subcategory || null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,merchant' },
-      );
-    if (error) throw error;
+    await persistManualRules(supabase, userId, [{ merchant, category, subcategory }]);
+  },
+
+  upsertAutomaticCategoryRules: async (userId: string, rules: CategoryRule[]): Promise<void> => {
+    await persistAutomaticRules(supabase, userId, rules);
   },
 
   deleteCategoryRule: async (userId: string, merchant: string): Promise<void> => {

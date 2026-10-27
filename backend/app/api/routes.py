@@ -8,7 +8,7 @@ import math
 import logging
 import time
 import zipfile
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
 import json as _json
@@ -20,6 +20,8 @@ import numpy as np
 from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
+from ..services.data_processor import keyword_hits
+from ..services.category_rules import apply_manual_rules, manual_rule_mask
 from ..services.data_processor import (
     process_data, clean_dataframe,
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
@@ -279,6 +281,8 @@ class CategoryRule(BaseModel):
     merchant: str
     category: str
     subcategory: Optional[str] = None
+    source: Literal['legacy', 'manual', 'ai'] = 'legacy'
+    updated_at: Optional[str] = None
 
 
 class TransactionOverride(BaseModel):
@@ -441,6 +445,8 @@ def restore_session(body: RestoreSessionRequest):
         }
         valid_cats = set(CATEGORY_ICONS) | custom_cats
         if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
+            # Provenance comes from saved rules, never baked snapshot flags.
+            df['_manual_rule'] = False
             # Old-taxonomy snapshots (pre-2026-07 category names) are migrated
             # in place FIRST — otherwise the hygiene pass below would wipe them
             # all to שונות.
@@ -478,11 +484,11 @@ def restore_session(body: RestoreSessionRequest):
             if eligible.any():
                 # Shrinking scan: each row stops at its first (= longest,
                 # KEYWORD_TO_CATEGORY is sorted longest-first) keyword hit.
-                remaining = desc_lower[eligible]
+                remaining = df.loc[eligible, 'תיאור'].map(normalize_merchant)
                 for kw, cat in KEYWORD_TO_CATEGORY.items():
                     if remaining.empty:
                         break
-                    hit = remaining.str.contains(kw, na=False, regex=False)
+                    hit = keyword_hits(remaining, kw)
                     if hit.any():
                         hit_idx = remaining.index[hit]
                         changed_idx = hit_idx[df.loc[hit_idx, 'קטגוריה'] != cat]
@@ -510,6 +516,8 @@ def restore_session(body: RestoreSessionRequest):
             # company's own sector fills whatever the keyword catalog left in
             # שונות. Weaker than user rules (applied below, they overwrite) and
             # cheaper than the AI fallback (fewer Claude queries).
+            # Preserve explicit overseas descriptors when a brand keyword matched.
+            apply_unconditional_overrides(df)
             apply_issuer_category(df)
 
             # Trip-window sweep: latin-only שונות rows within ±3 days of
@@ -532,7 +540,7 @@ def restore_session(body: RestoreSessionRequest):
                 # variant too.
                 desc_norm = df['תיאור'].astype(str).map(normalize_merchant)
                 for r in body.category_rules:
-                    if not r.merchant:
+                    if not r.merchant or r.source == 'manual':
                         continue
                     # Rules saved under the OLD taxonomy are translated on the
                     # fly (the frontend also migrates them in Supabase, this is
@@ -581,6 +589,10 @@ def restore_session(body: RestoreSessionRequest):
             # keyword pass, user rules and AI). Rule/manual subcategories set
             # above are preserved (derive only fills empty ones).
             derive_subcategory(df)
+
+            # A verified manual choice wins over the catalog and automatic
+            # suggestions, including an intentionally empty subcategory.
+            apply_manual_rules(df, body.category_rules, valid_cats)
 
         # (User-defined category rules are applied above, before the AI step,
         # so rule-covered merchants skip the web search — see that block.)
@@ -827,6 +839,7 @@ def update_transaction_category(body: UpdateTransactionCategoryRequest):
         # Old subcategories belonged to the old category — re-derive.
         df.loc[changed, 'קטגוריה_משנה'] = ''
         derive_subcategory(df)
+        df.loc[apply_mask, '_manual_rule'] = True
         affected = int(apply_mask.sum())
 
     sessions[body.session_id] = df
@@ -905,6 +918,7 @@ def bulk_update_category(body: BulkUpdateCategoryRequest):
         # seeded derivation, like the single-row subcategory editor.
         if new_sub:
             df.loc[apply_mask, 'קטגוריה_משנה'] = new_sub
+        df.loc[apply_mask, '_manual_rule'] = True
         affected = int(apply_mask.sum())
 
     sessions[body.session_id] = df
@@ -952,7 +966,9 @@ def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
         key = normalize_merchant(merchant)
         merchant_mask = df['תיאור'].astype(str).map(normalize_merchant) == key
         scope = merchant_mask & (df['קטגוריה'].astype(str) == (category or ''))
-        df.loc[(scope | mask) & ~locked_mask(df), 'קטגוריה_משנה'] = new_subcategory
+        apply_mask = (scope | mask) & ~locked_mask(df)
+        df.loc[apply_mask, 'קטגוריה_משנה'] = new_subcategory
+        df.loc[apply_mask, '_manual_rule'] = True
 
     sessions[body.session_id] = df
 
@@ -1031,6 +1047,7 @@ def rename_category(body: RenameCategoryRequest):
         merchants = sorted({str(v) for v in df.loc[mask, 'תיאור'].dropna().tolist() if str(v).strip()})
 
     df.loc[mask, 'קטגוריה'] = new_category
+    df.loc[mask, '_manual_rule'] = True
     sessions[body.session_id] = df
 
     return {
@@ -1411,7 +1428,7 @@ def ai_categorize(body: AICategorizeRequest):
     ai_categorized: list[dict] = []
     if 'קטגוריה' in df.columns and 'תיאור' in df.columns:
         # Pinned rows ("אל תשנה עסקאות דומות") are never sent to the AI.
-        misc_mask = (df['קטגוריה'] == 'שונות') & ~locked_mask(df)
+        misc_mask = (df['קטגוריה'] == 'שונות') & ~locked_mask(df) & ~manual_rule_mask(df)
         if misc_mask.any():
             misc_descs = df.loc[misc_mask, 'תיאור'].tolist()
             # Card-company sector (ענף_מקור) is a useful hint for the AI —
@@ -1433,7 +1450,12 @@ def ai_categorize(body: AICategorizeRequest):
             misc_idx = df.index[misc_mask].tolist()
             for local_i, cat in ai_map.items():
                 if 0 <= local_i < len(misc_idx):
-                    df.at[misc_idx[local_i], 'קטגוריה'] = cat
+                    idx = misc_idx[local_i]
+                    # The user may have edited while the remote call ran.
+                    if (locked_mask(df).at[idx] or manual_rule_mask(df).at[idx]
+                            or df.at[idx, 'קטגוריה'] != 'שונות'):
+                        continue
+                    df.at[idx, 'קטגוריה'] = cat
                     ai_categorized.append({
                         "merchant": str(df.at[misc_idx[local_i], 'תיאור']),
                         "category": cat,
@@ -1473,7 +1495,7 @@ def ai_audit(body: AIAuditRequest):
     expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
     # Pinned rows ("אל תשנה עסקאות דומות") are the user's explicit word —
     # auditing them would only produce proposals that can't be applied.
-    expenses = expenses[~locked_mask(expenses)]
+    expenses = expenses[~locked_mask(expenses) & ~manual_rule_mask(expenses)]
     if expenses.empty:
         return {"success": True, "proposals": [], "audited_count": 0,
                 "audited_merchants": [], "remaining": 0}
@@ -1547,11 +1569,12 @@ def ai_audit(body: AIAuditRequest):
             continue
         it = items[i]
         if v["category"] == it["current"] or v["category"] == 'שונות':
-            if v["category"] == it["current"] and it["current"] != 'שונות':
+            if v["category"] == it["current"] and it["current"] != 'שונות' and v['confidence'] >= 0.9:
                 verified.append({"merchant": it["merchant"], "category": it["current"]})
             continue
         merchant_lower = str(it["merchant"]).lower()
-        catalog_hit = any(kw in merchant_lower for kw in KEYWORD_TO_CATEGORY)
+        catalog_hit = any(keyword_hits(pd.Series([normalize_merchant(merchant_lower)]), kw).iat[0]
+                          for kw in KEYWORD_TO_CATEGORY)
         proposals.append({
             "merchant": it["merchant"],
             "current_category": it["current"],
@@ -1585,6 +1608,7 @@ class UpdateMerchantCategoryRequest(BaseModel):
     session_id: str
     merchant: str
     category: str
+    source: Literal['manual', 'ai'] = 'manual'
 
 
 @router.post("/merchants/category")
@@ -1616,6 +1640,8 @@ def update_merchant_category(body: UpdateMerchantCategoryRequest):
     # דומות" — that's the entire point of the pin (e.g. ביט transfers,
     # each classified differently).
     mask = mask & ~locked_mask(df)
+    if body.source == 'ai':
+        mask &= ~manual_rule_mask(df)
     if not mask.any():
         return {"success": True, "merchant": body.merchant,
                 "category": new_category, "affected_count": 0}
@@ -1625,6 +1651,8 @@ def update_merchant_category(body: UpdateMerchantCategoryRequest):
     if 'קטגוריה_משנה' in df.columns:
         df.loc[mask, 'קטגוריה_משנה'] = ''
         derive_subcategory(df)
+    if body.source == 'manual':
+        df.loc[mask, '_manual_rule'] = True
     sessions[body.session_id] = df
 
     return {
@@ -1659,7 +1687,7 @@ def _ai_subcategorize_category(df, category: str, limit: int) -> tuple[list[dict
     cat_mask = df['קטגוריה'].astype(str) == category
     # Pinned rows ("אל תשנה עסקאות דומות") keep whatever the user chose,
     # including an intentionally empty subcategory.
-    target = cat_mask & (sub_series == '') & ~locked_mask(df)
+    target = cat_mask & (sub_series == '') & ~locked_mask(df) & ~manual_rule_mask(df)
     if not target.any():
         return [], 0
 
@@ -1709,7 +1737,14 @@ def _ai_subcategorize_category(df, category: str, limit: int) -> tuple[list[dict
         it = items[i]
         # Fill only rows still empty, so a manual assignment made while the AI
         # call was in flight survives.
-        apply_mask = target & (desc_norm == it["_key"])
+        apply_mask = (
+            (df['קטגוריה'].astype(str) == category)
+            & (df['קטגוריה_משנה'].fillna('').astype(str).str.strip() == '')
+            & ~locked_mask(df) & ~manual_rule_mask(df)
+            & (desc_norm == it["_key"])
+        )
+        if not apply_mask.any():
+            continue
         df.loc[apply_mask, 'קטגוריה_משנה'] = sub
         assignments.append({
             "merchant": it["merchant"],
