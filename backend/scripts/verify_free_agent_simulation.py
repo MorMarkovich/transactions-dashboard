@@ -10,6 +10,7 @@ os.environ.update(AUTH_DISABLED='true', AI_PROVIDER='gemini-free',
     SUPABASE_URL=storage, SUPABASE_ANON_KEY='synthetic-key',
     GEMINI_API_KEY='synthetic-gemini', TAVILY_API_KEY='synthetic-search',
     GEMINI_FREE_KEY_SHA256=hashlib.sha256(b'synthetic-gemini').hexdigest(),
+    TAVILY_FREE_KEY_SHA256=hashlib.sha256(b'synthetic-search').hexdigest(),
     GEMINI_API_BASE_URL=provider, TAVILY_API_BASE_URL=provider)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.security import _current_access_token, _current_user  # noqa: E402

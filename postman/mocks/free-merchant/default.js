@@ -5,7 +5,7 @@ http.createServer((req,res)=>{
  const json=(s,b)=>{res.writeHead(s,{'content-type':'application/json'});res.end(JSON.stringify(b))}
  if(req.url.endsWith('/scenario')&&req.method==='POST'){mode=req.body.mode;calls={usage:0,search:0,gemini:0};return json(200,{ok:true})}
  if(req.url.endsWith('/calls'))return json(200,calls)
- if(req.url.endsWith('/usage')){calls.usage++;return json(200,{account:{current_plan:mode==='paid'?'Bootstrap':'Researcher',plan_usage:0,plan_limit:1000,paygo_usage:0,paygo_limit:mode==='paygo'?100:0}})}
+ if(req.url.endsWith('/usage')){calls.usage++;return json(200,{account:{current_plan:mode==='paid'?'Bootstrap':'Researcher',plan_usage:0,plan_limit:1000,paygo_usage:0,paygo_limit:mode==='paygo'?100:null}})}
  if(req.url.endsWith('/search')){
   calls.search++
   const b=req.body

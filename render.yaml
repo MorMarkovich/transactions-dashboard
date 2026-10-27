@@ -24,6 +24,9 @@ services:
         sync: false
       - key: TAVILY_API_KEY
         sync: false
+      # Verified free account, PAYG off; required even when usage returns null.
+      - key: TAVILY_FREE_KEY_SHA256
+        sync: false
       - key: ALLOWED_ORIGINS
         value: https://transactions-dashboard-bfxn.onrender.com
       - key: VITE_AUTO_AI

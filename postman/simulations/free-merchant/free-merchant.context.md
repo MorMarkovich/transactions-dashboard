@@ -14,6 +14,10 @@ paid account, pay-as-you-go enabled, and provider quota. Repeated canonical
 merchant requests and later audit/subcategory phases made no new provider
 calls. Paid/paygo accounts made zero searches and zero Gemini calls.
 
+The usage fixture also includes the explicit `paygo_limit: null` observed
+on the verified Researcher account with PAYG off. Both provider keys require
+a free-account deployment attestation; missing fields still stop before search.
+
 The mock was written from Tavily's `/usage` and `/search` documentation and
 Google's `generateContent` schema. An owner-published mock was not available.
 This proves request handling, free-only guards and SQL persistence using
