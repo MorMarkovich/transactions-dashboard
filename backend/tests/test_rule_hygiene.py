@@ -63,7 +63,7 @@ def test_catalog_beats_conflicting_rules_and_rules_decide_unknowns():
     rows = [
         {"תאריך": "2026-06-01", "תיאור": "שופרסל דיל", "קטגוריה": "שונות", "סכום": -100},
         {"תאריך": "2026-06-02", "תיאור": "OPENAI *CHATGPT", "קטגוריה": "שונות", "סכום": -80},
-        {"תאריך": "2026-06-03", "תיאור": "ZZQWX UNKNOWN CO", "קטגוריה": "שונות", "סכום": -50},
+        {"תאריך": "2026-06-03", "תיאור": "ZZQWX UNKNOWN LTD", "קטגוריה": "שונות", "סכום": -50},
     ]
     rules = [
         # Conflicts with a catalog hit (שופרסל → אוכל) — a stale AI
@@ -71,13 +71,13 @@ def test_catalog_beats_conflicting_rules_and_rules_decide_unknowns():
         {"merchant": "שופרסל דיל", "category": "אירועים ומתנות"},
         {"merchant": "OPENAI *CHATGPT", "category": "חשמל ומחשבים"},  # stale pre-AI-category rule
         # The catalog has no opinion here — the rule decides.
-        {"merchant": "ZZQWX UNKNOWN CO", "category": "אירועים ומתנות"},
+        {"merchant": "ZZQWX UNKNOWN LTD", "category": "אירועים ומתנות"},
     ]
     by_desc = _restore(rows, rules)
     assert by_desc["שופרסל דיל"]["קטגוריה"] == "אוכל"
     # The AI-tool override still beats the stale rule.
     assert by_desc["OPENAI *CHATGPT"]["קטגוריה"] == AI_CATEGORY
-    assert by_desc["ZZQWX UNKNOWN CO"]["קטגוריה"] == "אירועים ומתנות"
+    assert by_desc["ZZQWX UNKNOWN LTD"]["קטגוריה"] == "אירועים ומתנות"
 
 def test_stale_exempt_travel_rows_are_repaired():
     """Rows tagged travel by the PRE-exemption foreign rule must migrate out:

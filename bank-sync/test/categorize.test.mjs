@@ -577,3 +577,10 @@ test('retag trip-window: latin misc rows near confirmed overseas spend → trave
   assert.equal(txns[2]['קטגוריה'], 'שונות')
   assert.equal(txns[3]['קטגוריה'], 'שונות')
 })
+
+
+test('online API and media billing descriptors are not trip purchases', () => {
+  for (const desc of ['WWW.SCRAPINGBEE.COM PARIS FR', 'REAL-DEBRID LEVALLOIS-PER FR', 'DP* DODOPAY_APIS DODOPAYMENTS. US']) {
+    assert.notEqual(categorize(desc), 'טיסות ותיירות')
+  }
+})

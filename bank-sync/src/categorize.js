@@ -615,7 +615,7 @@ function boundaryMatch(text, kw) {
 const FOREIGN_DESC = /(?:^|\s)(?!IL(?:\s|$))[A-Z]{2}\s*$/
 // Online services bill from abroad year-round ("NETFLIX.COM AMSTERDAM NL",
 // "PAYPAL *SPOTIFY ... GB") — not trip spend. Mirrors FOREIGN_EXEMPT_KEYWORDS.
-const FOREIGN_EXEMPT_KEYWORDS = ["netflix", "spotify", "paypal", "google", "apple", "amazon", "microsoft", "disney", "hbo", "youtube", "ebay", "aliexpress", "temu", "banggood", "steam", "playstation", "xbox", "nintendo", "epic games", "adobe", "canva", "notion", "dropbox", "icloud", "github", "zoom", "linkedin", "patreon", "substack", "audible", "kindle", "twitch", "discord", "wolt", "facebook", "facebk", "meta platforms", "render.com", "digitalocean", "digitalocea", "alldebrid", "browserbase", "browserba", "televizo", "iptv"]
+const FOREIGN_EXEMPT_KEYWORDS = ["netflix", "spotify", "paypal", "google", "apple", "amazon", "microsoft", "disney", "hbo", "youtube", "ebay", "aliexpress", "temu", "banggood", "steam", "playstation", "xbox", "nintendo", "epic games", "adobe", "canva", "notion", "dropbox", "icloud", "github", "zoom", "linkedin", "patreon", "substack", "audible", "kindle", "twitch", "discord", "wolt", "facebook", "facebk", "meta platforms", "render.com", "digitalocean", "digitalocea", "alldebrid", "browserbase", "browserba", "televizo", "iptv", "scrapingbee", "real-debrid", "dodopay"]
 
 // True when the descriptor matches an exempt online service (used by retag to
 // repair rows the PRE-exemption foreign rule wrongly tagged as travel).

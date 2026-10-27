@@ -60,7 +60,9 @@ Resolved results do not expire automatically and are reused by categorization,
 audit, subcategory selection, dashboard restores and local bank synchronization.
 Manual rules and transaction pins retain precedence. The existing foreign-card
 trip policy also takes precedence over automatic business identification; those
-descriptors are excluded from web audits. Online-service exemptions still apply,
+descriptors are excluded from web audits. Legacy automatic rules follow the
+same policy; explicitly manual rules remain exceptions. ScrapingBee, Real-Debrid
+and Dodo Payments are online-service exemptions. Online-service exemptions still apply,
 and an explicit manual choice can override the trip category.
 
 An atomic claim serializes new lookups through the owner's monthly quota row.
