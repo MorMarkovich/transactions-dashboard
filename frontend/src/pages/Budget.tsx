@@ -11,6 +11,7 @@ import {
   CheckCircle,
   PiggyBank,
 } from 'lucide-react'
+import Select from '../components/ui/Select'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import PageHeader from '../components/common/PageHeader'
@@ -382,29 +383,7 @@ export default function Budget() {
                 <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                   קטגוריה
                 </label>
-                <select
-                  aria-label="קטגוריה"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '40px',
-                    padding: '0 12px',
-                    paddingInlineEnd: '34px',
-                    borderRadius: 'var(--radius-md, 8px)',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-input, var(--bg-card))',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.875rem',
-                    fontFamily: 'var(--font-family)',
-                    direction: 'rtl',
-                  }}
-                >
-                  <option value="">בחר קטגוריה...</option>
-                  {availableCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+                <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'בחר קטגוריה...' }, ...availableCategories.map((cat) => ({ value: cat, label: cat }))]} value={newCategory} onChange={setNewCategory} />
               </div>
 
               <div style={{ flex: '0 0 160px' }}>
@@ -632,4 +611,4 @@ export default function Budget() {
 
     </div>
   )
-}
+                      }
