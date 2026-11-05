@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { User, Mail, Lock, Trash2 } from 'lucide-react'
+import { User, UserCog, Mail, Lock, Trash2, LogOut } from 'lucide-react'
+import PageHeader from '../components/common/PageHeader'
 import Card from '../components/ui/Card'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import './AccountSettings.css'
 
 // ---------------------------------------------------------------------------
 // Signed-in account management: display name, email change (confirmed by
-// email), password change. Account/data deletion lives in Data Management.
+// email), password change, sign-out. Account/data deletion lives in Data
+// Management. Styled to the dashboard's Orbit standard (page header with
+// gradient icon, glass cards, dashboard spacing) — keep it that way.
 // ---------------------------------------------------------------------------
 export default function AccountSettings() {
-  const { user, updateDisplayName, updateEmail, updatePassword } = useAuth()
+  const { user, updateDisplayName, updateEmail, updatePassword, signOut } = useAuth()
 
   const currentName = (user?.user_metadata?.full_name as string | undefined) || ''
   const currentEmail = user?.email || ''
@@ -31,11 +35,6 @@ export default function AccountSettings() {
   const [pw2, setPw2] = useState('')
   const [pwMsg, setPwMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [pwLoading, setPwLoading] = useState(false)
-
-  useEffect(() => {
-    document.title = 'הגדרות חשבון | פנקס'
-    return () => { document.title = 'פנקס' }
-  }, [])
 
   const initials = (currentName || currentEmail.split('@')[0] || 'מ')
     .split(' ').map((w) => w[0]).join('').slice(0, 2)
@@ -82,123 +81,126 @@ export default function AccountSettings() {
   }
 
   return (
-    <div dir="rtl" style={{ maxWidth: '640px', marginInline: 'auto', padding: '24px 16px 48px' }}>
-      <h1 style={{ margin: '0 0 4px', fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-        הגדרות חשבון
-      </h1>
-      <p style={{ margin: '0 0 20px', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-        ניהול פרטי ההתחברות והפרופיל שלך
-      </p>
-
-      {/* Profile */}
-      <Card padding="md" className="glass-card">
-        <SectionTitle icon={<User size={16} />} title="פרופיל" />
-        <p style={{ margin: '0 0 12px', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          השם מוצג באפליקציה בלבד; ההתחברות תמיד מתבצעת עם כתובת המייל.
-        </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-          <div
-            aria-hidden="true"
-            style={{
-              width: '44px', height: '44px', borderRadius: '9999px', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, #818cf8, #6d28d9)', color: '#fff', fontWeight: 700,
-            }}
+    <div dir="rtl" className="account-page">
+      <PageHeader
+        title="הגדרות חשבון"
+        subtitle="ניהול פרטי ההתחברות והפרופיל שלך"
+        icon={UserCog}
+        actions={
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            icon={<LogOut size={16} />}
+            onClick={() => { void signOut() }}
           >
-            {initials}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9375rem' }}>{currentName || '—'}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', direction: 'ltr', textAlign: 'right' }}>{currentEmail}</div>
-          </div>
-        </div>
-        <form onSubmit={handleNameSave} noValidate style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="שם מלא (מוצג באפליקציה)"
-              icon={<User size={18} />}
-              aria-label="שם מלא"
-              autoComplete="name"
-            />
-          </div>
-          <Button type="submit" variant="primary" size="md" loading={nameLoading}>שמור</Button>
-        </form>
-        <Msg msg={nameMsg} />
-      </Card>
+            התנתק
+          </Button>
+        }
+      />
 
-      {/* Email */}
-      <Card padding="md" className="glass-card">
-        <SectionTitle icon={<Mail size={16} />} title="כתובת מייל" />
-        <p style={{ margin: '0 0 12px', fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          זוהי הכתובת שמשמשת להתחברות: <span dir="ltr">{currentEmail}</span>. לאחר השמירה נשלח מייל אימות גם לכתובת הנוכחית וגם לחדשה, והשינוי נכנס לתוקף רק אחרי אישור בשתיהן.
-        </p>
-        <form onSubmit={handleEmailSave} noValidate style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <Input
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="מייל חדש"
-              icon={<Mail size={18} />}
-              aria-label="כתובת מייל חדשה"
-              autoComplete="email"
-            />
+      <div className="account-sections">
+        {/* Profile */}
+        <Card padding="lg" className="glass-card">
+          <SectionTitle icon={<User size={16} />} title="פרופיל" />
+          <div className="account-identity">
+            <div className="account-identity-avatar" aria-hidden="true">{initials}</div>
+            <div className="account-identity-info">
+              <div className="account-identity-name">{currentName || '—'}</div>
+              <div className="account-identity-email" dir="ltr">{currentEmail}</div>
+            </div>
           </div>
-          <Button type="submit" variant="primary" size="md" loading={emailLoading}>עדכן מייל</Button>
-        </form>
-        <Msg msg={emailMsg} />
-      </Card>
+          <p className="account-hint">
+            השם מוצג באפליקציה בלבד; ההתחברות תמיד מתבצעת עם כתובת המייל.
+          </p>
+          <form onSubmit={handleNameSave} noValidate className="account-form-row">
+            <div className="account-form-grow">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="שם מלא (מוצג באפליקציה)"
+                icon={<User size={18} />}
+                aria-label="שם מלא"
+                autoComplete="name"
+              />
+            </div>
+            <Button type="submit" variant="primary" size="md" loading={nameLoading}>שמור</Button>
+          </form>
+          <Msg msg={nameMsg} />
+        </Card>
 
-      {/* Password */}
-      <Card padding="md" className="glass-card">
-        <SectionTitle icon={<Lock size={16} />} title="סיסמה" />
-        <form onSubmit={handlePasswordSave} noValidate>
-          <div className="space-y-3">
-            <Input
-              type="password"
-              value={pw1}
-              onChange={(e) => setPw1(e.target.value)}
-              placeholder="סיסמה חדשה"
-              icon={<Lock size={18} />}
-              aria-label="סיסמה חדשה"
-              autoComplete="new-password"
-            />
-            <Input
-              type="password"
-              value={pw2}
-              onChange={(e) => setPw2(e.target.value)}
-              placeholder="אימות סיסמה חדשה"
-              icon={<Lock size={18} />}
-              aria-label="אימות סיסמה חדשה"
-              autoComplete="new-password"
-            />
-          </div>
-          <div style={{ marginTop: '12px' }}>
-            <Button type="submit" variant="primary" size="md" loading={pwLoading}>עדכן סיסמה</Button>
-          </div>
-        </form>
-        <Msg msg={pwMsg} />
-      </Card>
+        {/* Email */}
+        <Card padding="lg" className="glass-card">
+          <SectionTitle icon={<Mail size={16} />} title="כתובת מייל" />
+          <p className="account-hint">
+            זוהי הכתובת שמשמשת להתחברות: <span dir="ltr">{currentEmail}</span>. לאחר השמירה נשלח מייל אימות גם לכתובת הנוכחית וגם לחדשה, והשינוי נכנס לתוקף רק אחרי אישור בשתיהן.
+          </p>
+          <form onSubmit={handleEmailSave} noValidate className="account-form-row">
+            <div className="account-form-grow">
+              <Input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="מייל חדש"
+                icon={<Mail size={18} />}
+                aria-label="כתובת מייל חדשה"
+                autoComplete="email"
+              />
+            </div>
+            <Button type="submit" variant="primary" size="md" loading={emailLoading}>עדכן מייל</Button>
+          </form>
+          <Msg msg={emailMsg} />
+        </Card>
 
-      {/* Danger zone pointer */}
-      <Card padding="md" className="glass-card">
-        <SectionTitle icon={<Trash2 size={16} />} title="מחיקת חשבון" />
-        <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          מחיקת החשבון והנתונים זמינה בעמוד{' '}
-          <Link to="/data-management" style={{ color: 'var(--accent)', fontWeight: 600 }}>ניהול מידע</Link>.
-        </p>
-      </Card>
+        {/* Password */}
+        <Card padding="lg" className="glass-card">
+          <SectionTitle icon={<Lock size={16} />} title="סיסמה" />
+          <form onSubmit={handlePasswordSave} noValidate>
+            <div className="account-form-stack">
+              <Input
+                type="password"
+                value={pw1}
+                onChange={(e) => setPw1(e.target.value)}
+                placeholder="סיסמה חדשה"
+                icon={<Lock size={18} />}
+                aria-label="סיסמה חדשה"
+                autoComplete="new-password"
+              />
+              <Input
+                type="password"
+                value={pw2}
+                onChange={(e) => setPw2(e.target.value)}
+                placeholder="אימות סיסמה חדשה"
+                icon={<Lock size={18} />}
+                aria-label="אימות סיסמה חדשה"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="account-form-actions">
+              <Button type="submit" variant="primary" size="md" loading={pwLoading}>עדכן סיסמה</Button>
+            </div>
+          </form>
+          <Msg msg={pwMsg} />
+        </Card>
+
+        {/* Danger zone pointer */}
+        <Card padding="lg" className="glass-card">
+          <SectionTitle icon={<Trash2 size={16} />} title="מחיקת חשבון" />
+          <p className="account-hint" style={{ margin: 0 }}>
+            מחיקת החשבון והנתונים זמינה בעמוד{' '}
+            <Link to="/data-management" style={{ color: 'var(--accent)', fontWeight: 600 }}>ניהול מידע</Link>.
+          </p>
+        </Card>
+      </div>
     </div>
   )
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-      <span style={{ color: 'var(--accent-primary, #818cf8)', display: 'inline-flex' }}>{icon}</span>
-      <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h2>
+    <div className="account-section-title">
+      <span className="account-section-icon" aria-hidden="true">{icon}</span>
+      <h2>{title}</h2>
     </div>
   )
 }
@@ -219,4 +221,4 @@ function Msg({ msg }: { msg: { kind: 'ok' | 'err'; text: string } | null }) {
       {msg.text}
     </div>
   )
-}
+          }
