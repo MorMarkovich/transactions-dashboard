@@ -81,12 +81,21 @@ export default function Select({
     const trigger = triggerRef.current
     if (!trigger) return
     const rect = trigger.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const spaceBelow = vh - rect.bottom - VIEWPORT_MARGIN
+    // The visual viewport shrinks when the mobile OS keyboard opens; measure
+    // against it so the menu stays usable on small-height screens.
+    const vv = window.visualViewport
+    const vw = vv ? vv.width : window.innerWidth
+    const vh = vv ? vv.height : window.innerHeight
+    // Keep clear of the app's fixed mobile bottom navigation when shown.
+    const bottomNav = document.querySelector('.mobile-bottom-nav')
+    const navInset =
+      bottomNav && getComputedStyle(bottomNav).display !== 'none'
+        ? bottomNav.getBoundingClientRect().height + 6
+        : 0
+    const spaceBelow = vh - rect.bottom - VIEWPORT_MARGIN - navInset
     const spaceAbove = rect.top - VIEWPORT_MARGIN
-    const flip = spaceBelow < 180 && spaceAbove > spaceBelow
-    const available = Math.max(100, (flip ? spaceAbove : spaceBelow) - 6)
+    const flip = spaceBelow < 200 && spaceAbove > spaceBelow
+    const available = Math.max(80, (flip ? spaceAbove : spaceBelow) - 6)
     const width = Math.min(Math.max(rect.width, 260), vw - VIEWPORT_MARGIN * 2, 560)
     let left = rect.right - width // inline-end alignment (right edge in RTL)
     left = Math.max(VIEWPORT_MARGIN, Math.min(left, vw - VIEWPORT_MARGIN - width))
@@ -106,9 +115,11 @@ export default function Select({
     const reposition = () => updatePosition()
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
+    window.visualViewport?.addEventListener('resize', reposition)
     return () => {
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
+      window.visualViewport?.removeEventListener('resize', reposition)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -275,4 +286,4 @@ export default function Select({
       )}
     </div>
   )
-          }
+    }
