@@ -27,6 +27,7 @@ from ..services.data_processor import (
     apply_unconditional_overrides, apply_ai_tool_override, derive_subcategory,
     apply_issuer_category, normalize_merchant, apply_trip_window_heuristic,
     compute_txn_keys, txn_fingerprint, locked_mask, apply_category_migration, foreign_card_mask,
+    drop_neutral_financing,
 )
 from ..core.constants import (
     CREDIT_CARD_PAYMENT_KEYWORDS, INTERNAL_TRANSFER_PATTERN, KEYWORD_TO_CATEGORY, EXACT_WORD_KEYWORDS,
@@ -1838,7 +1839,7 @@ def get_metrics(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
-
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0]
     income = df[df['סכום'] > 0]
 
@@ -1892,6 +1893,7 @@ def get_donut_chart(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     chart_data = create_donut_chart(df)
     return chart_data
 
@@ -1904,6 +1906,7 @@ def get_monthly_chart(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     chart_data = create_monthly_bars(df)
     return chart_data
 
@@ -1916,6 +1919,7 @@ def get_weekday_chart(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     chart_data = create_weekday_chart(df)
     return chart_data
 
@@ -1928,6 +1932,7 @@ def get_trend_chart(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
     
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     chart_data = create_trend_chart(df)
     return chart_data
 
@@ -2054,6 +2059,7 @@ def get_donut_v2(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2094,6 +2100,7 @@ def get_income_analysis(
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     df = sessions[sessionId].copy()
+    df = drop_neutral_financing(df)
     income = df[df['סכום'] > 0].copy()
     empty = {"transactions": [], "total": 0, "count": 0, "average": 0, "months": [], "sources": [], "categories": []}
     if income.empty:
@@ -2143,6 +2150,7 @@ def get_income_sources(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     income = df[df['סכום'] > 0].copy()
     if income.empty:
         return {"sources": [], "total": 0}
@@ -2182,6 +2190,7 @@ def get_category_snapshot(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     # Determine which month column to use based on date_type
@@ -2507,6 +2516,7 @@ def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transact
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2542,6 +2552,7 @@ def get_weekday_v2(sessionId: str = Query(...)):
     }
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2571,7 +2582,7 @@ def get_trend_v2(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId].copy()
-
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"points": []}
 
@@ -2599,6 +2610,7 @@ def get_merchants(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2636,6 +2648,7 @@ def get_trend_stats(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2695,6 +2708,7 @@ def get_heatmap_v2(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2732,6 +2746,7 @@ def get_month_overview(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId].copy()
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
 
@@ -2786,6 +2801,7 @@ def get_industry_monthly(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
     if expenses.empty:
@@ -2845,6 +2861,7 @@ def get_subcategory_monthly(
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if 'קטגוריה_משנה' not in df.columns:
         return {"months": [], "series": []}
     expenses = df[(df['סכום'] < 0) & (df['קטגוריה'] == category)].copy()
@@ -2885,6 +2902,7 @@ def get_category_monthly_comparison(
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
     empty = {"months": [], "categories": [], "month_totals": {}, "grand_total": 0}
     if expenses.empty:
@@ -2964,6 +2982,7 @@ def get_recurring_transactions(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"recurring": []}
 
@@ -3043,6 +3062,7 @@ def get_spending_forecast(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"forecast_amount": 0, "confidence": "low", "trend_direction": "stable", "monthly_data": [], "avg_monthly": 0}
 
@@ -3119,6 +3139,7 @@ def get_weekly_summary(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if df.empty:
         return {
             "this_week": {"total": 0, "count": 0, "top_category": ""},
@@ -3190,6 +3211,7 @@ def get_spending_velocity(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"daily_avg": 0, "rolling_7day": 0, "rolling_30day": 0, "daily_data": []}
 
@@ -3236,6 +3258,7 @@ def get_anomalies(sessionId: str = Query(...)):
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
+    df = drop_neutral_financing(df)
     if df.empty:
         return {"anomalies": []}
 
