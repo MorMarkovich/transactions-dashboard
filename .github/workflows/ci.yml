@@ -85,7 +85,7 @@ jobs:
   e2e:
     needs: changes
     if: github.event_name != 'pull_request' || needs.changes.outputs.e2e == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:54321
       VITE_SUPABASE_ANON_KEY: ci-dummy-key
