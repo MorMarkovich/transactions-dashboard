@@ -165,19 +165,25 @@
 }
 
 .ui-select-menu {
+  display: flex;
+  flex-direction: column;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
   box-shadow: var(--shadow-lg);
+  /* Only the options list scrolls; the menu itself clips so scrolled
+     options can never peek above the search row or outside the radius. */
+  overflow: hidden;
+}
+
+.ui-select-options {
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 .ui-select-search-row {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 7px;
