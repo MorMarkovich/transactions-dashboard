@@ -258,7 +258,6 @@ video {
     direction: rtl;
     background: var(--bg-card);
     border-radius: var(--radius-lg);
-    overflow: hidden;
     font-family: var(--font-family);
 }
 
