@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 const updateDisplayName = vi.fn()
 const updateEmail = vi.fn()
 const updatePassword = vi.fn()
+const signOut = vi.fn()
 
 vi.mock('../lib/AuthContext', () => ({
   useAuth: () => ({
@@ -12,6 +13,7 @@ vi.mock('../lib/AuthContext', () => ({
     updateDisplayName,
     updateEmail,
     updatePassword,
+    signOut,
   }),
 }))
 
@@ -33,6 +35,8 @@ describe('AccountSettings', () => {
     updateDisplayName.mockResolvedValue({ error: null })
     updateEmail.mockResolvedValue({ error: null })
     updatePassword.mockResolvedValue({ error: null })
+    signOut.mockReset()
+    signOut.mockResolvedValue(undefined)
   })
 
   it('shows the current name and email', () => {
@@ -80,6 +84,12 @@ describe('AccountSettings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'עדכן סיסמה' }))
     await waitFor(() => expect(updatePassword).toHaveBeenCalledWith('secret1'))
     expect(await screen.findByText('הסיסמה עודכנה')).toBeTruthy()
+  })
+
+  it('signs out from the page header action', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'התנתק' }))
+    await waitFor(() => expect(signOut).toHaveBeenCalledOnce())
   })
 
   it('points to Data Management for account deletion', () => {

@@ -14,7 +14,6 @@ import {
   X,
   FolderOpen,
   PiggyBank,
-  LogOut,
   ChevronsLeft,
   ChevronsRight,
   Info,
@@ -22,7 +21,6 @@ import {
   Search,
   Sun,
   Moon,
-  UserCog,
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
@@ -73,7 +71,6 @@ const NAV_SECTIONS = [
     label: 'ניהול',
     items: [
       { to: '/data-management', label: 'ניהול מידע', icon: Database },
-      { to: '/account', label: 'חשבון', icon: UserCog },
     ],
   },
 ]
@@ -117,20 +114,9 @@ export default function Sidebar({
   const [showFormats, setShowFormats] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
 
   const sessionId = searchParams.get('session_id')
-
-  const displayName =
-    user?.user_metadata?.full_name ||
-    user?.email?.split('@')[0] ||
-    'משתמש'
-
-  const initials = displayName
-    .split(' ')
-    .map((w: string) => w[0])
-    .join('')
-    .slice(0, 2)
 
   function buildNavHref(basePath: string): string {
     if (sessionId) {
@@ -422,30 +408,6 @@ export default function Sidebar({
         </>
       )}
 
-      {/* ─── User Profile Area ─── */}
-      <div className={`sidebar-profile ${collapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-profile-avatar">
-          {initials}
-        </div>
-        {!collapsed && (
-          <>
-            <div className="sidebar-profile-info">
-              <span className="sidebar-profile-name">{displayName}</span>
-              <span className="sidebar-profile-email">
-                {user?.email || ''}
-              </span>
-            </div>
-            <button
-              onClick={() => signOut()}
-              className="sidebar-signout-btn"
-              aria-label="התנתק"
-              title="התנתק"
-            >
-              <LogOut size={16} />
-            </button>
-          </>
-        )}
-      </div>
     </aside>
   )
-}
+                         }
