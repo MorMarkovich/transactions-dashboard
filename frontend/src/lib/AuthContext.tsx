@@ -10,6 +10,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<{ error: string | null; needsConfirmation?: boolean }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
+  updatePassword: (newPassword: string) => Promise<{ error: string | null }>
+  updateEmail: (newEmail: string) => Promise<{ error: string | null }>
+  updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -71,12 +74,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    // The recovery email must land on the dedicated reset page of THIS
+    // deployment (also allow-listed in Supabase Auth redirect URLs).
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { error: error?.message ?? null }
+  }
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    return { error: error?.message ?? null }
+  }
+
+  const updateEmail = async (newEmail: string) => {
+    const { error } = await supabase.auth.updateUser({ email: newEmail })
+    if (error) {
+      if (error.message.toLowerCase().includes('already')) return { error: 'המייל כבר רשום' }
+      return { error: error.message }
+    }
+    return { error: null }
+  }
+
+  const updateDisplayName = async (name: string) => {
+    const { error } = await supabase.auth.updateUser({ data: { full_name: name } })
     return { error: error?.message ?? null }
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPassword, updatePassword, updateEmail, updateDisplayName }}>
       {children}
     </AuthContext.Provider>
   )
