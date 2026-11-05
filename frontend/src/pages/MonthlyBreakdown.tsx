@@ -15,6 +15,7 @@ import Skeleton from '../components/ui/Skeleton'
 import { useCategoryColor } from '../hooks/useCategoryColor'
 import DonutChart from '../components/charts/DonutChart'
 import MultiSelect from '../components/ui/MultiSelect'
+import Select from '../components/ui/Select'
 import BarChart from '../components/charts/BarChart'
 import IndustryMonthlyChart from '../components/charts/IndustryMonthlyChart'
 import CategoryMonthlyComparison from '../components/charts/CategoryMonthlyComparison'
@@ -344,10 +345,7 @@ export default function MonthlyBreakdown() {
         <div className="dashboard-filter-fields">
           <label>
             <span>ענף</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">כל הענפים</option>
-              {comparison.categories.map((item) => <option key={item.name} value={item.name}>{get_icon(item.name)} {item.name}</option>)}
-            </select>
+            <Select ariaLabel="ענף" options={[{ value: '', label: 'כל הענפים' }, ...comparison.categories.map((item) => ({ value: item.name, label: `${get_icon(item.name)} ${item.name}` }))]} value={category} onChange={setCategory} />
           </label>
           <label>
             <span>תת-ענף</span>
@@ -683,4 +681,4 @@ export default function MonthlyBreakdown() {
       )}
     </div>
   )
-}
+                                  }
