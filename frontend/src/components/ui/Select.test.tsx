@@ -30,6 +30,24 @@ function Harness({ many = false, disabled = false }: { many?: boolean; disabled?
 }
 
 describe('Select', () => {
+  it('keeps the search row outside the scrollable options region (scroll-leak regression)', async () => {
+    const user = userEvent.setup()
+    render(<Harness many />)
+    await user.click(screen.getByRole('combobox', { name: 'מקור' }))
+    const menu = screen.getByRole('listbox', { name: 'מקור' })
+    const scroller = menu.querySelector('.ui-select-options')
+    expect(scroller).not.toBeNull()
+    // Every option lives inside the scroll region...
+    for (const opt of screen.getAllByRole('option')) {
+      expect(scroller!.contains(opt)).toBe(true)
+    }
+    // ...and the search row lives outside it, so scrolled options can
+    // never slide behind or above the search field.
+    const search = screen.getByRole('combobox', { name: 'חיפוש בתוך מקור' })
+    expect(scroller!.contains(search)).toBe(false)
+    expect(menu.contains(search)).toBe(true)
+  })
+
   it('shows the selected option label on the closed trigger', () => {
     render(<Harness />)
     expect(screen.getByRole('combobox', { name: 'מקור' })).toHaveTextContent('בנק פועלים משכורת')
