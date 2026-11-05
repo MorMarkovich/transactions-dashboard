@@ -30,6 +30,10 @@ CATEGORY_ICONS = {
     'משיכת מזומן': '🏧',
     'הוראות קבע': '🔄',
     'שונות': '📦',
+    # Neutral bucket for financing shell movements (loan drawdown + its
+    # installment repayments). Rows stay fully visible in the ledger but are
+    # excluded from income/expense aggregation (see drop_neutral_financing).
+    'תנועות מימון': '🏦',  # FINANCING_CATEGORY - see below
 }
 
 # ── Old taxonomy → new taxonomy ─────────────────────────────────────
@@ -938,3 +942,23 @@ def get_subcategory_catalog() -> dict[str, list[str]]:
     catalog.setdefault('בילויים', []).append('בילויים עם חברים')
     catalog['פארם'] = ['תרופות', 'טיפוח']
     return catalog
+
+# ── Financing movements (neutral category) ──────────────────────────
+FINANCING_CATEGORY = 'תנועות מימון'
+
+# Scoped identification of the Isracard "קרדיט" financing shell rows, taken
+# from the verified statement evidence (2026-09-30 drawdown of 9,200 repaid in
+# 3 installments of 3,105.34). Each rule is an exact
+# (description, amount, billing-date) triple - deliberately NOT a name
+# pattern, so unrelated installment rows (e.g. "(תשלום 3/3)" from other
+# vendors) and other credit arrangements never match.
+FINANCING_MOVEMENT_RULES: tuple[tuple[str, float, str], ...] = (
+    ('העברות לקרדיט', -9200.00, '2026-10-02'),           # loan drawdown
+    ('העברות לקרדיט', 9200.00, '2026-10-02'),            # drawdown credit leg
+    ('העברות לקרדיט (תשלום 1/3)', -3105.34, '2026-11-02'),
+    ('העברות לקרדיט (תשלום 2/3)', -3105.34, '2026-12-02'),
+    # Forecast, not a confirmed issuer row: if the actual 3/3 charge lands on
+    # a different billed date it simply stays unclassified (normal category)
+    # until reviewed - nothing general is inferred beyond this exact triple.
+    ('העברות לקרדיט (תשלום 3/3)', -3105.34, '2027-01-02'),
+)
