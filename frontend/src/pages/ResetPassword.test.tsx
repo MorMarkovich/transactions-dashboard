@@ -52,17 +52,22 @@ describe('ResetPassword', () => {
     expect(await screen.findByText('בחירת סיסמה חדשה 🔑')).toBeTruthy()
   })
 
-  it('falls back to the recovery hash when the event fired before mount', async () => {
-    window.location.hash = '#access_token=abc&type=recovery'
-    getSession.mockResolvedValue({ data: { session: { access_token: 'abc' } } })
+  it('does not open the form for a forged recovery hash without a PASSWORD_RECOVERY event', async () => {
+    // A crafted #access_token&type=recovery hash while an ordinary session
+    // exists must not unlock the form - only the auth event may.
+    window.location.hash = '#access_token=forged&type=recovery'
+    getSession.mockResolvedValue({ data: { session: { access_token: 'ordinary' } } })
+    vi.useFakeTimers()
     renderPage()
-    expect(await screen.findByText('בחירת סיסמה חדשה 🔑')).toBeTruthy()
+    await act(async () => { vi.advanceTimersByTime(9000) })
+    expect(screen.getByText('הקישור לא תקין 🔑')).toBeTruthy()
+    expect(screen.queryByText('בחירת סיסמה חדשה 🔑')).toBeNull()
   })
 
   it('marks a link with no recovery event as invalid', async () => {
     vi.useFakeTimers()
     renderPage()
-    await act(async () => { vi.advanceTimersByTime(6000) })
+    await act(async () => { vi.advanceTimersByTime(9000) })
     expect(screen.getByText('הקישור לא תקין 🔑')).toBeTruthy()
   })
 
