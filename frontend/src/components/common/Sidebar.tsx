@@ -22,6 +22,7 @@ import {
   Search,
   Sun,
   Moon,
+  UserCog,
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
@@ -72,6 +73,7 @@ const NAV_SECTIONS = [
     label: 'ניהול',
     items: [
       { to: '/data-management', label: 'ניהול מידע', icon: Database },
+      { to: '/account', label: 'חשבון', icon: UserCog },
     ],
   },
 ]

@@ -10,6 +10,8 @@ import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
 const Login = lazy(() => import('./pages/Login'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const AccountSettings = lazy(() => import('./pages/AccountSettings'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Trends = lazy(() => import('./pages/Trends'))
@@ -97,6 +99,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
         <Route path="/monthly" element={<ProtectedPage><MonthlyBreakdown /></ProtectedPage>} />
@@ -106,6 +109,7 @@ function AppRoutes() {
         <Route path="/budget" element={<ProtectedPage><Budget /></ProtectedPage>} />
         <Route path="/savings" element={<ProtectedPage><SavingsGoals /></ProtectedPage>} />
         <Route path="/data-management" element={<ProtectedPage><DataManagement /></ProtectedPage>} />
+        <Route path="/account" element={<ProtectedPage><AccountSettings /></ProtectedPage>} />
         <Route path="*" element={
           <ProtectedPage>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', direction: 'rtl' }}>
