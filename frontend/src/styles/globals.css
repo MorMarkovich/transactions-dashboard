@@ -263,6 +263,12 @@ video {
 }
 
 .transactions-table th {
+    /* Sticky column headers: rows scroll under them inside .table-scroll.
+       Only `top` is sticky, so horizontal scrolling keeps header/column
+       alignment automatically. Opaque background (below) hides rows behind. */
+    position: sticky;
+    top: 0;
+    z-index: 2;
     background: var(--bg-elevated);
     color: var(--text-primary);
     padding: 16px 22px;
@@ -1285,4 +1291,4 @@ select:focus-visible,
   .shimmer-premium {
     animation: none;
   }
-}
+    }
