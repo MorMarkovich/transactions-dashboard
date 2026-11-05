@@ -19,6 +19,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   'משיכת מזומן': '🏧',
   'הוראות קבע': '🔄',
   'שונות': '📦',
+  'תנועות מימון': '🏦',
   'אחר': '📊',
 }
 
