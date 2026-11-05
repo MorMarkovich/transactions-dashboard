@@ -29,19 +29,13 @@ export default function ResetPassword() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setStatus('ready')
     })
-    // Fallback: the hash may already have been consumed into a session before
-    // our listener attached (e.g. react strict double-mount). Only a session
-    // that actually came from a recovery link counts.
-    const hash = window.location.hash
-    if (hash.includes('type=recovery') && (hash.includes('access_token=') || hash.includes('refresh_token='))) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setStatus((s) => (s === 'checking' && session ? 'ready' : s))
-      })
-    }
-    // No recovery event within a few seconds = bad or expired link.
+    // Deliberately NO hash/session fallback: only the PASSWORD_RECOVERY event
+    // opens the form. A forged hash token must never let the form act on an
+    // unrelated already-authenticated session. If the link is bad, expired or
+    // already consumed, no event arrives and we show the invalid state.
     const timer = window.setTimeout(() => {
       setStatus((s) => (s === 'checking' ? 'invalid' : s))
-    }, 5000)
+    }, 8000)
     return () => { subscription.unsubscribe(); window.clearTimeout(timer) }
   }, [])
 
@@ -154,4 +148,4 @@ export default function ResetPassword() {
       </div>
     </div>
   )
-      }
+}
