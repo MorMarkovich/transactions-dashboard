@@ -257,6 +257,7 @@ export default function Select({
               />
             </div>
           )}
+          <div className="ui-select-options">
           {filtered.length === 0 ? (
             <div className="ui-select-empty">אין תוצאות תואמות</div>
           ) : (
@@ -281,9 +282,10 @@ export default function Select({
               )
             })
           )}
+          </div>
         </div>,
         document.body,
       )}
     </div>
   )
-    }
+}
