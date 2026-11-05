@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search, Filter, Download, X, ChevronDown } from 'lucide-react'
+import { Search, Filter, Download, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Select from '../ui/Select'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 
@@ -181,10 +182,11 @@ export default function AdvancedFilters({
 
         {/* Category lives in the shared persistent filter bar on Transactions. */}
         {showCategory && <div className="advanced-filter-select" style={{ position: 'relative', minWidth: '140px' }}>
-          <select
+          <Select
+            ariaLabel="קטגוריה"
+            options={[{ value: '', label: 'כל הקטגוריות' }, ...categories.map((cat) => ({ value: cat, label: cat }))]}
             value={category}
-            onChange={(e) => {
-              const newCat = e.target.value
+            onChange={(newCat) => {
               setCategory(newCat)
               onFilterChange({
                 search: search || undefined,
@@ -194,40 +196,6 @@ export default function AdvancedFilters({
                 minAmount: minAmount ? Number(minAmount) : undefined,
                 maxAmount: maxAmount ? Number(maxAmount) : undefined,
               })
-            }}
-            style={{
-              width: '100%',
-              height: '40px',
-              padding: '0 12px',
-              paddingLeft: '28px',
-              borderRadius: 'var(--radius-md, 8px)',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-input, var(--bg-card))',
-              color: 'var(--text-primary)',
-              fontSize: '0.875rem',
-              fontFamily: 'var(--font-family)',
-              appearance: 'none',
-              backgroundImage: 'none',
-              cursor: 'pointer',
-              direction: 'rtl',
-            }}
-          >
-            <option value="">כל הקטגוריות</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={14}
-            style={{
-              position: 'absolute',
-              left: '10px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              pointerEvents: 'none',
-              color: 'var(--text-muted)',
             }}
           />
         </div>}
@@ -461,4 +429,4 @@ export default function AdvancedFilters({
       </AnimatePresence>
     </div>
   )
-}
+                  }

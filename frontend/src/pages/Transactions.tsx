@@ -6,6 +6,7 @@ import TransactionDrawer from '../components/table/TransactionDrawer'
 import AdvancedFilters from '../components/table/AdvancedFilters'
 import EmptyState from '../components/common/EmptyState'
 import MultiSelect from '../components/ui/MultiSelect'
+import Select from '../components/ui/Select'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
@@ -490,10 +491,7 @@ export default function Transactions() {
         <div className="dashboard-filter-fields">
           <label>
             <span>קטגוריה</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">כל הקטגוריות</option>
-              {categories.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
-            </select>
+            <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...categories.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
           </label>
           <label>
             <span>תת-קטגוריה</span>
@@ -571,4 +569,4 @@ const catTdStyle: React.CSSProperties = {
   padding: '10px 12px',
   color: 'var(--text-primary)',
   fontSize: '0.8125rem',
-         }
+                         }

@@ -42,6 +42,7 @@ import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Button from '../components/ui/Button'
 import MultiSelect from '../components/ui/MultiSelect'
+import Select from '../components/ui/Select'
 import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
@@ -926,9 +927,7 @@ export default function Dashboard() {
         subtitle="סקירה חודשית של ההוצאות, ההכנסות ומה שהשתנה"
         icon={LayoutDashboard}
         actions={<label className="dashboard-month-control">חודש לתצוגה
-          <select aria-label="חודש לתצוגה" value={selectedMonth || ''} onChange={e => setSelectedMonth(e.target.value)}>
-            {availableMonths.map(m => <option key={m.month} value={m.month}>{formatMonthLabel(m.month)}</option>)}
-          </select>
+          <Select ariaLabel="חודש לתצוגה" options={availableMonths.map(m => ({ value: m.month, label: formatMonthLabel(m.month) }))} value={selectedMonth || ''} onChange={setSelectedMonth} />
         </label>}
       />
 
@@ -970,10 +969,7 @@ export default function Dashboard() {
         <div className="dashboard-filter-fields">
           <label>
             <span>קטגוריה</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">כל הקטגוריות</option>
-              {availableCategoryNames.map((item) => <option key={item} value={item}>{get_icon(item)} {item}</option>)}
-            </select>
+            <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...availableCategoryNames.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
           </label>
           <label>
             <span>תת-קטגוריה</span>
@@ -1353,17 +1349,9 @@ export default function Dashboard() {
               {/* Month range */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>תקופה:</span>
-                <select value={snapshotMonthFrom} onChange={(e) => setSnapshotMonthFrom(e.target.value)}
-                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', paddingInlineEnd: '26px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  <option value="">מתחילת התקופה</option>
-                  {availableMonths.map((m) => <option key={m.month} value={m.month}>{m.month}</option>)}
-                </select>
+                <Select className="compact" ariaLabel="מתחילת התקופה" options={[{ value: '', label: 'מתחילת התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthFrom} onChange={setSnapshotMonthFrom} />
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>עד</span>
-                <select value={snapshotMonthTo} onChange={(e) => setSnapshotMonthTo(e.target.value)}
-                  style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', paddingInlineEnd: '26px', fontSize: '0.6875rem', fontFamily: 'var(--font-family)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                  <option value="">סוף התקופה</option>
-                  {availableMonths.map((m) => <option key={m.month} value={m.month}>{m.month}</option>)}
-                </select>
+                <Select className="compact" ariaLabel="סוף התקופה" options={[{ value: '', label: 'סוף התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthTo} onChange={setSnapshotMonthTo} />
               </div>
 
               {/* Excluded chips */}
@@ -1967,4 +1955,4 @@ export default function Dashboard() {
     </div>
     </>
   )
-                  }
+  }

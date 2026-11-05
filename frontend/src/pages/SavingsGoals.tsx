@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
+import Select from '../components/ui/Select'
 import RadialProgress from '../components/ui/RadialProgress'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -449,31 +450,7 @@ export default function SavingsGoals() {
                   >
                     קטגוריה
                   </label>
-                  <select
-                    aria-label="קטגוריה"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '40px',
-                      padding: '0 12px',
-                      paddingInlineEnd: '34px',
-                      borderRadius: 'var(--radius-md, 8px)',
-                      border: '1px solid var(--border)',
-                      backgroundColor: 'var(--bg-input, var(--bg-card))',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.875rem',
-                      fontFamily: "var(--font-family, 'Heebo', sans-serif)",
-                      direction: 'rtl',
-                      outline: 'none',
-                    }}
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                  <Select ariaLabel="קטגוריה" options={CATEGORIES.map((cat) => ({ value: cat, label: cat }))} value={newCategory} onChange={setNewCategory} />
                 </div>
 
                 {/* Color picker */}
@@ -839,4 +816,4 @@ export default function SavingsGoals() {
       )}
     </div>
   )
-}
+                    }

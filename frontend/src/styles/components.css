@@ -82,21 +82,190 @@
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
-/* ── Select ──────────────────────────────────────────────────────────── */
+/* ── Select (custom dropdown) ─────────────────────────────────────── */
 
-.ui-select:focus {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+.ui-select-wrapper {
+  width: 100%;
+  min-width: 0;
 }
 
-.ui-select:hover:not(:focus) {
+.ui-select-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ui-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 12px;
+  padding-inline-end: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ui-select-trigger:hover:not(:disabled):not(.open) {
   border-color: var(--border-color-hover);
 }
 
-.ui-select option {
+.ui-select-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.ui-select-trigger.open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.ui-select-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ui-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-placeholder {
+  color: var(--text-muted);
+}
+
+.ui-select-chevron {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.ui-select-trigger.open .ui-select-chevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.ui-select-menu {
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ui-select-search-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--bg-card);
+  color: var(--text-muted);
+}
+
+.ui-select-search-row input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
   color: var(--text-primary);
-  padding: 8px;
+  font: inherit;
+}
+
+.ui-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 9px 10px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ui-select-option:hover,
+.ui-select-option.active {
+  background: var(--accent-muted);
+}
+
+.ui-select-option.selected {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ui-select-option-check {
+  flex: 0 0 16px;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.ui-select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.ui-select-empty {
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.ui-select-wrapper.compact .ui-select-trigger {
+  min-height: 30px;
+  padding: 4px 8px;
+  padding-inline-end: 26px;
+  font-size: 0.6875rem;
+  font-weight: 400;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+}
+
+.ui-select-wrapper.compact .ui-select-chevron {
+  inset-inline-end: 8px;
+}
+
+.ui-select-wrapper.compact .ui-select-menu {
+  font-size: 0.75rem;
+}
+
+@media (max-width: 800px) {
+  .ui-select-option {
+    padding: 12px 10px;
+  }
 }
 
 /* ── Modal ───────────────────────────────────────────────────────────── */
