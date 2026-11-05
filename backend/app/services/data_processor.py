@@ -13,6 +13,7 @@ from ..core.constants import (
     AI_CATEGORY, AI_SUBCATEGORY, AI_OVERRIDE_KEYWORDS, SUBCATEGORY_KEYWORDS,
     FOREIGN_EXEMPT_KEYWORDS, map_issuer_category,
     CATEGORY_MIGRATION, CATEGORY_PAIR_MIGRATION, migrate_category,
+    FINANCING_CATEGORY, FINANCING_MOVEMENT_RULES,
 )
 from .ai_categorizer import categorize_transactions
 from .category_rules import manual_rule_mask
@@ -89,7 +90,74 @@ def apply_unconditional_overrides(df: pd.DataFrame) -> pd.DataFrame:
 
     apply_ai_tool_override(df, desc_lower)
 
+    apply_financing_classification(df)
+
     return df
+
+
+def financing_movement_mask(df: pd.DataFrame) -> pd.Series:
+    """Rows that are financing shell movements (loan drawdown + repayment
+    installments) identified by the scoped evidence rules: exact
+    (description, amount, billing-date) triples, never a name pattern - so
+    unrelated installment rows from other vendors cannot match.
+
+    Scope guard: when the row carries issuer/account markers (they exist on
+    restored sessions and persisted rows), they must also match the evidence
+    source (Isracard, owner שלי) - the same description/amount/date on another
+    account must not silently become neutral. Rows without the markers yet
+    (mid-upload-pipeline) fall back to the exact triple alone."""
+    if df.empty or 'תיאור' not in df.columns or 'סכום' not in df.columns:
+        return pd.Series(False, index=df.index)
+    mask = pd.Series(True, index=df.index)
+    if '_provider' in df.columns:
+        prov = df['_provider'].astype(str).str.lower()
+        mask &= prov.isin(['isracard', 'none', 'nan', ''])
+    if '_owner' in df.columns:
+        own = df['_owner'].astype(str)
+        mask &= own.isin(['שלי', 'None', 'nan', ''])
+    desc = df['תיאור'].astype(str)
+    amounts = pd.to_numeric(df['סכום'], errors='coerce')
+    if 'תאריך_חיוב' in df.columns:
+        billed = pd.to_datetime(df['תאריך_חיוב'], errors='coerce').dt.strftime('%Y-%m-%d')
+    else:
+        billed = pd.Series('', index=df.index)
+    matched = pd.Series(False, index=df.index)
+    for rule_desc, rule_amount, rule_billed in FINANCING_MOVEMENT_RULES:
+        matched |= (
+            (desc == rule_desc)
+            & (amounts - rule_amount).abs().lt(0.005).fillna(False)
+            & (billed == rule_billed)
+        )
+    return mask & matched
+
+
+def apply_financing_classification(df: pd.DataFrame) -> pd.DataFrame:
+    """Classify the scoped financing shell rows into the neutral
+    FINANCING_CATEGORY. Runs inside the unconditional override pass (upload +
+    restore), so keyword/AI categorization (שונות-only) never undoes it, and
+    single-transaction pins applied afterwards still outrank it. Rows pinned
+    by the user (_locked) are respected."""
+    if df.empty or 'קטגוריה' not in df.columns:
+        return df
+    mask = financing_movement_mask(df)
+    if '_locked' in df.columns:
+        mask &= ~df['_locked'].fillna(False).astype(bool)
+    if mask.any():
+        df.loc[mask, 'קטגוריה'] = FINANCING_CATEGORY
+        if 'קטגוריה_משנה' in df.columns:
+            df.loc[mask, 'קטגוריה_משנה'] = ''
+    return df
+
+
+def drop_neutral_financing(df: pd.DataFrame) -> pd.DataFrame:
+    """Exclude neutral financing-movement rows from an income/expense
+    aggregation view. The rows themselves stay in the session (visible in the
+    ledger, export, search and explicit category drill-downs); this is only
+    for sum endpoints where counting both the original purchases and the
+    loan's drawdown/repayments would double-count."""
+    if df.empty or 'קטגוריה' not in df.columns:
+        return df
+    return df[df['קטגוריה'].astype(str) != FINANCING_CATEGORY]
 
 
 def apply_ai_tool_override(df: pd.DataFrame, desc_lower: Optional[pd.Series] = None) -> pd.DataFrame:
