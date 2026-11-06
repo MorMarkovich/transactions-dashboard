@@ -30,6 +30,7 @@ import { scoped, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
 import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
 import { clearSampleSession } from '../../lib/sampleMode'
+import { mergeDroppedRows, summarizeDroppedRows } from '../../lib/droppedRows'
 import { UPLOAD_FILES_EVENT, UPLOAD_STATE_EVENT, type UploadState } from './OnboardingWizard'
 import './Sidebar.css'
 
@@ -111,6 +112,9 @@ export default function Sidebar({
   const {theme, toggleTheme} = useTheme()
   const [uploading, setUploading] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('מעלה קובץ...')
+  // Parser-dropped rows from the last upload. Persistent (not a toast) so a
+  // user who missed the merge summary still sees that rows were rejected.
+  const [droppedRows, setDroppedRows] = useState<Record<string, number> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showFormats, setShowFormats] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -139,10 +143,12 @@ export default function Sidebar({
   const handleUploadFiles = async (files: File[]) => {
     setUploading(true)
     setError(null)
+    setDroppedRows(null)
 
     try {
       // Upload all files, tag each transaction with its source file name
       const allTransactions: unknown[] = []
+      const droppedAcc: Record<string, number> = {}
 
       for (let i = 0; i < files.length; i++) {
         setUploadStatus(files.length === 1
@@ -150,6 +156,7 @@ export default function Sidebar({
           : `מעלה קובץ ${i + 1} מ-${files.length}...`)
         const response = await transactionsApi.uploadFile(files[i])
         if (response.success && response.session_id) {
+          mergeDroppedRows(droppedAcc, response.dropped_rows)
           const data = await transactionsApi.getTransactions(
             response.session_id,
             { page: 1, page_size: 50000 }
@@ -184,6 +191,7 @@ export default function Sidebar({
           if (removedParts.length > 0) {
             setUploadStatus(`הוסרו: ${removedParts.join(', ')}`)
           }
+          if (Object.keys(droppedAcc).length > 0) setDroppedRows(droppedAcc)
           clearSampleSession()
           saveToSupabase(allTransactions)
           onFileUploaded?.(merged.session_id)
@@ -392,6 +400,20 @@ export default function Sidebar({
             <RefreshFromBanks onSynced={handleBankSynced} />
 
             {error && <div className="sidebar-error">{error}</div>}
+
+            {droppedRows && (() => {
+              const summary = summarizeDroppedRows(droppedRows)
+              if (!summary) return null
+              return (
+                <div
+                  className={summary.level === 'warning' ? 'sidebar-dropped-warning' : 'sidebar-dropped-info'}
+                  role={summary.level === 'warning' ? 'alert' : 'status'}
+                >
+                  <span>{summary.text}</span>
+                  <button type="button" aria-label="סגור" onClick={() => setDroppedRows(null)}>×</button>
+                </div>
+              )
+            })()}
 
             {showFormats && (
               <div className="sidebar-formats">

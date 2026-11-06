@@ -66,6 +66,9 @@ export interface MetricsData {
 export interface FileUploadResponse {
   success: boolean;
   message: string;
+  /** rows the parser skipped, by reason: summary / blank / invalid_date /
+   *  invalid_amount / zero_amount. Present only when non-empty. */
+  dropped_rows?: Record<string, number>;
   session_id?: string;
   sheets?: string[];
   transaction_count?: number;
