@@ -87,10 +87,16 @@ html, body {
     padding: 0;
     width: 100%;
     max-width: 100%;
+<<<<<<< ours
     /* clip (not hidden): a non-visible overflow here creates a scroll
        container, which breaks position:sticky on the top bar and stops
        body overflow from propagating the modal scroll-lock.
        hidden is kept as a fallback for browsers without clip (iOS <16). */
+=======
+    /* clip keeps the horizontal clamp without making html/body a scroll container,
+       so position:sticky children (topbar, desktop sidebar) stick again.
+       hidden kept as fallback for Safari <16 (no overflow: clip support). */
+>>>>>>> theirs
     overflow-x: hidden;
     overflow-x: clip;
     background: var(--bg-primary);
