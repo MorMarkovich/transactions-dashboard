@@ -1133,7 +1133,11 @@ def get_transactions(
     total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
     expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
     income_count = total - expense_count
-    avg_transaction = round(_sanitize(total_amount / total), 2) if total > 0 else 0
+    # Average over the same shell-excluded population that produced
+    # total_amount: mixing an excluded numerator with an inclusive denominator
+    # deflates the average whenever neutral shells are present.
+    stats_count = len(df_stats)
+    avg_transaction = round(_sanitize(total_amount / stats_count), 2) if stats_count > 0 else 0
 
     # Enhanced stats
     expenses_df = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()

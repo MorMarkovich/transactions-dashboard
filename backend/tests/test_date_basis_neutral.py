@@ -116,3 +116,19 @@ def test_session_df_not_mutated_and_aggregates_consistent(client):
     assert body['expense_count'] + body['income_count'] == 4  # shell rows excluded from counts
     assert body['total'] == 6                                  # ledger pagination counts visible rows
     assert round(sum(c['total'] for c in body['category_breakdown']), 2) == body['total_expenses']
+
+
+def test_avg_transaction_uses_shell_excluded_denominator(client):
+    """avg_transaction is the EXPENSE average (matching /trends and /budget):
+    total_expenses / expense_count, both shell-excluded -> 1000/3 = 333.33,
+    not deflated by the 2 visible shell rows (which would give 1000/5 = 200).
+    The no-expense fallback divides total_amount by the shell-excluded count."""
+    r = client.get('/api/transactions',
+                   params={'sessionId': 't-datebasis', 'start_date': '2026-09-01',
+                           'end_date': '2026-11-30', 'page_size': 50})
+    assert r.status_code == 200
+    body = r.json()
+    assert body['total_amount'] == 11000.0
+    assert body['total_expenses'] == 1000.0
+    assert body['expense_count'] == 3
+    assert body['avg_transaction'] == 333.33
