@@ -148,11 +148,21 @@ export default function MonthlyBreakdown() {
     if (!sessionId || !selectedCategory) { setSubcategoryMonthly(null); return }
     setSubcategoryMonthly(null)
     const controller = new AbortController()
-    transactionsApi.getSubcategoryMonthly(sessionId, selectedCategory, dateType, controller.signal)
-      .then(setSubcategoryMonthly)
-      .catch(() => setSubcategoryMonthly(null))
+    // Scope by the per-person filter, same as the main comparison fetch above:
+    // an owner-filtered view must show that owner's subcategory split, or the
+    // subcategory pie contradicts the category row it drills into.
+    const fetchSubcategories = async () => {
+      try {
+        const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
+        const data = await transactionsApi.getSubcategoryMonthly(sid, selectedCategory, dateType, controller.signal)
+        setSubcategoryMonthly(data)
+      } catch {
+        setSubcategoryMonthly(null)
+      }
+    }
+    fetchSubcategories()
     return () => controller.abort()
-  }, [sessionId, selectedCategory, dateType])
+  }, [sessionId, selectedCategory, dateType, selectedOwner])
 
   // Sync month/category defaults when comparison data (re)loads
   useEffect(() => {
@@ -524,7 +534,7 @@ export default function MonthlyBreakdown() {
           <div className="section-header-v2">
             <PieChart size={18} />
             <span>פירוט {selectedCategory} לפי תתי-קטגוריות</span>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>לחצו על קטגוריה בעוגה למעלה כדי להיכנס אליה</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>לחצו על קטגוריה ברשימה שליד העוגה למעלה כדי להיכנס אליה</span>
           </div>
           <Card className="glass-card" padding="md">
             <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 'var(--space-lg)', alignItems: 'center' }}>

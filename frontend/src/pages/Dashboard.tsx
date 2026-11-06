@@ -204,6 +204,10 @@ export default function Dashboard() {
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerCategory, setDrawerCategory] = useState('')
+  // Set when the drawer was opened from the month pie: that card shows ONE
+  // month, so its drawer must list that month even when the snapshot period
+  // filter below covers a wider range. Null = follow the snapshot period.
+  const [drawerMonth, setDrawerMonth] = useState<string | null>(null)
   const [drawerTransactions, setDrawerTransactions] = useState<Transaction[]>([])
   const [drawerTotal, setDrawerTotal] = useState(0)
   const [drawerLoading, setDrawerLoading] = useState(false)
@@ -213,7 +217,7 @@ export default function Dashboard() {
 
   // Load (or reload) the drawer's transaction list for a category, using the
   // snapshot date-range filters so it matches what the card displays.
-  const loadDrawerTransactions = useCallback(async (categoryName: string, keepList = false) => {
+  const loadDrawerTransactions = useCallback(async (categoryName: string, keepList = false, monthOverride: string | null = null) => {
     if (!sessionId) return
     const reqId = ++drawerReqRef.current
     setDrawerLoading(true)
@@ -222,10 +226,14 @@ export default function Dashboard() {
     let recovering = false
     const attempt = async () => {
       const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, undefined, category, subcategories)
-      return transactionsApi.getCategoryTransactions(
-        sid, '', categoryName, dateType, undefined, undefined,
-        snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
-      )
+      return monthOverride
+        ? transactionsApi.getCategoryTransactions(
+            sid, monthOverride, categoryName, dateType,
+          )
+        : transactionsApi.getCategoryTransactions(
+            sid, '', categoryName, dateType, undefined, undefined,
+            snapshotMonthFrom || undefined, snapshotMonthTo || undefined,
+          )
     }
     try {
       let data
@@ -244,11 +252,13 @@ export default function Dashboard() {
     }
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, selectedOwner, category, subcategories])
 
-  const handleCategoryCardClick = useCallback(async (categoryName: string) => {
+  const handleCategoryCardClick = useCallback(async (categoryName: string, month?: string) => {
     if (!sessionId) return
+    const entryMonth = month ?? null
+    setDrawerMonth(entryMonth)
     setDrawerCategory(categoryName)
     setDrawerOpen(true)
-    await loadDrawerTransactions(categoryName)
+    await loadDrawerTransactions(categoryName, false, entryMonth)
   }, [sessionId, loadDrawerTransactions])
 
   // ── Manual category override ──
@@ -287,10 +297,10 @@ export default function Dashboard() {
         // Refresh every widget, but KEEP the drawer open on the same list —
         // an edit must not bounce the user back to the dashboard.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true, drawerMonth)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory],
+    [sessionId, user, drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions, addCustomCategory],
   )
 
   // ── Manual subcategory override ──
@@ -320,10 +330,10 @@ export default function Dashboard() {
       } finally {
         // Same as handleCategoryChange: refresh in place, don't close.
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true, drawerMonth)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomSubcategory],
+    [sessionId, user, drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions, addCustomSubcategory],
   )
 
   // ── Bulk category move ──
@@ -362,10 +372,10 @@ export default function Dashboard() {
         }
       } finally {
         setRefreshKey((k) => k + 1)
-        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
+        if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true, drawerMonth)
       }
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
+    [sessionId, user, drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions, addCustomCategory, addCustomSubcategory],
   )
 
   // ── Per-transaction note ──
@@ -382,9 +392,9 @@ export default function Dashboard() {
           await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
         }
       }
-      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true)
+      if (drawerOpen && drawerCategory) loadDrawerTransactions(drawerCategory, true, drawerMonth)
     },
-    [sessionId, user, drawerOpen, drawerCategory, loadDrawerTransactions],
+    [sessionId, user, drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions],
   )
 
   // ── Push notifications to header notification center ──
@@ -472,8 +482,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (drawerSessionRef.current === sessionId) return
     drawerSessionRef.current = sessionId
-    if (drawerOpen && drawerCategory) void loadDrawerTransactions(drawerCategory)
-  }, [sessionId, drawerOpen, drawerCategory, loadDrawerTransactions])
+    if (drawerOpen && drawerCategory) void loadDrawerTransactions(drawerCategory, false, drawerMonth)
+  }, [sessionId, drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions])
 
   // ── Fetch all data ─────────────────────────────────────────────────
   useEffect(() => {
@@ -1095,7 +1105,7 @@ export default function Dashboard() {
                       <div className="month-pie-legend">
                         {(showAllMonthCategories ? monthExpensePie : monthChartData).map((item) => {
                           const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
-                          return <button type="button" onClick={() => item.aggregate ? setShowAllMonthCategories(true) : handleCategoryCardClick(item.name)} key={`${item.aggregate ? "group" : "category"}:${item.name}`} className="month-pie-legend-row">
+                          return <button type="button" onClick={() => item.aggregate ? setShowAllMonthCategories(true) : handleCategoryCardClick(item.name, monthOverview.month)} key={`${item.aggregate ? "group" : "category"}:${item.name}`} className="month-pie-legend-row">
                             <span className="month-pie-color" style={{background:categoryColor(item.name)}} />
                             <span className="month-pie-name">{item.name}</span>
                             <span className="month-pie-share"><i style={{width:`${pct}%`}}/></span><span className="month-pie-percent">{pct.toFixed(0)}%</span>
@@ -1924,17 +1934,18 @@ export default function Dashboard() {
         onClose={() => setDrawerOpen(false)}
         category={drawerCategory}
         month={
-          snapshotMonthFrom || snapshotMonthTo
-            ? (snapshotMonthFrom && snapshotMonthTo && snapshotMonthFrom === snapshotMonthTo
-                ? snapshotMonthFrom
-                : `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`)
-            : ''
+          drawerMonth
+            ?? (snapshotMonthFrom || snapshotMonthTo
+              ? (snapshotMonthFrom && snapshotMonthTo && snapshotMonthFrom === snapshotMonthTo
+                  ? snapshotMonthFrom
+                  : `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`)
+              : '')
         }
         transactions={drawerTransactions}
         total={drawerTotal}
         loading={drawerLoading}
         error={drawerError}
-        onRetry={() => drawerCategory && loadDrawerTransactions(drawerCategory)}
+        onRetry={() => drawerCategory && loadDrawerTransactions(drawerCategory, false, drawerMonth)}
         availableCategories={availableCategoryNames}
         onCategoryChange={handleCategoryChange}
         subcategoryOptions={drawerSubcategoryOptions}

@@ -176,6 +176,9 @@ export default function Merchants() {
         subtitle="ניתוח הוצאות לפי בתי עסק"
         icon={Store}
       />
+      <p style={{ margin: 'calc(var(--space-md) * -0.5) 0 var(--space-md)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        מוצג: כל התקופה · כל הבעלים
+      </p>
 
       {/* ─── Summary Stats Row ───────────────────────────────────────── */}
       {summaryStats && (
