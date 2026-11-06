@@ -6,7 +6,14 @@ import Transactions from './Transactions'
 import { FilterProvider } from '../context/FilterContext'
 import { transactionsApi } from '../services/api'
 
-vi.mock('../lib/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', email: 'qa@example.com' }, session: null }) }))
+vi.mock('../lib/AuthContext', async () => {
+  const { createContext } = await import('react')
+  return {
+    useAuth: () => ({ user: { id: 'u1', email: 'qa@example.com' }, session: null }),
+    // FilterContext reads the raw context to tolerate a missing provider.
+    AuthContext: createContext(undefined),
+  }
+})
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../services/supabaseApi', () => ({ supabaseApi: new Proxy({}, { get: () => vi.fn().mockResolvedValue([]) }) }))
 vi.mock('../services/api', () => ({

@@ -7,7 +7,14 @@ import Transactions from './Transactions'
 import { FilterProvider } from '../context/FilterContext'
 import { transactionsApi } from '../services/api'
 
-vi.mock('../lib/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', email: 'qa@example.com' }, session: null }) }))
+vi.mock('../lib/AuthContext', async () => {
+  const { createContext } = await import('react')
+  return {
+    useAuth: () => ({ user: { id: 'u1', email: 'qa@example.com' }, session: null }),
+    // FilterContext reads the raw context to tolerate a missing provider.
+    AuthContext: createContext(undefined),
+  }
+})
 
 // The page tree pulls in supabaseApi; keep the client construction out of jsdom.
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
