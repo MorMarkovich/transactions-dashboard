@@ -47,3 +47,6 @@ font rendering. Screenshots are attached to the HTML report as a CI artifact.
 
 Next to cover: the logged-in dashboard with a mocked API (R2), transactions,
 categories, insights.
+| R11 | auditor3 | Date chips send yesterday / wrong month start near midnight | `toISODate` used UTC `toISOString()` on local-midnight dates | fix/transactions-filters-export | Live-confirmed: month chip sent Oct31->Nov5 on Nov 6 ~00:30; after fix sends local dates | Transactions.filtersExport.regression.test.tsx (chips tests) |
+| R12 | auditor3 | Chip date range lost after typing search or applying amounts | AdvancedFilters held mount-time local dates, emitted undefined; parent replaced filters | fix/transactions-filters-export | Pick month chip, type search, dates survive; apply amounts keeps dates | Transactions.filtersExport.regression.test.tsx (2 tests) |
+| R13 | auditor3 | Export ignored search/min/max (list/export mismatch) | exportTransactions passed category only; backend lacked the params | fix/transactions-filters-export | Export under search+100/500 sends all params; XLSX matches filtered list; same semantics as list endpoint; 0-bounds preserved | test_export_parity.py (3 tests) + frontend export test |

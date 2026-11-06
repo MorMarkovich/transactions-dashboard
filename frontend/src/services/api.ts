@@ -629,7 +629,7 @@ export const transactionsApi = {
    */
   exportTransactions: async (
     sessionId: string,
-    filters?: { start_date?: string; end_date?: string; category?: string; subcategory?: string },
+    filters?: { start_date?: string; end_date?: string; category?: string; subcategory?: string; search?: string; min_amount?: number; max_amount?: number },
     signal?: AbortSignal
   ): Promise<Blob> => {
     const params = new URLSearchParams();
@@ -640,6 +640,9 @@ export const transactionsApi = {
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
       if (filters.subcategory) params.append('subcategory', filters.subcategory);
+      if (filters.search) params.append('search', filters.search);
+      if (filters.min_amount != null) params.append('min_amount', String(filters.min_amount));
+      if (filters.max_amount != null) params.append('max_amount', String(filters.max_amount));
     }
 
     const response = await api.get(`/api/export?${params.toString()}`, {

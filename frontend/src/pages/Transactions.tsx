@@ -26,7 +26,13 @@ interface DateChip {
 }
 
 function toISODate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  // Local calendar date: toISOString() is UTC and shifts Israeli users one
+  // day back (month/week chips started on the previous day; "today" showed
+  // yesterday between midnight and 02:00 IST).
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 const DATE_CHIPS: DateChip[] = [
@@ -294,7 +300,15 @@ export default function Transactions() {
 
     try {
       const scopedId = await transactionsApi.scopeSession(sessionId, null, undefined, category, subcategories)
-      const blob = await transactionsApi.exportTransactions(scopedId, { category: category || filters.category })
+      // Export exactly what the list shows: every active filter goes along.
+      const blob = await transactionsApi.exportTransactions(scopedId, {
+        category: category || filters.category,
+        search: filters.search,
+        start_date: filters.startDate,
+        end_date: filters.endDate,
+        min_amount: filters.minAmount,
+        max_amount: filters.maxAmount,
+      })
 
       const url = window.URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -305,7 +319,7 @@ export default function Transactions() {
     } catch (err) {
       console.error('Error exporting:', err)
     }
-  }, [sessionId, filters.category, category, subcategories])
+  }, [sessionId, filters, category, subcategories])
 
   // ---- No session: empty state --------------------------------------------
   if (!sessionId) {
@@ -503,6 +517,7 @@ export default function Transactions() {
 
       <AdvancedFilters
         initial={initialFilters}
+        value={filters}
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}

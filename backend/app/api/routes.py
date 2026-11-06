@@ -1944,7 +1944,10 @@ def export_transactions(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     category: Optional[str] = None,
-    subcategory: Optional[str] = None
+    subcategory: Optional[str] = None,
+    search: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None
 ):
     """Export transactions to Excel"""
     if sessionId not in sessions:
@@ -1961,7 +1964,21 @@ def export_transactions(
         df = df[df['קטגוריה'] == category]
     if subcategory and 'קטגוריה_משנה' in df.columns:
         df = df[df['קטגוריה_משנה'].fillna('').astype(str) == subcategory]
-    
+    # Same search/amount semantics as GET /transactions so the export matches
+    # the list the user is looking at.
+    if search:
+        _m = df['תיאור'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה' in df.columns:
+            _m = _m | df['קטגוריה'].astype(str).str.contains(search, case=False, na=False, regex=False)
+        if 'קטגוריה_משנה' in df.columns:
+            _m = _m | df['קטגוריה_משנה'].fillna('').astype(str).str.contains(search, case=False, na=False, regex=False)
+        df = df[_m]
+    if (min_amount is not None or max_amount is not None) and 'סכום_מוחלט' in df.columns:
+        if min_amount is not None:
+            df = df[df['סכום_מוחלט'] >= min_amount]
+        if max_amount is not None:
+            df = df[df['סכום_מוחלט'] <= max_amount]
+
     # Export
     excel_buffer = export_to_excel(df)
     
