@@ -105,7 +105,7 @@ describe('ResetPassword', () => {
     expect(await screen.findByText('הסיסמה עודכנה ✓')).toBeTruthy()
   })
 
-  it('surfaces a Supabase error to the user', async () => {
+  it('surfaces a mapped Hebrew message for a Supabase error (never raw English)', async () => {
     updateUser.mockResolvedValue({ error: { message: 'weak password' } })
     renderPage()
     act(() => authCallback?.('PASSWORD_RECOVERY'))
@@ -113,6 +113,6 @@ describe('ResetPassword', () => {
     fireEvent.change(screen.getByLabelText('סיסמה חדשה'), { target: { value: 'secret1' } })
     fireEvent.change(screen.getByLabelText('אימות סיסמה חדשה'), { target: { value: 'secret1' } })
     fireEvent.click(screen.getByRole('button', { name: 'שמור סיסמה חדשה' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('weak password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('הסיסמה אינה עומדת בדרישות (לפחות 6 תווים)')
   })
 })

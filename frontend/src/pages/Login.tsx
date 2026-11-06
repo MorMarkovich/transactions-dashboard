@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { safeReturnTo } from '../lib/returnTo'
 import { useAuth } from '../lib/AuthContext'
@@ -40,6 +40,16 @@ export default function Login() {
   const { signIn, signUp, resetPassword } = useAuth()
 
   const [page, setPage] = useState<Page>('login')
+  // Move focus to the page heading when it mounts: on every
+  // login/register/reset switch the clicked control unmounts during the
+  // transition, so without this keyboard and screen-reader users are
+  // dropped back to <body>. A stable callback ref fires exactly on
+  // mount/unmount - independent of animation timing or
+  // prefers-reduced-motion - and a stable identity means no re-fires on
+  // unrelated re-renders.
+  const focusHeading = useCallback((el: HTMLHeadingElement | null) => {
+    el?.focus()
+  }, [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(() => {
     try {
@@ -117,7 +127,12 @@ export default function Login() {
     setLoading(false)
     if (needsConfirmation) {
       // Stay on the register page with a persistent instruction: the account
-      // only works after the emailed link is opened.
+      // only works after the emailed link is opened. Clear the password
+      // fields: the values are no longer needed, and an accidental second
+      // tap on the submit button must hit client validation rather than
+      // re-calling signUp and tripping the email rate limit.
+      setPassword('')
+      setPassword2('')
       setSuccess(`שלחנו מייל אימות אל ${email}. לחצו על הקישור במייל כדי להפעיל את החשבון, ואז התחברו. (בדקו גם בספאם)`)
       return
     }
@@ -266,8 +281,10 @@ export default function Login() {
               {page === 'login' && (
                 <form onSubmit={handleLogin} noValidate>
                   <h2
+                    ref={focusHeading}
+                    tabIndex={-1}
                     className="text-xl font-bold mb-1"
-                    style={{ color: 'var(--text-primary)' }}
+                    style={{ color: 'var(--text-primary)', outline: 'none' }}
                   >
                     {'\u05D1\u05E8\u05D5\u05DA \u05D4\u05D1\u05D0 \uD83D\uDC4B'}
                   </h2>
@@ -351,8 +368,10 @@ export default function Login() {
               {page === 'register' && (
                 <form onSubmit={handleRegister} noValidate>
                   <h2
+                    ref={focusHeading}
+                    tabIndex={-1}
                     className="text-xl font-bold mb-1"
-                    style={{ color: 'var(--text-primary)' }}
+                    style={{ color: 'var(--text-primary)', outline: 'none' }}
                   >
                     {'\u05D9\u05E6\u05D9\u05E8\u05EA \u05D7\u05E9\u05D1\u05D5\u05DF \u2728'}
                   </h2>
@@ -438,8 +457,10 @@ export default function Login() {
               {page === 'reset' && (
                 <form onSubmit={handleReset} noValidate>
                   <h2
+                    ref={focusHeading}
+                    tabIndex={-1}
                     className="text-xl font-bold mb-1"
-                    style={{ color: 'var(--text-primary)' }}
+                    style={{ color: 'var(--text-primary)', outline: 'none' }}
                   >
                     {'\u05D0\u05D9\u05E4\u05D5\u05E1 \u05E1\u05D9\u05E1\u05DE\u05D4 \uD83D\uDD11'}
                   </h2>

@@ -16,6 +16,22 @@ interface AuthContextType {
   updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
+// Maps Supabase auth errors to Hebrew. Raw server messages (English) must
+// never reach the UI: unrecognized errors get a generic Hebrew message that
+// does not guess at the cause.
+export function authErrorMessage(error: { message?: string } | null): string | null {
+  if (!error) return null
+  const m = (error.message || '').toLowerCase()
+  if (m.includes('not confirmed')) return 'יש לאשר את כתובת המייל (הקישור נשלח אליכם) לפני ההתחברות'
+  if (m.includes('unable to validate email') || m.includes('invalid format') || m.includes('valid email')) return 'כתובת המייל אינה תקינה'
+  if (m.includes('rate limit') || m.includes('too many')) return 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות'
+  if (m.includes('already')) return 'המייל כבר רשום'
+  if (m.includes('invalid')) return 'מייל או סיסמה שגויים'
+  if (m.includes('different from the old')) return 'הסיסמה החדשה חייבת להיות שונה מהנוכחית'
+  if (m.includes('password')) return 'הסיסמה אינה עומדת בדרישות (לפחות 6 תווים)'
+  return 'משהו השתבש. נסו שוב מאוחר יותר'
+}
+
 // Exported so state-only consumers (e.g. FilterProvider) can tolerate a
 // missing provider in tests via useContext; useAuth keeps the hard guard.
 export const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -49,12 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      if (error.message.toLowerCase().includes('not confirmed')) return { error: 'יש לאשר את כתובת המייל (הקישור נשלח אליכם) לפני ההתחברות' }
-      if (error.message.includes('Invalid')) return { error: 'מייל או סיסמה שגויים' }
-      return { error: error.message }
-    }
-    return { error: null }
+    return { error: authErrorMessage(error) }
   }
 
   const signUp = async (email: string, password: string, name: string) => {
@@ -62,10 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email, password,
       options: { data: { full_name: name }, emailRedirectTo: window.location.origin }
     })
-    if (error) {
-      if (error.message.includes('already')) return { error: 'המייל כבר רשום' }
-      return { error: error.message }
-    }
+    if (error) return { error: authErrorMessage(error) }
     // With "Confirm email" enabled Supabase returns the user but no session,
     // and for an already-registered address an obfuscated user with no
     // identities. With it disabled a session comes back and the user is
@@ -86,26 +94,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
-    return { error: error?.message ?? null }
+    return { error: authErrorMessage(error) }
   }
 
   const updatePassword = async (newPassword: string) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
-    return { error: error?.message ?? null }
+    return { error: authErrorMessage(error) }
   }
 
   const updateEmail = async (newEmail: string) => {
     const { error } = await supabase.auth.updateUser({ email: newEmail })
-    if (error) {
-      if (error.message.toLowerCase().includes('already')) return { error: 'המייל כבר רשום' }
-      return { error: error.message }
-    }
-    return { error: null }
+    return { error: authErrorMessage(error) }
   }
 
   const updateDisplayName = async (name: string) => {
     const { error } = await supabase.auth.updateUser({ data: { full_name: name } })
-    return { error: error?.message ?? null }
+    return { error: authErrorMessage(error) }
   }
 
   return (

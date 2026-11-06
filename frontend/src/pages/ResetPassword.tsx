@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { authErrorMessage } from '../lib/AuthContext'
 import { CreditCard, Lock, ArrowRight } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -48,7 +49,7 @@ export default function ResetPassword() {
     setError('')
     const { error: err } = await supabase.auth.updateUser({ password })
     setLoading(false)
-    if (err) { setError(err.message); return }
+    if (err) { setError(authErrorMessage(err) ?? 'משהו השתבש. נסו שוב מאוחר יותר'); return }
     setStatus('done')
     window.setTimeout(() => navigate('/', { replace: true }), 1800)
   }
