@@ -35,6 +35,12 @@ interface AdvancedFiltersProps {
 // the same browser never sees the first account's saved filters. The legacy
 // global key migrates once via migrateUserState.
 
+/** Non-empty amount text that is not a valid non-negative number (e.g. a
+    negative value, or invalid text some mobile keyboards let through). */
+export function isInvalidAmountInput(v: string): boolean {
+  return v !== '' && (Number.isNaN(Number(v)) || Number(v) < 0)
+}
+
 interface SavedPreset {
   name: string
   filters: Record<string, string | number | undefined>
@@ -99,8 +105,7 @@ export default function AdvancedFilters({
 
   const [rangeNote, setRangeNote] = useState('')
   const handleApply = () => {
-    const invalidAmount = [minAmount, maxAmount].some((v) => v !== '' && (Number.isNaN(Number(v)) || Number(v) < 0))
-    if (invalidAmount) {
+    if ([minAmount, maxAmount].some(isInvalidAmountInput)) {
       setRangeNote('נא להזין סכומים חיוביים תקינים')
       return
     }
