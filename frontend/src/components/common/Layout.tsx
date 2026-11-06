@@ -10,6 +10,7 @@ import CommandPalette from './CommandPalette'
 import { LayoutDashboard, Receipt, CalendarRange, Menu } from 'lucide-react'
 import Skeleton from '../ui/Skeleton'
 import { useAuth } from '../../lib/AuthContext'
+import { scoped, LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
 import { isValidRuleCategory, migrateRule } from '../../utils/constants'
 import { supabaseApi } from '../../services/supabaseApi'
 import { transactionsApi } from '../../services/api'
@@ -72,11 +73,9 @@ function useNewVersionAvailable(): boolean {
   return stale
 }
 
-const LAST_SESSION_KEY = 'transactions-dashboard:last-session'
-// created_at of the Supabase snapshot this device's session was built from. When
-// another device (or a bank refresh) saves a newer snapshot, this device rebuilds
-// instead of showing older numbers.
-const SNAPSHOT_SEEN_KEY = 'transactions-dashboard:snapshot-seen'
+// Both keys are per-user (scoped with the account id): on a shared browser the
+// next account must not inherit the previous account's session pointer or
+// snapshot marker. Legacy globals migrate once via migrateUserState.
 const isNewer = (a: string | null, b: string | null) => {
   if (!a) return false
   if (!b) return true
@@ -203,12 +202,13 @@ export default function Layout({ children }: LayoutProps) {
   })
   const [restoreFailed, setRestoreFailed] = useState(false)
   const newVersion = useNewVersionAvailable()
-  const [snapshotAt, setSnapshotAt] = useState<string | null>(() => localStorage.getItem(SNAPSHOT_SEEN_KEY))
+  const lastSessionKey = scoped(LAST_SESSION_BASE, user?.id ?? '')
+  const snapshotSeenKey = scoped(SNAPSHOT_SEEN_BASE, user?.id ?? '')
+  const [snapshotAt, setSnapshotAt] = useState<string | null>(() => (user ? localStorage.getItem(snapshotSeenKey) : null))
 
   // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  useModalFocus(sidebarOpen)
   const openSearch = () => { setSidebarOpen(false); setCommandPaletteOpen(true) }
 
   // Global Ctrl+K / Cmd+K keyboard shortcut for command palette
@@ -227,12 +227,12 @@ export default function Layout({ children }: LayoutProps) {
   // Auto-restore last session from Supabase when user logs in with no active session
   useEffect(() => {
     const urlSession = searchParams.get('session_id')
-    if (urlSession && !urlSession.includes('::') && urlSession !== getSampleSessionId()) localStorage.setItem(LAST_SESSION_KEY, urlSession)
+    if (urlSession && !urlSession.includes('::') && urlSession !== getSampleSessionId()) localStorage.setItem(lastSessionKey, urlSession)
     if (!user || hasTriedRestore.current) return
     hasTriedRestore.current = true
     // A link without ?session_id (bookmark, address bar) reuses the last
     // session rather than rebuilding one from the database every time.
-    const rememberedSession = urlSession ? null : localStorage.getItem(LAST_SESSION_KEY)
+    const rememberedSession = urlSession ? null : localStorage.getItem(lastSessionKey)
     const sessionId = urlSession || rememberedSession
 
     const doRestore = (attempt = 0) => {
@@ -259,7 +259,7 @@ export default function Layout({ children }: LayoutProps) {
         .then(response => {
           if (response?.success && response.session_id) {
             snapshotAtPromise.then((at) => {
-              if (at) { localStorage.setItem(SNAPSHOT_SEEN_KEY, at); setSnapshotAt(at) }
+              if (at) { localStorage.setItem(snapshotSeenKey, at); setSnapshotAt(at) }
             })
             // Preserve current page path when restoring session
             const currentPath = window.location.pathname
@@ -301,11 +301,11 @@ export default function Layout({ children }: LayoutProps) {
         // Session is valid, but another device (or a bank refresh) may have saved
         // newer data since this one was built.
         const latest = await supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
-        if (isNewer(latest, localStorage.getItem(SNAPSHOT_SEEN_KEY))) {
+        if (isNewer(latest, localStorage.getItem(snapshotSeenKey))) {
           doRestore()
           return
         }
-        setSnapshotAt(localStorage.getItem(SNAPSHOT_SEEN_KEY))
+        setSnapshotAt(localStorage.getItem(snapshotSeenKey))
         if (rememberedSession) {
           navigate(`${window.location.pathname}?session_id=${rememberedSession}`, { replace: true })
         }
@@ -446,16 +446,7 @@ export default function Layout({ children }: LayoutProps) {
     setSidebarOpen(false)
   }, [])
 
-  useEffect(() => {
-    if (!sidebarOpen) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSidebarOpen(false)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => {
-      window.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [sidebarOpen])
+  useModalFocus(sidebarOpen, closeSidebar)
 
   // File upload handler: navigate to dashboard with the new session_id
   const handleFileUploaded = useCallback(

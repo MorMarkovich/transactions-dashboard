@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { FilterProvider } from './context/FilterContext'
+import { safeReturnTo } from './lib/returnTo'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import Layout from './components/common/Layout'
 import { Loader2 } from 'lucide-react'
@@ -64,18 +65,27 @@ function ContentLoader() {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return <PageLoader />
   }
 
-  if (!user) return <Navigate to="/login" replace />
+  // Carry the requested page (path + query only, never the hash) so a
+  // deep link survives the trip through the login page.
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+  }
   return <>{children}</>
 }
 
 function LoginRoute() {
-  const { user } = useAuth()
-  if (user) return <Navigate to="/" replace />
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  // A signed-in user with a resolving session must never see the login form
+  // flash by; wait for the auth state to settle first.
+  if (loading) return <PageLoader />
+  if (user) return <Navigate to={safeReturnTo((location.state as { from?: unknown } | null)?.from)} replace />
   return <Login />
 }
 

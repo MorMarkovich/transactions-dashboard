@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { useTheme } from '../../hooks/useTheme'
+import { pushOverlay, removeOverlay, isTopOverlay } from '../../lib/overlayStack'
 
 interface CommandItem {
   id: string
@@ -42,6 +43,8 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const overlayIdRef = useRef<string | null>(null)
 
   const sessionQuery = sessionId ? `?session_id=${sessionId}` : ''
 
@@ -84,15 +87,19 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   // Modal behaviour: remember opener, trap Tab, close on Escape from anywhere, restore focus
   useEffect(() => {
     if (!isOpen) return
+    const id = pushOverlay()
+    overlayIdRef.current = id
     const opener = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => {
+      if (!isTopOverlay(id)) return
       if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopPropagation()
         onClose()
         return
       }
       if (e.key !== 'Tab') return
-      const dlg = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      const dlg = dialogRef.current
       if (!dlg) return
       const items = Array.from(dlg.querySelectorAll<HTMLElement>('button, input, [href], [tabindex]:not([tabindex="-1"])')).filter((el) => !el.hasAttribute('disabled'))
       if (items.length === 0) return
@@ -113,6 +120,8 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
+      removeOverlay(id)
+      overlayIdRef.current = null
       if (opener && document.contains(opener)) opener.focus()
     }
   }, [isOpen, onClose])
@@ -185,6 +194,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
 
           {/* Palette */}
           <motion.div
+            ref={dialogRef}
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}

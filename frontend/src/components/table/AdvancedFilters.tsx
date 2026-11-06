@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useContext } from 'react'
+import { AuthContext } from '../../lib/AuthContext'
+import { scoped, PRESETS_BASE } from '../../lib/userStorage'
 import { Search, Filter, Download, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Select from '../ui/Select'
@@ -29,7 +31,9 @@ interface AdvancedFiltersProps {
   }
 }
 
-const PRESETS_KEY = 'txn-filter-presets'
+// Presets are per-user (scoped with the account id) so a second account on
+// the same browser never sees the first account's saved filters. The legacy
+// global key migrates once via migrateUserState.
 
 interface SavedPreset {
   name: string
@@ -54,14 +58,17 @@ export default function AdvancedFilters({
   const firstRun = useRef(true)
   const [presets, setPresets] = useState<SavedPreset[]>([])
   const [presetName, setPresetName] = useState('')
+  const auth = useContext(AuthContext)
+  const presetsKey = auth?.user ? scoped(PRESETS_BASE, auth.user.id) : null
 
-  // Load saved presets from localStorage
+  // Load saved presets from localStorage (per signed-in user)
   useEffect(() => {
+    if (!presetsKey) { setPresets([]); return }
     try {
-      const saved = localStorage.getItem(PRESETS_KEY)
-      if (saved) setPresets(JSON.parse(saved))
+      const saved = localStorage.getItem(presetsKey)
+      setPresets(saved ? JSON.parse(saved) : [])
     } catch { /* ignore */ }
-  }, [])
+  }, [presetsKey])
 
   // Debounced search
   useEffect(() => {
@@ -135,7 +142,7 @@ export default function AdvancedFilters({
     }
     const updated = [...presets.filter(p => p.name !== newPreset.name), newPreset]
     setPresets(updated)
-    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated))
+    if (presetsKey) localStorage.setItem(presetsKey, JSON.stringify(updated))
     setPresetName('')
   }
 
@@ -159,7 +166,7 @@ export default function AdvancedFilters({
   const deletePreset = (name: string) => {
     const updated = presets.filter(p => p.name !== name)
     setPresets(updated)
-    localStorage.setItem(PRESETS_KEY, JSON.stringify(updated))
+    if (presetsKey) localStorage.setItem(presetsKey, JSON.stringify(updated))
   }
 
   return (

@@ -30,18 +30,32 @@ export default function CategoryManagerModal({
   const [renameValue, setRenameValue] = useState('')
   const [subDraft, setSubDraft] = useState<Record<string, string>>({})
 
+  const [addReservedError, setAddReservedError] = useState(false)
+
   const addCategory = () => {
     const name = newCategory.trim()
     if (!name) return
+    // 'אחר' is the chart-legend bucket — never a real category.
+    if (name === 'אחר') { setAddReservedError(true); return }
+    setAddReservedError(false)
     onAddCategory(name)
     setNewCategory('')
   }
 
+  const [renameError, setRenameError] = useState<string | null>(null)
+
   const commitRename = async (oldName: string) => {
     const next = renameValue.trim()
-    setRenaming(null)
-    setRenameValue('')
-    if (next && next !== oldName) await onRenameCategory(oldName, next)
+    if (!next || next === oldName) { setRenaming(null); setRenameValue(''); return }
+    try {
+      setRenameError(null)
+      await onRenameCategory(oldName, next)
+      setRenaming(null)
+      setRenameValue('')
+    } catch {
+      // Keep the editor open with the typed name so the user can retry.
+      setRenameError('לא הצלחנו לשנות את השם. נסו שוב.')
+    }
   }
 
   const addSub = (parent: string) => {
@@ -101,6 +115,11 @@ export default function CategoryManagerModal({
               <Plus size={14} /> הוסף
             </button>
           </form>
+          {addReservedError && (
+            <p role="alert" style={{ fontSize: '0.7rem', color: 'var(--danger)', margin: '6px 2px 0' }}>
+              ״אחר״ שמורה לסיכום בגרפים — בחרו שם אחר
+            </p>
+          )}
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: '6px 2px 0' }}>
             קטגוריות ותתי-קטגוריות חדשות יופיעו ברשימות הבחירה. הן נשמרות לצמיתות ברגע
             שמשייכים אליהן עסקה (דרך «שנה קטגוריה» בכרטיס קטגוריה).
@@ -135,11 +154,16 @@ export default function CategoryManagerModal({
                     <button
                       type="button"
                       aria-label="בטל"
-                      onClick={() => { setRenaming(null); setRenameValue('') }}
+                      onClick={() => { setRenaming(null); setRenameValue(''); setRenameError(null) }}
                       style={{ border: '1px solid var(--border-color, var(--border))', borderRadius: 'var(--radius-sm,6px)', background: 'transparent', color: 'var(--text-muted)', padding: '0 9px', cursor: 'pointer' }}
                     >
                       <X size={14} />
                     </button>
+                    {renameError && renaming === cat.name && (
+                      <span role="alert" style={{ flexBasis: '100%', color: 'var(--danger)', fontSize: '0.6875rem' }}>
+                        {renameError}
+                      </span>
+                    )}
                   </form>
                 ) : (
                   <>

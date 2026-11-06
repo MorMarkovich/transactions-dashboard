@@ -26,6 +26,7 @@ import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
 import RefreshFromBanks from './RefreshFromBanks'
 import { useAuth } from '../../lib/AuthContext'
+import { scoped, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
 import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
 import { clearSampleSession } from '../../lib/sampleMode'
@@ -131,7 +132,7 @@ export default function Sidebar({
     supabaseApi.deleteAllTransactions(user.id)
       .then(() => supabaseApi.saveTransactions(user.id, transactions))
       .then(() => supabaseApi.getLatestSnapshotAt(user.id))
-      .then((at) => { if (at) localStorage.setItem('transactions-dashboard:snapshot-seen', at) })
+      .then((at) => { if (at) localStorage.setItem(scoped(SNAPSHOT_SEEN_BASE, user.id), at) })
       .catch(e => console.error('Failed to save to Supabase:', e))
   }
 

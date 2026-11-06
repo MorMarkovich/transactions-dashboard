@@ -31,6 +31,7 @@ import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
 import DonutChart from '../components/charts/DonutChart'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
+import { persistCategoryRenameToSupabase } from '../services/categoryRenamePersistence'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import EmptyState from '../components/common/EmptyState'
 import RefreshFromBanks from '../components/common/RefreshFromBanks'
@@ -47,6 +48,7 @@ import { formatCurrency } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
+import { scoped, LAST_SESSION_BASE } from '../lib/userStorage'
 import { canUseBankSync } from '../lib/bankSyncAccess'
 import { useDashboardFilters } from '../context/FilterContext'
 import type {
@@ -200,6 +202,7 @@ export default function Dashboard() {
   const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null)
   const [categoryRenameValue, setCategoryRenameValue] = useState('')
   const [savingCategoryName, setSavingCategoryName] = useState<string | null>(null)
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -639,23 +642,51 @@ export default function Dashboard() {
     }
   }, [user])
 
+  // Persist a rename so it SURVIVES the next restore:
+  // - rules are re-pointed in place (update, not upsert) so each merchant's
+  //   manual subcategory rule is preserved;
+  // - single-transaction pins move to the new name so pinned rows don't
+  //   resurrect the old category;
+  // - a brand-new name is registered as a custom category (user_categories +
+  //   localStorage), otherwise restore hygiene would reject the rules.
+  const persistCategoryRename = useCallback(
+    async (oldCategory: string, newCategory: string, merchants: string[]) => {
+      if (!user) return
+      const newIsCustom = !ASSIGNABLE_CATEGORIES.includes(newCategory)
+      const oldIsCustom = !ASSIGNABLE_CATEGORIES.includes(oldCategory)
+      // Strict + idempotent: a mid-chain failure throws so the UI surfaces it,
+      // and the user's retry (backend rename is idempotent) completes the rest.
+      await persistCategoryRenameToSupabase(user.id, oldCategory, newCategory, merchants, { newIsCustom, oldIsCustom })
+      if (newIsCustom) addCustomCategory(newCategory)
+      if (oldIsCustom) {
+        setCustomCategories((prev) => {
+          if (!prev.includes(oldCategory)) return prev
+          const next = prev.map((c) => (c === oldCategory ? newCategory : c))
+          try { localStorage.setItem(`customCats:${user.id}`, JSON.stringify(next)) } catch { /* ignore */ }
+          return next
+        })
+      }
+    },
+    [user, addCustomCategory],
+  )
+
   const handleManagerRename = useCallback(async (oldCategory: string, newCategory: string) => {
     if (!sessionId) return
     const next = newCategory.trim()
     if (!next || next === oldCategory) return
-    try {
-      const resp = await transactionsApi.renameCategory(sessionId, oldCategory, next)
-      if (user && resp.merchants.length > 0) {
-        await supabaseApi.upsertCategoryRules(
-          user.id,
-          resp.merchants.map((merchant) => ({ merchant, category: next })),
-        ).catch(() => {})
-      }
-      setRefreshKey((k) => k + 1)
-    } catch {
-      // ignore — rename is best-effort
-    }
-  }, [sessionId, user])
+    // Throws on failure — the manager modal surfaces the error.
+    const resp = await transactionsApi.renameCategory(sessionId, oldCategory, next)
+    await persistCategoryRename(oldCategory, next, resp.merchants)
+    if (drawerCategory === oldCategory) setDrawerCategory(next)
+    setSnapshotExcluded((prev) => {
+      if (!prev.has(oldCategory)) return prev
+      const nextSet = new Set(prev)
+      nextSet.delete(oldCategory)
+      nextSet.add(next)
+      return nextSet
+    })
+    setRefreshKey((k) => k + 1)
+  }, [sessionId, persistCategoryRename, drawerCategory])
 
   // ── Filtered + sorted snapshot categories (uses extracted pure fn) ────
   const snapshotFilterOpts = useMemo(() => ({
@@ -747,12 +778,14 @@ export default function Dashboard() {
   const startCategoryRename = useCallback((categoryName: string) => {
     setEditingCategoryName(categoryName)
     setCategoryRenameValue(categoryName)
+    setRenameError(null)
   }, [])
 
   const cancelCategoryRename = useCallback(() => {
     setEditingCategoryName(null)
     setCategoryRenameValue('')
     setSavingCategoryName(null)
+    setRenameError(null)
   }, [])
 
   const handleCategoryRename = useCallback(
@@ -765,16 +798,10 @@ export default function Dashboard() {
       }
 
       setSavingCategoryName(oldCategory)
+      setRenameError(null)
       try {
         const resp = await transactionsApi.renameCategory(sessionId, oldCategory, newCategory)
-        if (user && resp.merchants.length > 0) {
-          await supabaseApi.upsertCategoryRules(
-            user.id,
-            resp.merchants.map((merchant) => ({ merchant, category: newCategory })),
-          ).catch((e) => {
-            console.warn('Failed to persist category rename rules:', e)
-          })
-        }
+        await persistCategoryRename(oldCategory, newCategory, resp.merchants)
 
         setSnapshotExcluded((prev) => {
           if (!prev.has(oldCategory)) return prev
@@ -792,11 +819,14 @@ export default function Dashboard() {
         })
         if (drawerCategory === oldCategory) setDrawerCategory(newCategory)
         setRefreshKey((k) => k + 1)
-      } finally {
         cancelCategoryRename()
+      } catch {
+        // Keep the editor open with the typed name so the user can retry.
+        setRenameError('לא הצלחנו לשנות את שם הקטגוריה. נסו שוב.')
+        setSavingCategoryName(null)
       }
     },
-    [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, user],
+    [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, persistCategoryRename],
   )
 
   const monthExpensePie = useMemo<MonthLegendItem[]>(() => {
@@ -844,7 +874,7 @@ export default function Dashboard() {
 
   const exitSample = () => {
     clearSampleSession()
-    localStorage.removeItem('transactions-dashboard:last-session')
+    if (user) localStorage.removeItem(scoped(LAST_SESSION_BASE, user.id))
     navigate('/')
   }
 
@@ -1521,6 +1551,11 @@ export default function Dashboard() {
                             >
                               <X size={12} />
                             </button>
+                            {renameError && editingCategoryName === cat.name && (
+                              <span role="alert" style={{ flexBasis: '100%', color: 'var(--danger)', fontSize: '0.6875rem' }}>
+                                {renameError}
+                              </span>
+                            )}
                           </form>
                         ) : (
                           <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

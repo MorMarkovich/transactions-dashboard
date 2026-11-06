@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react'
+import { pushOverlay, removeOverlay, isTopOverlay, lockBodyScroll, unlockBodyScroll } from '../../lib/overlayStack'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 
@@ -25,18 +26,25 @@ export default function Modal({
 }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null)
 
-  // Escape key to close
+  // Escape key to close (only when this is the topmost overlay)
+  const overlayIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isOpen) return
+    const id = pushOverlay()
+    overlayIdRef.current = id
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isTopOverlay(id)) {
         onClose()
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      removeOverlay(id)
+      overlayIdRef.current = null
+    }
   }, [isOpen, onClose])
 
   // Focus trap: focus the first control, keep Tab inside, restore focus to the opener on close
@@ -51,6 +59,7 @@ export default function Modal({
     list()[0]?.focus()
     const onTab = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return
+      if (overlayIdRef.current && !isTopOverlay(overlayIdRef.current)) return
       const items = list()
       if (items.length === 0) return
       const first = items[0]
@@ -74,14 +83,12 @@ export default function Modal({
     }
   }, [isOpen])
 
-  // Lock body scroll when open
+  // Lock body scroll when open (ref-counted: a stacked overlay closing must
+  // not release the lock while another overlay is still open)
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.body.style.overflow = ''
-    }
+    if (!isOpen) return
+    lockBodyScroll()
+    return () => unlockBodyScroll()
   }, [isOpen])
 
   return (

@@ -54,3 +54,27 @@ export async function persistAutomaticRules(client: SupabaseClient, userId: stri
     if (updateError) throw updateError
   }
 }
+
+/**
+ * Rename the CATEGORY of existing rules without touching their subcategory or
+ * source. Used by category rename: a plain upsert would overwrite the
+ * subcategory column with null and destroy manual subrules. Merchants with no
+ * existing rule get a fresh manual rule so a catalog-categorized merchant's
+ * rename still persists.
+ */
+export async function renameRuleCategories(
+  client: SupabaseClient, userId: string, merchants: string[], newCategory: string,
+) {
+  for (const raw of merchants) {
+    const merchant = merchantRuleKey(raw)
+    if (!merchant) continue
+    const { data, error } = await client.from('user_category_rules')
+      .update({ category: newCategory, updated_at: new Date().toISOString() })
+      .eq('user_id', userId).eq('merchant', merchant)
+      .select('merchant')
+    if (error) throw error
+    if (!data || data.length === 0) {
+      await persistManualRules(client, userId, [{ merchant, category: newCategory }])
+    }
+  }
+}

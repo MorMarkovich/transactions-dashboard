@@ -1,9 +1,10 @@
-import { useEffect, useCallback, useState, useMemo } from 'react'
+import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote, CheckSquare, Search } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { get_icon, ASSIGNABLE_CATEGORIES, get_subcategory_icon } from '../../utils/constants'
 import type { Transaction } from '../../services/types'
+import { pushOverlay, removeOverlay, isTopOverlay, lockBodyScroll, unlockBodyScroll } from '../../lib/overlayStack'
 
 interface CategoryTransactionsDrawerProps {
   isOpen: boolean
@@ -96,18 +97,25 @@ export default function CategoryTransactionsDrawer({
   const [bulkSaving, setBulkSaving] = useState(false)
   const [transactionQuery, setTransactionQuery] = useState('')
   const [classificationQuery, setClassificationQuery] = useState('')
+  const [customCatReservedError, setCustomCatReservedError] = useState(false)
 
+  const overlayIdRef = useRef<string | null>(null)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && overlayIdRef.current && isTopOverlay(overlayIdRef.current)) onClose()
     },
     [onClose],
   )
 
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
+    if (!isOpen) return
+    const id = pushOverlay()
+    overlayIdRef.current = id
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      removeOverlay(id)
+      overlayIdRef.current = null
     }
   }, [isOpen, handleKeyDown])
 
@@ -131,6 +139,7 @@ export default function CategoryTransactionsDrawer({
     }, 60)
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return
+      if (overlayIdRef.current && !isTopOverlay(overlayIdRef.current)) return
       const d = getDrawer()
       const items = focusable()
       if (!d || items.length === 0) { event.preventDefault(); d?.focus(); return }
@@ -150,11 +159,12 @@ export default function CategoryTransactionsDrawer({
   }, [isOpen])
 
   // Lock page scroll behind the drawer so touch scrolling never moves the page.
+  // Ref-counted via the overlay stack: an overlay closing above this drawer
+  // must not release the lock.
   useEffect(() => {
     if (!isOpen) return
-    const original = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = original }
+    lockBodyScroll()
+    return () => unlockBodyScroll()
   }, [isOpen])
 
   // Reset edit state when drawer closes or category changes.
@@ -211,6 +221,8 @@ export default function CategoryTransactionsDrawer({
     setPendingSub(undefined)
     setCustomCategory('')
     setCustomSubcategory('')
+    setClassificationQuery('')
+    setCustomCatReservedError(false)
     if (editingId == null) { setOnlyThis(false); setNoteValue(''); return }
     const tx = transactions.find((t) => t.id === editingId)
     setOnlyThis(!!tx?._locked)
@@ -282,14 +294,30 @@ export default function CategoryTransactionsDrawer({
       const catChanged = !!nextCat && (nextCat !== curCat || (editError && pendingCat !== null))
       const subChanged = nextSub !== curSub || (editError && pendingSub !== undefined)
       const noteChanged = nextNote !== curNote
-      if (!catChanged && !subChanged && !noteChanged) {
+      const pinChanged = onlyThis !== !!tx._locked
+      if (!catChanged && !subChanged && !noteChanged && !pinChanged) {
         setEditingId(null)
         return
       }
       setSavingId(tx.id)
       try {
-        if (catChanged && onCategoryChange) await onCategoryChange(tx, nextCat, onlyThis)
-        if (subChanged && onSubcategoryChange) await onSubcategoryChange(tx, nextSub, onlyThis)
+        if (pinChanged && !catChanged && !subChanged) {
+          // Pin-toggle only: pin exactly the current {category, subcategory}
+          // (the subcategory pin path preserves the sub; the category pin path
+          // would clear it). Unpin goes through a same-category normal edit —
+          // which deletes the override — then re-asserts the subrule so the
+          // merchant's subcategory rule isn't nulled by the category write.
+          if (onlyThis) {
+            if (onSubcategoryChange) await onSubcategoryChange(tx, curSub, true)
+            else if (onCategoryChange) await onCategoryChange(tx, curCat, true)
+          } else if (onCategoryChange) {
+            await onCategoryChange(tx, curCat, false)
+            if (curSub && onSubcategoryChange) await onSubcategoryChange(tx, curSub, false)
+          }
+        } else {
+          if (catChanged && onCategoryChange) await onCategoryChange(tx, nextCat, onlyThis)
+          if (subChanged && onSubcategoryChange) await onSubcategoryChange(tx, nextSub, onlyThis)
+        }
         if (noteChanged && onSaveNote) await onSaveNote(tx, nextNote)
         setEditingId(null)
         setEditError(false)
@@ -685,7 +713,12 @@ export default function CategoryTransactionsDrawer({
                           const curCat = (tx.קטגוריה ?? category).trim()
                           const effCat = (pendingCat ?? curCat).trim()
                           const curSub = (tx.קטגוריה_משנה ?? '').trim()
-                          const effSub = pendingSub === undefined ? curSub : pendingSub
+                          // A staged NEW category means the old subcategory no
+                          // longer applies — show nothing selected until the
+                          // user picks one (the save clears/derives it anyway).
+                          const effSub = pendingSub === undefined
+                            ? (effCat !== curCat ? '' : curSub)
+                            : pendingSub
                           const effSubOptions = Array.from(new Set([
                             ...(subcategoryCatalog[effCat] ?? []),
                             ...(effCat === category ? subOptions : []),
@@ -694,6 +727,7 @@ export default function CategoryTransactionsDrawer({
                             effCat !== curCat
                             || effSub !== curSub
                             || noteValue.trim() !== (tx.הערות ?? '').trim()
+                            || onlyThis !== !!tx._locked
                           return (
                           <div
                             style={{
@@ -737,11 +771,17 @@ export default function CategoryTransactionsDrawer({
                             <form
                               onSubmit={(e) => {
                                 e.preventDefault()
-                                if (customCategory.trim()) {
-                                  setPendingCat(customCategory.trim())
-                                  setPendingSub(undefined)
-                                  setCustomCategory('')
+                                const name = customCategory.trim()
+                                if (!name) return
+                                // 'אחר' is the chart-legend bucket — never assignable.
+                                if (name === 'אחר') {
+                                  setCustomCatReservedError(true)
+                                  return
                                 }
+                                setCustomCatReservedError(false)
+                                setPendingCat(name)
+                                setPendingSub(undefined)
+                                setCustomCategory('')
                               }}
                               style={{ display: 'flex', gap: '6px', width: '100%', marginBottom: '4px' }}
                             >
@@ -781,6 +821,11 @@ export default function CategoryTransactionsDrawer({
                                 בחר
                               </button>
                             </form>
+                            {customCatReservedError && (
+                              <p role="alert" style={{ width: '100%', margin: '0 0 4px', color: 'var(--danger)', fontSize: '0.6875rem' }}>
+                                ״אחר״ שמורה לסיכום בגרפים — בחרו שם אחר לקטגוריה
+                              </p>
+                            )}
                             <label style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', marginBottom: 4, padding: '7px 9px', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-primary)' }}>
                               <Search size={13} style={{ color: 'var(--text-muted)' }} />
                               <input value={classificationQuery} onChange={(event) => setClassificationQuery(event.target.value)} placeholder="חיפוש קטגוריה או תת-קטגוריה" aria-label="חיפוש קטגוריות ותתי קטגוריות" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', color: 'var(--text-primary)', fontFamily: 'var(--font-family)', fontSize: '0.75rem' }} />
@@ -879,7 +924,7 @@ export default function CategoryTransactionsDrawer({
                                     return (
                                       <button
                                         key={sub}
-                                        onClick={() => setPendingSub(sub === curSub && pendingSub !== undefined ? undefined : sub)}
+                                        onClick={() => setPendingSub(sub === effSub ? undefined : sub)}
                                         disabled={isSaving}
                                         style={{
                                           display: 'inline-flex', alignItems: 'center', gap: '4px',

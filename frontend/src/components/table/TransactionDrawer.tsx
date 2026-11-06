@@ -1,10 +1,11 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calendar, Tag, CreditCard, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '../../utils/formatting'
 import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
 import { useAuth } from '../../lib/AuthContext'
+import { pushOverlay, removeOverlay, isTopOverlay, lockBodyScroll, unlockBodyScroll } from '../../lib/overlayStack'
 import type { Transaction as BaseTransaction } from '../../services/types'
 
 // Allow extra dynamic fields (e.g. 'ארבע ספרות אחרונות') on top of the core Transaction shape
@@ -22,20 +23,70 @@ interface TransactionDrawerProps {
 }
 
 export default function TransactionDrawer({ transaction, isOpen, onClose, sessionId, onUpdateTransaction }: TransactionDrawerProps) {
-  // Close on Escape
+  // Overlay stack id: this drawer closes on Escape only when it is the
+  // topmost overlay, so a palette/modal above it closes first.
+  const overlayIdRef = useRef<string | null>(null)
+
+  // Close on Escape (topmost overlay only)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && overlayIdRef.current && isTopOverlay(overlayIdRef.current)) onClose()
     },
     [onClose],
   )
 
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown)
-      return () => document.removeEventListener('keydown', handleKeyDown)
+    if (!isOpen) return
+    const id = pushOverlay()
+    overlayIdRef.current = id
+    lockBodyScroll()
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      removeOverlay(id)
+      overlayIdRef.current = null
+      unlockBodyScroll()
     }
   }, [isOpen, handleKeyDown])
+
+  // Keyboard modal: move focus in, keep Tab inside, restore focus on close.
+  useEffect(() => {
+    if (!isOpen) return
+    const opener = document.activeElement as HTMLElement | null
+    const outside = Array.from(document.querySelectorAll<HTMLElement>('.orbit-topbar, .mobile-bottom-nav'))
+    const previous = outside.map((el) => el.inert)
+    outside.forEach((el) => { el.inert = true })
+    const getDrawer = () => document.querySelector<HTMLElement>('.transaction-drawer')
+    const focusable = () => {
+      const d = getDrawer()
+      if (!d) return [] as HTMLElement[]
+      return Array.from(d.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter((el) => el.getClientRects().length > 0)
+    }
+    const t = window.setTimeout(() => {
+      const d = getDrawer()
+      const target = d?.querySelector<HTMLElement>('button[aria-label="סגור"]') ?? focusable()[0] ?? d
+      target?.focus()
+    }, 60)
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      if (!overlayIdRef.current || !isTopOverlay(overlayIdRef.current)) return
+      const d = getDrawer()
+      const items = focusable()
+      if (!d || items.length === 0) { event.preventDefault(); return }
+      const first = items[0]
+      const last = items[items.length - 1]
+      const active = document.activeElement
+      if (event.shiftKey && (active === first || !d.contains(active))) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && (active === last || !d.contains(active))) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', trap)
+    return () => {
+      window.clearTimeout(t)
+      document.removeEventListener('keydown', trap)
+      outside.forEach((el, i) => { el.inert = previous[i] })
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [isOpen])
 
   const amount = transaction?.סכום ?? 0
   const isExpense = amount < 0
@@ -102,6 +153,10 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
 
           {/* Drawer - slides from left in RTL context */}
           <motion.div
+            className="transaction-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="פרטי עסקה"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}

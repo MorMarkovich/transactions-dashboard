@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from './supabase'
+import { migrateUserState } from './userStorage'
 import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
@@ -15,7 +16,9 @@ interface AuthContextType {
   updateDisplayName: (name: string) => Promise<{ error: string | null }>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// Exported so state-only consumers (e.g. FilterProvider) can tolerate a
+// missing provider in tests via useContext; useAuth keeps the hard guard.
+export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -25,6 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Migrate legacy global view state into this user's scoped keys BEFORE
+      // publishing the user, so consumers never read pre-migration storage.
+      if (session?.user) migrateUserState(session.user.id)
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
@@ -32,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) migrateUserState(session.user.id)
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)

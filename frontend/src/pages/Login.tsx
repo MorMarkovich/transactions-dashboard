@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { safeReturnTo } from '../lib/returnTo'
 import { useAuth } from '../lib/AuthContext'
 import { CreditCard, Mail, Lock, User, ArrowRight, LogIn } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -35,6 +36,7 @@ const pageVariants = {
 // ---------------------------------------------------------------------------
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { signIn, signUp, resetPassword } = useAuth()
 
   const [page, setPage] = useState<Page>('login')
@@ -86,7 +88,8 @@ export default function Login() {
       setLoading(false)
       return
     }
-    navigate('/')
+    // Return to the page the auth guard bounced away from, when there is one.
+    navigate(safeReturnTo((location.state as { from?: unknown } | null)?.from), { replace: true })
   }
 
   const handleRegister = async (e: React.FormEvent) => {

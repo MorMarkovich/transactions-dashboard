@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Income, CategoryRule } from './types';
-import { persistManualRules, persistAutomaticRules } from './categoryRuleStore';
+import { persistManualRules, persistAutomaticRules, renameRuleCategories } from './categoryRuleStore';
 import { guardSampleWrites } from '../lib/sampleMode';
 
 const rawSupabaseApi = {
@@ -195,6 +195,37 @@ const rawSupabaseApi = {
 
   upsertAutomaticCategoryRules: async (userId: string, rules: CategoryRule[]): Promise<void> => {
     await persistAutomaticRules(supabase, userId, rules);
+  },
+
+  /**
+   * Rename the category on existing rules IN PLACE so each merchant's manual
+   * subcategory rule survives a category rename (upsert would null it).
+   */
+  renameCategoryRules: async (userId: string, merchants: string[], newCategory: string): Promise<void> => {
+    await renameRuleCategories(supabase, userId, merchants, newCategory);
+  },
+
+  /** Re-point every single-transaction pin from an old category name to the
+   *  new one, preserving each pin's subcategory. Used by category rename so
+   *  pinned rows don't resurrect the old category on the next restore. */
+  renameTransactionOverrideCategory: async (userId: string, oldCategory: string, newCategory: string): Promise<void> => {
+    const { error } = await supabase
+      .from('transaction_overrides')
+      .update({ category: newCategory, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('category', oldCategory);
+    if (error) throw error;
+  },
+
+  /** Rename a custom category row (user_categories) so the old name stops
+   *  being offered and the new one stays valid on restores. */
+  renameUserCategory: async (userId: string, oldName: string, newName: string): Promise<void> => {
+    const { error } = await supabase
+      .from('user_categories')
+      .update({ name: newName })
+      .eq('user_id', userId)
+      .eq('name', oldName);
+    if (error) throw error;
   },
 
   deleteCategoryRule: async (userId: string, merchant: string): Promise<void> => {

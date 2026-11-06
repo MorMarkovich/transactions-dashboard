@@ -802,6 +802,11 @@ def update_transaction_category(body: UpdateTransactionCategoryRequest):
     new_category = (body.category or '').strip()
     if not new_category:
         raise HTTPException(status_code=400, detail="Category cannot be empty")
+    # 'אחר' is a chart-legend aggregation bucket, not an assignable category —
+    # the pickers hide it, and the free-text path must reject it too, otherwise
+    # edited rows vanish into the bucket and mix with aggregated spend.
+    if new_category == 'אחר':
+        raise HTTPException(status_code=400, detail="'אחר' is a reserved chart bucket, not a category")
     # A name outside the catalog is a user-created category (the dynamic
     # taxonomy): remember it for this session so rules/merchant edits and the
     # next hygiene pass treat it as valid. The frontend persists it to
@@ -880,6 +885,8 @@ def bulk_update_category(body: BulkUpdateCategoryRequest):
     new_category = (body.category or '').strip()
     if not new_category:
         raise HTTPException(status_code=400, detail="Category cannot be empty")
+    if new_category == 'אחר':
+        raise HTTPException(status_code=400, detail="'אחר' is a reserved chart bucket, not a category")
     if new_category not in CATEGORY_ICONS:
         SESSION_CUSTOM_CATS.setdefault(body.session_id, set()).add(new_category)
     new_sub = (body.subcategory or '').strip()
@@ -1037,6 +1044,8 @@ def rename_category(body: RenameCategoryRequest):
     new_category = (body.new_category or '').strip()
     if not old_category or not new_category:
         raise HTTPException(status_code=400, detail="Category names cannot be empty")
+    if new_category == 'אחר':
+        raise HTTPException(status_code=400, detail="'אחר' is a reserved chart bucket, not a category")
 
     df = sessions[body.session_id]
     if 'קטגוריה' not in df.columns:
@@ -1044,11 +1053,29 @@ def rename_category(body: RenameCategoryRequest):
 
     mask = df['קטגוריה'].astype(str) == old_category
     if not mask.any():
-        raise HTTPException(status_code=404, detail="Category not found")
+        # Idempotent retry: the rename already applied in this session but the
+        # caller's persistence (rules/pins/user_categories) failed midway and it
+        # is retrying the same rename. Report the new category's merchants so the
+        # retry can finish persisting instead of dying on a 404.
+        new_mask = df['קטגוריה'].astype(str) == new_category
+        if not new_mask.any():
+            raise HTTPException(status_code=404, detail="Category not found")
+        merchants = []
+        if 'תיאור' in df.columns:
+            merchants = sorted({str(v) for v in df.loc[new_mask, 'תיאור'].dropna().tolist() if str(v).strip()})
+        return {"success": True, "old_category": old_category, "new_category": new_category,
+                "affected_count": 0, "already_renamed": True, "merchants": merchants}
 
     merchants: list[str] = []
     if 'תיאור' in df.columns:
         merchants = sorted({str(v) for v in df.loc[mask, 'תיאור'].dropna().tolist() if str(v).strip()})
+
+    # A rename to a name outside the built-in tree creates a custom category:
+    # register it for this session exactly like the single/bulk editors do, so
+    # in-session validity checks treat it as a real category. The frontend
+    # persists it to Supabase user_categories so restores accept it too.
+    if new_category not in CATEGORY_ICONS:
+        SESSION_CUSTOM_CATS.setdefault(body.session_id, set()).add(new_category)
 
     df.loc[mask, 'קטגוריה'] = new_category
     df.loc[mask, '_manual_rule'] = True
