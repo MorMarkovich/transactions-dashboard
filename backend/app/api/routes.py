@@ -2837,10 +2837,11 @@ def get_industry_monthly(
     if expenses.empty:
         return {"months": [], "series": []}
 
-    # Choose date column
-    date_col = 'תאריך_חיוב' if (date_type == 'billing' and 'תאריך_חיוב' in expenses.columns) else 'תאריך'
-    expenses['_month_period'] = expenses[date_col].dt.to_period('M')
-    expenses = expenses.dropna(subset=['_month_period'])
+    # Shift-aware month attribution (billing basis falls back to the canonical
+    # חודש for rows without a billing date), consistent with the other month views.
+    expenses['_month'] = _month_series(expenses, date_type)
+    expenses = expenses[expenses['_month'].notna() & (expenses['_month'].astype(str) != '')]
+    expenses['_month_period'] = pd.PeriodIndex(expenses['_month'].astype(str), freq='M')
 
     # Get top N categories by total spend, group the rest into "אחר"
     cat_totals = expenses.groupby('קטגוריה')['סכום_מוחלט'].sum().sort_values(ascending=False)
