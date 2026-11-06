@@ -169,6 +169,10 @@ export default function Dashboard() {
     else sessionStorage.removeItem('dash-owner')
   }, [selectedOwner])
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
+  const [monthOverviewError, setMonthOverviewError] = useState(false)
+  const [overviewRetry, setOverviewRetry] = useState(0)
+  const [snapshotError, setSnapshotError] = useState(false)
+  const [snapshotRetry, setSnapshotRetry] = useState(0)
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -566,12 +570,13 @@ export default function Dashboard() {
     const fetchOverview = async () => {
       setMonthOverviewLoading(true)
       setMonthOverview(null)
+      setMonthOverviewError(false)
       try {
         const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategories)
         const data = await transactionsApi.getMonthOverview(sid, selectedMonth, dateType, controller.signal)
         if (!controller.signal.aborted) setMonthOverview(data)
       } catch {
-        // non-critical
+        if (!controller.signal.aborted) setMonthOverviewError(true)
       } finally {
         if (!controller.signal.aborted) setMonthOverviewLoading(false)
       }
@@ -579,7 +584,7 @@ export default function Dashboard() {
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories])
+  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories, overviewRetry])
 
   // ── Derived data ───────────────────────────────────────────────────
   // List of months to show in selector (last 12 months)
@@ -613,10 +618,10 @@ export default function Dashboard() {
         sid, controller.signal,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
       ))
-      .then((data) => setCategorySnapshot(data))
-      .catch(() => {})
+      .then((data) => { setCategorySnapshot(data); setSnapshotError(false) })
+      .catch(() => { if (!controller.signal.aborted) setSnapshotError(true) })
     return () => controller.abort()
-  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategories])
+  }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategories, snapshotRetry])
 
   // ── Fetch the category/subcategory catalog (seeded names + everything in
   // use in this session, so a subcategory created once stays pickable) ──
@@ -1116,6 +1121,11 @@ export default function Dashboard() {
           {/* Month overview content */}
           {monthOverviewLoading ? (
             <Skeleton variant="rectangular" height={320} />
+          ) : monthOverviewError ? (
+            <div role="status" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+              לא ניתן לטעון את הפילוח כרגע.
+              <button type="button" onClick={() => setOverviewRetry(n => n + 1)} style={{ display: 'block', margin: '10px auto 0', padding: '8px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)' }}>נסו שוב</button>
+            </div>
           ) : monthOverview && (
             <div style={{
               display: 'grid',
@@ -1125,6 +1135,11 @@ export default function Dashboard() {
               className="month-overview-grid"
             >
               <>
+                {monthExpensePie.length === 0 && (
+                  <div role="status" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', gridColumn: '1/-1' }}>
+                    אין הוצאות בחודש זה.
+                  </div>
+                )}
                 {monthExpensePie.length > 0 && (
                   <Card variant="glass" padding="md" className="month-breakdown-pie-card">
                     <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -1155,6 +1170,18 @@ export default function Dashboard() {
       )}
 
       {/* ── Full Category Snapshot ──────────────────────────────────── */}
+      {snapshotError && !categorySnapshot && (
+        <div style={{ marginTop: 'var(--space-lg)' }}>
+          <div className="section-header-v2">
+            <Grid3X3 size={18} />
+            <span>סיכום הוצאות לפי קטגוריה</span>
+          </div>
+          <div role="status" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+            לא ניתן לטעון את סיכום הקטגוריות כרגע.
+            <button type="button" onClick={() => setSnapshotRetry(n => n + 1)} style={{ display: 'block', margin: '10px auto 0', padding: '8px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)' }}>נסו שוב</button>
+          </div>
+        </div>
+      )}
       {categorySnapshot && categorySnapshot.categories.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -1495,6 +1522,7 @@ export default function Dashboard() {
                             <input
                               value={categoryRenameValue}
                               onChange={(e) => setCategoryRenameValue(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Escape') cancelCategoryRename() }}
                               autoFocus
                               disabled={isSavingRename}
                               style={{
@@ -1637,8 +1665,8 @@ export default function Dashboard() {
                       )}
 
                       </details>
-                      {/* Row 5: Progress bar + mini sparkline */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                      {/* Row 5: Progress bar + mini sparkline (inline-end padding reserves the hide button's corner so it never covers the sparkline) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', paddingInlineEnd: '48px' }}>
                         <div style={{ flex: 1, height: '3px', borderRadius: '2px', background: 'var(--bg-elevated)', overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${Math.min(cat.percent, 100)}%`, background: 'var(--accent)', borderRadius: '2px', transition: 'width 0.5s ease' }} />
                         </div>
