@@ -27,12 +27,6 @@ interface AdvancedFiltersProps {
     minAmount?: number
     maxAmount?: number
   }
-  /** Live filter object owned by the parent: date chips write here, and the
-      panel mirrors those dates so a later search/apply does not wipe them. */
-  value?: {
-    startDate?: string
-    endDate?: string
-  }
 }
 
 const PRESETS_KEY = 'txn-filter-presets'
@@ -49,7 +43,6 @@ export default function AdvancedFilters({
   loading = false,
   showCategory = true,
   initial,
-  value,
 }: AdvancedFiltersProps) {
   const [search, setSearch] = useState(initial?.search ?? '')
   const [category, setCategory] = useState(initial?.category ?? '')
@@ -70,13 +63,6 @@ export default function AdvancedFilters({
     } catch { /* ignore */ }
   }, [])
 
-  // Mirror externally-set dates (quick date chips) into the panel so the
-  // debounced search emit and "החל סינון" keep them instead of wiping them.
-  useEffect(() => {
-    setStartDate(value?.startDate ?? '')
-    setEndDate(value?.endDate ?? '')
-  }, [value?.startDate, value?.endDate])
-
   // Debounced search
   useEffect(() => {
     // Mounting must not emit: it would wipe the restored filters.
@@ -88,16 +74,21 @@ export default function AdvancedFilters({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
+  // Always emit the LATEST field values: a debounce timer scheduled before a
+  // quick date-chip click must not fire with the pre-chip dates.
+  const latest = useRef({ search, category, startDate, endDate, minAmount, maxAmount })
+  latest.current = { search, category, startDate, endDate, minAmount, maxAmount }
   const emitFilters = useCallback(() => {
+    const current = latest.current
     onFilterChange({
-      search: search || undefined,
-      category: category || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      minAmount: minAmount ? Number(minAmount) : undefined,
-      maxAmount: maxAmount ? Number(maxAmount) : undefined,
+      search: current.search || undefined,
+      category: current.category || undefined,
+      startDate: current.startDate || undefined,
+      endDate: current.endDate || undefined,
+      minAmount: current.minAmount ? Number(current.minAmount) : undefined,
+      maxAmount: current.maxAmount ? Number(current.maxAmount) : undefined,
     })
-  }, [search, category, startDate, endDate, minAmount, maxAmount, onFilterChange])
+  }, [onFilterChange])
 
   const [rangeNote, setRangeNote] = useState('')
   const handleApply = () => {
