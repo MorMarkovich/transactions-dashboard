@@ -70,21 +70,96 @@ function getStorageKey(ownerId: string | null): string {
   return ownerId ? `${STORAGE_KEY_PREFIX}-user-${ownerId}` : STORAGE_KEY_PREFIX
 }
 
-function loadGoals(ownerId: string | null, legacySessionId: string | null): SavingsGoal[] {
+function isValidGoal(value: unknown): value is SavingsGoal {
+  if (!value || typeof value !== 'object') return false
+  const g = value as Record<string, unknown>
+  return (
+    typeof g.id === 'string' &&
+    typeof g.name === 'string' &&
+    typeof g.category === 'string' &&
+    typeof g.color === 'string' &&
+    typeof g.created_at === 'string' &&
+    Number.isFinite(g.target_amount) &&
+    Number.isFinite(g.current_amount) &&
+    (g.target_amount as number) > 0 &&
+    (g.current_amount as number) >= 0
+  )
+}
+
+// Preserve the original raw value under versioned backup keys before anything
+// else could overwrite it; a failed backup write never touches the original.
+// Returns false when the raw could not be preserved anywhere.
+const MAX_RAW_BACKUPS = 3
+
+function backupRawGoals(storageKey: string, raw: string): boolean {
   try {
-    let stored = localStorage.getItem(getStorageKey(ownerId))
+    for (let i = 1; i <= MAX_RAW_BACKUPS; i++) {
+      const backupKey = i === 1 ? `${storageKey}-corrupt-backup` : `${storageKey}-corrupt-backup-${i}`
+      const existing = localStorage.getItem(backupKey)
+      if (existing === raw) return true // already preserved
+      if (existing === null) {
+        localStorage.setItem(backupKey, raw)
+        return true
+      }
+    }
+  } catch {
+    /* storage may be unavailable */
+  }
+  return false
+}
+
+// A corrupt original we had to drop but could not yet preserve. While this is
+// set, repair writes to that key are refused so the raw is never lost silently.
+let unpreservedRaw: { key: string; raw: string } | null = null
+
+function loadGoals(ownerId: string | null, legacySessionId: string | null): SavingsGoal[] {
+  const storageKey = getStorageKey(ownerId)
+  try {
+    let stored = localStorage.getItem(storageKey)
     if (!stored && ownerId && legacySessionId) {
       stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${legacySessionId}`)
-      if (stored) localStorage.setItem(getStorageKey(ownerId), stored)
+      if (stored) localStorage.setItem(storageKey, stored)
     }
-    return stored ? JSON.parse(stored) : []
+    if (!stored) return []
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(stored)
+    } catch {
+      if (!backupRawGoals(storageKey, stored)) unpreservedRaw = { key: storageKey, raw: stored }
+      return []
+    }
+    if (!Array.isArray(parsed)) {
+      if (!backupRawGoals(storageKey, stored)) unpreservedRaw = { key: storageKey, raw: stored }
+      return []
+    }
+    // Recover every valid entry; drop malformed ones instead of crashing the
+    // app or rendering NaN, keeping the original raw value in the backup.
+    const valid = parsed.filter(isValidGoal)
+    if (valid.length !== parsed.length && !backupRawGoals(storageKey, stored)) {
+      unpreservedRaw = { key: storageKey, raw: stored }
+    }
+    return valid
   } catch {
     return []
   }
 }
 
-function saveGoals(goals: SavingsGoal[], ownerId: string | null) {
-  localStorage.setItem(getStorageKey(ownerId), JSON.stringify(goals))
+// Returns false when persistence failed (private browsing / quota) so callers
+// can avoid showing a change as saved when it was not. Refuses the write while
+// an unpreserved corrupt original exists for this key: retry the backup first,
+// so the original raw is never overwritten without a surviving copy.
+function saveGoals(goals: SavingsGoal[], ownerId: string | null): boolean {
+  const storageKey = getStorageKey(ownerId)
+  try {
+    if (unpreservedRaw && unpreservedRaw.key === storageKey) {
+      if (!backupRawGoals(storageKey, unpreservedRaw.raw)) return false
+      unpreservedRaw = null
+    }
+    localStorage.setItem(storageKey, JSON.stringify(goals))
+    return true
+  } catch {
+    return false
+  }
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -106,6 +181,7 @@ export default function SavingsGoals() {
   }
   const [showForm, setShowForm] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState('')
   const [addFundsId, setAddFundsId] = useState<string | null>(null)
   const [addFundsAmount, setAddFundsAmount] = useState('')
   const [fundsError, setFundsError] = useState('')
@@ -148,8 +224,11 @@ export default function SavingsGoals() {
       created_at: new Date().toISOString(),
     }
     const updated = [...goals, goal]
+    if (!saveGoals(updated, ownerId)) {
+      setFormError('השמירה נכשלה - היעד לא נשמר, נסה שוב')
+      return
+    }
     setGoals(updated)
-    saveGoals(updated, ownerId)
     setNewName('')
     setNewTarget('')
     setNewCategory(CATEGORIES[0])
@@ -160,8 +239,12 @@ export default function SavingsGoals() {
   const removeGoal = useCallback(
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
+      if (!saveGoals(updated, ownerId)) {
+        setSaveError('השמירה נכשלה - היעד לא נמחק, נסה שוב')
+        return
+      }
+      setSaveError('')
       setGoals(updated)
-      saveGoals(updated, ownerId)
     },
     [goals, ownerId],
   )
@@ -184,8 +267,11 @@ export default function SavingsGoals() {
       const updated = goals.map((g) =>
         g.id === id ? { ...g, current_amount: g.current_amount + amount } : g,
       )
+      if (!saveGoals(updated, ownerId)) {
+        setFundsError('השמירה נכשלה - הסכום לא נוסף, נסה שוב')
+        return
+      }
       setGoals(updated)
-      saveGoals(updated, ownerId)
       setAddFundsId(null)
       setAddFundsAmount('')
     },
@@ -349,6 +435,21 @@ export default function SavingsGoals() {
           {showForm ? 'סגור' : 'הוסף יעד'}
         </Button>
       </div>
+
+      {/* ─── Persist-failure notice ────────────────────────────── */}
+      {saveError && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 'var(--space-md)',
+            fontSize: '0.8125rem',
+            color: 'var(--accent-danger, #ef4444)',
+            fontWeight: 500,
+          }}
+        >
+          {saveError}
+        </div>
+      )}
 
       {/* ─── Add Goal Form ───────────────────────────────────────── */}
       <AnimatePresence>
