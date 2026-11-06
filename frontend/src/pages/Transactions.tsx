@@ -6,6 +6,7 @@ import TransactionDrawer from '../components/table/TransactionDrawer'
 import AdvancedFilters from '../components/table/AdvancedFilters'
 import EmptyState from '../components/common/EmptyState'
 import MultiSelect from '../components/ui/MultiSelect'
+import { joinActiveFilters } from '../utils/categoryFilters'
 import Select from '../components/ui/Select'
 import PageHeader from '../components/common/PageHeader'
 import Skeleton from '../components/ui/Skeleton'
@@ -537,7 +538,7 @@ export default function Transactions() {
             <MultiSelect options={subcategoryMap[category] ?? []} value={subcategories} onChange={setSubcategories} placeholder="כל תתי-הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
           </label>
         </div>
-        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">מציג: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
+        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">מציג: {joinActiveFilters(category, subcategories)}</div>}
       </section>
 
       <AdvancedFilters

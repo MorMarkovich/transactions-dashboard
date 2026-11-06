@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   filterAndSortCategories,
   countActiveFilters,
+  joinActiveFilters,
   type CategoryFilterOptions,
 } from './categoryFilters'
 import type { CategorySnapshotItem } from '../services/types'
@@ -283,5 +284,20 @@ describe('countActiveFilters', () => {
 
   it('whitespace-only search is not counted', () => {
     expect(countActiveFilters({ ...defaultOpts, search: '   ' })).toBe(0)
+  })
+})
+
+describe('joinActiveFilters', () => {
+  it('category only: no trailing separator', () => {
+    expect(joinActiveFilters('אוכל', [])).toBe('אוכל')
+  })
+  it('category with subcategories', () => {
+    expect(joinActiveFilters('אוכל', ['מסעדות', 'קפה'])).toBe('אוכל / מסעדות / קפה')
+  })
+  it('subcategories only', () => {
+    expect(joinActiveFilters(null, ['מסעדות'])).toBe('מסעדות')
+  })
+  it('empty both', () => {
+    expect(joinActiveFilters('', [])).toBe('')
   })
 })

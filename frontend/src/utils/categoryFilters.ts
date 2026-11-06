@@ -70,3 +70,11 @@ export function countActiveFilters(opts: CategoryFilterOptions): number {
   if (opts.selectedCategories !== null) count++
   return count
 }
+
+/**
+ * Join the active category filter labels for the "מציג:" summary line.
+ * Spreads subcategories so an empty list leaves no trailing separator.
+ */
+export function joinActiveFilters(category: string | null | undefined, subcategories: string[]): string {
+  return [category, ...subcategories].filter((p): p is string => Boolean(p)).join(' / ')
+}

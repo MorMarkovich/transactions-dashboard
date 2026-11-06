@@ -270,7 +270,10 @@ body {background:radial-gradient(ellipse at 90% 15%,rgba(25,112,103,.23),transpa
   .income-table-wrap td:nth-child(6) {grid-column:3;grid-row:1;}
   .income-table-wrap td:nth-child(1) {grid-column:1;grid-row:2;font-size:12px;color:var(--text-muted);}
   .income-table-wrap td:nth-child(3) {grid-column:2;grid-row:2;font-size:12px;color:var(--text-muted);}
-  .income-table-wrap td:nth-child(4) {grid-column:3;grid-row:2;font-size:12px;color:var(--text-muted);}
+  /* Account (חשבון) gets its own full-width third line: the 24px chevron column
+     clipped the nowrap account name off the left edge of the card. */
+  .income-table-wrap td:nth-child(4) {grid-column:1/-1;grid-row:3;font-size:12px;color:var(--text-muted);}
+  .income-table-wrap td:nth-child(4) span {white-space:normal !important;overflow-wrap:anywhere;}
   .studio-category .category-hide-btn {width:36px !important;height:36px !important;}
   .studio-category button:not(.category-hide-btn) {min-width:36px;}
   .main-content .ui-btn {min-width:40px;}
