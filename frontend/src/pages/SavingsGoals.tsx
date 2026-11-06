@@ -97,6 +97,13 @@ export default function SavingsGoals() {
 
   // State
   const [goals, setGoals] = useState<SavingsGoal[]>(() => loadGoals(ownerId, sessionId))
+  // Re-key when the auth owner changes (account switch without remount):
+  // never show or write the previous owner's goals under the new key.
+  const [goalsOwner, setGoalsOwner] = useState(ownerId)
+  if (goalsOwner !== ownerId) {
+    setGoalsOwner(ownerId)
+    setGoals(loadGoals(ownerId, sessionId))
+  }
   const [showForm, setShowForm] = useState(false)
   const [addFundsId, setAddFundsId] = useState<string | null>(null)
   const [addFundsAmount, setAddFundsAmount] = useState('')
