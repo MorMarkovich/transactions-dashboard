@@ -9,7 +9,6 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
-import { niceCeil } from '../../utils/formatting'
 import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
 
 /* ------------------------------------------------------------------ */
