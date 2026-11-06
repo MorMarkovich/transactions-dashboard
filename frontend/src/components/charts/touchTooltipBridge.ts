@@ -22,7 +22,7 @@ const phantomCredits = new WeakMap<HTMLElement, PhantomCredit>()
 const PHANTOM_WINDOW_MS = 1500
 
 export function bridgeTouchToMouseMove(e: TouchEvent<HTMLElement>): void {
-  const touch = e.touches[0]
+  const touch = e.touches?.[0]
   const target = e.target as HTMLElement | null
   if (!touch || !target || typeof target.dispatchEvent !== 'function') return
   const root = (e.currentTarget as HTMLElement | null) ?? target
