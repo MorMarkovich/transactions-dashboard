@@ -16,7 +16,7 @@ type Page = 'login' | 'register' | 'reset'
 // Feature badges shown on branding panel
 // ---------------------------------------------------------------------------
 const FEATURES: readonly { icon: string; text: string }[] = [
-  { icon: '\u{1F512}', text: '\u05DE\u05D0\u05D5\u05D1\u05D8\u05D7' },
+  { icon: '\u{1F511}', text: '\u05DE\u05D0\u05D5\u05D1\u05D8\u05D7' },
   { icon: '\u{1F4CA}', text: '\u05E0\u05D9\u05EA\u05D5\u05D7 \u05D7\u05DB\u05DD' },
   { icon: '\u2601\uFE0F', text: '\u05E9\u05DE\u05D9\u05E8\u05D4 \u05D1\u05E2\u05E0\u05DF' },
   { icon: '\u{1F1EE}\u{1F1F1}', text: '\u05E2\u05D1\u05E8\u05D9\u05EA \u05DE\u05DC\u05D0\u05D4' },
