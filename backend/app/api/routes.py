@@ -1338,7 +1338,8 @@ def get_session_info(sessionId: str = Query(...)):
     # Months in data
     months = []
     if 'חודש' in df.columns:
-        months = sorted(df['חודש'].dropna().unique().tolist())
+        # Chronological (year, month) order - lexical MM/YYYY sort breaks across years
+        months = sorted(df['חודש'].dropna().unique().tolist(), key=_month_key)
 
     return {
         "total_rows": total,
@@ -2142,7 +2143,9 @@ def get_income_analysis(
             "category": _safe_str(row.get('קטגוריה')), "subcategory": _safe_str(row.get('קטגוריה_משנה')),
             "account": account_of(row), "notes": _safe_str(row.get('הערות')), "month": str(row['_month']),
         })
-    month_group = income.groupby('_month')['סכום'].agg(['sum', 'count']).sort_index()
+    # Chronological (year, month) order - lexical MM/YYYY sort breaks across years
+    month_group = income.groupby('_month')['סכום'].agg(['sum', 'count'])
+    month_group = month_group.loc[sorted(month_group.index, key=_month_key)]
     source_group = income.groupby('תיאור')['סכום'].agg(['sum', 'count']).sort_values('sum', ascending=False)
     category_group = income.groupby('קטגוריה')['סכום'].agg(['sum', 'count']).sort_values('sum', ascending=False)
     total = round(_sanitize(float(income['סכום'].sum())), 2)
