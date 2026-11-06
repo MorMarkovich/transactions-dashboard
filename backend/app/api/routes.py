@@ -1129,10 +1129,14 @@ def get_transactions(
         df = df.sort_values(by='תאריך', ascending=False)
     
     # Aggregate stats (computed on the full filtered dataset, before pagination)
+    # Monetary aggregates exclude neutral financing shell rows (loan drawdown +
+    # its repayments) so they don't double-count the original purchases; the
+    # rows themselves stay visible in the paginated ledger below.
+    df_stats = drop_neutral_financing(df)
     total = len(df)
-    total_amount = round(_sanitize(float(df['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df.columns and total > 0 else 0
-    expense_count = int((df['סכום'] < 0).sum()) if 'סכום' in df.columns else 0
-    income_count = total - expense_count
+    total_amount = round(_sanitize(float(df_stats['סכום_מוחלט'].sum())), 2) if 'סכום_מוחלט' in df_stats.columns and len(df_stats) > 0 else 0
+    expense_count = int((df_stats['סכום'] < 0).sum()) if 'סכום' in df_stats.columns else 0
+    income_count = int((df_stats['סכום'] > 0).sum()) if 'סכום' in df_stats.columns else 0
     # Average over the same shell-excluded population that produced
     # total_amount: mixing an excluded numerator with an inclusive denominator
     # deflates the average whenever neutral shells are present.
@@ -1140,8 +1144,8 @@ def get_transactions(
     avg_transaction = round(_sanitize(total_amount / stats_count), 2) if stats_count > 0 else 0
 
     # Enhanced stats
-    expenses_df = df[df['סכום'] < 0] if 'סכום' in df.columns else pd.DataFrame()
-    income_df = df[df['סכום'] > 0] if 'סכום' in df.columns else pd.DataFrame()
+    expenses_df = df_stats[df_stats['סכום'] < 0] if 'סכום' in df_stats.columns else pd.DataFrame()
+    income_df = df_stats[df_stats['סכום'] > 0] if 'סכום' in df_stats.columns else pd.DataFrame()
     total_expenses = round(_sanitize(float(expenses_df['סכום_מוחלט'].sum())), 2) if not expenses_df.empty and 'סכום_מוחלט' in expenses_df.columns else 0
     total_income = round(_sanitize(float(income_df['סכום'].sum())), 2) if not income_df.empty else 0
     # Median / average are for EXPENSES only, matching /trends and /budget
@@ -2013,20 +2017,39 @@ def _month_series(df: pd.DataFrame, date_type: str) -> pd.Series:
     other; deriving the month ad-hoc from the raw date silently throws the shift
     away. Falls back to the raw date only for legacy rows missing those columns.
     """
+    def _dt_month(col: str) -> "pd.Series | None":
+        """MM/YYYY from a date column, or None when it isn't datetime."""
+        if col in df.columns and pd.api.types.is_datetime64_any_dtype(df[col]):
+            return df[col].dt.strftime('%m/%Y')
+        return None
+
     if date_type == 'billing':
         if 'חודש_חיוב' in df.columns:
             s = df['חודש_חיוב'].astype('object')
-            if 'תאריך_חיוב' in df.columns:
-                s = s.where(s.notna() & (s != ''), df['תאריך_חיוב'].dt.strftime('%m/%Y'))
+            billed = _dt_month('תאריך_חיוב')
+            if billed is not None:
+                s = s.where(s.notna() & (s != ''), billed)
+            # Rows without a billing date (bank rows — bank-sync only stamps
+            # תאריך_חיוב on card rows) fall back to the canonical חודש month
+            # instead of vanishing from every billing-basis view.
+            if 'חודש' in df.columns:
+                s = s.where(s.notna() & (s != ''), df['חודש'].astype('object'))
             return s
-        if 'תאריך_חיוב' in df.columns:
-            return df['תאריך_חיוב'].dt.strftime('%m/%Y')
+        billed = _dt_month('תאריך_חיוב')
+        if billed is not None:
+            if 'חודש' in df.columns:
+                return billed.where(billed.notna() & (billed != ''), df['חודש'].astype('object'))
+            return billed
     if 'חודש' in df.columns:
         s = df['חודש'].astype('object')
-        if 'תאריך' in df.columns:
-            s = s.where(s.notna() & (s != ''), df['תאריך'].dt.strftime('%m/%Y'))
+        txn = _dt_month('תאריך')
+        if txn is not None:
+            s = s.where(s.notna() & (s != ''), txn)
         return s
-    return df['תאריך'].dt.strftime('%m/%Y')
+    txn = _dt_month('תאריך')
+    if txn is not None:
+        return txn
+    return pd.Series(pd.NA, index=df.index, dtype='object')
 
 
 def _month_key(m) -> tuple:
@@ -2214,10 +2237,14 @@ def get_category_snapshot(
     df = drop_neutral_financing(df)
     expenses = df[df['סכום'] < 0].copy()
 
-    # Determine which month column to use based on date_type
-    month_col = 'חודש'
-    if date_type == 'billing' and 'חודש_חיוב' in expenses.columns:
-        month_col = 'חודש_חיוב'
+    # Shift-aware month attribution (billing basis falls back to the canonical
+    # חודש for rows without a billing date) — keeps the snapshot consistent with
+    # month-overview and the other month views, and never NaN.
+    expenses = expenses.copy()
+    expenses['_month'] = _month_series(expenses, date_type)
+    expenses = expenses[expenses['_month'].notna() & (expenses['_month'].astype(str) != '')]
+    expenses['_month'] = expenses['_month'].astype(str)
+    month_col = '_month'
 
     # Optional month range filtering
     if (month_from or month_to) and not expenses.empty:
