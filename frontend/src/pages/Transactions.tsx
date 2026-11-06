@@ -217,6 +217,7 @@ export default function Transactions() {
     const fetchTransactions = async () => {
       setLoading(true)
 
+      try {
       const scopedId = await transactionsApi.scopeSession(sessionId, null, controller.signal, category, subcategories)
       const apiFilters: TransactionFilters = {
         page,
@@ -229,7 +230,6 @@ export default function Transactions() {
         max_amount: filters.maxAmount,
       }
 
-      try {
         const response = await transactionsApi.getTransactions(
           scopedId,
           apiFilters,
@@ -543,6 +543,7 @@ export default function Transactions() {
 
       <AdvancedFilters
         initial={initialFilters}
+        value={filters}
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}

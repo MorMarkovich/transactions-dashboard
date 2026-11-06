@@ -29,6 +29,12 @@ interface AdvancedFiltersProps {
     minAmount?: number
     maxAmount?: number
   }
+  /** Live filter object owned by the parent: date chips write here, and the
+      panel mirrors those dates so a later search/apply does not wipe them. */
+  value?: {
+    startDate?: string
+    endDate?: string
+  }
 }
 
 // Presets are per-user (scoped with the account id) so a second account on
@@ -53,6 +59,7 @@ export default function AdvancedFilters({
   loading = false,
   showCategory = true,
   initial,
+  value,
 }: AdvancedFiltersProps) {
   const [search, setSearch] = useState(initial?.search ?? '')
   const [category, setCategory] = useState(initial?.category ?? '')
@@ -75,6 +82,13 @@ export default function AdvancedFilters({
       setPresets(saved ? JSON.parse(saved) : [])
     } catch { /* ignore */ }
   }, [presetsKey])
+
+  // Mirror externally-set dates (quick date chips) into the panel so the
+  // debounced search emit and "החל סינון" keep them instead of wiping them.
+  useEffect(() => {
+    setStartDate(value?.startDate ?? '')
+    setEndDate(value?.endDate ?? '')
+  }, [value?.startDate, value?.endDate])
 
   // Debounced search
   useEffect(() => {

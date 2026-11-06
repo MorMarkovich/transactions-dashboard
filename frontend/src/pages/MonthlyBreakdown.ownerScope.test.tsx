@@ -6,6 +6,11 @@ import MonthlyBreakdown from './MonthlyBreakdown'
 import {FilterProvider} from '../context/FilterContext'
 import {transactionsApi} from '../services/api'
 
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
+vi.mock('../services/supabaseApi', () => ({
+  supabaseApi: new Proxy({}, { get: () => vi.fn().mockResolvedValue([]) }),
+}))
+
 vi.mock('../services/api', () => {
   const comparison = {
     months: ['10/2026'],
