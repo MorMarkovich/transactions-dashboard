@@ -354,17 +354,44 @@ export default function DataManagement() {
     }
   }, [sessionId])
 
+  // Mirrors Layout.tsx LAST_SESSION_KEY. Cleared on every destructive wipe so
+  // the app cannot silently re-attach to a session the user just erased (F2).
+  const clearRememberedSession = () => {
+    try { localStorage.removeItem('transactions-dashboard:last-session') } catch { /* ignore */ }
+  }
+
+  // Delete the backend session honestly: 404 = already gone (success). Any
+  // other failure is reported to the caller instead of being swallowed, so a
+  // ghost session never masquerades as a completed wipe (F2).
+  const purgeSession = useCallback(async (sid: string): Promise<boolean> => {
+    clearRememberedSession()
+    try {
+      await transactionsApi.deleteSession(sid)
+      return true
+    } catch (err) {
+      return (err as { response?: { status?: number } })?.response?.status === 404
+    }
+  }, [])
+
   const handleDeleteFile = useCallback(async (fileName: string) => {
     if (!sessionId) return
     setDeletingFile(fileName)
     try {
       const result = await transactionsApi.deleteSessionFile(sessionId, fileName)
       if (result.remaining === 0) {
-        // All files removed — clear session entirely
-        await transactionsApi.deleteSession(sessionId).catch(() => {})
+        // All files removed — wipe the durable snapshot too, or the next
+        // restore resurrects every transaction the user just deleted.
+        let snapshotGone = true
+        if (user) {
+          try { await supabaseApi.deleteAllTransactions(user.id) } catch { snapshotGone = false }
+        }
+        const purged = await purgeSession(sessionId)
         setSessionInfo(null)
         setSessionFiles([])
         navigate(window.location.pathname, { replace: true })
+        if (!snapshotGone || !purged) {
+          showToast('הקבצים הוסרו מהתצוגה, אבל המחיקה לא הושלמה. הנתונים עלולים לחזור לאחר כניסה מחדש — נסה שוב.', 'error')
+        }
       } else {
         await Promise.all([fetchSessionFiles(), fetchSessionInfo()])
       }
@@ -465,13 +492,18 @@ export default function DataManagement() {
       showToast('כל ההכנסות נמחקו בהצלחה', 'success')
       setShowDeleteIncomesModal(false)
       setIncomes([])
-      // Check if transactions are also empty — if so, clear session entirely
+      // Check if transactions are also empty — if so, clear session entirely.
+      // A live session that still holds transaction rows must survive an
+      // incomes-only wipe (F3): transactionSets counts durable snapshots, but
+      // an unsaved live session is invisible to it.
       const info = await supabaseApi.getStorageInfo(user.id)
-      if (info.transactionSets === 0 && sessionId) {
-        await transactionsApi.deleteSession(sessionId).catch(() => {})
+      const sessionHasRows = (sessionInfo?.total_rows ?? 0) > 0
+      if (info.transactionSets === 0 && !sessionHasRows && sessionId) {
+        const purged = await purgeSession(sessionId)
         setSessionInfo(null)
         setSessionFiles([])
         navigate(window.location.pathname, { replace: true })
+        if (!purged) showToast('ההכנסות נמחקו, אבל ניקוי הסשן בשרת נכשל.', 'error')
       }
       await fetchStorageInfo()
     } catch (err) {
@@ -487,11 +519,15 @@ export default function DataManagement() {
     setDeletingTransactions(true)
     try {
       await supabaseApi.deleteAllTransactions(user.id)
-      // Also clear the in-memory backend session
-      if (sessionId) {
-        await transactionsApi.deleteSession(sessionId).catch(() => {})
+      // Also clear the in-memory backend session — honestly: a failed purge
+      // must not be reported as success, or the ghost session keeps serving
+      // the "deleted" data (F2).
+      const purged = sessionId ? await purgeSession(sessionId) : true
+      if (purged) {
+        showToast('כל העסקאות נמחקו בהצלחה', 'success')
+      } else {
+        showToast('העסקאות נמחקו מהחשבון, אבל ניקוי הסשן בשרת נכשל. אם הנתונים יופיעו שוב — נסה שוב.', 'error')
       }
-      showToast('כל העסקאות נמחקו בהצלחה', 'success')
       setShowDeleteTransactionsModal(false)
       setSessionInfo(null)
       setSessionFiles([])
