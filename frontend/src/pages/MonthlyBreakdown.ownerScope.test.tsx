@@ -1,12 +1,3 @@
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null } }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      signOut: () => Promise.resolve({}),
-    },
-  },
-}))
 import {act, render, screen, waitFor} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {beforeEach, expect, it, vi} from 'vitest'
