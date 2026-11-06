@@ -142,11 +142,26 @@ export function ToastContainer({ toasts, removeToast }: {
   toasts: ToastData[]
   removeToast: (id: string) => void
 }) {
+  // Mobile: the topbar is sticky, so a fixed toast must start below it.
+  // Derive the bar's real rendered height (66px <=767px, 76px <=1023px)
+  // instead of hardcoding; desktop keeps the original 1rem offset.
+  // No safe-area term: the topbar carries no env() padding and the page
+  // has no viewport-fit=cover, so adding one would double-count.
+  const [topbarH, setTopbarH] = useState(0)
+  useEffect(() => {
+    const measure = () => {
+      const bar = document.querySelector('.orbit-topbar')
+      setTopbarH(window.innerWidth <= 1023 && bar ? Math.round(bar.getBoundingClientRect().height) : 0)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
   return (
     <div
       style={{
         position: 'fixed',
-        top: '1rem',
+        top: topbarH > 0 ? `${topbarH + 12}px` : '1rem',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 99999,
