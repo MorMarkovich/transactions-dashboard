@@ -401,33 +401,45 @@ def _row_looks_like_header(row) -> bool:
     return sum(1 for k in keywords if any(k in v for v in values)) >= 3
 
 
-def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def clean_dataframe(df: pd.DataFrame, stats: Optional[dict] = None) -> pd.DataFrame:
     """ניקוי והכנת ה-DataFrame"""
     if df.empty:
         return df
-    
+
     # זיהוי שורת כותרת
     header_row = detect_header_row(df)
-    
+
     if header_row > 0 or _row_looks_like_header(df.iloc[0]):
         # הגדרת הכותרות
         df.columns = df.iloc[header_row].tolist()
         df = df.iloc[header_row + 1:].reset_index(drop=True)
-    
+
     # ניקוי שמות העמודות
     df.columns = [str(c).strip() for c in df.columns]
-    
+
     # הסרת שורות סיכום וזבל
     summary_keywords = ['סך הכל', 'סה"כ', 'total', 'סיכום', 'יתרה']
-    
+
     def is_valid_row(row):
-        # Create string representation safely handles mixed types/NaNs
-        row_str = ' '.join([str(x).lower() for x in row if pd.notna(x)])
-        # בדיקה אם זו שורת סיכום
-        if any(k in row_str for k in summary_keywords):
+        non_empty = [x for x in row if pd.notna(x) and str(x).strip() != '']
+        if not non_empty:
+            return False
+        first_cell = str(non_empty[0]).lower()
+        row_str = ' '.join([str(x).lower() for x in non_empty])
+        # שורת סיכום אמיתית: מילת הסיכום היא התווית של השורה (התא הראשון),
+        # או שורה דלילה (תווית+ערך). תנועה מלאה שמתארת "תשלום יתרה" נשמרת.
+        if any(k in first_cell for k in summary_keywords):
+            if stats is not None:
+                stats['summary'] = stats.get('summary', 0) + 1
+            return False
+        if len(non_empty) <= 2 and any(k in row_str for k in summary_keywords):
+            if stats is not None:
+                stats['summary'] = stats.get('summary', 0) + 1
             return False
         # בדיקה אם השורה ריקה כמעט לגמרי
         if row.isnull().sum() > len(row) * 0.8:
+            if stats is not None:
+                stats['blank'] = stats.get('blank', 0) + 1
             return False
         return True
 
@@ -440,7 +452,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str, cat_col: Optional[str], billing_date_col: Optional[str] = None) -> pd.DataFrame:
+def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str, cat_col: Optional[str], billing_date_col: Optional[str] = None, stats: Optional[dict] = None) -> pd.DataFrame:
     """עיבוד הנתונים עם טיפול מקיף ב-edge cases"""
     if df.empty:
         return pd.DataFrame()
@@ -463,7 +475,9 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # ניקוי סכומים
     try:
         # וידוא שהערכים הם מספריים
-        result['סכום'] = pd.to_numeric(result[amount_col].apply(clean_amount), errors='coerce').fillna(0.0)
+        # None מ-clean_amount = תוכן לא-ריק שלא נפרסר בביטחון — נשאר NaN,
+        # ייספר כ-invalid_amount וייסרק החוצה; לא הופך ל-0 בשקט.
+        result['סכום'] = pd.to_numeric(result[amount_col].apply(clean_amount), errors='coerce')
     except Exception:
         result['סכום'] = 0.0
 
@@ -472,10 +486,11 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     if amount_col_clean == 'סכום חיוב' and 'סכום עסקה מקורי' in result.columns:
         try:
             fallback = pd.to_numeric(result['סכום עסקה מקורי'].apply(clean_amount), errors='coerce').fillna(0.0)
-            # עדכון רק היכן שהסכום הוא 0
-            mask_zero = result['סכום'] == 0
-            if mask_zero.any():
-                result.loc[mask_zero, 'סכום'] = fallback[mask_zero]
+            # עדכון רק היכן שהסכום הוא 0 או לא תקין (NaN) — ורק מערך מקור לא-אפס
+            mask_zero = result['סכום'].isna() | (result['סכום'] == 0)
+            fillable = mask_zero & (fallback != 0)
+            if fillable.any():
+                result.loc[fillable, 'סכום'] = fallback[fillable]
         except Exception:
             pass
     
@@ -517,17 +532,32 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # (3%) because a bank statement may have very few income rows
     # (e.g. 2 salaries out of 80 transactions = 2.5%).
     if not is_bank_statement and not is_credit_card_file:
-        _nz = result['סכום'][result['סכום'] != 0]
+        _nz = result['סכום'].dropna()
+        _nz = _nz[_nz != 0]
         if len(_nz) > 0:
             _pos_r = (_nz > 0).sum() / len(_nz)
             _neg_r = (_nz < 0).sum() / len(_nz)
-            if _pos_r >= 0.03 and _neg_r >= 0.03:
+            # רוב חיובי מעל 80% נראה כמו קובץ כרטיס אשראי, לא עו"ש — לא
+            # מסווגים כדוח בנק לפי סימנים מעורבים באזור הזה.
+            if _pos_r >= 0.03 and _neg_r >= 0.03 and _pos_r <= 0.8:
                 is_bank_statement = True
 
-    non_zero = result['סכום'][result['סכום'] != 0]
+    non_zero = result['סכום'].dropna()
+    non_zero = non_zero[non_zero != 0]
     if not is_bank_statement and len(non_zero) > 0:
         positive_ratio = (non_zero > 0).sum() / len(non_zero)
         if positive_ratio > 0.8:  # אם יותר מ-80% חיוביים - אלה הוצאות
+            negative_ratio = (non_zero < 0).sum() / len(non_zero)
+            if not is_credit_card_file and negative_ratio >= 0.03:
+                # סימנים לא חד-משמעיים: רוב חיובי כמו כרטיס אשראי עם מיעוט
+                # שלילי ממשי, בלי עמודת זכות/חובה או תאריך חיוב שמסמנים פורמט
+                # מוכר. נכשל בבירור במקום לנחש סימנים ולקלקל דוחות כספיים.
+                raise ValueError(
+                    'סימני הסכומים בקובץ לא חד-משמעיים: יש גם סכומים חיוביים וגם שליליים, '
+                    'בלי עמודת זכות/חובה או תאריך חיוב שמזהים פורמט מוכר. '
+                    'לייצוא מכרטיס אשראי ודאו שהקובץ כולל עמודת תאריך חיוב; '
+                    'לדוח עו"ש העלו קובץ עם עמודות זכות וחובה נפרדות או עמודת סכום חתומה.'
+                )
             # Remember which rows were originally negative (credits/refunds/income)
             originally_negative = result['סכום'] < 0
             # Flip positive amounts to negative (expenses)
@@ -646,8 +676,27 @@ def process_data(df: pd.DataFrame, date_col: str, amount_col: str, desc_col: str
     # Derive the subcategory (קטגוריה_משנה) from the now-finalized category.
     derive_subcategory(result)
 
-    # סינון שורות לא תקינות
-    result = result[(result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
+    # סינון שורות לא תקינות — עם ספירה לפי סיבה כדי שה-UI יוכל להתריע
+    if stats is not None:
+        try:
+            invalid_date_mask = result['תאריך'].isna()
+            stats['invalid_date'] = stats.get('invalid_date', 0) + int(invalid_date_mask.sum())
+            # סכום לא תקין: תוכן לא-ריק שלא נפרסר (clean_amount -> None/NaN),
+            # או תא סכום ריק/חסר. אפס מפורש ("0", "0.00") = zero_amount בלבד.
+            nan_amount_mask = ~invalid_date_mask & result['סכום'].isna()
+            stats['invalid_amount'] = stats.get('invalid_amount', 0) + int(nan_amount_mask.sum())
+            zero_mask = ~invalid_date_mask & (result['סכום'] == 0)
+            if zero_mask.any() and amount_col in result.columns:
+                raw_amount = result.loc[zero_mask, amount_col]
+                if isinstance(raw_amount, pd.Series):
+                    raw_empty = raw_amount.isna() | (raw_amount.astype(str).str.strip() == '')
+                    stats['invalid_amount'] = stats.get('invalid_amount', 0) + int(raw_empty.sum())
+                    stats['zero_amount'] = stats.get('zero_amount', 0) + int((~raw_empty).sum())
+                else:
+                    stats['zero_amount'] = stats.get('zero_amount', 0) + int(zero_mask.sum())
+        except Exception:
+            pass  # ספירת הסיכום אף פעם לא מפילה העלאה תקינה
+    result = result[result['סכום'].notna() & (result['סכום'] != 0) & result['תאריך'].notna()].reset_index(drop=True)
     
     # הוספת עמודות נוספות
     if not result.empty:
