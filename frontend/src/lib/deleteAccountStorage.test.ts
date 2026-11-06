@@ -1,4 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('./supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signOut: () => Promise.resolve({}),
+    },
+  },
+}))
 import { clearDeletedAccountStorage } from './deleteAccountStorage'
 import { scoped, LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE, FILTERS_BASE, PRESETS_BASE } from './userStorage'
 

@@ -997,7 +997,7 @@ export default function Dashboard() {
         overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
         category={category} subcategories={subcategories} refreshKey={refreshKey}
         onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
-        onCategory={handleCategoryCardClick}
+        onCategory={(name) => handleCategoryCardClick(name, selectedMonth ?? undefined)}
         onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
 
       {import.meta.env.VITE_PENDING_APPROVALS === 'true' && user && !isSampleActive() &&

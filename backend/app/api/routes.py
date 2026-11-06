@@ -2660,9 +2660,22 @@ def get_merchants(
     if expenses.empty:
         return {"merchants": []}
 
+    # Group on the canonical merchant key (same one rules and the AI audit
+    # use): descriptor variants — installment suffixes, PAYPAL */GOOGLE *
+    # prefixes, case, whitespace — are ONE merchant. Grouping by the raw
+    # תיאור splits installments into single-visit fragments and pushes the
+    # real top merchants off the chart. Display the group's most frequent
+    # raw descriptor so names stay recognizable.
+    expenses = expenses.copy()
+    expenses['_merchant_key'] = expenses['תיאור'].astype(str).map(normalize_merchant)
+    display_names = (
+        expenses
+        .groupby('_merchant_key')['תיאור']
+        .agg(lambda s: s.astype(str).value_counts().idxmax())
+    )
     merchant_agg = (
         expenses
-        .groupby('תיאור')
+        .groupby('_merchant_key')
         .agg(
             total=('סכום_מוחלט', 'sum'),
             count=('סכום_מוחלט', 'size'),
@@ -2674,12 +2687,12 @@ def get_merchants(
 
     merchants = [
         {
-            "name": str(name),
+            "name": str(display_names[key]),
             "total": round(_sanitize(row['total']), 2),
             "count": int(row['count']),
             "average": round(_sanitize(row['average']), 2),
         }
-        for name, row in merchant_agg.iterrows()
+        for key, row in merchant_agg.iterrows()
     ]
     return {"merchants": merchants}
 

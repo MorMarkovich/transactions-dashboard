@@ -150,18 +150,21 @@ export default function MonthlyBreakdown() {
     const controller = new AbortController()
     // Scope by the per-person filter, same as the main comparison fetch above:
     // an owner-filtered view must show that owner's subcategory split, or the
-    // subcategory pie contradicts the category row it drills into.
+    // subcategory pie contradicts the category row it drills into. The stale
+    // flag covers responses that were already resolving when the selection
+    // changed — an aborted request must never overwrite the newer one.
+    let stale = false
     const fetchSubcategories = async () => {
       try {
         const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal)
         const data = await transactionsApi.getSubcategoryMonthly(sid, selectedCategory, dateType, controller.signal)
-        setSubcategoryMonthly(data)
+        if (!stale) setSubcategoryMonthly(data)
       } catch {
-        setSubcategoryMonthly(null)
+        if (!stale) setSubcategoryMonthly(null)
       }
     }
     fetchSubcategories()
-    return () => controller.abort()
+    return () => { stale = true; controller.abort() }
   }, [sessionId, selectedCategory, dateType, selectedOwner])
 
   // Sync month/category defaults when comparison data (re)loads
