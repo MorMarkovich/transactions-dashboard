@@ -2,8 +2,10 @@ import { scoped, LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE, FILTERS_BASE, PRESETS_BA
 
 // Remove this account's browser-only financial preferences after confirmed
 // server deletion. Do not clear other accounts' keys or the whole origin.
+import { forgetPendingRawBackup } from './budgetRawBackup'
 export function clearDeletedAccountStorage(userId: string): void {
   try {
+    forgetPendingRawBackup(userId)
     const sessionId = localStorage.getItem(scoped(LAST_SESSION_BASE, userId)) ?? localStorage.getItem(LAST_SESSION_BASE)
     if (sessionId) {
       localStorage.removeItem(`budget-goals-${sessionId}`)
@@ -17,6 +19,14 @@ export function clearDeletedAccountStorage(userId: string): void {
       // Legacy pre-isolation globals, in case migration never ran on this device.
       LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE, FILTERS_BASE, PRESETS_BASE,
     ]) localStorage.removeItem(key)
+    // Versioned raw backups of repaired budget/savings goal stores:
+    // "<base>-corrupt-backup", "-corrupt-backup-2", "-corrupt-backup-3", ...
+    for (const key of Object.keys(localStorage)) {
+      if (
+        key.startsWith(`budget-goals-user-${userId}-corrupt-backup`) ||
+        key.startsWith(`savings-goals-user-${userId}-corrupt-backup`)
+      ) localStorage.removeItem(key)
+    }
     for (const key of Object.keys(sessionStorage)) {
       if (key.startsWith('dash-') || key.startsWith('tx-view:v1:') || key === 'transactions-dashboard:sample-session') sessionStorage.removeItem(key)
     }

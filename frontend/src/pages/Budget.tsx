@@ -23,6 +23,7 @@ import { formatCurrency, formatPercent } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
 import type { MetricsData, RawDonutData } from '../services/types'
 import { useAuth } from '../lib/AuthContext'
+import { preserveRawCopy, rawBackupStillBlocking } from '../lib/budgetRawBackup'
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -40,22 +41,71 @@ function getStorageKey(ownerId: string | null): string {
   return ownerId ? `${STORAGE_KEY_PREFIX}-user-${ownerId}` : STORAGE_KEY_PREFIX
 }
 
+// Raw-backup registry shared with account deletion: ../lib/budgetRawBackup
+
 function loadGoals(ownerId: string | null, legacySessionId: string | null): BudgetGoal[] {
+  const key = getStorageKey(ownerId)
+  let stored: string | null
   try {
-    let stored = localStorage.getItem(getStorageKey(ownerId))
-    // One-time migration from the old ephemeral-session key.
+    stored = localStorage.getItem(key)
+    // One-time migration from the old ephemeral-session key. The legacy key
+    // itself is never deleted, so this raw copy is inherently recoverable.
     if (!stored && ownerId && legacySessionId) {
-      stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${legacySessionId}`)
-      if (stored) localStorage.setItem(getStorageKey(ownerId), stored)
+      const legacy = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${legacySessionId}`)
+      if (legacy) {
+        try {
+          localStorage.setItem(key, legacy)
+        } catch {
+          return []
+        }
+        stored = legacy
+      }
     }
-    return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
+  if (!stored) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(stored)
+  } catch {
+    preserveRawCopy(key, stored)
+    return []
+  }
+  if (!Array.isArray(parsed)) {
+    preserveRawCopy(key, stored)
+    return []
+  }
+  // Tolerate older/partially-corrupt entries: keep only well-formed goals
+  // and coerce numeric-looking limits so totals never string-concatenate.
+  const repaired = parsed
+    .filter(
+      (g): g is { id: string; category: string; limit: number | string } =>
+        !!g && typeof g === 'object' && typeof (g as { category?: unknown }).category === 'string'
+        && Number.isFinite(Number((g as { limit?: unknown }).limit)) && Number((g as { limit?: unknown }).limit) > 0,
+    )
+    .map((g) => ({ id: String(g.id), category: g.category, limit: Number(g.limit) }))
+  const changed =
+    repaired.length !== parsed.length ||
+    parsed.some((g, i) => !g || typeof g !== 'object' || (g as { limit?: unknown }).limit !== repaired[i].limit)
+  if (changed) preserveRawCopy(key, stored)
+  return repaired
 }
 
-function saveGoals(goals: BudgetGoal[], ownerId: string | null) {
-  localStorage.setItem(getStorageKey(ownerId), JSON.stringify(goals))
+function saveGoals(goals: BudgetGoal[], ownerId: string | null): boolean {
+  const key = getStorageKey(ownerId)
+  // Block saving while the current raw has no recoverable copy; retry the
+  // backup now (it may succeed even though it failed at load time).
+  if (rawBackupStillBlocking(key)) {
+    return false
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(goals))
+    return true
+  } catch {
+    // Storage full or blocked (private mode): caller must not claim a save.
+    return false
+  }
 }
 
 // ─── Animation ─────────────────────────────────────────────────────────
@@ -82,14 +132,30 @@ export default function Budget() {
   const [donutData, setDonutData] = useState<RawDonutData | null>(null)
   const [allCategoryTotals, setAllCategoryTotals] = useState<{ name: string; total: number }[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   // Budget goals
   const [goals, setGoals] = useState<BudgetGoal[]>(() => loadGoals(ownerId, sessionId))
   const [newCategory, setNewCategory] = useState('')
   const [newLimit, setNewLimit] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+
+  // Account switch without an unmount (D29's intentional mid-mount switch):
+  // reload keyed on the new owner during render so the previous owner's
+  // goals never flash and can never be saved into the new owner's key.
+  const [goalsOwner, setGoalsOwner] = useState(ownerId)
+  if (goalsOwner !== ownerId) {
+    setGoalsOwner(ownerId)
+    setGoals(loadGoals(ownerId, sessionId))
+    setSaveError(false)
+    setShowForm(false)
+    setNewCategory('')
+    setNewLimit('')
+  }
 
   // Fetch data
+  const [reloadToken, setReloadToken] = useState(0)
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
@@ -97,6 +163,7 @@ export default function Budget() {
 
     const fetchData = async () => {
       setLoading(true)
+      setLoadError(false)
       try {
         const [metricsRes, donutRes, snapshotRes] = await Promise.all([
           transactionsApi.getMetrics(sessionId, signal),
@@ -109,13 +176,17 @@ export default function Budget() {
       } catch (err: unknown) {
         if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         console.error('Error loading budget data:', err)
+        setMetrics(null)
+        setDonutData(null)
+        setAllCategoryTotals([])
+        setLoadError(true)
       } finally {
         setLoading(false)
       }
     }
     fetchData()
     return () => controller.abort()
-  }, [sessionId])
+  }, [sessionId, reloadToken])
 
   // Category spending map
   const categorySpending = useMemo(() => {
@@ -177,8 +248,13 @@ export default function Budget() {
       limit: Number(newLimit),
     }
     const updated = [...goals, goal]
+    if (!saveGoals(updated, ownerId)) {
+      // Persist failed: leave state and the stored list untouched, say so.
+      setSaveError(true)
+      return
+    }
+    setSaveError(false)
     setGoals(updated)
-    saveGoals(updated, ownerId)
     setNewCategory('')
     setNewLimit('')
     setShowForm(false)
@@ -187,8 +263,12 @@ export default function Budget() {
   const removeGoal = useCallback(
     (id: string) => {
       const updated = goals.filter((g) => g.id !== id)
+      if (!saveGoals(updated, ownerId)) {
+        setSaveError(true)
+        return
+      }
+      setSaveError(false)
       setGoals(updated)
-      saveGoals(updated, ownerId)
     },
     [goals, ownerId],
   )
@@ -220,10 +300,27 @@ export default function Budget() {
   return (
     <div style={{ direction: 'rtl' }}>
       {/* ─── Header ─────────────────────────────────────────────────── */}
-      <PageHeader title="תקציב" subtitle="הגדרת יעדי תקציב ומעקב" icon={Target} />
+      <PageHeader title="תקציב" subtitle="הגדרת יעדי תקציב ומעקב · ההוצאה מצטברת על כל תקופת הנתונים" icon={Target} />
+
+      {/* ─── Load error: never present missing spend data as zeros ─── */}
+      {loadError && (
+        <Card className="glass-card" padding="md" >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle size={16} style={{ color: 'var(--danger, #ef4444)' }} />
+              <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+                שגיאה בטעינת נתוני ההוצאות - הנתונים המוצגים להלן אינם מלאים
+              </span>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setReloadToken((t) => t + 1)}>
+              נסה שוב
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* ─── Overall Budget Health ────────────────────────────────── */}
-      {goals.length > 0 && (
+      {goals.length > 0 && !loadError && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -293,13 +390,15 @@ export default function Budget() {
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    background: budgetSummary.utilization > 90 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                    background: loadError ? 'rgba(100, 116, 139, 0.12)' : budgetSummary.utilization > 90 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  {budgetSummary.utilization > 90 ? (
+                  {loadError ? (
+                    <AlertTriangle size={20} style={{ color: 'var(--text-muted)' }} />
+                  ) : budgetSummary.utilization > 90 ? (
                     <TrendingUp size={20} style={{ color: '#ef4444' }} />
                   ) : (
                     <TrendingDown size={20} style={{ color: '#10b981' }} />
@@ -308,7 +407,7 @@ export default function Budget() {
                 <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>ניצול תקציב</span>
               </div>
               <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {formatPercent(Math.min(budgetSummary.utilization, 999))}
+                {loadError ? '—' : formatPercent(Math.min(budgetSummary.utilization, 999))}
               </span>
             </Card>
           </motion.div>
@@ -321,22 +420,27 @@ export default function Budget() {
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    background: budgetSummary.remaining >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                    background: loadError ? 'rgba(100, 116, 139, 0.12)' : budgetSummary.remaining >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  {budgetSummary.remaining >= 0 ? (
+                  {loadError ? (
+                    <AlertTriangle size={20} style={{ color: 'var(--text-muted)' }} />
+                  ) : budgetSummary.remaining >= 0 ? (
                     <CheckCircle size={20} style={{ color: '#10b981' }} />
                   ) : (
                     <AlertTriangle size={20} style={{ color: '#ef4444' }} />
                   )}
                 </div>
                 <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  {budgetSummary.remaining >= 0 ? 'נותר' : 'חריגה'}
+                  {loadError ? 'לא זמין' : budgetSummary.remaining >= 0 ? 'נותר' : 'חריגה'}
                 </span>
               </div>
+              {loadError ? (
+                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>—</span>
+              ) : (
               <AnimatedNumber
                 value={Math.abs(budgetSummary.remaining)}
                 formatter={formatCurrency}
@@ -346,6 +450,7 @@ export default function Budget() {
                   color: budgetSummary.remaining >= 0 ? 'var(--success)' : 'var(--accent-danger, #ef4444)',
                 }}
               />
+              )}
             </Card>
           </motion.div>
         </div>
@@ -367,6 +472,18 @@ export default function Budget() {
           הוסף יעד
         </Button>
       </div>
+
+      {/* ─── Save failure: state was NOT persisted, say so ─── */}
+      {saveError && (
+        <Card className="glass-card" padding="md">
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={16} style={{ color: 'var(--danger, #ef4444)' }} />
+            <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem' }}>
+              שגיאה בשמירת יעד התקציב - השינוי לא נשמר, בדקו שהאחסון במכשיר זמין
+            </span>
+          </div>
+        </Card>
+      )}
 
       {/* ─── Add Goal Form ─────────────────────────────────────────── */}
       {showForm && (
@@ -416,7 +533,7 @@ export default function Budget() {
                 />
               </div>
 
-              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit || Number(newLimit) <= 0}>
+              <Button variant="primary" size="sm" onClick={addGoal} disabled={!newCategory || !newLimit || Number(newLimit) <= 0 || Number(newLimit) > 10_000_000}>
                 הוסף
               </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
@@ -489,12 +606,13 @@ export default function Budget() {
                   {/* Radial Progress + Stats */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
                     <RadialProgress
-                      value={Math.min(100, (spent / goal.limit) * 100)}
+                      value={loadError ? 0 : Math.min(100, (spent / goal.limit) * 100)}
+                      showValue={!loadError}
                       size={80}
                       color={
-                        pct > 90
+                        isOver
                           ? 'var(--danger)'
-                          : pct > 70
+                          : isWarning
                           ? 'var(--warning)'
                           : 'var(--success)'
                       }
@@ -509,7 +627,7 @@ export default function Budget() {
                             color: isOver ? 'var(--accent-danger, #ef4444)' : 'var(--text-primary)',
                           }}
                         >
-                          {formatCurrency(spent)}
+                          {loadError ? '—' : formatCurrency(spent)}
                         </span>
                       </div>
                       <div>
@@ -523,7 +641,11 @@ export default function Budget() {
 
                   {/* Status badge */}
                   <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isOver ? (
+                    {loadError ? (
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        אין נתוני הוצאות לחישוב
+                      </span>
+                    ) : isOver ? (
                       <>
                         <AlertTriangle size={14} style={{ color: '#ef4444' }} />
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#ef4444' }}>
