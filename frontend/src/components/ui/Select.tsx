@@ -111,12 +111,19 @@ export default function Select({
     updatePosition()
     const selectedIndex = filtered.findIndex((opt) => opt.value === value)
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0)
-    if (searchable) searchRef.current?.focus({ preventScroll: true })
+    // The menu's first frame is offscreen and visibility:hidden, and browsers
+    // ignore focus() on a hidden element, so the search input only becomes
+    // focusable after the positioned frame commits. Defer to rAF - React
+    // flushes the position state synchronously before the next paint.
+    const focusRaf = searchable
+      ? requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }))
+      : null
     const reposition = () => updatePosition()
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
     window.visualViewport?.addEventListener('resize', reposition)
     return () => {
+      if (focusRaf !== null) cancelAnimationFrame(focusRaf)
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
       window.visualViewport?.removeEventListener('resize', reposition)

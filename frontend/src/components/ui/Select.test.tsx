@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Select from './Select'
 
@@ -104,7 +104,9 @@ describe('Select', () => {
     render(<Harness many />)
     await user.click(screen.getByRole('combobox', { name: 'מקור' }))
     const search = screen.getByRole('combobox', { name: 'חיפוש בתוך מקור' })
-    expect(search).toHaveFocus()
+    // Focus lands on the next animation frame: the menu's first frame is
+    // offscreen/hidden and browsers refuse to focus a hidden element.
+    await waitFor(() => expect(search).toHaveFocus())
     expect(screen.getAllByRole('option')).toHaveLength(20)
     await user.type(search, 'שם ארוך')
     expect(screen.getAllByRole('option')).toHaveLength(1)
