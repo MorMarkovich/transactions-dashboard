@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Receipt, Hash, DollarSign, Calculator, TrendingDown, TrendingUp, ArrowDownRight, ArrowUpRight, BarChart3 } from 'lucide-react'
 import TransactionsTable from '../components/table/TransactionsTable'
@@ -184,10 +184,28 @@ export default function Transactions() {
     return () => controller.abort()
   }, [sessionId])
 
+  // Skip the first run: on mount the restored view (saved page + filters)
+  // must survive; only an actual category CHANGE resets the page.
+  const categoryFirstRun = useRef(true)
   useEffect(() => {
+    if (categoryFirstRun.current) {
+      categoryFirstRun.current = false
+      return
+    }
     setFilters((previous) => ({ ...previous, category: category || undefined }))
     setPage(1)
   }, [category])
+
+  // A subcategory change shrinks the result set; without a reset a high page
+  // slices past the end and renders an empty table with an impossible pager.
+  const subcategoriesFirstRun = useRef(true)
+  useEffect(() => {
+    if (subcategoriesFirstRun.current) {
+      subcategoriesFirstRun.current = false
+      return
+    }
+    setPage(1)
+  }, [subcategories])
 
   // ---- Effect 2: fetch transactions on sessionId, filters, page change ----
   useEffect(() => {
@@ -255,6 +273,13 @@ export default function Transactions() {
     totalIncome,
     medianTransaction,
   }), [total, serverTotalAmount, serverAvg, expenseCount, incomeCount, totalExpenses, totalIncome, medianTransaction])
+
+  // Clamp when the filtered total shrinks below the current page (data edited
+  // between page turns, filters arriving from another screen, ...).
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  useEffect(() => {
+    if (total > 0 && page > totalPages) setPage(totalPages)
+  }, [total, totalPages, page])
 
   // ---- Handlers -----------------------------------------------------------
 
@@ -552,7 +577,7 @@ export default function Transactions() {
         <TransactionsTable
           transactions={transactions}
           total={total}
-          page={page}
+          page={total > 0 ? Math.min(page, totalPages) : page}
           pageSize={pageSize}
           onPageChange={handlePageChange}
           onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}

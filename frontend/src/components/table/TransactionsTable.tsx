@@ -311,6 +311,7 @@ export default function TransactionsTable({
           onClick={() => handleSort('תאריך')}
         >
           תאריך
+          {sortField === 'תאריך' ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
         </Button>
         <Button
           variant={sortField === 'סכום' ? 'primary' : 'secondary'}
@@ -319,6 +320,7 @@ export default function TransactionsTable({
           onClick={() => handleSort('סכום')}
         >
           סכום
+          {sortField === 'סכום' ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
         </Button>
         <Button
           variant={sortField === 'קטגוריה' ? 'primary' : 'secondary'}
@@ -327,6 +329,7 @@ export default function TransactionsTable({
           onClick={() => handleSort('קטגוריה')}
         >
           קטגוריה
+          {sortField === 'קטגוריה' ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''}
         </Button>
       </div>
 
