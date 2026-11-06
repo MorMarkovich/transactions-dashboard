@@ -99,6 +99,11 @@ export default function AdvancedFilters({
 
   const [rangeNote, setRangeNote] = useState('')
   const handleApply = () => {
+    const invalidAmount = [minAmount, maxAmount].some((v) => v !== '' && (Number.isNaN(Number(v)) || Number(v) < 0))
+    if (invalidAmount) {
+      setRangeNote('נא להזין סכומים חיוביים תקינים')
+      return
+    }
     const notes: string[] = []
     let mn = minAmount, mx = maxAmount, sd = startDate, ed = endDate
     if (mn !== '' && mx !== '' && Number(mn) > Number(mx)) {

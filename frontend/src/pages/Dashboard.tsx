@@ -417,7 +417,7 @@ export default function Dashboard() {
       items.push({ id: 'forecast-up', type: 'insight', title: 'תחזית הוצאות', message: 'מגמת עלייה בהוצאות', time: now, read: false })
     }
     if (metrics.total_income > 0 && Math.abs(metrics.total_expenses) > metrics.total_income) {
-      items.push({ id: 'expenses-exceed-income', type: 'insight', title: 'הוצאות עולות על הכנסות', message: `הוצאות: ${Math.abs(metrics.total_expenses).toLocaleString('he-IL')} > הכנסות: ${metrics.total_income.toLocaleString('he-IL')}`, time: now, read: false })
+      items.push({ id: 'expenses-exceed-income', type: 'insight', title: 'הוצאות עולות על הכנסות', message: `הוצאות ${formatCurrency(Math.abs(metrics.total_expenses))} גבוהות מהכנסות ${formatCurrency(metrics.total_income)}`, time: now, read: false })
     }
     setNotifications(items)
   }, [metrics, anomalies, forecast, setNotifications])
