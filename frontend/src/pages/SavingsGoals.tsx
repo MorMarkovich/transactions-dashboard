@@ -105,8 +105,10 @@ export default function SavingsGoals() {
     setGoals(loadGoals(ownerId, sessionId))
   }
   const [showForm, setShowForm] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [addFundsId, setAddFundsId] = useState<string | null>(null)
   const [addFundsAmount, setAddFundsAmount] = useState('')
+  const [fundsError, setFundsError] = useState('')
 
   // New goal form state
   const [newName, setNewName] = useState('')
@@ -167,12 +169,20 @@ export default function SavingsGoals() {
   const handleAddFunds = useCallback(
     (id: string) => {
       const amount = Number(addFundsAmount)
-      if (!amount || amount <= 0) return
-
+      if (!addFundsAmount.trim() || !Number.isFinite(amount) || amount <= 0) {
+        setFundsError('נא להזין סכום חיובי')
+        return
+      }
+      const goal = goals.find((g) => g.id === id)
+      if (!goal) return
+      const remaining = goal.target_amount - goal.current_amount
+      if (amount > remaining) {
+        setFundsError(`נשארו רק ${formatCurrency(remaining)} ליעד - הסכום לא נוסף`)
+        return
+      }
+      setFundsError('')
       const updated = goals.map((g) =>
-        g.id === id
-          ? { ...g, current_amount: Math.min(g.current_amount + amount, g.target_amount) }
-          : g,
+        g.id === id ? { ...g, current_amount: g.current_amount + amount } : g,
       )
       setGoals(updated)
       saveGoals(updated, ownerId)
@@ -609,22 +619,44 @@ export default function SavingsGoals() {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => removeGoal(goal.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          color: 'var(--text-muted)',
-                          borderRadius: '6px',
-                          transition: 'color 0.15s',
-                          flexShrink: 0,
-                        }}
-                        title="מחק יעד"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {confirmDeleteId === goal.id ? (
+                        <span style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+                          <button
+                            onClick={() => { removeGoal(goal.id); setConfirmDeleteId(null) }}
+                            style={{ minWidth: 44, minHeight: 44, borderRadius: '8px', border: 'none', background: 'var(--accent-danger, #ef4444)', color: '#fff', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                          >
+                            למחוק?
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            style={{ minWidth: 44, minHeight: 44, borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.75rem' }}
+                          >
+                            ביטול
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(goal.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            minWidth: 44,
+                            minHeight: 44,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)',
+                            borderRadius: '6px',
+                            transition: 'color 0.15s',
+                            flexShrink: 0,
+                          }}
+                          title="מחק יעד"
+                          aria-label={`מחק את היעד ${goal.name}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
 
                     {/* Radial Progress */}
@@ -703,6 +735,7 @@ export default function SavingsGoals() {
                     {!isComplete && (
                       <>
                         {addFundsId === goal.id ? (
+                          <div>
                           <div
                             style={{
                               display: 'flex',
@@ -743,8 +776,8 @@ export default function SavingsGoals() {
                             <button
                               onClick={() => handleAddFunds(goal.id)}
                               style={{
-                                width: 34,
-                                height: 34,
+                                width: 44,
+                                height: 44,
                                 borderRadius: '8px',
                                 border: 'none',
                                 background: 'var(--success)',
@@ -763,10 +796,11 @@ export default function SavingsGoals() {
                               onClick={() => {
                                 setAddFundsId(null)
                                 setAddFundsAmount('')
+                                setFundsError('')
                               }}
                               style={{
-                                width: 34,
-                                height: 34,
+                                width: 44,
+                                height: 44,
                                 borderRadius: '8px',
                                 border: '1px solid var(--border)',
                                 background: 'transparent',
@@ -782,6 +816,12 @@ export default function SavingsGoals() {
                               <X size={14} />
                             </button>
                           </div>
+                          {fundsError && (
+                            <div role="alert" style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--accent-danger, #ef4444)', fontWeight: 500 }}>
+                              {fundsError}
+                            </div>
+                          )}
+                          </div>
                         ) : (
                           <Button
                             variant="secondary"
@@ -791,6 +831,7 @@ export default function SavingsGoals() {
                             onClick={() => {
                               setAddFundsId(goal.id)
                               setAddFundsAmount('')
+                              setFundsError('')
                             }}
                           >
                             הוסף כסף
