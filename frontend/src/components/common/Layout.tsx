@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import { useModalFocus } from '../../hooks/useModalFocus'
 import Sidebar from './Sidebar'
-import { getSampleSessionId } from '../../lib/sampleMode'
+import { getSampleSessionId, clearSampleSession } from '../../lib/sampleMode'
 import CommandPalette from './CommandPalette'
 import { LayoutDashboard, Receipt, CalendarRange, Menu, X } from 'lucide-react'
 import Skeleton from '../ui/Skeleton'
@@ -192,7 +192,12 @@ export default function Layout({ children }: LayoutProps) {
   const { category: activeCategory, subcategories: activeSubs, clearFilters } = useDashboardFilters()
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const hasTriedRestore = useRef(false)
+  // Per-user: a second account signing in must get its own restore pass.
+  const hasTriedRestore = useRef<string | null>(null)
+  // Incremented once per restore RUN. A same-user effect re-run (new user
+  // object identity from a second auth event, searchParams/navigate churn)
+  // does not start a new run, so the in-flight run stays authoritative.
+  const restoreRunGen = useRef(0)
   // Background-AI progress pill: null = hidden.
   const [aiStatus, setAiStatus] = useState<{ label: string; done?: boolean } | null>(null)
   const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -228,19 +233,28 @@ export default function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const urlSession = searchParams.get('session_id')
     if (urlSession && !urlSession.includes('::') && urlSession !== getSampleSessionId()) localStorage.setItem(lastSessionKey, urlSession)
-    if (!user || hasTriedRestore.current) return
-    hasTriedRestore.current = true
+    if (!user || hasTriedRestore.current === user.id) return
+    hasTriedRestore.current = user.id
+    // Late completions of a PREVIOUS account's async restore must not touch
+    // this account's URL, state, or storage. Staleness is run-based, not
+    // cleanup-based: a same-user dependency re-run returns early above without
+    // bumping the generation, so the in-flight run still gets to finish and
+    // clear `sessionValidating` — an empty account's fast chain would
+    // otherwise be orphaned by its own re-run and the page would validate
+    // forever.
+    const run = ++restoreRunGen.current
+    const stale = () => restoreRunGen.current !== run
     // A link without ?session_id (bookmark, address bar) reuses the last
     // session rather than rebuilding one from the database every time.
     const rememberedSession = urlSession ? null : localStorage.getItem(lastSessionKey)
     const sessionId = urlSession || rememberedSession
 
-    const doRestore = (attempt = 0) => {
+    const doRestore = (attempt = 0): Promise<void> => {
       const snapshotAtPromise = supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
       // Load saved transactions AND user-defined category rules in parallel,
       // then pass both to /restore-session so the rules are applied during
       // re-categorization.
-      Promise.all([
+      return Promise.all([
         supabaseApi.getLatestTransactions(user.id),
         supabaseApi.getCategoryRules(user.id),
         supabaseApi.getTransactionOverrides(user.id).catch(() => []),
@@ -248,7 +262,25 @@ export default function Layout({ children }: LayoutProps) {
         supabaseApi.getTransactionNotes(user.id).catch(() => []),
       ])
         .then(([transactions, rules, overrides, customCats, notes]) => {
-          if (!transactions || transactions.length === 0) return
+          if (stale()) return
+          if (!transactions || transactions.length === 0) {
+            // Nothing saved to rebuild from. If the URL still carries the
+            // dead session id (a sample session wiped by a backend restart,
+            // or a stale bookmark), every page would keep 404ing on it with
+            // no way out — drop only that param (other params and the hash
+            // stay) so the user lands on the empty state. The `stale` guard
+            // above already keeps a superseded restore (account switch) from
+            // ever reaching this.
+            if (urlSession) {
+              // Clear the marker only when the dead id IS the sample.
+              if (urlSession === getSampleSessionId()) clearSampleSession()
+              const next = new URLSearchParams(location.search)
+              next.delete('session_id')
+              const qs = next.toString()
+              navigate(`${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`, { replace: true })
+            }
+            return
+          }
           // Translate old names in memory without changing rule provenance.
           const effectiveRules = rules.map((r) => migrateRule(r) ?? r)
           const customNames = customCats.map((c) => c.name)
@@ -257,9 +289,12 @@ export default function Layout({ children }: LayoutProps) {
           return transactionsApi.restoreSession(transactions, validRules, overrides, customNames, notes)
         })
         .then(response => {
+          if (stale()) return
           if (response?.success && response.session_id) {
             snapshotAtPromise.then((at) => {
-              if (at) { localStorage.setItem(snapshotSeenKey, at); setSnapshotAt(at) }
+              // The scoped key records a fact about this account's device
+              // state and stays correct after a switch; the setState does not.
+              if (at) { localStorage.setItem(snapshotSeenKey, at); if (!stale()) setSnapshotAt(at) }
             })
             // Preserve current page path when restoring session
             const currentPath = window.location.pathname
@@ -271,36 +306,39 @@ export default function Layout({ children }: LayoutProps) {
             if (AUTO_AI_ENABLED) runAiChain(response.session_id, user.id)
           }
         })
-        .catch(async (err: unknown) => {
+        .catch((err: unknown): void | Promise<void> => {
           // Rate-limited restore: wait out Retry-After once instead of
-          // leaving the user on an empty account screen.
+          // leaving the user on an empty account screen. The retry is
+          // returned so the finally below holds the validating state (and
+          // its skeleton) until the retry actually completes — the empty
+          // upload/onboarding screen must not flash open while data is
+          // still coming.
           const res = (err as { response?: { status?: number; headers?: Record<string, string> } })?.response
           if (res?.status === 429 && attempt < 1) {
             const wait = Math.min(20, Math.max(2, Number(res.headers?.['retry-after']) || 5))
-            await new Promise((r) => setTimeout(r, wait * 1000))
-            doRestore(attempt + 1)
-            return
+            return new Promise<void>((r) => setTimeout(r, wait * 1000))
+              .then(() => (stale() ? undefined : doRestore(attempt + 1)))
           }
-          setRestoreFailed(true)
+          if (!stale()) setRestoreFailed(true)
         })
-        .finally(() => setSessionValidating(false))
+        .finally(() => { if (!stale()) setSessionValidating(false) })
     }
 
     if (!sessionId) {
       setSessionValidating(true)
       doRestore()
-      return
-    }
-
+    } else {
     // Session ID is in URL — verify it still exists in the backend.
     // After a backend restart all in-memory sessions are wiped, so a stale
     // session_id causes 404s across the whole app.
     setSessionValidating(true)
     transactionsApi.getMetrics(sessionId)
       .then(async () => {
+        if (stale()) return
         // Session is valid, but another device (or a bank refresh) may have saved
         // newer data since this one was built.
         const latest = await supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
+        if (stale()) return
         if (isNewer(latest, localStorage.getItem(snapshotSeenKey))) {
           doRestore()
           return
@@ -312,12 +350,14 @@ export default function Layout({ children }: LayoutProps) {
         setSessionValidating(false)
       })
       .catch(err => {
+        if (stale()) return
         if ((err as { response?: { status?: number } }).response?.status === 404) {
           doRestore()
         } else {
           setSessionValidating(false)
         }
       })
+    }
   // runAiChain is intentionally stable (empty useCallback dependency list)
   // and is declared below this restore effect for readability.
   // eslint-disable-next-line react-hooks/exhaustive-deps
