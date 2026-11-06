@@ -12,6 +12,14 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('../lib/AuthContext', async () => {
+  const { createContext } = await import('react')
+  return {
+    useAuth: () => ({ user: { id: 'u1', email: 'qa@example.com' }, session: null }),
+    AuthContext: createContext({ user: { id: 'u1', email: 'qa@example.com' } }),
+  }
+})
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
 import Transactions from './Transactions'
 import { FilterProvider, useDashboardFilters } from '../context/FilterContext'
 
@@ -138,7 +146,8 @@ describe('Transactions pagination state (domain24 audit)', () => {
 })
 
   it('D - arriving with a saved page beyond the shrunk filtered total clamps to the last valid page', async () => {
-    localStorage.setItem('transactions-dashboard:filters:v1', JSON.stringify({ category: 'מזון וצריכה', subcategories: ['סופר גדול'] }))
+    // D29 v4: filters persist under the per-user scoped key; the mocked user is u1.
+    localStorage.setItem('transactions-dashboard:filters:v1:u1', JSON.stringify({ category: 'מזון וצריכה', subcategories: ['סופר גדול'] }))
     sessionStorage.setItem('tx-view:v1:test', JSON.stringify({ page: 3, filters: { category: 'מזון וצריכה' }, chip: 'all' }))
     renderPage()
     await screen.findByText('עמוד 1 מתוך 1')
