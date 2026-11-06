@@ -521,10 +521,12 @@ export default function Dashboard() {
         setDonutData(results[1] as RawDonutData)
         setMonthlyData(results[2] as RawMonthlyData)
         setWeekdayData(results[3] as RawWeekdayData)
-        if (results[4]) setWeeklySummary(results[4] as WeeklySummaryData)
-        if (results[5]) setForecast(results[5] as ForecastData)
-        if (results[6]) setVelocity(results[6] as SpendingVelocityData)
-        if (results[7]) setAnomalies((results[7] as { anomalies: AnomalyItem[] }).anomalies ?? [])
+        // A failed auxiliary endpoint must CLEAR its card, not keep the
+        // previous filter's values on screen (mirrors incomeSources below).
+        setWeeklySummary((results[4] as WeeklySummaryData | null) ?? null)
+        setForecast((results[5] as ForecastData | null) ?? null)
+        setVelocity((results[6] as SpendingVelocityData | null) ?? null)
+        setAnomalies((results[7] as { anomalies: AnomalyItem[] } | null)?.anomalies ?? [])
         setIncomeSources((results[8] as IncomeSourcesData) ?? null)
 
         recoveryAttempts.current = 0 // healthy load — allow future recovery

@@ -81,6 +81,24 @@ function withSignal(p: Promise<AxiosResponse>, config: InternalAxiosRequestConfi
   });
 }
 
+// The response cache and the in-flight dedup must be scoped to the caller's
+// identity, not just to "logged in". Two users sharing one browser (logout ->
+// login) share every URL; the token itself is the partition key so one user's
+// cached or still-in-flight response can never be served to the other. Keys
+// live only in these in-memory Maps - they are never logged or persisted -
+// and expired entries are swept on every cache write.
+function authCacheKey(config: InternalAxiosRequestConfig): string {
+  const header = config.headers?.Authorization;
+  return typeof header === 'string' && header ? `a|${header}` : 'n';
+}
+
+function sweepExpired() {
+  const now = Date.now();
+  for (const [k, v] of responseCache) {
+    if (now - v.at >= CACHE_TTL_MS) responseCache.delete(k);
+  }
+}
+
 const cachingAdapter = async (config: InternalAxiosRequestConfig): Promise<AxiosResponse> => {
   const method = (config.method || 'get').toLowerCase();
   const url = config.url || '';
@@ -95,7 +113,7 @@ const cachingAdapter = async (config: InternalAxiosRequestConfig): Promise<Axios
   }
   if (NO_CACHE.some((u) => url.includes(u))) return networkAdapter(config);
 
-  const key = `${config.headers?.Authorization ? 'a' : 'n'}|${axios.getUri(config)}`;
+  const key = `${authCacheKey(config)}|${axios.getUri(config)}`;
   const hit = responseCache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
     return { ...hit.res, config, headers: hit.res.headers };
@@ -105,7 +123,10 @@ const cachingAdapter = async (config: InternalAxiosRequestConfig): Promise<Axios
     const generation = cacheGeneration;
     // The shared request must not die with one caller's AbortSignal.
     pending = networkAdapter({ ...config, signal: undefined } as InternalAxiosRequestConfig).then((res) => {
-      if (generation === cacheGeneration) responseCache.set(key, { at: Date.now(), res });
+      if (generation === cacheGeneration) {
+        sweepExpired();
+        responseCache.set(key, { at: Date.now(), res });
+      }
       return res;
     }).finally(() => {
       if (inflight.get(key) === pending) inflight.delete(key);

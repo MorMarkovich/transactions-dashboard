@@ -1,5 +1,5 @@
 // Regression tests for R11 (date chips off-by-one) and R12 (chip dates lost).
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -28,6 +28,11 @@ describe('toISODate (R11)', () => {
 
 // --- R12: AdvancedFilters must keep parent-driven (chip) dates on emit ---
 import AdvancedFilters from '../components/table/AdvancedFilters'
+
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
+vi.mock('../services/supabaseApi', () => ({
+  supabaseApi: new Proxy({}, { get: () => vi.fn().mockResolvedValue([]) }),
+}))
 
 function Harness({ onEmit }: { onEmit: (f: Record<string, unknown>) => void }) {
   // Mimics the Transactions page: a date chip sets dates outside the child,

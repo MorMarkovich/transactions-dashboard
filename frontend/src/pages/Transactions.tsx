@@ -218,17 +218,17 @@ export default function Transactions() {
       setLoading(true)
 
       try {
-      const scopedId = await transactionsApi.scopeSession(sessionId, null, controller.signal, category, subcategories)
-      const apiFilters: TransactionFilters = {
-        page,
-        page_size: pageSize,
-        search: filters.search,
-        category: category || filters.category,
-        start_date: filters.startDate,
-        end_date: filters.endDate,
-        min_amount: filters.minAmount,
-        max_amount: filters.maxAmount,
-      }
+        const scopedId = await transactionsApi.scopeSession(sessionId, null, controller.signal, category, subcategories)
+        const apiFilters: TransactionFilters = {
+          page,
+          page_size: pageSize,
+          search: filters.search,
+          category: category || filters.category,
+          start_date: filters.startDate,
+          end_date: filters.endDate,
+          min_amount: filters.minAmount,
+          max_amount: filters.maxAmount,
+        }
 
         const response = await transactionsApi.getTransactions(
           scopedId,

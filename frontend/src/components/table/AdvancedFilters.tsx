@@ -69,6 +69,22 @@ export default function AdvancedFilters({
   const [maxAmount, setMaxAmount] = useState(initial?.maxAmount != null ? String(initial.maxAmount) : '')
   const [expanded, setExpanded] = useState(false)
   const firstRun = useRef(true)
+
+  // Keep local state in sync when the parent drives new filter values
+  // (e.g. date chips set startDate/endDate outside this component).
+  // Without this, the next debounced search emit would overwrite the
+  // parent's filters with the stale empty local dates. Setting identical
+  // values is a React no-op, so normal typing/apply flows don't echo.
+  const initialKey = JSON.stringify(initial ?? {})
+  useEffect(() => {
+    setSearch(initial?.search ?? '')
+    setCategory(initial?.category ?? '')
+    setStartDate(initial?.startDate ?? '')
+    setEndDate(initial?.endDate ?? '')
+    setMinAmount(initial?.minAmount != null ? String(initial.minAmount) : '')
+    setMaxAmount(initial?.maxAmount != null ? String(initial.maxAmount) : '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialKey])
   const [presets, setPresets] = useState<SavedPreset[]>([])
   const [presetName, setPresetName] = useState('')
   const auth = useContext(AuthContext)
