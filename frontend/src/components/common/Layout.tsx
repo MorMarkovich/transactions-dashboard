@@ -7,7 +7,7 @@ import { useModalFocus } from '../../hooks/useModalFocus'
 import Sidebar from './Sidebar'
 import { getSampleSessionId } from '../../lib/sampleMode'
 import CommandPalette from './CommandPalette'
-import { LayoutDashboard, Receipt, CalendarRange, Menu } from 'lucide-react'
+import { LayoutDashboard, Receipt, CalendarRange, Menu, X } from 'lucide-react'
 import Skeleton from '../ui/Skeleton'
 import { useAuth } from '../../lib/AuthContext'
 import { scoped, LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
@@ -534,7 +534,7 @@ export default function Layout({ children }: LayoutProps) {
       />
       <nav className="mobile-bottom-nav" aria-label="ניווט מהיר">
         {[{to:'/',text:'סקירה',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}
-        <button onClick={toggleSidebar}><Menu size={20}/><span>תפריט</span></button>
+        <button onClick={toggleSidebar} aria-label={sidebarOpen ? 'סגור תפריט' : 'פתח תפריט'} aria-expanded={sidebarOpen} aria-haspopup="dialog">{sidebarOpen ? <X size={20}/> : <Menu size={20}/>}<span>תפריט</span></button>
       </nav>
 
       {/* Background-AI progress pill — visible while the automatic

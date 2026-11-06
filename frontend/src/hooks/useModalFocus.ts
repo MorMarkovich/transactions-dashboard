@@ -14,8 +14,13 @@ export function useModalFocus(open: boolean, onClose?: () => void) {
     const background = Array.from(document.querySelectorAll<HTMLElement>('.orbit-topbar, .main-content, .mobile-bottom-nav'))
     const previous = background.map(el => el.inert)
     background.forEach(el => { el.inert = true })
+    // Lock scrolling on <html> as well as <body>: with any non-visible
+    // overflow-x on <html> the body's overflow never reaches the viewport,
+    // so a body-only lock lets the page scroll behind the drawer.
     const original = document.body.style.overflow
+    const originalHtml = document.documentElement.style.overflow
     document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
     const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')).filter(el => !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
     ;(focusable()[0] || drawer).focus()
     const trap = (event: KeyboardEvent) => {
@@ -37,6 +42,7 @@ export function useModalFocus(open: boolean, onClose?: () => void) {
       removeOverlay(overlayId)
       background.forEach((el, i) => { el.inert = previous[i] })
       document.body.style.overflow = original
+      document.documentElement.style.overflow = originalHtml
       if (opener?.isConnected) opener.focus()
     }
   }, [open, onClose])
