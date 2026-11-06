@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -138,6 +139,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   height,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const phantomGuardRef = usePhantomMouseOutGuard<HTMLDivElement>()
 
   if (!data.length) {
     return (
@@ -178,7 +180,7 @@ const MerchantChart: React.FC<MerchantChartProps> = React.memo(function Merchant
   const computedHeight = height ?? Math.max(200, data.length * 36 + 40)
 
   return (
-    <div dir="ltr"><ResponsiveContainer width="100%" height={computedHeight}>
+    <div dir="ltr" ref={phantomGuardRef} onTouchStart={bridgeTouchToMouseMove}><ResponsiveContainer width="100%" height={computedHeight}>
       <BarChart
         accessibilityLayer
         data={data}

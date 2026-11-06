@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -192,6 +193,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   color = 'var(--accent)',
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const phantomGuardRef = usePhantomMouseOutGuard<HTMLDivElement>()
 
   // True temporal axis: irregular dates must sit at their real time positions,
   // not equispaced categorical slots (which put tick labels under the wrong cursor).
@@ -208,7 +210,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
   }
 
   return (
-    <div dir="ltr"><ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
+    <div dir="ltr" ref={phantomGuardRef} onTouchStart={bridgeTouchToMouseMove}><ResponsiveContainer width="100%" height={isCompact ? Math.min(height, 240) : height}>
       <AreaChart
         accessibilityLayer
         data={hasValidTs ? timedData : data}

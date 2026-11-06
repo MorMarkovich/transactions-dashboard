@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
 import { niceCeil } from '../../utils/formatting'
+import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -106,6 +107,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   reversed = false,
 }) {
   const isCompact = useMediaQuery('(max-width: 640px)')
+  const phantomGuardRef = usePhantomMouseOutGuard<HTMLDivElement>()
 
   if (!data.length) {
     return (
@@ -120,7 +122,7 @@ const BarChart: React.FC<BarChartProps> = React.memo(function BarChart({
   const labelLimit = isCompact ? 9 : 14
 
   return (
-    <div dir="ltr"><ResponsiveContainer width="100%" height={chartHeight}>
+    <div dir="ltr" ref={phantomGuardRef} onTouchStart={bridgeTouchToMouseMove}><ResponsiveContainer width="100%" height={chartHeight}>
       <RechartsBarChart
         accessibilityLayer
         data={data}
