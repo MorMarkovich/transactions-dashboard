@@ -393,6 +393,16 @@ export default function DataManagement() {
           showToast('הקבצים הוסרו מהתצוגה, אבל המחיקה לא הושלמה. הנתונים עלולים לחזור לאחר כניסה מחדש — נסה שוב.', 'error')
         }
       } else {
+        // Persist the reduced set so the deletion survives the next restore.
+        // saveTransactions is insert-first: a failed save leaves the previous
+        // snapshot intact (no pre-delete here).
+        try {
+          const data = await transactionsApi.getTransactions(sessionId, { page: 1, page_size: 50000 })
+          if (user) await supabaseApi.saveTransactions(user.id, data.transactions as unknown[])
+        } catch (persistErr) {
+          console.error('Error persisting file deletion:', persistErr)
+          showToast('הקובץ הוסר מהתצוגה, אבל השמירה נכשלה. המחיקה עלולה לחזור לאחר כניסה מחדש.', 'error')
+        }
         await Promise.all([fetchSessionFiles(), fetchSessionInfo()])
       }
     } catch (err) {
@@ -400,7 +410,7 @@ export default function DataManagement() {
     } finally {
       setDeletingFile(null)
     }
-  }, [sessionId, fetchSessionFiles, fetchSessionInfo, navigate])
+  }, [sessionId, user, fetchSessionFiles, fetchSessionInfo, navigate, showToast])
 
   useEffect(() => {
     if (!user) {

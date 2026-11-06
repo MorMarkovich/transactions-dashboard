@@ -10,8 +10,11 @@ const deleteAllTransactions = vi.fn()
 const deleteSessionFile = vi.fn()
 const getTransactions = vi.fn()
 
+// Stable identity: a fresh object per render would retrigger the mount effect
+// on every render (effect deps include `user`), starving timers and hanging.
+const authUser = { id: 'user-f10' }
 vi.mock('../lib/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-f10' } }),
+  useAuth: () => ({ user: authUser }),
 }))
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../services/supabaseApi', () => ({
@@ -19,12 +22,14 @@ vi.mock('../services/supabaseApi', () => ({
     saveTransactions: (...a: unknown[]) => saveTransactions(...a),
     deleteAllTransactions: (...a: unknown[]) => deleteAllTransactions(...a),
     getManualIncomes: vi.fn().mockResolvedValue([]),
+    getIncomes: vi.fn().mockResolvedValue([]),
+    getStorageInfo: vi.fn().mockResolvedValue(null),
     getLatestSnapshotAt: vi.fn().mockResolvedValue(null),
   },
 }))
 vi.mock('../services/api', () => ({
   transactionsApi: {
-    getSessionInfo: vi.fn().mockResolvedValue({ transaction_count: 20 }),
+    getSessionInfo: vi.fn().mockResolvedValue({ transaction_count: 20, total_rows: 20, total_expenses: 300, total_income: 110, expense_count: 17, income_count: 3, date_from: '2026-01-01', date_to: '2026-02-28', has_billing_date: false, months: ['2026-01','2026-02'], columns: ['date','description','amount'], categories: [] }),
     getSessionFiles: vi.fn().mockResolvedValue({
       files: [
         { name: 'bank-a.xlsx', transaction_count: 10, expense_count: 8, income_count: 2, total_expenses: 100, total_income: 50, date_from: '2026-01-01', date_to: '2026-01-31' },
