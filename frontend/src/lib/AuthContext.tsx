@@ -24,7 +24,7 @@ export function authErrorMessage(error: { message?: string } | null): string | n
   const m = (error.message || '').toLowerCase()
   if (m.includes('not confirmed')) return 'יש לאשר את כתובת המייל (הקישור נשלח אליכם) לפני ההתחברות'
   if (m.includes('unable to validate email') || m.includes('invalid format') || m.includes('valid email')) return 'כתובת המייל אינה תקינה'
-  if (m.includes('rate limit') || m.includes('too many')) return 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות'
+  if (m.includes('rate limit') || m.includes('rate_limit') || m.includes('too many') || m.includes('for security purposes')) return 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות'
   if (m.includes('already')) return 'המייל כבר רשום'
   if (m.includes('invalid')) return 'מייל או סיסמה שגויים'
   if (m.includes('different from the old')) return 'הסיסמה החדשה חייבת להיות שונה מהנוכחית'

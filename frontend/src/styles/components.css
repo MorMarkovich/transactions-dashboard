@@ -531,3 +531,9 @@
     padding: 0 10px !important;
   }
 }
+
+/* Mobile: inputs must render at >=16px or iOS Safari auto-zooms on focus and
+   leaves the page zoomed. Inline size styles set 14px, hence !important. */
+@media (max-width: 767px) {
+  .ui-input { font-size: 16px !important; }
+}

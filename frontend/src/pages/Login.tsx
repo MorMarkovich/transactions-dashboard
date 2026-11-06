@@ -104,7 +104,8 @@ export default function Login() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name || !email || !password || !password2) {
+    const trimmedName = name.trim()
+    if (!trimmedName || !email || !password || !password2) {
       setError('\u05E0\u05D0 \u05DC\u05DE\u05DC\u05D0 \u05D0\u05EA \u05DB\u05DC \u05D4\u05E9\u05D3\u05D5\u05EA')
       return
     }
@@ -118,7 +119,7 @@ export default function Login() {
     }
     setLoading(true)
     setError('')
-    const { error: err, needsConfirmation } = await signUp(email, password, name)
+    const { error: err, needsConfirmation } = await signUp(email, password, trimmedName)
     if (err) {
       setError(err)
       setLoading(false)
@@ -322,7 +323,13 @@ export default function Login() {
                     type="button"
                     onClick={() => switchPage('reset')}
                     className="text-xs mt-2 block transition-colors"
-                    style={{ color: 'var(--accent-primary, #818cf8)' }}
+                    style={{
+                      color: 'var(--accent-primary, #818cf8)',
+                      minHeight: '44px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '0 4px',
+                    }}
                   >
                     {'\u05E9\u05DB\u05D7\u05EA\u05D9 \u05E1\u05D9\u05E1\u05DE\u05D4'}
                   </button>

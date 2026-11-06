@@ -36,3 +36,18 @@ describe('DeleteAccount safeguards', () => {
     expect(state.signOut).not.toHaveBeenCalled()
   })
 })
+
+describe('D30-hint: confirmation mismatch hint', () => {
+  it('shows a hint on non-empty mismatch and hides it on exact match', async () => {
+    render(<DeleteAccount />)
+    fireEvent.click(screen.getByRole('button', { name: /מחק את החשבון/ }))
+    const input = await screen.findByLabelText('אישור מחיקת חשבון')
+    expect(screen.queryByText('יש להקליד בדיוק: מחק את החשבון')).toBeNull()
+    fireEvent.change(input, { target: { value: 'מחק' } })
+    expect(await screen.findByText('יש להקליד בדיוק: מחק את החשבון')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'מחק לצמיתות' })).toHaveProperty('disabled', true)
+    fireEvent.change(input, { target: { value: 'מחק את החשבון' } })
+    expect(screen.queryByText('יש להקליד בדיוק: מחק את החשבון')).toBeNull()
+    expect(screen.getByRole('button', { name: 'מחק לצמיתות' })).toHaveProperty('disabled', false)
+  })
+})

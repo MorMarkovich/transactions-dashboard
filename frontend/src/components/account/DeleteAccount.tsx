@@ -63,6 +63,9 @@ export default function DeleteAccount() {
         <div>
           <p style={{ lineHeight: 1.7 }}>החשבון {user.email} וכל הנתונים שלו יימחקו לצמיתות. הפעולה אינה ניתנת לביטול.</p>
           <Input label={`להמשך, הקלידו: ${CONFIRM_TEXT}`} aria-label="אישור מחיקת חשבון" value={confirmation} onChange={e => setConfirmation(e.target.value)} disabled={busy} autoComplete="off" />
+          {confirmation.length > 0 && confirmation !== CONFIRM_TEXT && (
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>יש להקליד בדיוק: {CONFIRM_TEXT}</p>
+          )}
           {error && <p role="alert" style={{ color: 'var(--danger)', lineHeight: 1.7 }}>{error}</p>}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 20 }}>
             <Button variant="secondary" onClick={close} disabled={busy}>ביטול</Button>
