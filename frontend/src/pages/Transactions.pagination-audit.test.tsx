@@ -75,6 +75,7 @@ vi.mock('../components/table/TransactionDrawer', () => ({ default: () => null })
 import { transactionsApi } from '../services/api'
 const getTransactions = transactionsApi.getTransactions as unknown as ReturnType<typeof vi.fn>
 
+// eslint-disable-next-line react-hooks/globals -- audit harness: capture the live filter context from the rendered tree for assertions
 let ctx: { setCategory: (v: string) => void; setSubcategories: (v: string[]) => void }
 function Harness() {
   const c = useDashboardFilters()

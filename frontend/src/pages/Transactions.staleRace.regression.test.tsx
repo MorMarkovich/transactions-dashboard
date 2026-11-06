@@ -27,7 +27,7 @@ vi.mock('../services/api', () => ({
 }))
 const api = transactionsApi as unknown as { getTransactions: ReturnType<typeof vi.fn> }
 beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); localStorage.clear()
-  if (!window.matchMedia) { window.matchMedia = (q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as any } })
+  if (!window.matchMedia) { window.matchMedia = (q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as unknown as typeof window.matchMedia } })
 function lastCallFilters() { const c = api.getTransactions.mock.calls; return c[c.length - 1][1] as Record<string, unknown> }
 
 describe('stale debounce race', () => {

@@ -35,7 +35,7 @@ let consoleError: ReturnType<typeof vi.spyOn>
 beforeEach(() => {
   vi.clearAllMocks(); sessionStorage.clear(); localStorage.clear()
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-  if (!window.matchMedia) { window.matchMedia = (q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as any }
+  if (!window.matchMedia) { window.matchMedia = (q: string) => ({ matches: false, media: q, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false }) as unknown as typeof window.matchMedia }
 })
 afterEach(() => { consoleError.mockRestore() })
 

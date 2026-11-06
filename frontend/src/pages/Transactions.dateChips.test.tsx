@@ -1,4 +1,9 @@
 // Regression tests for R11 (date chips off-by-one) and R12 (chip dates lost).
+// The R11 expectations are Jerusalem-local by design (the app's market): the
+// 00:30 case only means "still today" when the process reads local time as
+// Asia/Jerusalem. Pin TZ for this file so the suite is runner-agnostic (CI
+// runs UTC). Vitest isolates files per worker, so this does not leak.
+process.env.TZ = 'Asia/Jerusalem'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { render, screen, waitFor } from '@testing-library/react'

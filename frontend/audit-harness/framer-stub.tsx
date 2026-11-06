@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- audit harness stub: the framer-motion proxy is intentionally untyped */
 import React from 'react'
 const STRIP = new Set(['initial','animate','exit','variants','custom','layout','layoutId','transition','whileHover','whileTap','whileFocus','whileInView','drag','dragConstraints','onAnimationComplete','mode'])
 function clean(props: Record<string, unknown>) {
