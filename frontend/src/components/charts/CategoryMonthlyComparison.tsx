@@ -166,7 +166,19 @@ export default function CategoryMonthlyComparison({
                   {m}
                 </th>
               ))}
-              <th style={{ padding: '10px 12px', color: 'var(--text-secondary)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              <th
+                className="cmc-sticky-end"
+                style={{
+                  position: 'sticky',
+                  insetInlineEnd: 0,
+                  zIndex: 2,
+                  background: 'var(--bg-elevated)',
+                  padding: '10px 12px',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 סה&quot;כ
               </th>
             </tr>
@@ -227,7 +239,18 @@ export default function CategoryMonthlyComparison({
                     </td>
                   )
                 })}
-                <td style={{ padding: '8px 12px', textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+                <td
+                  className="cmc-sticky-end"
+                  style={{
+                    position: 'sticky',
+                    insetInlineEnd: 0,
+                    zIndex: 1,
+                    background: 'var(--bg-card, var(--bg-elevated))',
+                    padding: '8px 12px',
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
                   {(() => {
                     const rowTotal = months.reduce((sum, m) => sum + (cat.months[m]?.amount ?? 0), 0)
                     const pctOfVisible = visibleGrandTotal > 0 ? (rowTotal / visibleGrandTotal) * 100 : 0
@@ -264,7 +287,20 @@ export default function CategoryMonthlyComparison({
                   {shekel(data.month_totals[m] ?? 0)}
                 </td>
               ))}
-              <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+              <td
+                className="cmc-sticky-end"
+                style={{
+                  position: 'sticky',
+                  insetInlineEnd: 0,
+                  zIndex: 1,
+                  background: 'var(--bg-elevated)',
+                  padding: '10px 12px',
+                  textAlign: 'center',
+                  fontWeight: 800,
+                  color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
                 {shekel(visibleGrandTotal)}
               </td>
             </tr>

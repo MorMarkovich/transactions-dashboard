@@ -1,4 +1,4 @@
-import { ltrIsolate } from '../../utils/formatting'
+import { ltrIsolate, formatCompactShekel } from '../../utils/formatting'
 import React from 'react'
 import {
   AreaChart,
@@ -36,12 +36,7 @@ interface PayloadEntry {
 const formatShekel = (v: number): string =>
   ltrIsolate(`${v < 0 ? '-' : ''}₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
 
-const formatAxisShekel = (v: number): string => {
-  const sign = v < 0 ? '-' : ''
-  const a = Math.abs(v)
-  if (a >= 1000) return ltrIsolate(`${sign}₪${(a / 1000).toFixed(a % 1000 === 0 ? 0 : 1)}K`)
-  return ltrIsolate(`${sign}₪${a}`)
-}
+const formatAxisShekel = formatCompactShekel
 
 /** Format a date label to DD/MM/YYYY for Hebrew locale display. */
 const formatDateLabel = (label: string): string => {
@@ -285,6 +280,7 @@ const LineChart: React.FC<LineChartProps> = React.memo(function LineChart({
           stroke={color}
           strokeWidth={2.5}
           fill={`url(#${GRADIENT_ID})`}
+          baseValue={0}
           dot={false}
           activeDot={<ActiveDot stroke={color} />}
           isAnimationActive={false}

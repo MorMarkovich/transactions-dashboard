@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
+import { niceCeil, formatCompactShekel } from '../../utils/formatting'
 import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
 
 /* ------------------------------------------------------------------ */
@@ -36,10 +37,7 @@ interface PayloadEntry {
 const formatShekel = (v: number): string =>
   `₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
-const formatAxisShekel = (v: number): string => {
-  if (v >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
-  return `₪${v}`
-}
+const formatAxisShekel = formatCompactShekel
 
 /* ------------------------------------------------------------------ */
 /*  Gradient definition                                                */

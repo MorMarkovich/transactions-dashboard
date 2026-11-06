@@ -33,6 +33,22 @@ export function formatCurrency(amount: number, explicitPlus = false): string {
 }
 
 /**
+ * Compact axis formatter: sign-aware and bidi-isolated, with K/M tiers
+ * (e.g. ₪950, ₪12.5K, ₪1.5M, -₪2M). Use for chart axes where space is tight;
+ * tooltips should use the full formatCurrency instead.
+ */
+export function formatCompactShekel(v: number): string {
+  if (!Number.isFinite(v)) return ltrIsolate('₪0')
+  const sign = v < 0 ? '-' : ''
+  const a = Math.abs(v)
+  // Number() drops the trailing '.0' and absorbs values that round up across
+  // the tier boundary (999,999 -> ₪1000K, not ₪1000.0K).
+  if (a >= 1_000_000) return ltrIsolate(`${sign}₪${Number((a / 1_000_000).toFixed(1))}M`)
+  if (a >= 1000) return ltrIsolate(`${sign}₪${Number((a / 1000).toFixed(1))}K`)
+  return ltrIsolate(`${sign}₪${a}`)
+}
+
+/**
  * Format a date string for Hebrew display as DD/MM/YYYY.
  * Accepts ISO strings (YYYY-MM-DD) and other Date-parseable formats.
  */

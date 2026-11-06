@@ -10,6 +10,7 @@ import {
 } from 'recharts'
 import useMediaQuery from '../../hooks/useMediaQuery'
 import { bridgeTouchToMouseMove, usePhantomMouseOutGuard } from './touchTooltipBridge'
+import { formatCompactShekel } from '../../utils/formatting'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -33,10 +34,7 @@ interface PayloadEntry {
 const formatShekel = (v: number): string =>
   `₪${Math.abs(v).toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
 
-const formatAxisShekel = (v: number): string => {
-  if (v >= 1000) return `₪${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`
-  return `₪${v}`
-}
+const formatAxisShekel = formatCompactShekel
 
 /* ------------------------------------------------------------------ */
 /*  Gradient                                                           */
@@ -125,6 +123,7 @@ function MerchantTick({ x, y, payload }: CustomTickProps) {
       fontSize={12}
       fontFamily="var(--font-family)" style={{unicodeBidi:'plaintext'}}
     >
+      <title>{payload.value}</title>
       {label}
     </text>
   )

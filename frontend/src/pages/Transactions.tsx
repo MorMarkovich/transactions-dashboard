@@ -542,7 +542,6 @@ export default function Transactions() {
 
       <AdvancedFilters
         initial={initialFilters}
-        value={filters}
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}
