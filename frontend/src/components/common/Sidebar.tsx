@@ -133,8 +133,10 @@ export default function Sidebar({
   // Save transactions to Supabase (fire and forget)
   const saveToSupabase = (transactions: unknown[]) => {
     if (!user || !transactions.length) return
-    supabaseApi.deleteAllTransactions(user.id)
-      .then(() => supabaseApi.saveTransactions(user.id, transactions))
+    // Insert-first only: NEVER pre-delete the durable snapshot. If the insert
+    // fails, the user's last good backup must survive (R10);
+    // saveTransactions prunes older snapshots itself once the new one is durable.
+    supabaseApi.saveTransactions(user.id, transactions)
       .then(() => supabaseApi.getLatestSnapshotAt(user.id))
       .then((at) => { if (at) localStorage.setItem(scoped(SNAPSHOT_SEEN_BASE, user.id), at) })
       .catch(e => console.error('Failed to save to Supabase:', e))
