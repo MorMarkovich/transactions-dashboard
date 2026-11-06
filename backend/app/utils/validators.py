@@ -27,82 +27,203 @@ def detect_header_row(df: pd.DataFrame) -> int:
     return 0
 
 
-def clean_amount(value) -> float:
-    """ניקוי ופרסור סכומים בצורה רובסטית"""
+def _strict_grouped_thousands(s_val: str, sep: str) -> Optional[float]:
+    """מפריד אלפים חוזר (1,234,567 / 1.234.567): כל קבוצה אחרי הראשונה בדיוק
+    3 ספרות, הראשונה 1-3. אחרת — לא תקין (None), לא ניחוש."""
+    parts = s_val.split(sep)
+    if len(parts) < 2:
+        return None
+    if not (1 <= len(parts[0]) <= 3) or not parts[0].isdigit():
+        return None
+    if any(len(part) != 3 or not part.isdigit() for part in parts[1:]):
+        return None
+    return float(''.join(parts))
+
+
+def _to_float(s_val: str) -> Optional[float]:
+    try:
+        return float(s_val)
+    except ValueError:
+        return None
+
+
+def clean_amount(value) -> Optional[float]:
+    """ניקוי ופרסור סכומים.
+
+    מוסכמת בטיחות פיננסית: ערך ריק/חסר מחזיר 0.0, אבל תוכן לא-ריק שלא ניתן
+    לפרסר בבירור לפי המוסכמות המאומתות (אלפים בקבוצות של 3, עשרוני ב-2 ספרות,
+    נקודה עשרונית בודדת) מחזיר None — "לא תקין" — ולא ניחוש שעלול להיות
+    פי 10/1000 מהערך האמיתי. השכבה מעל סופרת None כ-invalid_amount ומסמנת
+    ל-UI, במקום להפיל שורה בשקט או להמציא סכום.
+    """
     if pd.isna(value) or value == '':
         return 0.0
-        
+
     if isinstance(value, (int, float)):
         return float(value)
-        
+
     # המרה למחרוזת וניקוי תווים
     s_val = str(value).strip()
-    
+
+    # פורמט חשבונאי: סכום שלילי בסוגריים, לדוגמה (1,234.56)
+    paren_negative = s_val.startswith('(') and s_val.endswith(')')
+    if paren_negative:
+        s_val = s_val[1:-1].strip()
+
     # הסרת סימן שקל ורווחים
     s_val = s_val.replace('₪', '').replace('NIS', '').replace('nis', '').strip()
-    
+
     # טיפול בסימן מינוס (יכול להיות בהתחלה או בסוף, או תווי מינוס מיוחדים)
-    is_negative = '-' in s_val or '−' in s_val
+    is_negative = paren_negative or '-' in s_val or '−' in s_val
     s_val = s_val.replace('-', '').replace('−', '').strip()
-    
+
+    # מה נשאר אחרי מטבע/מינוס — תוכן לא-מספרי כאן עם בלי ספרות בהמשך = לא תקין
+    residual = s_val.strip()
+
     # הסרת כל התווים שאינם מספרים או נקודה/פסיק
     s_val = re.sub(r'[^\d.,]', '', s_val)
-    
+
     if not s_val:
-        return 0.0
-        
+        return None if residual else 0.0
+
     # טיפול בפורמטים שונים (1,000.00 או 1.000,00)
+    amount: Optional[float]
     if ',' in s_val and '.' in s_val:
         if s_val.rfind(',') > s_val.rfind('.'):
             # פורמט אירופאי: 1.000,00 -> 1000.00
-            s_val = s_val.replace('.', '').replace(',', '.')
+            amount = _to_float(s_val.replace('.', '').replace(',', '.'))
         else:
             # פורמט אמריקאי: 1,000.00 -> 1000.00
-            s_val = s_val.replace(',', '')
+            amount = _to_float(s_val.replace(',', ''))
     elif ',' in s_val:
-        # רק פסיקים - נניח שהם מפרידי אלפים אלא אם זה בסוף
-        # אבל אם יש רק פסיק אחד ו-2 ספרות אחריו, אולי זה עשרוני?
-        # ליתר ביטחון נחליף בנקודה רק אם זה נראה כמו עשרוני
-        if len(s_val.split(',')[-1]) == 2:
-             s_val = s_val.replace(',', '.')
+        parts = s_val.split(',')
+        tail = parts[-1]
+        if len(parts) == 2 and len(tail) == 2:
+            # עשרוני בפסיק, בדיוק 2 ספרות: 12,34 -> 12.34
+            amount = _to_float(s_val.replace(',', '.'))
+        elif len(parts) == 2 and len(tail) == 3 and 1 <= len(parts[0]) <= 3 and parts[0].isdigit():
+            # אלפים בודד: 1,234 -> 1234
+            amount = float(parts[0] + tail)
+        elif len(parts) > 2:
+            # אלפים חוזר: תקין רק בקבוצות של 3 (1,234,567); אחרת לא תקין
+            amount = _strict_grouped_thousands(s_val, ',')
         else:
-             s_val = s_val.replace(',', '')
-             
-    try:
-        amount = float(s_val)
-        return -amount if is_negative else amount
-    except ValueError:
-        return 0.0
+            # דו-משמעי: 0/1/4+ ספרות אחרי הפסיק (",5", "1,5", "1,2345") — לא מנחשים
+            amount = None
+    elif '.' in s_val:
+        if s_val.count('.') == 1:
+            amount = _to_float(s_val)
+        else:
+            # נקודות חוזרות: תקין רק כאלפים אירופיים בקבוצות של 3; "1.2.3" לא תקין
+            amount = _strict_grouped_thousands(s_val, '.')
+    else:
+        amount = _to_float(s_val)
+
+    if amount is None:
+        return None
+    return -amount if is_negative else amount
 
 
 def has_valid_amounts(df: pd.DataFrame, col: str) -> bool:
     if col not in df.columns:
         return False
     try:
-        values = df[col].apply(clean_amount)
-        return (values.abs().sum() > 0)
-    except:
+        values = pd.to_numeric(df[col].apply(clean_amount), errors='coerce')
+        return bool(values.abs().sum() > 0)
+    except Exception:
         return False
 
 
-def detect_amount_column(df: pd.DataFrame) -> Optional[str]:
+DEBIT_CREDIT_PAIRS = [('זכות', 'חובה'), ('סכום זכות', 'סכום חובה'), ('זכות ₪', 'חובה ₪')]
+
+
+_DATE_VALUE_RE = re.compile(r'^\s*\d{1,2}[/\.\-]\d{1,2}[/\.\-]\d{2,4}(\s+\d{1,2}:\d{2}(:\d{2})?)?\s*$')
+
+
+def _looks_like_date_column(df: pd.DataFrame, col) -> bool:
+    """True when the column's values are mostly dates — never an amount source."""
+    series = df[col]
+    if not isinstance(series, pd.Series):
+        return False
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return True
+    vals = series.dropna().astype(str).str.strip()
+    vals = vals[vals != '']
+    if vals.empty:
+        return False
+    return bool(vals.str.match(_DATE_VALUE_RE).mean() >= 0.5)
+
+
+def _looks_like_identifier_column(df: pd.DataFrame, col) -> bool:
+    """True when the column's values are mostly long digit runs (card numbers,
+    אסמכתא/reference ids) — never an amount source."""
+    series = df[col]
+    if not isinstance(series, pd.Series):
+        return False
+    vals = series.dropna().astype(str).str.strip().str.replace(r'[\s\-]', '', regex=True)
+    vals = vals[vals != '']
+    if vals.empty:
+        return False
+    return bool((vals.str.fullmatch(r'\d+') & (vals.str.len() >= 10)).mean() >= 0.5)
+
+
+def detect_amount_column(df: pd.DataFrame, exclude: Optional[str] = None) -> Optional[str]:
     preferred = ['סכום חיוב', 'סכום עסקה מקורי', 'סכום', '₪ זכות/חובה', 'אם זכות/חובה']
+    named_found = False
     for name in preferred:
         matches = [c for c in df.columns if str(c).strip() == name]
         for col in matches:
+            named_found = True
             if has_valid_amounts(df, col):
                 return col
 
     keywords = ['amount', 'sum', 'סכום', 'total', 'חיוב', 'זכות/חובה']
     for col in df.columns:
         col_lower = str(col).lower()
-        if any(k in col_lower for k in keywords) and has_valid_amounts(df, col):
-            return col
+        if any(k in col_lower for k in keywords):
+            named_found = True
+            if has_valid_amounts(df, col):
+                return col
 
+    # עמודת סכום בשם מוכר קיימת אבל כל ערכיה אפס/ריק (למשל ייצוא עסקאות
+    # ממתינות) — אין סכומים לקרוא. נכשל בבירור במקום לנחש עמודה לא קשורה
+    # (תאריך, מספר כרטיס, אסמכתא) כעמודת סכומים.
+    if named_found:
+        return None
+
+    # זוג עמודות זכות/חובה נפרדות הוא פורמט מוכר — אין לנחש עמודה אחרת;
+    # ה-caller מאחד אותן לעמודה חתומה דרך combine_debit_credit_columns.
+    col_names = {str(c).strip() for c in df.columns}
+    for credit_name, debit_name in DEBIT_CREDIT_PAIRS:
+        if credit_name in col_names and debit_name in col_names:
+            return None
+
+    # נפילה אחרונה: עמודה מספרית ללא שם מוכר — לעולם לא עמודת תאריך או מזהה.
     for col in df.columns:
+        if exclude is not None and str(col).strip() == str(exclude).strip():
+            continue
+        if _looks_like_date_column(df, col) or _looks_like_identifier_column(df, col):
+            continue
         if has_valid_amounts(df, col):
             return col
 
+    return None
+
+
+def combine_debit_credit_columns(df: pd.DataFrame) -> Optional[str]:
+    """דוחות בנק ישראלים מפצלים לעיתים סכומים לעמודות זכות (קרדיט) וחובה
+    (דביט) נפרדות. מאחד לעמודת '₪ זכות/חובה' חתומה (זכות חיובי, חובה שלילי)
+    כדי שחוזה הסימנים הקיים של דוח עו"ש יחול כמות שהוא — בלי ניחוש סימנים."""
+    cols = {str(c).strip(): c for c in df.columns}
+    for credit_name, debit_name in DEBIT_CREDIT_PAIRS:
+        if credit_name in cols and debit_name in cols:
+            credit = df[cols[credit_name]].apply(clean_amount)
+            debit = df[cols[debit_name]].apply(clean_amount)
+            combined = credit - debit
+            if combined.abs().sum() == 0:
+                return None
+            df['₪ זכות/חובה'] = combined
+            return '₪ זכות/חובה'
     return None
 
 

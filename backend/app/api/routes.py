@@ -3,6 +3,7 @@ API routes for transactions dashboard
 """
 import uuid
 import functools
+import re
 import os
 import math
 import logging
@@ -42,7 +43,7 @@ from ..services.chart_generator import (
     create_trend_chart
 )
 from ..services.export_service import export_to_excel
-from ..utils.validators import detect_amount_column, find_column
+from ..utils.validators import detect_amount_column, find_column, combine_debit_credit_columns
 from ..core.security import (
     authorize_api_request,
     bind_session,
@@ -187,11 +188,15 @@ async def upload_file(file: UploadFile = File(...)):
         
         # Load and process file (ensure file is closed before processing)
         df_raw = load_transaction_file(file_path)
-        df_clean = clean_dataframe(df_raw)
-        
+        stats: dict = {}
+        df_clean = clean_dataframe(df_raw, stats=stats)
+
         # Detect columns
         date_col = find_column(df_clean, ['תאריך עסקה', 'תאריך', 'date', 'Date'])
-        amount_col = detect_amount_column(df_clean)
+        amount_col = detect_amount_column(df_clean, exclude=date_col)
+        if amount_col is None:
+            # פורמט בנק מוכר: עמודות זכות/חובה נפרדות — מאחד לעמודה חתומה
+            amount_col = combine_debit_credit_columns(df_clean)
         desc_col = find_column(df_clean, ['שם בית העסק', 'שם בית עסק', 'תיאור', 'תיאור התנועה', 'description', 'merchant'])
         cat_col = find_column(df_clean, ['קטגוריה', 'category', 'Category'])
         billing_date_col = find_column(df_clean, ['תאריך חיוב', 'תאריך_חיוב', 'Billing Date', 'billing date', 'תאריך חיוב:', 'יום ערך'])
@@ -211,7 +216,7 @@ async def upload_file(file: UploadFile = File(...)):
             )
 
         # Process data
-        df = process_data(df_clean, date_col, amount_col, desc_col, cat_col, billing_date_col)
+        df = process_data(df_clean, date_col, amount_col, desc_col, cat_col, billing_date_col, stats=stats)
         
         if df.empty:
             # Clean up before raising error
@@ -243,12 +248,18 @@ async def upload_file(file: UploadFile = File(...)):
                 except:
                     pass  # Ignore if still can't delete
         
-        return {
+        response = {
             "success": True,
             "message": f"Loaded {len(df)} transactions",
             "session_id": session_id,
             "transaction_count": len(df)
         }
+        dropped = {k: v for k, v in stats.items() if v}
+        if dropped:
+            # שורות שלא נטענו, לפי סיבה: summary (שורות סיכום שהוסרו בכוונה),
+            # blank, invalid_date, invalid_amount, zero_amount.
+            response["dropped_rows"] = dropped
+        return response
     except HTTPException:
         if file_path and os.path.exists(file_path):
             try:
@@ -269,6 +280,9 @@ async def upload_file(file: UploadFile = File(...)):
             msg = str(e)
             if suffix == ".pdf" or "PDF" in msg:
                 detail = "לא הצלחנו לקרוא עסקאות מקובץ ה-PDF. כרגע נתמכים דפי פירוט של ישראכרט. לשאר הבנקים והכרטיסים העלו קובץ אקסל (xlsx) או csv."
+            elif re.search(r'[֐-׿]', msg):
+                # הודעת שגיאה ספציפית בעברית מהצינור (למשל סימנים לא חד-משמעיים)
+                detail = msg
             else:
                 detail = "לא הצלחנו לקרוא את הקובץ. ודאו שזה קובץ תנועות מהבנק או מחברת האשראי (xlsx, xls, csv) ושהוא לא פגום."
             raise HTTPException(status_code=400, detail=detail) from e
