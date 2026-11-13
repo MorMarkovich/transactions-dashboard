@@ -32,11 +32,11 @@ async function resolveAccounts() {
 }
 
 /**
- * @param {(msg:string)=>void} [log] progress callback
- * @param {{fresh?: boolean}} [opts] fresh = replace all data (ignore + delete old snapshots)
+ * @param {(msg:string)=>void} [log] log callback
+ * @param {{fresh?: boolean, onProgress?: (event: object) => void}} [opts]
  */
 export async function runSync(...args){return withLocalSyncLock(()=>runSyncUnlocked(...args))}
-async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
+async function runSyncUnlocked(log = () => {}, { fresh = false, onProgress = () => {} } = {}) {
   assertConfig()
 
   const auth = await getJSON(SUPABASE_AUTH_KEY)
@@ -50,6 +50,7 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
   // Always read the existing snapshot. A normal sync merges into it; a fresh
   // resync uses it to PRESERVE rows from accounts that fail to scrape this run
   // (so a temporary block — e.g. Isracard anti-bot — can't wipe good data).
+  onProgress({ stage: 'loading', percent: 10 })
   const [existing, rules, customCategories] = await Promise.all([
     getLatestSnapshot(supabase, userId),
     getCategoryRules(supabase, userId),
@@ -69,7 +70,10 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
   const accounts = allAccounts.filter((a) => !isRetiredAccount(a))
   if (retired.length) log(`מקורות לא פעילים (לא נסרקים, ההיסטוריה נשמרת): ${retired.map((a) => a.label || a.key).join(', ')}`)
   let prevProvider = null
-  for (const acct of accounts) {
+  for (const [index, acct] of accounts.entries()) {
+    const accountProgress = { account: index + 1, accounts: accounts.length }
+    const percent = 15 + Math.floor(70 * index / accounts.length)
+    onProgress({ stage: 'collecting', percent, ...accountProgress })
     const credentials = await getJSON(credKey(acct.key))
     if (!credentials) {
       log(`דילוג על ${acct.label || acct.key} (אין פרטי התחברות)`) // not set up — skip
@@ -80,7 +84,12 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
     // hitting the SAME provider twice in a row (e.g. two Isracard cards).
     if (prevProvider !== null) {
       const ms = prevProvider === acct.provider ? config.sameProviderDelayMs : config.accountDelayMs
-      if (ms > 0) { log(`ממתין ${Math.round(ms / 1000)} שניות לפני החשבון הבא…`); await sleep(ms) }
+      if (ms > 0) {
+        onProgress({ stage: 'waiting', percent, ...accountProgress })
+        log(`ממתין ${Math.round(ms / 1000)} שניות לפני החשבון הבא…`)
+        await sleep(ms)
+        onProgress({ stage: 'collecting', percent, ...accountProgress })
+      }
     }
     prevProvider = acct.provider
     try {
@@ -117,6 +126,7 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
   // this run (so they're kept), then layer the fresh data over them. Accounts
   // that succeeded get fully replaced by their fresh scrape. A normal sync just
   // merges into everything that already exists.
+  onProgress({ stage: 'merging', percent: 85 })
   let baseRows = existing
   if (fresh) {
     const failedLabels = new Set(
@@ -141,6 +151,7 @@ async function runSyncUnlocked(log = () => {}, { fresh = false } = {}) {
   })
   if (shifted) log(`התאמת חודש להכנסות: ${shifted} משכורות שויכו לחודש הנכון`)
 
+  onProgress({ stage: 'saving', percent: 94 })
   if (fresh) {
     // Replace everything: write the fresh snapshot, then delete the old ones.
     if (merged.length === 0) {

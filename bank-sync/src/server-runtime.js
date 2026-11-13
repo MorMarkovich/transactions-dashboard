@@ -8,7 +8,6 @@ import express from 'express'
 import { syncJsonParser, safeRequestError } from './request-body.js'
 import { safeErrorCode, safeError } from './safe-errors.js'
 import { config, assertConfig } from './config.js'
-import { getSecret, SYNC_TOKEN_KEY } from './secrets.js'
 import { runSync, tokensMatch } from './sync.js'
 
 const HOST = '127.0.0.1'
@@ -39,14 +38,7 @@ function applyCors(req, res) {
   res.setHeader('Access-Control-Max-Age', '600')
 }
 
-export async function main() {
-  assertConfig()
-
-  const token = await getSecret(SYNC_TOKEN_KEY)
-  if (!token) {
-    throw safeError('SYNC_TOKEN_REQUIRED')
-  }
-
+export function createSyncApp(token, sync = runSync) {
   let syncing = false
   const app = express()
   app.use(syncJsonParser())
@@ -73,20 +65,48 @@ export async function main() {
     }
 
     syncing = true
+    const stream = req.body?.progress === true
+    const send = (event) => {
+      if (!res.destroyed) res.write(JSON.stringify(event) + '\n')
+    }
     try {
-      const result = await runSync((m) => console.log('•', m))
-      res.json(result)
+      if (stream) {
+        res.setHeader('Content-Type', 'application/x-ndjson')
+        res.setHeader('Cache-Control', 'no-store')
+        res.flushHeaders()
+        send({ type: 'progress', stage: 'connecting', percent: 3 })
+      }
+      const result = await sync((m) => console.log('•', m), {
+        onProgress: stream ? (progress) => send({ type: 'progress', ...progress }) : undefined,
+      })
+      if (stream) send({ type: 'result', result })
+      else res.json(result)
     } catch (err) {
-      console.error('sync error:', safeErrorCode(err))
-      res.status(500).json({ success: false, error: safeErrorCode(err) })
+      const error = safeErrorCode(err)
+      console.error('sync error:', error)
+      if (stream) send({ type: 'error', error })
+      else res.status(500).json({ success: false, error })
     } finally {
       syncing = false
+      if (stream && !res.destroyed) res.end()
     }
   })
 
   app.use(safeRequestError)
 
-  app.listen(config.port, HOST, () => {
+  return app
+}
+
+export async function main() {
+  assertConfig()
+
+  const { getSecret, SYNC_TOKEN_KEY } = await import('./secrets.js')
+  const token = await getSecret(SYNC_TOKEN_KEY)
+  if (!token) {
+    throw safeError('SYNC_TOKEN_REQUIRED')
+  }
+
+  createSyncApp(token).listen(config.port, HOST, () => {
     console.log(`bank-sync listening on http://${HOST}:${config.port}`)
     console.log(`Allowed origins: ${config.allowedOrigins.join(', ')}`)
     console.log('Click "רענן מהבנקים" in the dashboard to trigger a sync.')
