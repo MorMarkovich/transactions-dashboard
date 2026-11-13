@@ -101,6 +101,22 @@ async function readSyncStream(
   }
 }
 
+function makeSyncRequest(token: string): Request {
+  const url = `${SYNC_URL}/sync`
+  const init: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-sync-token': token },
+    body: JSON.stringify({ progress: true }),
+  }
+  // Chromium uses the loopback address hint. Some WebKit versions reject
+  // the enum value, so construct the request before making a network call.
+  try {
+    return new Request(url, { ...init, targetAddressSpace: 'loopback' } as RequestInit)
+  } catch {
+    return new Request(url, init)
+  }
+}
+
 function getToken(): string | null {
   const envToken = import.meta.env.VITE_SYNC_TOKEN as string | undefined
   if (envToken) return envToken
@@ -143,16 +159,7 @@ export default function RefreshFromBanks({ onSynced, sidebarClosed = false }: Re
     setStatus({ kind: 'syncing', progress: { percent: null, label: STAGES.connecting } })
     let connected = false
     try {
-      const res = await fetch(`${SYNC_URL}/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-sync-token': token },
-        body: JSON.stringify({ progress: true }),
-        // Chrome 142+ requires public HTTPS pages to explicitly identify
-        // requests that are intended for a service on the user's own machine.
-        // 127.0.0.1 is the loopback address space (not the broader LAN/local
-        // space); declaring the wrong space makes Chrome reject the request.
-        targetAddressSpace: 'loopback',
-      } as RequestInit)
+      const res = await fetch(makeSyncRequest(token))
 
       connected = true
 
