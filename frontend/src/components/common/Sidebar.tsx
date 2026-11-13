@@ -216,23 +216,18 @@ export default function Sidebar({
   // it through the same restore path used after a manual upload.
   const handleBankSynced = async () => {
     if (!user) return
-    try {
-      const [transactions, rules, overrides, customCats, notes] = await Promise.all([
-        supabaseApi.getLatestTransactions(user.id),
-        supabaseApi.getCategoryRules(user.id).catch(() => []),
-        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
-        supabaseApi.getUserCategories(user.id).catch(() => []),
-        supabaseApi.getTransactionNotes(user.id).catch(() => []),
-      ])
-      if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(
-        transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
-      if (merged.success && merged.session_id) {
-        onFileUploaded?.(merged.session_id)
-      }
-    } catch (err) {
-      console.error('Failed to reload after bank sync:', err)
-    }
+    const [transactions, rules, overrides, customCats, notes] = await Promise.all([
+      supabaseApi.getLatestTransactions(user.id),
+      supabaseApi.getCategoryRules(user.id).catch(() => []),
+      supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+      supabaseApi.getUserCategories(user.id).catch(() => []),
+      supabaseApi.getTransactionNotes(user.id).catch(() => []),
+    ])
+    if (!transactions?.length) throw new Error('Missing saved transactions')
+    const merged = await transactionsApi.restoreSession(
+      transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
+    if (!merged.success || !merged.session_id) throw new Error('Could not restore the saved transactions')
+    onFileUploaded?.(merged.session_id)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -399,7 +394,7 @@ export default function Sidebar({
               </label>
             </div>
 
-            <RefreshFromBanks onSynced={handleBankSynced} />
+            <RefreshFromBanks onSynced={handleBankSynced} sidebarClosed={!isOpen} />
 
             {error && <div className="sidebar-error">{error}</div>}
 

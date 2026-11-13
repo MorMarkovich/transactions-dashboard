@@ -416,13 +416,13 @@ def restore_session(body: RestoreSessionRequest):
     try:
         df = pd.DataFrame(body.transactions)
 
-        # Parse date column
+        # Saved uploads use ISO timestamps and bank imports use date-only strings.
         if 'תאריך' in df.columns:
-            df['תאריך'] = pd.to_datetime(df['תאריך'], errors='coerce')
+            df['תאריך'] = pd.to_datetime(df['תאריך'], format='mixed', errors='coerce')
 
         # Parse billing date column if present
         if 'תאריך_חיוב' in df.columns:
-            df['תאריך_חיוב'] = pd.to_datetime(df['תאריך_חיוב'], errors='coerce')
+            df['תאריך_חיוב'] = pd.to_datetime(df['תאריך_חיוב'], format='mixed', errors='coerce')
 
         # Ensure numeric columns
         if 'סכום' in df.columns:
@@ -2498,10 +2498,10 @@ def get_category_transactions(
     sort_order: str = Query("asc"),
 ):
     """Return all transactions for a given category, optionally filtered by month or date range."""
-    if sessionId not in sessions:
+    df = sessions.get(sessionId)
+    if df is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    df = sessions[sessionId].copy()
     if df.empty:
         return {"transactions": [], "total": 0, "count": 0}
 
@@ -2516,16 +2516,15 @@ def get_category_transactions(
     elif month_from or month_to:
         filtered = filtered.copy()
         filtered['_month'] = _month_series(filtered, date_type)
-        # Parse MM/YYYY into sortable YYYY-MM for comparison
-        def month_sort_key(m: str) -> str:
-            parts = m.split('/')
-            return f"{parts[1]}-{parts[0]}" if len(parts) == 2 else m
+        keys = filtered['_month'].map(_month_key)
+        in_range = keys.map(lambda key: key != (0, 0))
         if month_from:
-            from_key = month_sort_key(month_from)
-            filtered = filtered[filtered['_month'].apply(month_sort_key) >= from_key]
+            from_key = _month_key(month_from)
+            in_range &= keys.map(lambda key: key >= from_key)
         if month_to:
-            to_key = month_sort_key(month_to)
-            filtered = filtered[filtered['_month'].apply(month_sort_key) <= to_key]
+            to_key = _month_key(month_to)
+            in_range &= keys.map(lambda key: key <= to_key)
+        filtered = filtered[in_range]
 
     if filtered.empty:
         return {"transactions": [], "total": 0, "count": 0}
@@ -2536,7 +2535,7 @@ def get_category_transactions(
     transactions = [
         {
             "id": int(row['id']) if 'id' in filtered.columns and pd.notna(row.get('id')) else None,
-            "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
+            "תאריך": _safe_str(_to_json_safe(row.get('תאריך')))[:10],
             "תיאור": str(row['תיאור']),
             "תאריך_חיוב": _to_json_safe(row.get('תאריך_חיוב')),
             "ארבע ספרות אחרונות": _to_json_safe(row.get('ארבע ספרות אחרונות')),

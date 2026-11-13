@@ -860,23 +860,18 @@ export default function Dashboard() {
   // through the normal restore path (same flow as a manual upload).
   const handleBankSynced = async () => {
     if (!user) return
-    try {
-      const [transactions, rules, overrides, customCats, notes] = await Promise.all([
-        supabaseApi.getLatestTransactions(user.id),
-        supabaseApi.getCategoryRules(user.id),
-        supabaseApi.getTransactionOverrides(user.id).catch(() => []),
-        supabaseApi.getUserCategories(user.id).catch(() => []),
-        supabaseApi.getTransactionNotes(user.id).catch(() => []),
-      ])
-      if (!transactions || transactions.length === 0) return
-      const merged = await transactionsApi.restoreSession(
-        transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
-      if (merged.success && merged.session_id) {
-        navigate(`/?session_id=${merged.session_id}`)
-      }
-    } catch (err) {
-      console.error('Failed to reload after bank sync:', err)
-    }
+    const [transactions, rules, overrides, customCats, notes] = await Promise.all([
+      supabaseApi.getLatestTransactions(user.id),
+      supabaseApi.getCategoryRules(user.id),
+      supabaseApi.getTransactionOverrides(user.id).catch(() => []),
+      supabaseApi.getUserCategories(user.id).catch(() => []),
+      supabaseApi.getTransactionNotes(user.id).catch(() => []),
+    ])
+    if (!transactions?.length) throw new Error('Missing saved transactions')
+    const merged = await transactionsApi.restoreSession(
+      transactions as unknown[], rules, overrides, customCats.map((c) => c.name), notes)
+    if (!merged.success || !merged.session_id) throw new Error('Could not restore the saved transactions')
+    navigate(`/?session_id=${merged.session_id}`)
   }
 
   // Onboarding: load fictional transactions into an in-memory session. Nothing
