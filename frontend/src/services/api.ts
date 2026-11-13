@@ -6,6 +6,7 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { supabase } from '../lib/supabase';
 import type {
   TransactionResponse,
+  SimilarTransaction,
   MetricsData,
   FileUploadResponse,
   ChartData,
@@ -422,6 +423,19 @@ export const transactionsApi = {
       signal,
     });
     return response.data;
+  },
+
+  getSimilarTransactions: async (
+    sessionId: string,
+    transactionId: number,
+    owner: string | null,
+    signal?: AbortSignal,
+  ): Promise<SimilarTransaction[]> => {
+    const response = await api.get<{ transactions: SimilarTransaction[] }>(`/api/transactions/${transactionId}/similar`, {
+      params: { sessionId, owner },
+      signal,
+    });
+    return response.data.transactions;
   },
 
   /**

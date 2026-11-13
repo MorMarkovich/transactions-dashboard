@@ -6,6 +6,7 @@ import { transactionsApi } from '../../services/api'
 import { supabaseApi } from '../../services/supabaseApi'
 import { useAuth } from '../../lib/AuthContext'
 import { pushOverlay, removeOverlay, isTopOverlay, lockBodyScroll, unlockBodyScroll } from '../../lib/overlayStack'
+import SimilarTransactions from './SimilarTransactions'
 import type { Transaction as BaseTransaction } from '../../services/types'
 
 // Allow extra dynamic fields (e.g. 'ארבע ספרות אחרונות') on top of the core Transaction shape
@@ -19,10 +20,11 @@ interface TransactionDrawerProps {
   isOpen: boolean
   onClose: () => void
   sessionId: string | null
+  owner?: string | null
   onUpdateTransaction?: (updated: Transaction) => void
 }
 
-export default function TransactionDrawer({ transaction, isOpen, onClose, sessionId, onUpdateTransaction }: TransactionDrawerProps) {
+export default function TransactionDrawer({ transaction, isOpen, onClose, sessionId, owner = null, onUpdateTransaction }: TransactionDrawerProps) {
   // Overlay stack id: this drawer closes on Escape only when it is the
   // topmost overlay, so a palette/modal above it closes first.
   const overlayIdRef = useRef<string | null>(null)
@@ -169,7 +171,7 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
               width: '100%',
               maxWidth: '400px',
               zIndex: 99999,
-              background: 'var(--glass-bg-hover)',
+              background: 'var(--bg-card)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
               borderRight: '1px solid var(--glass-border)',
@@ -207,8 +209,8 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 32,
-                  height: 32,
+                  width: 44,
+                  height: 44,
                   borderRadius: 8,
                   border: 'none',
                   background: 'var(--glass-bg)',
@@ -303,6 +305,11 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                   label="כרטיס"
                   value={`**** ${transaction['ארבע ספרות אחרונות']}`}
                 />
+              )}
+
+              {isOpen && sessionId && typeof transaction.id === 'number' && (
+                <SimilarTransactions key={JSON.stringify([sessionId, transaction.id, owner])}
+                  sessionId={sessionId} transactionId={transaction.id} owner={owner} />
               )}
 
               {/* Manual notes */}

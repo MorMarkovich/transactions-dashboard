@@ -1,6 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search } from 'lucide-react'
+import MobilePickerSheet from './MobilePickerSheet'
+import useMobilePicker from '../../hooks/useMobilePicker'
 
 interface SelectOption {
   value: string
@@ -40,6 +42,7 @@ export default function Select({
   searchable: searchableProp,
 }: SelectProps) {
   const generatedId = useId()
+  const mobilePicker = useMobilePicker()
   const listboxId = `${generatedId}-listbox`
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -67,12 +70,12 @@ export default function Select({
   const close = (refocus = false) => {
     setOpen(false)
     setQuery('')
-    if (refocus) triggerRef.current?.focus()
+    if (refocus) triggerRef.current?.focus({ preventScroll: true })
   }
 
   const choose = (option: SelectOption) => {
     onChange(option.value)
-    close(true)
+    close(!mobilePicker)
   }
 
   // Position the menu against the viewport: flip above the trigger when there
@@ -108,9 +111,10 @@ export default function Select({
 
   useLayoutEffect(() => {
     if (!open) return
-    updatePosition()
     const selectedIndex = filtered.findIndex((opt) => opt.value === value)
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0)
+    if (mobilePicker) return
+    updatePosition()
     // The menu's first frame is offscreen and visibility:hidden, and browsers
     // ignore focus() on a hidden element, so the search input only becomes
     // focusable after the positioned frame commits. Defer to rAF - React
@@ -129,10 +133,10 @@ export default function Select({
       window.visualViewport?.removeEventListener('resize', reposition)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, mobilePicker])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || mobilePicker) return
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target as Node
       if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return
@@ -140,13 +144,18 @@ export default function Select({
     }
     document.addEventListener('mousedown', onPointerDown)
     return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [open])
+  }, [open, mobilePicker])
 
   // Keep the highlighted option visible while moving with the keyboard.
   useEffect(() => {
     if (!open) return
     const node = menuRef.current?.querySelector<HTMLElement>(`#${CSS.escape(optionId(activeIndex))}`)
-    if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' })
+    const list = node?.parentElement
+    if (!node || !list) return
+    const item = node.getBoundingClientRect()
+    const viewport = list.getBoundingClientRect()
+    if (item.top < viewport.top) list.scrollTop += item.top - viewport.top
+    else if (item.bottom > viewport.bottom) list.scrollTop += item.bottom - viewport.bottom
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex, open, filtered.length])
 
@@ -194,10 +203,10 @@ export default function Select({
       case 'Escape':
         event.preventDefault()
         event.stopPropagation()
-        close(true)
+        close(!mobilePicker)
         break
       case 'Tab':
-        close()
+        if (!mobilePicker) close()
         break
       default:
         break
@@ -205,6 +214,66 @@ export default function Select({
   }
 
   const activeDescendant = open && filtered[activeIndex] ? optionId(activeIndex) : undefined
+
+  const menu = (
+    <div
+      className="ui-select-menu"
+      id={listboxId}
+      role="listbox"
+      aria-label={resolvedLabel}
+      ref={menuRef}
+      style={mobilePicker ? undefined : menuStyle}
+      onKeyDown={mobilePicker ? (event) => { if (!(event.target instanceof HTMLButtonElement)) onKeyDown(event) } : undefined}
+    >
+      {searchable && (
+        <div className="ui-select-search-row">
+          <Search size={14} aria-hidden="true" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setActiveIndex(0)
+            }}
+            onKeyDown={mobilePicker ? undefined : onKeyDown}
+            placeholder="חיפוש..."
+            aria-label={`חיפוש בתוך ${resolvedLabel}`}
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listboxId}
+            aria-activedescendant={activeDescendant}
+            autoComplete="off"
+          />
+        </div>
+      )}
+      <div className="ui-select-options">
+        {filtered.length === 0 ? (
+          <div className="ui-select-empty">אין תוצאות תואמות</div>
+        ) : (
+          filtered.map((option, index) => {
+            const isSelected = option.value === value
+            return (
+              <button
+                type="button"
+                key={option.value === '' ? '__empty__' : option.value}
+                id={optionId(index)}
+                role="option"
+                aria-selected={isSelected}
+                className={`ui-select-option${isSelected ? ' selected' : ''}${index === activeIndex ? ' active' : ''}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => choose(option)}
+              >
+                <span className="ui-select-option-check" aria-hidden="true">
+                  {isSelected && <Check size={14} />}
+                </span>
+                <span className="ui-select-option-label">{option.label}</span>
+              </button>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <div className={`ui-select-wrapper ${className}`} ref={rootRef}>
@@ -218,11 +287,11 @@ export default function Select({
         id={generatedId}
         ref={triggerRef}
         className={`ui-select-trigger${open ? ' open' : ''}`}
-        role="combobox"
-        aria-haspopup="listbox"
+        role={mobilePicker ? undefined : 'combobox'}
+        aria-haspopup={mobilePicker ? 'dialog' : 'listbox'}
         aria-expanded={open}
-        aria-controls={open ? listboxId : undefined}
-        aria-activedescendant={!searchable ? activeDescendant : undefined}
+        aria-controls={open && !mobilePicker ? listboxId : undefined}
+        aria-activedescendant={!mobilePicker && !searchable ? activeDescendant : undefined}
         aria-label={resolvedLabel}
         disabled={disabled}
         title={selected ? selected.label : undefined}
@@ -234,65 +303,9 @@ export default function Select({
         </span>
         <ChevronDown size={16} className="ui-select-chevron" aria-hidden="true" />
       </button>
-      {open && !disabled && createPortal(
-        <div
-          className="ui-select-menu"
-          id={listboxId}
-          role="listbox"
-          aria-label={resolvedLabel}
-          ref={menuRef}
-          style={menuStyle}
-        >
-          {searchable && (
-            <div className="ui-select-search-row">
-              <Search size={14} aria-hidden="true" />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setActiveIndex(0)
-                }}
-                onKeyDown={onKeyDown}
-                placeholder="חיפוש..."
-                aria-label={`חיפוש בתוך ${resolvedLabel}`}
-                role="combobox"
-                aria-expanded={open}
-                aria-controls={listboxId}
-                aria-activedescendant={activeDescendant}
-                autoComplete="off"
-              />
-            </div>
-          )}
-          <div className="ui-select-options">
-          {filtered.length === 0 ? (
-            <div className="ui-select-empty">אין תוצאות תואמות</div>
-          ) : (
-            filtered.map((option, index) => {
-              const isSelected = option.value === value
-              return (
-                <button
-                  type="button"
-                  key={option.value === '' ? '__empty__' : option.value}
-                  id={optionId(index)}
-                  role="option"
-                  aria-selected={isSelected}
-                  className={`ui-select-option${isSelected ? ' selected' : ''}${index === activeIndex ? ' active' : ''}`}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => choose(option)}
-                >
-                  <span className="ui-select-option-check" aria-hidden="true">
-                    {isSelected && <Check size={14} />}
-                  </span>
-                  <span className="ui-select-option-label">{option.label}</span>
-                </button>
-              )
-            })
-          )}
-          </div>
-        </div>,
-        document.body,
-      )}
+      {open && !disabled && (mobilePicker
+        ? <MobilePickerSheet label={resolvedLabel} onDismiss={() => close()}>{menu}</MobilePickerSheet>
+        : createPortal(menu, document.body))}
     </div>
   )
 }

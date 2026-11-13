@@ -12,6 +12,7 @@ import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import { transactionsApi } from '../services/api'
+import { useDashboardFilterSelection } from '../context/FilterContext'
 import { formatCurrency } from '../utils/formatting'
 import type { RawTrendData, TrendStats } from '../services/types'
 
@@ -78,6 +79,7 @@ const cardVariants = {
 // Component
 // ---------------------------------------------------------------------------
 export default function Trends() {
+  const { owner, category: dashboardCategory, subcategories } = useDashboardFilterSelection()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
 
@@ -101,27 +103,33 @@ export default function Trends() {
       setLoading(true)
 
       try {
+        const scoped = owner || dashboardCategory || subcategories.length
+          ? await transactionsApi.scopeSession(sessionId, owner, signal, dashboardCategory, subcategories)
+          : sessionId
+        if (signal.aborted) return
         const [trendRes, statsRes] = await Promise.all([
-          transactionsApi.getTrendChartV2(sessionId, signal),
-          transactionsApi.getTrendStats(sessionId, signal),
+          transactionsApi.getTrendChartV2(scoped, signal),
+          transactionsApi.getTrendStats(scoped, signal),
         ])
 
+        if (signal.aborted) return
         setTrendData(trendRes)
         setTrendStats(statsRes)
         setLoadError(false)
       } catch (err: unknown) {
+        if (signal.aborted) return
         if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         console.error('Error loading trend data:', err)
         setLoadError(true)
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
 
     fetchData()
 
     return () => controller.abort()
-  }, [sessionId, retryNonce])
+  }, [sessionId, retryNonce, owner, dashboardCategory, subcategories])
 
   // ---- Transform trend points for LineChart --------------------------------
   const lineChartData = useMemo(() => {

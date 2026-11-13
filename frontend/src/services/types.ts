@@ -11,12 +11,19 @@ export interface Transaction {
   סכום_מוחלט?: number;
   חודש?: string;
   יום_בשבוע?: number;
-  תאריך_חיוב?: string;
+  תאריך_חיוב?: string | null;
+  'ארבע ספרות אחרונות'?: string | number | null;
   חודש_חיוב?: string;
   הערות?: string;
   id?: number;
   /** Pinned by "אל תשנה סיווג של עסקאות דומות" — rules/AI never touch it. */
   _locked?: boolean;
+}
+
+export interface SimilarTransaction {
+  date: string;
+  description: string;
+  amount: number;
 }
 
 export interface TransactionResponse {

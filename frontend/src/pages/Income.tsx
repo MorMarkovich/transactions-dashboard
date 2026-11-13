@@ -9,17 +9,43 @@ import EmptyState from '../components/common/EmptyState'
 import { useCategoryColor } from '../hooks/useCategoryColor'
 import BarChart from '../components/charts/BarChart'
 import { transactionsApi } from '../services/api'
+import { useDashboardFilterSelection } from '../context/FilterContext'
 import type { IncomeAnalysisData, IncomeTransactionDetail } from '../services/types'
 import { formatCurrency, formatDate, hebOwner } from '../utils/formatting'
 
 export default function Income() {
+  const { owner, category: dashboardCategory, subcategories } = useDashboardFilterSelection()
   const [params] = useSearchParams(); const sessionId = params.get('session_id')
   const categoryColor = useCategoryColor()
   const [data,setData]=useState<IncomeAnalysisData|null>(null); const [loading,setLoading]=useState(false)
   const [loadError,setLoadError]=useState(false); const [reloadTick,setReloadTick]=useState(0)
   const [month,setMonth]=useState(''); const [source,setSource]=useState(''); const [category,setCategory]=useState(''); const [search,setSearch]=useState('')
   const [selected,setSelected]=useState<IncomeTransactionDetail|null>(null)
-  useEffect(()=>{if(!sessionId)return;const c=new AbortController();setLoading(true);setLoadError(false);transactionsApi.getIncomeAnalysis(sessionId,{month:month||undefined,source:source||undefined,category:category||undefined},c.signal).then(next=>{if(!c.signal.aborted)setData(next)}).catch(()=>{if(!c.signal.aborted)setLoadError(true)}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[sessionId,month,source,category,reloadTick])
+  useEffect(() => {
+    if (!sessionId) return
+    const controller = new AbortController()
+    const { signal } = controller
+    setLoading(true)
+    setLoadError(false)
+    const load = async () => {
+      try {
+        const scoped = owner || dashboardCategory || subcategories.length
+          ? await transactionsApi.scopeSession(sessionId, owner, signal, dashboardCategory, subcategories)
+          : sessionId
+        if (signal.aborted) return
+        const next = await transactionsApi.getIncomeAnalysis(scoped, {
+          month: month || undefined, source: source || undefined, category: category || undefined,
+        }, signal)
+        if (!signal.aborted) setData(next)
+      } catch {
+        if (!signal.aborted) setLoadError(true)
+      } finally {
+        if (!signal.aborted) setLoading(false)
+      }
+    }
+    void load()
+    return () => controller.abort()
+  }, [sessionId, month, source, category, reloadTick, owner, dashboardCategory, subcategories])
   // The backend narrows its option lists to the current selection; keep every
   // option ever seen so the user can switch straight to another source/month.
   const [facets,setFacets]=useState<{months:string[];sources:string[];categories:string[]}>({months:[],sources:[],categories:[]})

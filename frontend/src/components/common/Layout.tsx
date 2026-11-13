@@ -189,7 +189,7 @@ export default function Layout({ children }: LayoutProps) {
   const [searchParams] = useSearchParams()
   useScrollMemory(location.pathname)
   useChartLabels(location.pathname)
-  const { category: activeCategory, subcategories: activeSubs, clearFilters } = useDashboardFilters()
+  const { category: activeCategory, subcategories: activeSubs, clearFilters, owner: activeOwner, setOwner } = useDashboardFilters()
   const { user } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   // Per-user: a second account signing in must get its own restore pass.
@@ -539,6 +539,12 @@ export default function Layout({ children }: LayoutProps) {
                 {activeSubs.length > 0 ? ` (${activeSubs.length} תתי-קטגוריות)` : ''}
               </span>
               <button type="button" className="ui-btn" onClick={clearFilters}>נקה סינון</button>
+            </div>
+          )}
+          {!sessionValidating && activeOwner && (
+            <div className="active-filter-banner" role="status">
+              <span>תצוגה לפי <strong>{activeOwner}</strong></span>
+              <button type="button" className="ui-btn" onClick={() => setOwner(null)}>נקה סינון לפי אדם</button>
             </div>
           )}
           {!sessionValidating && snapshotAt && formatStamp(snapshotAt) && (

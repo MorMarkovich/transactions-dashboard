@@ -16,6 +16,7 @@ interface CategoryTransactionsDrawerProps {
   loading?: boolean
   error?: boolean
   onRetry?: () => void
+  onTransactionClick?: (transaction: Transaction) => void
   availableCategories?: string[]
   /**
    * Called when the user saves a new category for a transaction.
@@ -64,6 +65,7 @@ export default function CategoryTransactionsDrawer({
   loading,
   error,
   onRetry,
+  onTransactionClick,
   availableCategories = [],
   onCategoryChange,
   subcategoryOptions = [],
@@ -274,6 +276,7 @@ export default function CategoryTransactionsDrawer({
     const empty = bySub.get('') ? [['', bySub.get('')!] as [string, Transaction[]]] : []
     return [...named, ...empty].map(([sub, items]) => ({
       sub,
+      total: items.reduce((sum, tx) => sum + Math.abs(tx.סכום), 0),
       items: [...items].sort(sortFn),
     }))
   }, [visibleTransactions, sortAsc])
@@ -540,13 +543,15 @@ export default function CategoryTransactionsDrawer({
                   {groups.map((group) => (
                     <div key={group.sub || '__none__'} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {hasSubGroups && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 2px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                          <span>{group.sub ? get_subcategory_icon(group.sub) : '•'}</span>
-                          <span>{group.sub || 'ללא תת-קטגוריה'}</span>
-                          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· {group.items.length}</span>
-                        </div>
+                        <h3 className="category-subtotal">
+                          <span><span aria-hidden="true">{group.sub ? get_subcategory_icon(group.sub) : '•'}</span>{' '}
+                            {group.sub || 'ללא תת־קטגוריה'} <small>· {group.items.length}</small>
+                          </span>
+                          <span>סה״כ <bdi>{formatCurrency(group.total)}</bdi></span>
+                        </h3>
                       )}
                       {group.items.map((tx, i) => {
+                    const Info = onTransactionClick && !selectMode ? 'button' : 'div'
                     const isEditing = editingId === tx.id
                     const isSaving = savingId === tx.id
                     const canEdit = !!onCategoryChange && tx.id != null
@@ -595,22 +600,27 @@ export default function CategoryTransactionsDrawer({
                               {isSelected && <Check size={12} />}
                             </span>
                           )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p
+                          <Info
+                            className="category-transaction-info"
+                            type={Info === 'button' ? 'button' : undefined}
+                            onClick={Info === 'button' ? () => onTransactionClick?.(tx) : undefined}
+                          >
+                            <span
                               style={{
                                 margin: 0,
                                 fontSize: '0.8125rem',
                                 fontWeight: 600,
                                 color: 'var(--text-primary)',
+                                display: 'block',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
                               }}
                             >
                               {tx.תיאור}
-                            </p>
+                            </span>
                             {tx.הערות && (
-                              <p
+                              <span
                                 style={{
                                   margin: '2px 0 0',
                                   fontSize: '0.75rem',
@@ -621,9 +631,9 @@ export default function CategoryTransactionsDrawer({
                                 }}
                               >
                                 {tx.הערות}
-                              </p>
+                              </span>
                             )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
                               <Calendar size={10} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                               <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                                 {formatDate(tx.תאריך)}
@@ -665,8 +675,8 @@ export default function CategoryTransactionsDrawer({
                                   {(tx.קטגוריה_משנה ?? '').trim()}
                                 </span>
                               )}
-                            </div>
-                          </div>
+                            </span>
+                          </Info>
                           <div className="category-transaction-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                             <span
                               style={{

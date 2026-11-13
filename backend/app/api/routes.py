@@ -1245,6 +1245,51 @@ def get_transactions(
     }
 
 
+@router.get("/transactions/{transaction_id}/similar")
+@_offload
+def get_similar_transactions(
+    transaction_id: int,
+    sessionId: str = Query(...),
+    owner: Optional[str] = None,
+):
+    """Return earlier charges or credits from the selected transaction's merchant."""
+    df = sessions.get(sessionId)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    df = _filter_owner(df, owner)
+    if df.empty or 'id' not in df.columns:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    selected = df[df['id'] == transaction_id]
+    if selected.empty:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    reference = selected.iloc[0]
+    merchant = normalize_merchant(_to_json_safe(reference['תיאור']))
+    dates = df['תאריך']
+    if 'תאריך_חיוב' in df.columns:
+        dates = df['תאריך_חיוב'].fillna(dates)
+    reference_date = reference.get('תאריך_חיוב')
+    if pd.isna(reference_date):
+        reference_date = reference['תאריך']
+    amount = reference['סכום']
+    if not merchant or merchant == 'לא ידוע' or pd.isna(reference_date) or not np.isfinite(amount) or amount == 0:
+        return {"transactions": []}
+
+    # Use the charge date when available so separate installments with the
+    # same purchase date still appear in their actual payment order.
+    amounts = df['סכום']
+    earlier = (dates.dt.normalize() < reference_date.normalize()) & (np.sign(amounts) == np.sign(amount))
+    eligible = earlier & np.isfinite(amounts)
+    candidates = df.loc[eligible, ['תיאור', 'סכום']].assign(_date=dates.loc[eligible])
+    merchant_keys = candidates['תיאור'].fillna('').map(normalize_merchant)
+    matches = candidates.loc[merchant_keys == merchant].sort_values('_date', ascending=False, kind='stable')
+    return {"transactions": [
+        {"date": date.strftime('%Y-%m-%d'), "description": description, "amount": round(float(amount), 2)}
+        for description, amount, date in matches.itertuples(index=False, name=None)
+    ]}
+
+
 @router.get("/session-files")
 @_offload
 def get_session_files(sessionId: str = Query(...)):
@@ -1407,6 +1452,16 @@ def get_owners(sessionId: str = Query(...)):
     return sorted({v for v in vals if v and v.lower() != 'nan'})
 
 
+def _filter_owner(df: pd.DataFrame, owner: Optional[str]) -> pd.DataFrame:
+    owner = (owner or '').strip()
+    if owner and owner.lower() != 'all' and owner != 'הכל' and '_owner' in df.columns:
+        if owner in ('joint', 'משותף'):
+            df = df[df['_owner'].astype(str).str.strip().isin(['joint', 'משותף'])]
+        else:
+            df = df[df['_owner'] == owner]
+    return df
+
+
 class ScopeSessionRequest(BaseModel):
     session_id: str
     owner: Optional[str] = None
@@ -1436,11 +1491,7 @@ def scope_session(body: ScopeSessionRequest):
     if not owner and not category and not subcategories:
         return {"session_id": base}
     df = sessions[base].copy()
-    if owner and owner.lower() != 'all' and owner != 'הכל' and '_owner' in df.columns:
-        if owner in ('joint', 'משותף'):
-            df = df[df['_owner'].astype(str).str.strip().isin(['joint', 'משותף'])]
-        else:
-            df = df[df['_owner'] == owner]
+    df = _filter_owner(df, owner)
     if category and 'קטגוריה' in df.columns:
         df = df[df['קטגוריה'] == category]
     if subcategories and 'קטגוריה_משנה' in df.columns:
@@ -2487,6 +2538,8 @@ def get_category_transactions(
             "id": int(row['id']) if 'id' in filtered.columns and pd.notna(row.get('id')) else None,
             "תאריך": row['תאריך'].strftime('%Y-%m-%d') if hasattr(row['תאריך'], 'strftime') else str(row['תאריך']),
             "תיאור": str(row['תיאור']),
+            "תאריך_חיוב": _to_json_safe(row.get('תאריך_חיוב')),
+            "ארבע ספרות אחרונות": _to_json_safe(row.get('ארבע ספרות אחרונות')),
             "סכום": _sanitize(round(float(row['סכום']), 2)),
             "סכום_מוחלט": _sanitize(round(float(row['סכום_מוחלט']), 2)),
             "קטגוריה": str(row['קטגוריה']),
