@@ -88,7 +88,7 @@ export default function Transactions() {
   const [searchParams] = useSearchParams()
   const categoryColor = useCategoryColor()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters, owner } = useDashboardFilters()
 
   // Data state
   // On phones the search and the transaction list come first; the summary and category analysis sit below, collapsed.
@@ -206,7 +206,7 @@ export default function Transactions() {
       return
     }
     setPage(1)
-  }, [subcategories])
+  }, [subcategories, owner])
 
   // ---- Effect 2: fetch transactions on sessionId, filters, page change ----
   useEffect(() => {
@@ -218,7 +218,7 @@ export default function Transactions() {
       setLoading(true)
 
       try {
-        const scopedId = await transactionsApi.scopeSession(sessionId, null, controller.signal, category, subcategories)
+        const scopedId = await transactionsApi.scopeSession(sessionId, owner, controller.signal, category, subcategories)
         const apiFilters: TransactionFilters = {
           page,
           page_size: pageSize,
@@ -261,7 +261,7 @@ export default function Transactions() {
     fetchTransactions()
 
     return () => controller.abort()
-  }, [sessionId, filters, page, pageSize, category, subcategories])
+  }, [sessionId, filters, page, pageSize, category, subcategories, owner])
 
   // ---- Computed stats -------------------------------------------------------
   const stats = useMemo(() => ({
@@ -316,7 +316,7 @@ export default function Transactions() {
       setTransactions((prev) =>
         prev.map((tx) => (tx.id !== undefined && tx.id === updated.id ? updated : tx)),
       )
-      setSelectedTransaction(updated)
+      setSelectedTransaction((current) => current?.id === updated.id ? updated : current)
     },
     [],
   )
@@ -325,7 +325,7 @@ export default function Transactions() {
     if (!sessionId) return
 
     try {
-      const scopedId = await transactionsApi.scopeSession(sessionId, null, undefined, category, subcategories)
+      const scopedId = await transactionsApi.scopeSession(sessionId, owner, undefined, category, subcategories)
       // Export exactly what the list shows: every active filter goes along.
       const blob = await transactionsApi.exportTransactions(scopedId, {
         category: category || filters.category,
@@ -345,7 +345,7 @@ export default function Transactions() {
     } catch (err) {
       console.error('Error exporting:', err)
     }
-  }, [sessionId, filters, category, subcategories])
+  }, [sessionId, filters, category, subcategories, owner])
 
   // ---- No session: empty state --------------------------------------------
   if (!sessionId) {
@@ -591,6 +591,7 @@ export default function Transactions() {
         isOpen={drawerOpen}
         onClose={() => { setDrawerOpen(false); setSelectedTransaction(null) }}
         sessionId={sessionId}
+        owner={owner}
         onUpdateTransaction={handleUpdateTransaction}
       />
     </div>

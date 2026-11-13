@@ -5,21 +5,24 @@ import { FILTERS_BASE, scoped } from '../lib/userStorage'
 export interface DashboardFilters {
   category: string
   subcategories: string[]
+  owner: string | null
 }
 
 interface FilterContextValue extends DashboardFilters {
+  setOwner: (value: string | null) => void
   setCategory: (value: string) => void
   setSubcategories: (value: string[]) => void
   clearFilters: () => void
 }
 
-const EMPTY: DashboardFilters = { category: '', subcategories: [] }
+const EMPTY: DashboardFilters = { category: '', subcategories: [], owner: null }
 const FilterContext = createContext<FilterContextValue | null>(null)
 
 function readSaved(key: string): DashboardFilters {
   try {
     const saved = JSON.parse(localStorage.getItem(key) || '{}')
     return {
+      owner: typeof saved.owner === 'string' && saved.owner ? saved.owner : null,
       category: typeof saved.category === 'string' ? saved.category : '',
       subcategories: Array.isArray(saved.subcategories)
         ? saved.subcategories.filter((item: unknown): item is string => typeof item === 'string')
@@ -68,6 +71,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({
       ...prev,
       filters: {
+        ...prev.filters,
         category,
         subcategories: category === prev.filters.category ? prev.filters.subcategories : [],
       },
@@ -76,11 +80,14 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
   const setSubcategories = useCallback((subcategories: string[]) => {
     setState((prev) => ({ ...prev, filters: { ...prev.filters, subcategories: [...new Set(subcategories)] } }))
   }, [])
+  const setOwner = useCallback((owner: string | null) => {
+    setState((prev) => ({ ...prev, filters: { ...prev.filters, owner } }))
+  }, [])
   const clearFilters = useCallback(() => {
-    setState((prev) => ({ ...prev, filters: { ...EMPTY } }))
+    setState((prev) => ({ ...prev, filters: { ...EMPTY, owner: prev.filters.owner } }))
   }, [])
 
-  const value = useMemo(() => ({ ...filters, setCategory, setSubcategories, clearFilters }), [filters, setCategory, setSubcategories, clearFilters])
+  const value = useMemo(() => ({ ...filters, setOwner, setCategory, setSubcategories, clearFilters }), [filters, setOwner, setCategory, setSubcategories, clearFilters])
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>
 }
 
@@ -88,4 +95,8 @@ export function useDashboardFilters() {
   const context = useContext(FilterContext)
   if (!context) throw new Error('useDashboardFilters must be used inside FilterProvider')
   return context
+}
+
+export function useDashboardFilterSelection(): DashboardFilters {
+  return useContext(FilterContext) ?? EMPTY
 }

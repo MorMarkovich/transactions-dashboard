@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Store, ShoppingBag, Hash, TrendingUp, DollarSign, Users, Crown } from 'lucide-react'
 import { transactionsApi } from '../services/api'
+import { useDashboardFilterSelection } from '../context/FilterContext'
 import type { MerchantData } from '../services/types'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import Card from '../components/ui/Card'
@@ -89,6 +90,7 @@ function MerchantsSkeleton() {
 /* ------------------------------------------------------------------ */
 
 export default function Merchants() {
+  const { owner, category: dashboardCategory, subcategories } = useDashboardFilterSelection()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
 
@@ -107,22 +109,27 @@ export default function Merchants() {
       setLoading(true)
       setError(null)
       try {
-        const data = await transactionsApi.getMerchants(sessionId, merchantCount, signal)
-        setMerchantData(data)
+        const scoped = owner || dashboardCategory || subcategories.length
+          ? await transactionsApi.scopeSession(sessionId, owner, signal, dashboardCategory, subcategories)
+          : sessionId
+        if (signal.aborted) return
+        const data = await transactionsApi.getMerchants(scoped, merchantCount, signal)
+        if (!signal.aborted) setMerchantData(data)
       } catch (err: unknown) {
+        if (signal.aborted) return
         const name = err instanceof Error ? err.name : ''
         if (name !== 'CanceledError' && name !== 'AbortError') {
           console.error('Error loading merchants:', err)
           setError('שגיאה בטעינת בתי העסק')
         }
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
 
     fetchMerchants()
     return () => controller.abort()
-  }, [sessionId, merchantCount])
+  }, [sessionId, merchantCount, owner, dashboardCategory, subcategories])
 
   // ── Computed summary stats ──────────────────────────────────────────
   const summaryStats = useMemo(() => {

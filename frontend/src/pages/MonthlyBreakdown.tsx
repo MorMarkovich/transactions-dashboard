@@ -56,7 +56,7 @@ export default function MonthlyBreakdown() {
   const [searchParams] = useSearchParams()
   const categoryColor = useCategoryColor()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters, owner: selectedOwner, setOwner: setSelectedOwner } = useDashboardFilters()
 
   // ── Data state ────────────────────────────────────────────────────
   const [comparison, setComparison] = useState<CategoryMonthlyComparisonData | null>(null)
@@ -70,7 +70,6 @@ export default function MonthlyBreakdown() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dateType, setDateType] = useState<'transaction' | 'billing'>('billing')
-  const [selectedOwner, setSelectedOwner] = useState<string | null>(null)
   // Month subset for the stacked comparison chart
   const [selectedComparisonMonths, setSelectedComparisonMonths] = useState<Set<string>>(new Set())
   // Month whose category pie is shown

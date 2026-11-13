@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import type { IncomeAnalysisData } from '../services/types'
 
 const getIncomeAnalysis = vi.fn()
+vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../services/api', () => ({
   transactionsApi: { getIncomeAnalysis: (...a: unknown[]) => getIncomeAnalysis(...a) },
 }))

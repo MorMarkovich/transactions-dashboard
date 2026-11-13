@@ -33,6 +33,7 @@ import DonutChart from '../components/charts/DonutChart'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import { persistCategoryRenameToSupabase } from '../services/categoryRenamePersistence'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
+import TransactionDrawer from '../components/table/TransactionDrawer'
 import EmptyState from '../components/common/EmptyState'
 import RefreshFromBanks from '../components/common/RefreshFromBanks'
 import OnboardingWizard from '../components/common/OnboardingWizard'
@@ -90,7 +91,7 @@ export default function Dashboard() {
   const categoryColor = useCategoryColor()
   const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
-  const { category, subcategories, setCategory, setSubcategories, clearFilters } = useDashboardFilters()
+  const { category, subcategories, setCategory, setSubcategories, clearFilters, owner: selectedOwner, setOwner: setSelectedOwner } = useDashboardFilters()
   const { setNotifications } = useAppNotifications()
   const { user } = useAuth()
   const bankSyncEnabled = canUseBankSync(user?.email)
@@ -107,6 +108,7 @@ export default function Dashboard() {
   const [anomalies, setAnomalies] = useState<AnomalyItem[]>([])
   const [monthOverview, setMonthOverview] = useState<MonthOverviewData | null>(null)
   const [categorySnapshot, setCategorySnapshot] = useState<CategorySnapshotData | null>(null)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [categoryCatalog, setCategoryCatalog] = useState<CategoryCatalog | null>(null)
   const [managerOpen, setManagerOpen] = useState(false)
   // User-created category / subcategory names (persisted in localStorage so they
@@ -153,9 +155,6 @@ export default function Dashboard() {
   // Per-person filter: list of owners in the data + the currently selected one
   // (null = everyone). The selection re-scopes every chart/metric below.
   const [owners, setOwners] = useState<string[]>([])
-  const [selectedOwner, setSelectedOwner] = useState<string | null>(
-    () => sessionStorage.getItem('dash-owner'),
-  )
 
   // Persist the view state for the rest of the browser session.
   useEffect(() => {
@@ -164,10 +163,6 @@ export default function Dashboard() {
   useEffect(() => {
     sessionStorage.setItem('dash-date-type', dateType)
   }, [dateType])
-  useEffect(() => {
-    if (selectedOwner) sessionStorage.setItem('dash-owner', selectedOwner)
-    else sessionStorage.removeItem('dash-owner')
-  }, [selectedOwner])
   const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
   const [monthOverviewError, setMonthOverviewError] = useState(false)
   const [overviewRetry, setOverviewRetry] = useState(0)
@@ -210,6 +205,12 @@ export default function Dashboard() {
 
   // ── Category drill-down drawer state ────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerTransaction, setDrawerTransaction] = useState<Transaction | null>(null)
+  const closeTransactionDetails = useCallback(() => setDrawerTransaction(null), [])
+  const handleUpdateDrawerTransaction = useCallback((updated: Transaction) => {
+    setDrawerTransactions((rows) => rows.map((row) => row.id === updated.id ? updated : row))
+    setDrawerTransaction((current) => current?.id === updated.id ? updated : current)
+  }, [])
   const [drawerCategory, setDrawerCategory] = useState('')
   // Set when the drawer was opened from the month pie: that card shows ONE
   // month, so its drawer must list that month even when the snapshot period
@@ -517,6 +518,7 @@ export default function Dashboard() {
           transactionsApi.getIncomeSources(sid, signal).catch(() => null),
         ])
 
+        if (signal.aborted) return
         setMetrics(results[0] as MetricsData)
         setDonutData(results[1] as RawDonutData)
         setMonthlyData(results[2] as RawMonthlyData)
@@ -547,6 +549,7 @@ export default function Dashboard() {
           })
         }
       } catch (err: unknown) {
+        if (signal.aborted) return
         if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         // Stale in-memory session (e.g. backend cold-start on Render's free
@@ -556,7 +559,7 @@ export default function Dashboard() {
         const message = err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
         setError(message)
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
 
@@ -615,13 +618,19 @@ export default function Dashboard() {
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
+    setSnapshotLoading(true)
     transactionsApi.scopeSession(sessionId, selectedOwner, controller.signal, category, subcategories)
       .then((sid) => transactionsApi.getCategorySnapshot(
         sid, controller.signal,
         snapshotMonthFrom || undefined, snapshotMonthTo || undefined, dateType,
       ))
-      .then((data) => { setCategorySnapshot(data); setSnapshotError(false) })
+      .then((data) => {
+        if (controller.signal.aborted) return
+        setCategorySnapshot(data)
+        setSnapshotError(false)
+      })
       .catch(() => { if (!controller.signal.aborted) setSnapshotError(true) })
+      .finally(() => { if (!controller.signal.aborted) setSnapshotLoading(false) })
     return () => controller.abort()
   }, [sessionId, snapshotMonthFrom, snapshotMonthTo, dateType, refreshKey, selectedOwner, category, subcategories, snapshotRetry])
 
@@ -921,7 +930,7 @@ export default function Dashboard() {
   }
 
   // ── Loading ───────────────────────────────────────────────────────
-  if (loading) {
+  if (loading && !metrics) {
     return (
       <div>
         <div className="card-grid-responsive">
@@ -1014,11 +1023,11 @@ export default function Dashboard() {
           {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
         </div>
         <div className="dashboard-filter-fields">
-          <label>
+          <div className="dashboard-filter-field">
             <span>קטגוריה</span>
             <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...availableCategoryNames.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
-          </label>
-          <label>
+          </div>
+          <div className="dashboard-filter-field">
             <span>תת-קטגוריה</span>
             <MultiSelect
               options={subcategoryCatalogMap[category] ?? []}
@@ -1028,7 +1037,7 @@ export default function Dashboard() {
               ariaLabel="בחירת מספר תתי-קטגוריות"
               disabled={!category}
             />
-          </label>
+          </div>
         </div>
         {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
       </details>
@@ -1184,24 +1193,21 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      {categorySnapshot && categorySnapshot.categories.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.35 }}
+      {categorySnapshot && (
+        <section aria-label="סיכום הוצאות לפי קטגוריה"
           style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
         >
           {/* ─── Header ─── */}
           <div className="section-header-v2" style={{ flexWrap: 'wrap' }}>
             <Grid3X3 size={18} />
             <span>סיכום הוצאות לפי קטגוריה</span>
-            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <bdi style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--info-muted)', color: 'var(--info)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               {snapshotMonthFrom || snapshotMonthTo
                 ? (snapshotMonthFrom && snapshotMonthTo && snapshotMonthFrom === snapshotMonthTo
                     ? snapshotMonthFrom
                     : `${snapshotMonthFrom || '...'} — ${snapshotMonthTo || '...'}`)
                 : `כל התקופה · ${categorySnapshot.month_count} חודשים`}
-            </span>
+            </bdi>
             <span style={{ fontSize: '0.6875rem', color: 'var(--accent)', fontWeight: 500, fontStyle: 'italic' }}>
               לחצו על קטגוריה לפירוט עסקאות
             </span>
@@ -1416,11 +1422,11 @@ export default function Dashboard() {
               </div>
 
               {/* Month range */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="snapshot-month-range" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>תקופה:</span>
-                <Select className="compact" ariaLabel="מתחילת התקופה" options={[{ value: '', label: 'מתחילת התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthFrom} onChange={setSnapshotMonthFrom} />
+                <Select className="compact" ariaLabel="מחודש" options={[{ value: '', label: 'מתחילת התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthFrom} onChange={setSnapshotMonthFrom} />
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>עד</span>
-                <Select className="compact" ariaLabel="סוף התקופה" options={[{ value: '', label: 'סוף התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthTo} onChange={setSnapshotMonthTo} />
+                <Select className="compact" ariaLabel="עד חודש" options={[{ value: '', label: 'סוף התקופה' }, ...availableMonths.map((m) => ({ value: m.month, label: m.month }))]} value={snapshotMonthTo} onChange={setSnapshotMonthTo} />
               </div>
 
               {/* Excluded chips */}
@@ -1438,8 +1444,19 @@ export default function Dashboard() {
             </div>
           )}
 
+          {snapshotLoading && <p className="snapshot-status" role="status">טוען סיכום הוצאות…</p>}
+          {snapshotError && !snapshotLoading && (
+            <p className="snapshot-status" role="alert">
+              לא ניתן לטעון את סיכום הקטגוריות כרגע.{' '}
+              <button type="button" onClick={() => setSnapshotRetry(n => n + 1)}>נסו שוב</button>
+            </p>
+          )}
+          {!snapshotError && !snapshotLoading && sortedSnapshotCategories.length === 0 && (
+            <p className="snapshot-status" role="status">אין הוצאות התואמות לסינון.</p>
+          )}
+
           {/* ─── Results summary ─── */}
-          <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div hidden={snapshotError && !snapshotLoading} className="snapshot-results-summary" style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span>
               {sortedSnapshotCategories.length === categorySnapshot.categories.length
                 ? `${categorySnapshot.categories.length} קטגוריות · ${categorySnapshot.total_count === 1 ? 'עסקה אחת' : `${categorySnapshot.total_count} עסקאות`}`
@@ -1456,7 +1473,7 @@ export default function Dashboard() {
           </div>
 
           {/* ─── Category cards grid ─── */}
-          <div className="dashboard-category-grid" style={{
+          <div className="dashboard-category-grid" aria-busy={snapshotLoading} inert={snapshotLoading} hidden={snapshotError && !snapshotLoading} style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
             gap: 'var(--space-sm)',
@@ -1475,24 +1492,6 @@ export default function Dashboard() {
                   onClick={() => handleCategoryCardClick(cat.name)}
                 >
                   <div style={{ display: 'flex', gap: '10px', position: 'relative' }}>
-                    {/* Exclude button */}
-                    <button
-                      className="category-hide-btn"
-                      onClick={(e) => { e.stopPropagation(); setSnapshotExcluded(prev => new Set([...prev, cat.name])) }}
-                      title={`הסתר ${cat.name}`}
-                      style={{
-                        position: 'absolute', top: '-2px', left: '-2px',
-                        width: '16px', height: '16px', borderRadius: '50%',
-                        border: '1px solid var(--border)', background: 'var(--bg-elevated)',
-                        color: 'var(--text-muted)', fontSize: '10px', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: 0, opacity: 0.4, transition: 'all 0.15s', zIndex: 2,
-                      }}
-                      onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = '1'; (e.target as HTMLElement).style.color = 'var(--danger)' }}
-                      onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = '0.4'; (e.target as HTMLElement).style.color = 'var(--text-muted)' }}
-                    >
-                      <X size={9} />
-                    </button>
                     {/* Icon */}
                     <div style={{
                       width: '40px',
@@ -1646,6 +1645,18 @@ export default function Dashboard() {
                             {cat.month_change > 0 ? '↑' : '↓'}{Math.abs(cat.month_change).toFixed(0)}%
                           </span>
                         )}
+                        <button
+                          type="button"
+                          className="category-card-hide"
+                          aria-label={`הסתר ${cat.name}`}
+                          title={`הסתר ${cat.name}`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSnapshotExcluded((previous) => new Set([...previous, cat.name]))
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
 
                       {/* Row 3: Analytical details */}
@@ -1711,7 +1722,7 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-        </motion.div>
+        </section>
       )}
 
       {/* ── Income sources (where income came from) ────────────────── */}
@@ -1996,7 +2007,8 @@ export default function Dashboard() {
       {/* ── Category Transactions Drawer ────────────────────────────── */}
       <CategoryTransactionsDrawer
         isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={() => { setDrawerOpen(false); closeTransactionDetails() }}
+        onTransactionClick={setDrawerTransaction}
         category={drawerCategory}
         month={
           drawerMonth
@@ -2018,6 +2030,15 @@ export default function Dashboard() {
         onSubcategoryChange={handleSubcategoryChange}
         onSaveNote={handleSaveNote}
         onBulkCategoryChange={handleBulkCategoryChange}
+      />
+
+      <TransactionDrawer
+        transaction={drawerTransaction}
+        isOpen={drawerOpen && drawerTransaction !== null}
+        onClose={closeTransactionDetails}
+        sessionId={sessionId}
+        owner={selectedOwner}
+        onUpdateTransaction={handleUpdateDrawerTransaction}
       />
 
       <CategoryManagerModal

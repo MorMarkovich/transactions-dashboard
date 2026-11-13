@@ -537,3 +537,75 @@
 @media (max-width: 767px) {
   .ui-input { font-size: 16px !important; }
 }
+
+.category-subtotal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.category-subtotal small { color: var(--text-muted); }
+.category-subtotal bdi { white-space: nowrap; font-family: var(--font-mono); }
+
+.category-transaction-info { flex: 1; min-width: 0; }
+button.category-transaction-info {
+  width: 100%;
+  min-height: 44px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.snapshot-status {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.snapshot-status button { color: var(--accent); text-decoration: underline; }
+.dashboard-category-grid[aria-busy='true'] { opacity: 0.45; }
+.dashboard-category-grid[hidden], .snapshot-results-summary[hidden] { display: none !important; }
+
+@media (max-width: 767px) {
+  .advanced-filter-search { flex-basis: auto !important; }
+  .transaction-drawer textarea,
+  .category-transactions-drawer :is(input:not([type='checkbox']), textarea),
+  .advanced-filters-primary input,
+  .advanced-filter-range-row input { font-size: max(16px, 1rem) !important; }
+}
+
+@media (max-width: 480px) {
+  .snapshot-month-range { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; }
+  .snapshot-month-range .ui-select-wrapper { flex: 1 0 100%; }
+  .snapshot-month-range .ui-select-trigger { min-height: 44px; }
+}
+
+.category-card-hide {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-start: auto;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.category-card-hide:hover { color: var(--danger); }
+
+@media (max-width: 1023px) {
+  .category-card-hide { min-width: 44px; min-height: 44px; }
+  .transaction-drawer, .category-transactions-drawer {
+    max-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+}

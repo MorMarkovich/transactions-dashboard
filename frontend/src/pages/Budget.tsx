@@ -21,6 +21,7 @@ import Skeleton from '../components/ui/Skeleton'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import { formatCurrency, formatPercent } from '../utils/formatting'
 import { transactionsApi } from '../services/api'
+import { useDashboardFilterSelection } from '../context/FilterContext'
 import type { MetricsData, RawDonutData } from '../services/types'
 import { useAuth } from '../lib/AuthContext'
 import { preserveRawCopy, rawBackupStillBlocking } from '../lib/budgetRawBackup'
@@ -122,6 +123,7 @@ const cardVariants = {
 // ─── Component ─────────────────────────────────────────────────────────
 
 export default function Budget() {
+  const { owner, category: dashboardCategory, subcategories } = useDashboardFilterSelection()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const sessionId = searchParams.get('session_id')
@@ -165,15 +167,21 @@ export default function Budget() {
       setLoading(true)
       setLoadError(false)
       try {
+        const scoped = owner || dashboardCategory || subcategories.length
+          ? await transactionsApi.scopeSession(sessionId, owner, signal, dashboardCategory, subcategories)
+          : sessionId
+        if (signal.aborted) return
         const [metricsRes, donutRes, snapshotRes] = await Promise.all([
-          transactionsApi.getMetrics(sessionId, signal),
-          transactionsApi.getDonutChartV2(sessionId, signal),
-          transactionsApi.getCategorySnapshot(sessionId, signal),
+          transactionsApi.getMetrics(scoped, signal),
+          transactionsApi.getDonutChartV2(scoped, signal),
+          transactionsApi.getCategorySnapshot(scoped, signal),
         ])
+        if (signal.aborted) return
         setMetrics(metricsRes)
         setDonutData(donutRes)
         setAllCategoryTotals((snapshotRes?.categories ?? []).map((c) => ({ name: c.name, total: c.total })))
       } catch (err: unknown) {
+        if (signal.aborted) return
         if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
         console.error('Error loading budget data:', err)
         setMetrics(null)
@@ -181,12 +189,12 @@ export default function Budget() {
         setAllCategoryTotals([])
         setLoadError(true)
       } finally {
-        setLoading(false)
+        if (!signal.aborted) setLoading(false)
       }
     }
     fetchData()
     return () => controller.abort()
-  }, [sessionId, reloadToken])
+  }, [sessionId, reloadToken, owner, dashboardCategory, subcategories])
 
   // Category spending map
   const categorySpending = useMemo(() => {
