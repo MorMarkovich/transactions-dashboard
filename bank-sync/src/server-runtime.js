@@ -8,7 +8,6 @@ import express from 'express'
 import { syncJsonParser, safeRequestError } from './request-body.js'
 import { safeErrorCode, safeError } from './safe-errors.js'
 import { config, assertConfig } from './config.js'
-import { getSecret, SYNC_TOKEN_KEY } from './secrets.js'
 import { runSync, tokensMatch } from './sync.js'
 
 const HOST = '127.0.0.1'
@@ -101,6 +100,7 @@ export function createSyncApp(token, sync = runSync) {
 export async function main() {
   assertConfig()
 
+  const { getSecret, SYNC_TOKEN_KEY } = await import('./secrets.js')
   const token = await getSecret(SYNC_TOKEN_KEY)
   if (!token) {
     throw safeError('SYNC_TOKEN_REQUIRED')
