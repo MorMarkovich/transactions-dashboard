@@ -5,7 +5,7 @@ const userId = '00000000-0000-4000-8000-000000000003'
 const user = { id: userId, aud: 'authenticated', role: 'authenticated', email: 'example@example.invalid', app_metadata: {}, user_metadata: {}, created_at: '2026-11-01T00:00:00Z' }
 
 async function mockProvider(page: Page, provider: 'apple' | 'google', result: 'success' | 'cancel' | 'expired') {
-  const exchange = { count: 0 }
+  const exchange = { count: 0, logouts: 0, failLogout: false }
   await page.route('http://127.0.0.1:54321/**', async (route) => {
     const url = new URL(route.request().url())
     const headers = {
@@ -33,6 +33,12 @@ async function mockProvider(page: Page, provider: 'apple' | 'google', result: 's
       return route.fulfill({ headers, json: { access_token: accessToken, refresh_token: 'synthetic-refresh', token_type: 'bearer', expires_in: 3600, user } })
     }
     if (url.pathname === '/auth/v1/user') return route.fulfill({ headers, json: user })
+    if (url.pathname === '/auth/v1/logout') {
+      exchange.logouts++
+      return exchange.failLogout
+        ? route.fulfill({ status: 500, headers, json: { message: 'Service unavailable' } })
+        : route.fulfill({ status: 204, headers })
+    }
     if (url.pathname.startsWith('/rest/v1/')) return route.fulfill({ headers, json: [] })
     return route.abort()
   })
@@ -55,6 +61,28 @@ test('Apple registration opens the new-user dashboard after provider consent', a
   await expect(page).toHaveURL('http://127.0.0.1:4173/')
   await expect(page.getByRole('heading', { name: 'הסקירה שלכם מתחילה כאן.' })).toBeVisible()
   expect(exchange.count).toBe(1)
+})
+
+test('the workspace allows sign-out without visiting the account settings', async ({ page, isMobile }) => {
+  const auth = await mockProvider(page, 'google', 'success')
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'המשיכו עם Google' }).click()
+  await expect(page.getByRole('heading', { name: 'הסקירה שלכם מתחילה כאן.' })).toBeVisible()
+
+  if (isMobile) await page.getByLabel(/תפריט חשבון/).click()
+  const signOut = page.getByRole('button', { name: 'התנתק', exact: true })
+  await expect(signOut).toBeInViewport()
+
+  auth.failLogout = true
+  await signOut.click()
+  await expect(page.getByText('ההתנתקות נכשלה. אפשר לנסות שוב.')).toBeVisible()
+
+  auth.failLogout = false
+  await signOut.click()
+  await expect(page.getByRole('heading', { name: 'כניסה לפנקס' })).toBeVisible()
+  expect(auth.logouts).toBe(2)
+  await page.goto('/transactions')
+  await expect(page).toHaveURL(/\/login$/)
 })
 
 test('Apple cancellation returns to registration with a clean URL and no exchange', async ({ page }) => {

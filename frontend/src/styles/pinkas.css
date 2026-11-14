@@ -190,7 +190,29 @@ body { background: var(--workspace-canvas); }
 .pinkas-workspace .sidebar-upload-title:hover { background: var(--bg-card-hover); }
 .pinkas-workspace .sidebar-upload-title::-webkit-details-marker { display: none; }
 .pinkas-workspace .sidebar-upload-section .sidebar-info-btn { margin: 4px 0; }
-.pinkas-workspace .sidebar-account { margin-top: auto; padding: 8px 12px 12px; }
+.pinkas-workspace .sidebar-account { margin-top: auto; padding: 8px 12px 12px; flex-shrink: 0; }
+.pinkas-workspace .sidebar-sign-out { width: 100%; background: transparent; border: 0; text-align: start; }
+.pinkas-workspace .sidebar-account :is(a, button) { min-height: 44px; }
+.pinkas-workspace .sidebar-sign-out:hover { color: var(--danger); }
+.pinkas-workspace .sign-out-error { margin: 4px 8px; color: var(--danger); font-size: 13px; }
+.pinkas-workspace button[aria-disabled="true"]:is(.sidebar-sign-out, .orbit-account-sign-out, .account-settings-sign-out) {
+  opacity: .65;
+  cursor: wait;
+}
+.pinkas-workspace .account-settings-sign-out {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 14px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.pinkas-workspace .account-settings-sign-out:hover { background: var(--bg-card-hover); }
 .pinkas-workspace .data-freshness { color: var(--text-muted); }
 
 @media (min-width: 1024px) {
@@ -214,6 +236,38 @@ body { background: var(--workspace-canvas); }
   .pinkas-workspace .orbit-brand strong { color: var(--text-primary); }
   .pinkas-workspace .orbit-brand > .pinkas-mark { display: grid; margin: 0; color: var(--accent); }
   .pinkas-workspace .orbit-tools button { border-radius: 9px; }
+  .orbit-account-menu { position: relative; }
+  .orbit-account-menu > summary { cursor: pointer; list-style: none; }
+  .orbit-account-menu > summary::-webkit-details-marker { display: none; }
+  .orbit-account-menu[open] > summary { background: var(--accent-muted); border-color: var(--accent); }
+  .orbit-account-actions {
+    position: absolute;
+    inset-block-start: calc(100% + 8px);
+    inset-inline-end: 0;
+    width: min(210px, calc(100vw - 32px));
+    padding: 5px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    box-shadow: 0 8px 24px rgb(0 0 0 / .18);
+  }
+  .pinkas-workspace .orbit-account-actions :is(a, button) {
+    display: flex;
+    align-items: center;
+    justify-content: start;
+    gap: 9px;
+    width: 100%;
+    height: auto;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .pinkas-workspace .orbit-account-actions :is(a, button):hover { background: var(--bg-card-hover); }
+  .pinkas-workspace .orbit-account-actions .orbit-account-sign-out:hover { color: var(--danger); }
 }
 @media (min-width: 1200px) { .pinkas-workspace .pulse-comparison { margin-top: 58px; } }
 @media (max-width: 460px) {
