@@ -30,12 +30,12 @@ import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFi
 import { ASSIGNABLE_CATEGORIES, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
+import BarChart from '../components/charts/BarChart'
 import DonutChart from '../components/charts/DonutChart'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import { persistCategoryRenameToSupabase } from '../services/categoryRenamePersistence'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
 import TransactionDrawer from '../components/table/TransactionDrawer'
-import EmptyState from '../components/common/EmptyState'
 import RefreshFromBanks from '../components/common/RefreshFromBanks'
 import OnboardingWizard from '../components/common/OnboardingWizard'
 import { buildSampleTransactions } from '../lib/sampleData'
@@ -610,6 +610,10 @@ export default function Dashboard() {
     }).slice(0, 12)
   }, [monthlyData])
 
+  const spendingTrend = (monthlyData?.months ?? []).slice(-6).map(({ month, amount }) => ({
+    label: formatMonthLabel(month),
+    value: Math.abs(amount),
+  }))
   const hasBillingDate = metrics?.has_billing_date ?? false
 
   // ── Sync category snapshot month with selectedMonth ──
@@ -897,37 +901,8 @@ export default function Dashboard() {
 
   // ── No session ────────────────────────────────────────────────────
   if (!sessionId) {
-    return (
-      <>
-        <EmptyState
-          icon={bankSyncEnabled ? '🏦' : '📂'}
-          title={bankSyncEnabled ? 'חברו את חשבונות הבנק והאשראי' : 'מתחילים: מעלים קובץ'}
-          text={bankSyncEnabled
-            ? 'סנכרנו את העסקאות ישירות מהבנקים וחברות האשראי — בלי להעלות קבצים ידנית.'
-            : 'העלו קובץ תנועות מהבנק או מחברת האשראי (xlsx, csv או pdf) דרך תפריט הצד, ותקבלו תמונה מלאה של ההוצאות וההכנסות.'}
-        />
-
-        {/* Primary action — pull transactions straight from the banks (owner only) */}
-        {bankSyncEnabled && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-lg)' }}>
-          <div style={{ width: '100%', maxWidth: '320px' }}>
-            <RefreshFromBanks onSynced={handleBankSynced} />
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', margin: 0, textAlign: 'center' }}>
-            דורש את כלי הסנכרון המקומי שרץ במחשב שלך · אפשר גם להעלות קובץ מהסרגל הצדי
-          </p>
-        </div>}
-
-        {bankSyncEnabled ? (
-        <div className="responsive-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-lg)', marginTop: 'var(--space-xl)' }}>
-          <div className="feature-card"><div className="feature-icon">🔄</div><div className="feature-title">{bankSyncEnabled ? 'סנכרון אוטומטי' : 'העלאת קבצים'}</div><div className="feature-desc">{bankSyncEnabled ? 'לאומי, דיסקונט, MAX וישראכרט — ישירות לדאשבורד' : 'קבצי אקסל, CSV ו-PDF מהבנק ומחברות האשראי'}</div></div>
-          <div className="feature-card"><div className="feature-icon">🏷️</div><div className="feature-title">קטגוריות אוטומטיות</div><div className="feature-desc">זיהוי חכם של קטגוריות לכל עסקה</div></div>
-          <div className="feature-card"><div className="feature-icon">📊</div><div className="feature-title">ניתוח ויזואלי</div><div className="feature-desc">גרפים אינטראקטיביים ותובנות מיידיות</div></div>
-        </div>
-        ) : (
-          <OnboardingWizard onLoadSample={handleLoadSample} />
-        )}
-      </>
-    )
+    return <OnboardingWizard onLoadSample={handleLoadSample}
+      bankSync={bankSyncEnabled && <RefreshFromBanks onSynced={handleBankSynced} />} />
   }
 
   // ── Loading ───────────────────────────────────────────────────────
@@ -980,8 +955,8 @@ export default function Dashboard() {
       <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
 
       <PageHeader
-        title="מרכז הבקרה של הכסף שלך"
-        subtitle="סקירה חודשית של ההוצאות, ההכנסות ומה שהשתנה"
+        title="סקירה פיננסית"
+        subtitle="הוצאות, הכנסות ושינויים ביחס לחודש הקודם"
         icon={LayoutDashboard}
         actions={<label className="dashboard-month-control">חודש לתצוגה
           <Select ariaLabel="חודש לתצוגה" options={availableMonths.map(m => ({ value: m.month, label: formatMonthLabel(m.month) }))} value={selectedMonth || ''} onChange={setSelectedMonth} />
@@ -1011,6 +986,16 @@ export default function Dashboard() {
         onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
         onCategory={(name) => handleCategoryCardClick(name, selectedMonth ?? undefined)}
         onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
+
+      {!loading && spendingTrend.length > 1 && (
+        <section className="workspace-trend" data-chart-label="הוצאות לפי חודש" aria-labelledby="workspace-trend-title">
+          <div className="workspace-trend-heading">
+            <div><h2 id="workspace-trend-title">הוצאות לאורך זמן</h2><p>עד שישה חודשים אחרונים</p></div>
+            <button type="button" onClick={() => navigate(`/monthly?session_id=${sessionId}`)}>השוואת חודשים <ChevronLeft size={17} /></button>
+          </div>
+          <BarChart data={spendingTrend} color="var(--chart-1)" height={isNarrow ? 168 : 206} />
+        </section>
+      )}
 
       {import.meta.env.VITE_PENDING_APPROVALS === 'true' && user && !isSampleActive() &&
         <PendingApprovals key={user.id} userId={user.id} refreshKey={refreshKey}/>}

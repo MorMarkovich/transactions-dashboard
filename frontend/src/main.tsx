@@ -4,6 +4,7 @@ import App from './App'
 import './index.css'
 import './styles/components.css'
 import './styles/redesign.css'
+import './styles/pinkas.css'
 
 // After a deploy the content-hashed chunk files this running shell references
 // no longer exist on the server, so lazy route imports fail. Vite surfaces

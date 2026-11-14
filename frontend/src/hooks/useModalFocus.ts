@@ -15,7 +15,10 @@ export function useModalFocus(open: boolean, onClose?: () => void) {
     const previous = background.map(el => el.inert)
     background.forEach(el => { el.inert = true })
     lockBodyScroll()
-    const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex="0"]')).filter(el => !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')
+    const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,[tabindex="0"]')).filter(el => {
+      const closed = el.closest('details:not([open])')
+      return (!closed || el === closed.querySelector('summary')) && !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'
+    })
     ;(focusable()[0] || drawer).focus()
     const trap = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {

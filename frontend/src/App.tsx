@@ -10,6 +10,7 @@ import Layout from './components/common/Layout'
 import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
+const Landing = lazy(() => import('./pages/Landing'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const AccountSettings = lazy(() => import('./pages/AccountSettings'))
@@ -103,6 +104,12 @@ function ProtectedPage({ children }: { children: React.ReactNode }) {
   )
 }
 
+function HomeRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <PageLoader />
+  return user ? <ProtectedPage><Dashboard /></ProtectedPage> : <Landing />
+}
+
 function AppRoutes() {
   return (
     // Outer Suspense handles the lazy Login page (no Layout needed there)
@@ -110,7 +117,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
         <Route path="/monthly" element={<ProtectedPage><MonthlyBreakdown /></ProtectedPage>} />
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />

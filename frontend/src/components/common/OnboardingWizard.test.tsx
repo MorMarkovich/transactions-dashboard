@@ -3,9 +3,9 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import OnboardingWizard, { UPLOAD_FILES_EVENT, UPLOAD_STATE_EVENT } from './OnboardingWizard'
 
 describe('OnboardingWizard', () => {
-  it('renders the three steps, upload and sample actions', () => {
+  it('renders upload and sample choices', () => {
     render(<OnboardingWizard onLoadSample={vi.fn()} />)
-    expect(screen.getByText('מייצאים קובץ')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'ייבוא עסקאות' })).toBeTruthy()
     expect(screen.getByText('בחרו קובץ להעלאה')).toBeTruthy()
     expect(screen.getByText('נסו עם נתוני דוגמה')).toBeTruthy()
   })

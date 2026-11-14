@@ -575,7 +575,7 @@ export default function DataManagement() {
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <PageHeader
-        title="ניהול נתונים"
+        title="חשבונות ונתונים"
         subtitle="צפייה מלאה, ניהול, סינון ומחיקה של כל הנתונים שלך"
         icon={Database}
       />

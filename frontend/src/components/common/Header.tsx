@@ -1,4 +1,4 @@
-import { Sun, Moon, Menu, X, Search, Orbit } from 'lucide-react'
+import { Sun, Moon, Menu, X, Search, PanelsTopLeft } from 'lucide-react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../lib/AuthContext'
@@ -34,7 +34,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
 
   return <header className="app-topbar orbit-topbar">
     <NavLink to={href('/')} className="orbit-brand" aria-label="פנקס - סקירה">
-      <Orbit size={27}/><strong>פנקס</strong><span>התמונה הפיננסית שלך</span>
+      <span className="pinkas-mark"><PanelsTopLeft size={19} aria-hidden="true" /></span><strong>פנקס</strong>
     </NavLink>
     <nav className="orbit-nav" aria-label="ניווט ראשי">
       {ORBIT_NAV.map(({to,label})=><NavLink key={to} to={href(to)} end={to==='/'}>{label}</NavLink>)}

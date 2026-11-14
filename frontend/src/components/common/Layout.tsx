@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './Header'
 import { useModalFocus } from '../../hooks/useModalFocus'
+import useMediaQuery from '../../hooks/useMediaQuery'
 import Sidebar from './Sidebar'
 import { getSampleSessionId, clearSampleSession } from '../../lib/sampleMode'
 import CommandPalette from './CommandPalette'
@@ -211,8 +212,10 @@ export default function Layout({ children }: LayoutProps) {
   const snapshotSeenKey = scoped(SNAPSHOT_SEEN_BASE, user?.id ?? '')
   const [snapshotAt, setSnapshotAt] = useState<string | null>(() => (user ? localStorage.getItem(snapshotSeenKey) : null))
 
-  // The Orbit shell uses a horizontal desktop nav; the drawer is explicit on every screen.
+  // The desktop navigation stays visible; smaller screens use a modal drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const desktopNavigation = useMediaQuery('(min-width: 1024px)')
+  const mobileSidebarOpen = sidebarOpen && !desktopNavigation
 
   const openSearch = () => { setSidebarOpen(false); setCommandPaletteOpen(true) }
 
@@ -486,7 +489,7 @@ export default function Layout({ children }: LayoutProps) {
     setSidebarOpen(false)
   }, [])
 
-  useModalFocus(sidebarOpen, closeSidebar)
+  useModalFocus(mobileSidebarOpen, closeSidebar)
 
   // File upload handler: navigate to dashboard with the new session_id
   const handleFileUploaded = useCallback(
@@ -500,17 +503,18 @@ export default function Layout({ children }: LayoutProps) {
   )
 
   return (
-    <div className="layout orbit-layout">
+    <div className="layout orbit-layout pinkas-workspace">
+      <a href="#workspace-main" className="pinkas-skip">דילוג לתוכן</a>
       <Header
         onToggleSidebar={toggleSidebar}
-        sidebarOpen={sidebarOpen}
+        sidebarOpen={mobileSidebarOpen}
         onCommandPalette={openSearch}
       />
 
       <div className="layout-content">
         {/* Sidebar */}
         <Sidebar
-          isOpen={sidebarOpen}
+          isOpen={mobileSidebarOpen}
           collapsed={false}
           onClose={closeSidebar}
           onFileUploaded={handleFileUploaded}
@@ -519,13 +523,13 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Mobile overlay backdrop */}
         <div
-          className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+          className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
           onClick={closeSidebar}
           aria-hidden="true"
         />
 
         {/* Main content area */}
-        <main className="main-content">
+        <main className="main-content" id="workspace-main">
           {newVersion && (
             <div className="update-bar" role="status">
               <span>גרסה חדשה זמינה</span>
@@ -548,7 +552,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           )}
           {!sessionValidating && snapshotAt && formatStamp(snapshotAt) && (
-            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}{runningBuild() ? ` · גרסה ${runningBuild().slice(0, 8)}` : ''}</div>
+            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}</div>
           )}
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
