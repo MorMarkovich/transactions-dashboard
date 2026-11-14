@@ -146,7 +146,7 @@ async def authorize_api_request(
 
     if not AUTH_DISABLED:
         _rate_limit(user_id, "general", 240, 60)
-    if not AUTH_DISABLED and path in {"/api/upload", "/api/restore-session", "/api/transactions/bit-import"}:
+    if not AUTH_DISABLED and path in {"/api/upload", "/api/restore-session"}:
         _rate_limit(user_id, "ingest", 30, 600)
     if not AUTH_DISABLED and is_ai:
         _rate_limit(user_id, "ai", 60, 3600)

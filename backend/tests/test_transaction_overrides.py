@@ -176,4 +176,4 @@ def test_bit_withdrawal_to_account_is_dropped_but_payments_and_cash_stay():
     descs = {t["תיאור"] for t in txns}
     assert descs == {"ביט - דני כהן", "משיכת מזומן ללא כרטיס"}
     bit = next(t for t in txns if t["תיאור"] == "ביט - דני כהן")
-    assert bit["קטגוריה"] != "העברת כספים"
+    assert bit["קטגוריה"] == "העברת כספים"

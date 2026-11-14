@@ -9,10 +9,9 @@ import math
 import logging
 import time
 import zipfile
-import csv
 from typing import Optional, Any, Literal
 from starlette.concurrency import run_in_threadpool
-from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
 import json as _json
 import datetime as _dt
 from pydantic import BaseModel, field_validator
@@ -22,8 +21,7 @@ import numpy as np
 from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
-from ..services.bit_import import MAX_BYTES as MAX_BIT_BYTES, is_generic_bit, preview_bit_import
-from ..services.bit_import_store import save_new_bit_overrides
+from ..services.bit_classification import bit_transfer_mask, classify_bit_transfers, is_generic_bit
 from ..services.data_processor import keyword_hits
 from ..services.category_rules import apply_manual_rules, manual_rule_mask
 from ..services.data_processor import (
@@ -611,6 +609,8 @@ def restore_session(body: RestoreSessionRequest):
             # above are preserved (derive only fills empty ones).
             derive_subcategory(df)
 
+            classify_bit_transfers(df, body.transaction_notes)
+
             # A verified manual choice wins over the catalog and automatic
             # suggestions, including an intentionally empty subcategory.
             apply_manual_rules(df, body.category_rules, valid_cats)
@@ -766,68 +766,6 @@ def restore_session(body: RestoreSessionRequest):
     except Exception as e:
         logger.exception("Session restore failed")
         raise HTTPException(status_code=500, detail="Failed to restore transaction session") from e
-
-
-@router.post("/transactions/bit-import")
-async def import_bit_activity(
-    sessionId: str = Query(...),
-    file: UploadFile = File(...),
-    owner: Optional[str] = Form(None),
-    selected: Optional[str] = Form(None),
-):
-    """Preview Bit classifications; a selection applies only still-valid matches."""
-    if not file.filename or not file.filename.lower().endswith('.csv'):
-        raise HTTPException(400, 'יש לבחור קובץ CSV של תנועות Bit.')
-    content = await file.read(MAX_BIT_BYTES + 1)
-    if len(content) > MAX_BIT_BYTES:
-        raise HTTPException(413, 'קובץ Bit יכול להיות בגודל של עד 2MB.')
-    return await run_in_threadpool(_import_bit_activity, sessionId, content, owner, selected)
-
-
-def _import_bit_activity(session_id: str, content: bytes, owner: str | None, selected: str | None) -> dict:
-    if '::' in session_id:
-        raise HTTPException(400, 'יש לייבא את קובץ Bit מתוך נתוני החשבון המלאים.')
-    df = sessions.get(session_id)
-    if df is None:
-        raise HTTPException(404, 'Session not found')
-    owners = _owner_labels(df)
-    if owner and owner not in owners:
-        raise HTTPException(400, 'בעל החשבון שנבחר אינו נמצא ברשימת העסקאות.')
-    if len(owners) > 1 and not owner:
-        raise HTTPException(400, 'יש לבחור את בעל החשבון לפני קריאת הקובץ.')
-    if not {'id', 'תאריך', 'סכום', 'תיאור', 'קטגוריה'}.issubset(df.columns):
-        raise HTTPException(400, 'יש לטעון עסקאות לפני ייבוא פירוט Bit.')
-    try:
-        preview = preview_bit_import(content, _filter_owner(df, owner))
-    except (ValueError, csv.Error) as error:
-        message = (str(error) if type(error) is ValueError
-                   else 'לא ניתן לקרוא את הקובץ. בחרו CSV מרשימת התנועות של Bit.')
-        raise HTTPException(400, message) from error
-    if selected is None:
-        return preview
-
-    try:
-        selection = _json.loads(selected)
-        if not isinstance(selection, list) or not selection or not all(isinstance(key, str) for key in selection):
-            raise ValueError()
-    except ValueError as error:
-        raise HTTPException(400, 'יש לבחור עסקאות לעדכון.') from error
-    by_key = {row['txn_key']: row for row in preview['proposals']}
-    if not set(selection).issubset(by_key):
-        raise HTTPException(409, 'חלק מהעסקאות השתנו. בחרו שוב את קובץ Bit כדי לרענן את ההתאמות.')
-
-    # Insert only missing overrides. A manual edit from another tab may win
-    # even if this in-memory session had not seen it yet.
-    saved = save_new_bit_overrides([by_key[key] for key in dict.fromkeys(selection)])
-    if 'קטגוריה_משנה' not in df.columns:
-        df['קטגוריה_משנה'] = ''
-    if '_locked' not in df.columns:
-        df['_locked'] = False
-    for key in saved:
-        row = by_key[key]
-        mask = (df['id'] == row['transaction_id']) & ~locked_mask(df) & ~manual_rule_mask(df)
-        df.loc[mask, ['קטגוריה', 'קטגוריה_משנה', '_locked']] = [row['category'], row['subcategory'], True]
-    return {'updated': len(saved), 'skipped': len(set(selection)) - len(saved)}
 
 
 @router.post("/transactions/note")
@@ -1523,12 +1461,6 @@ def get_owners(sessionId: str = Query(...)):
     df = sessions[sessionId]
     if '_owner' not in df.columns:
         return []
-    return _owner_labels(df)
-
-
-def _owner_labels(df: pd.DataFrame) -> list[str]:
-    if '_owner' not in df.columns:
-        return []
     # "joint" and "משותף" are the same owner: expose one label.
     vals = [('משותף' if str(o).strip().lower() == 'joint' else str(o).strip()) for o in df['_owner'].dropna().unique().tolist()]
     return sorted({v for v in vals if v and v.lower() != 'nan'})
@@ -1690,8 +1622,10 @@ def ai_audit(body: AIAuditRequest):
     expenses = df[df['סכום'] < 0] if 'סכום' in df.columns else df
     # Pinned rows ("אל תשנה עסקאות דומות") are the user's explicit word —
     # auditing them would only produce proposals that can't be applied.
-    expenses = expenses[~locked_mask(expenses) & ~manual_rule_mask(expenses)
-                        & ~foreign_card_mask(expenses['תיאור'])]
+    expenses = expenses[
+        ~locked_mask(expenses) & ~manual_rule_mask(expenses)
+        & ~foreign_card_mask(expenses['תיאור']) & ~bit_transfer_mask(expenses['תיאור'])
+    ]
     if expenses.empty:
         return {"success": True, "proposals": [], "audited_count": 0,
                 "audited_merchants": [], "remaining": 0}
@@ -1837,7 +1771,7 @@ def update_merchant_category(body: UpdateMerchantCategoryRequest):
     # each classified differently).
     mask = mask & ~locked_mask(df)
     if body.source == 'ai':
-        mask &= ~manual_rule_mask(df) & ~foreign_card_mask(df['תיאור'])
+        mask &= ~manual_rule_mask(df) & ~foreign_card_mask(df['תיאור']) & ~bit_transfer_mask(df['תיאור'])
     if not mask.any():
         return {"success": True, "merchant": body.merchant,
                 "category": new_category, "affected_count": 0}
@@ -1883,7 +1817,10 @@ def _ai_subcategorize_category(df, category: str, limit: int) -> tuple[list[dict
     cat_mask = df['קטגוריה'].astype(str) == category
     # Pinned rows ("אל תשנה עסקאות דומות") keep whatever the user chose,
     # including an intentionally empty subcategory.
-    target = cat_mask & (sub_series == '') & ~locked_mask(df) & ~manual_rule_mask(df)
+    target = (
+        cat_mask & (sub_series == '') & ~locked_mask(df) & ~manual_rule_mask(df)
+        & ~bit_transfer_mask(df['תיאור'])
+    )
     if not target.any():
         return [], 0
 

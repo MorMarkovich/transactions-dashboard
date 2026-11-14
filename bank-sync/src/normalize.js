@@ -4,6 +4,13 @@ import { categorize, applyRules, subcategorize, categoryFromIssuer, isForeignExe
 import { isBankProvider, PROVIDER_LABELS } from './providers.js'
 import { detectOwner } from './owner.js'
 
+// Keep the same Bit descriptors as the backend statement classifier.
+function isBitDescription(description) {
+  const merchant = normalizeMerchant(description)
+  return /^(?:bit(?:pay)?|ביט)(?=$|[\s*:/–-])/.test(merchant)
+    || /(?<![\p{L}\p{N}_])(?:העברה|העברת כספים|תשלום|שליחה|קבלת כספים) (?:בביט|ביט|ב[ -]?bit|bit)(?![\p{L}\p{N}_])/u.test(merchant)
+}
+
 function pad2(n) { return String(n).padStart(2, '0') }
 function ymd(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
 function mmYYYY(d) { return `${pad2(d.getMonth() + 1)}/${d.getFullYear()}` }
@@ -34,6 +41,7 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
 
   const baseDesc = (String(raw.description ?? '').trim()) || 'לא ידוע'
   const bankRow = isBankProvider(provider)
+  const bankMemo = String(raw.memo ?? '').trim()
 
   // The card company's own sector for the merchant (MAX sends it with every
   // transaction; Isracard needs the opt-in extra-info fetch). Stored so the
@@ -70,7 +78,7 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
     'סכום_מוחלט': Math.abs(amount),
     'חודש': mmYYYY(date),
     'יום_בשבוע': pandasDow(date),
-    'הערות': raw.memo ? String(raw.memo) : null,
+    'הערות': bankMemo || null,
     '_is_bank_row': bankRow,
     // Tag the account so you can filter/reconcile per card in the dashboard
     // (the existing "source" UI reads _source_file) and in `npm run verify`.
@@ -80,6 +88,11 @@ export function normalizeTxn(raw, account, ruleMap, ownerKeywords) {
     'ענף_מקור': issuerCategory || null,
     // Owner attribution: personal account → its owner; joint → name-detected.
     '_owner': detectOwner(baseDesc, acct.owner, ownerKeywords),
+  }
+
+  // Keep the provider's text apart from notes edited in the dashboard.
+  if (isBitDescription(baseDesc)) {
+    txn._bank_memo = bankMemo
   }
 
   // Billing date — credit cards only.
@@ -117,7 +130,8 @@ export function mergeSnapshots(existing, fresh) {
       // stored row is missing (e.g. account tags added in a later version).
       let changed = false
       for (const [field, val] of Object.entries(t)) {
-        if (existingRow[field] === undefined || existingRow[field] === null) {
+        if (existingRow[field] === undefined || existingRow[field] === null
+            || (field === '_bank_memo' && val && !existingRow[field])) {
           existingRow[field] = val
           changed = true
         }
