@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback, memo } from 'react'
-import { ChevronRight, ChevronLeft, Inbox, ArrowUpDown } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Inbox, ArrowUpDown, Pencil } from 'lucide-react'
 import type { Transaction } from '../../services/types'
 import { formatDate, formatCurrency } from '../../utils/formatting'
 import { get_icon } from '../../utils/constants'
@@ -12,7 +12,7 @@ interface TransactionsTableProps {
   page: number
   pageSize: number
   onPageChange: (page: number) => void
-  onRowClick?: (transaction: Transaction) => void
+  onRowClick?: (transaction: Transaction, edit?: boolean) => void
   showBillingDate?: boolean
 }
 
@@ -28,7 +28,7 @@ const TableRow = memo(function TableRow({
   showBillingDate,
 }: {
   tx: Transaction
-  onClick?: (tx: Transaction) => void
+  onClick?: (tx: Transaction, edit?: boolean) => void
   style?: React.CSSProperties
   showBillingDate?: boolean
 }) {
@@ -40,7 +40,7 @@ const TableRow = memo(function TableRow({
       onClick={() => onClick?.(tx)}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={(e) => {
-        if (!onClick) return
+        if (!onClick || e.target !== e.currentTarget) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onClick(tx)
@@ -62,6 +62,12 @@ const TableRow = memo(function TableRow({
           {get_icon(tx.קטגוריה)}
         </span>
         {tx.קטגוריה}
+        {onClick && tx.id != null && (
+          <button type="button" className="transaction-table-edit" aria-label={`שנה קטגוריה: ${tx.תיאור}`}
+            onClick={event => { event.stopPropagation(); onClick(tx, true) }}>
+            <Pencil size={14} aria-hidden="true" />
+          </button>
+        )}
       </td>
       <td className="col-notes">
         {tx.הערות ? (
@@ -88,7 +94,7 @@ const MobileTransactionCard = memo(function MobileTransactionCard({
   showBillingDate,
 }: {
   tx: Transaction
-  onClick?: (tx: Transaction) => void
+  onClick?: (tx: Transaction, edit?: boolean) => void
   showBillingDate?: boolean
 }) {
   const amount = tx.סכום

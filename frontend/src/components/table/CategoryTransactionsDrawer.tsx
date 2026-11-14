@@ -1,3 +1,4 @@
+import { isGenericBitTransaction } from '../../utils/bitTransactions'
 import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowUpDown, Calendar, Check, Edit2, Tag, Lock, StickyNote, CheckSquare, Search } from 'lucide-react'
@@ -96,6 +97,7 @@ export default function CategoryTransactionsDrawer({
   const [bulkCat, setBulkCat] = useState<string | null>(null)
   const [bulkSub, setBulkSub] = useState('')
   const [bulkOnlyThis, setBulkOnlyThis] = useState(false)
+  const bulkHasGenericBit = transactions.some(tx => tx.id != null && selectedIds.has(tx.id) && isGenericBitTransaction(tx))
   const [bulkSaving, setBulkSaving] = useState(false)
   const [transactionQuery, setTransactionQuery] = useState('')
   const [classificationQuery, setClassificationQuery] = useState('')
@@ -201,7 +203,7 @@ export default function CategoryTransactionsDrawer({
     setBulkSaving(true)
     setBulkError(false)
     try {
-      await onBulkCategoryChange(txs, bulkCat, bulkSub.trim() || null, bulkOnlyThis)
+      await onBulkCategoryChange(txs, bulkCat, bulkSub.trim() || null, bulkOnlyThis || bulkHasGenericBit)
       setSelectMode(false)
       setSelectedIds(new Set())
       setBulkCat(null)
@@ -212,7 +214,7 @@ export default function CategoryTransactionsDrawer({
     } finally {
       setBulkSaving(false)
     }
-  }, [onBulkCategoryChange, bulkCat, bulkSub, bulkOnlyThis, selectedIds, transactions])
+  }, [onBulkCategoryChange, bulkCat, bulkSub, bulkOnlyThis, bulkHasGenericBit, selectedIds, transactions])
 
   // Fresh editor state per row: pin toggle from the row's current state, no
   // staged changes, note prefilled. Deliberately NOT keyed on `transactions`
@@ -297,7 +299,7 @@ export default function CategoryTransactionsDrawer({
       const catChanged = !!nextCat && (nextCat !== curCat || (editError && pendingCat !== null))
       const subChanged = nextSub !== curSub || (editError && pendingSub !== undefined)
       const noteChanged = nextNote !== curNote
-      const pinChanged = onlyThis !== !!tx._locked
+      const pinChanged = !isGenericBitTransaction(tx) && onlyThis !== !!tx._locked
       if (!catChanged && !subChanged && !noteChanged && !pinChanged) {
         setEditingId(null)
         return
@@ -737,7 +739,7 @@ export default function CategoryTransactionsDrawer({
                             effCat !== curCat
                             || effSub !== curSub
                             || noteValue.trim() !== (tx.הערות ?? '').trim()
-                            || onlyThis !== !!tx._locked
+                            || (!isGenericBitTransaction(tx) && onlyThis !== !!tx._locked)
                           return (
                           <div
                             style={{
@@ -768,9 +770,9 @@ export default function CategoryTransactionsDrawer({
                             >
                               <input
                                 type="checkbox"
-                                checked={onlyThis}
+                                checked={onlyThis || isGenericBitTransaction(tx)}
                                 onChange={(e) => setOnlyThis(e.target.checked)}
-                                disabled={isSaving}
+                                disabled={isSaving || isGenericBitTransaction(tx)}
                                 style={{ accentColor: 'var(--accent)', margin: 0, flexShrink: 0 }}
                               />
                               <Lock size={11} style={{ flexShrink: 0 }} />
@@ -1107,9 +1109,9 @@ export default function CategoryTransactionsDrawer({
                     >
                       <input
                         type="checkbox"
-                        checked={bulkOnlyThis}
+                        checked={bulkOnlyThis || bulkHasGenericBit}
                         onChange={(e) => setBulkOnlyThis(e.target.checked)}
-                        disabled={bulkSaving}
+                        disabled={bulkSaving || bulkHasGenericBit}
                         style={{ accentColor: 'var(--accent)', margin: 0, flexShrink: 0 }}
                       />
                       <Lock size={11} style={{ flexShrink: 0 }} />

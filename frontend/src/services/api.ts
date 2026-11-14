@@ -495,8 +495,10 @@ export const transactionsApi = {
     category: string,
     subcategory: string | null,
     onlyThis: boolean,
-  ): Promise<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }> => {
-    const response = await api.post<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }>(
+  ): Promise<{ success: boolean; category: string; subcategory: string; locked: boolean;
+      items: { id: number; merchant: string; txn_key: string; subcategory: string }[]; affected_count: number }> => {
+    const response = await api.post<{ success: boolean; category: string; subcategory: string; locked: boolean;
+      items: { id: number; merchant: string; txn_key: string; subcategory: string }[]; affected_count: number }>(
       '/api/transactions/category-bulk',
       {
         session_id: sessionId,

@@ -7,6 +7,9 @@ import { supabaseApi } from '../../services/supabaseApi'
 import { useAuth } from '../../lib/AuthContext'
 import { pushOverlay, removeOverlay, isTopOverlay, lockBodyScroll, unlockBodyScroll } from '../../lib/overlayStack'
 import SimilarTransactions from './SimilarTransactions'
+import TransactionClassificationEditor from './TransactionClassificationEditor'
+import { saveTransactionEdits, type TransactionEditorChanges } from '../../services/transactionEdits'
+import Button from '../ui/Button'
 import type { Transaction as BaseTransaction } from '../../services/types'
 
 // Allow extra dynamic fields (e.g. 'ארבע ספרות אחרונות') on top of the core Transaction shape
@@ -22,9 +25,20 @@ interface TransactionDrawerProps {
   sessionId: string | null
   owner?: string | null
   onUpdateTransaction?: (updated: Transaction) => void
+  onClassificationChanged?: () => void
+  startEditing?: boolean
 }
 
-export default function TransactionDrawer({ transaction, isOpen, onClose, sessionId, owner = null, onUpdateTransaction }: TransactionDrawerProps) {
+export default function TransactionDrawer(props: TransactionDrawerProps) {
+  return <TransactionDrawerDetails key={`${props.sessionId}:${props.transaction?.id ?? props.transaction?.תיאור ?? ''}:${props.isOpen}`} {...props} />
+}
+
+function TransactionDrawerDetails({
+  transaction, isOpen, onClose, sessionId, owner = null, onUpdateTransaction, onClassificationChanged, startEditing = false,
+}: TransactionDrawerProps) {
+  const [editing, setEditing] = useState(startEditing)
+  const [related, setRelated] = useState<Transaction | null>(null)
+  const active = related ?? transaction
   // Overlay stack id: this drawer closes on Escape only when it is the
   // topmost overlay, so a palette/modal above it closes first.
   const overlayIdRef = useRef<string | null>(null)
@@ -90,29 +104,29 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
     }
   }, [isOpen])
 
-  const amount = transaction?.סכום ?? 0
+  const amount = active?.סכום ?? 0
   const isExpense = amount < 0
 
-  const [notes, setNotes] = useState<string>(transaction?.הערות ?? '')
+  const [notes, setNotes] = useState<string>(active?.הערות ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setNotes(transaction?.הערות ?? '')
+    setNotes(active?.הערות ?? '')
     setError(null)
     setSaving(false)
-  }, [transaction])
+  }, [active])
 
   const { user } = useAuth()
 
   const handleSaveNotes = useCallback(async () => {
-    if (!transaction || !sessionId || typeof transaction.id !== 'number') {
+    if (!active || !sessionId || typeof active.id !== 'number') {
       return
     }
     try {
       setSaving(true)
       setError(null)
-      const resp = await transactionsApi.updateTransactionNote(sessionId, transaction.id, notes)
+      const resp = await transactionsApi.updateTransactionNote(sessionId, active.id, notes)
       // Persist by fingerprint so the note survives restores and cold starts.
       if (user && resp.txn_key) {
         if (notes.trim()) {
@@ -121,20 +135,30 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
           await supabaseApi.deleteTransactionNote(user.id, resp.txn_key).catch(() => {})
         }
       }
-      if (onUpdateTransaction) {
-        onUpdateTransaction({ ...transaction, הערות: notes })
-      }
+      const updated = { ...active, הערות: resp.notes ?? '' }
+      if (related) setRelated(updated)
+      onUpdateTransaction?.(updated)
     } catch (e) {
       console.error('Failed to save notes', e)
       setError('שמירת ההערות נכשלה. נסו שוב.')
     } finally {
       setSaving(false)
     }
-  }, [transaction, sessionId, notes, onUpdateTransaction, user])
+  }, [active, sessionId, notes, onUpdateTransaction, related, user])
+
+  const handleSaveClassification = async (changes: TransactionEditorChanges) => {
+    if (!active || !sessionId) return
+    const { updated, warning } = await saveTransactionEdits(sessionId, user?.id, active, changes)
+    if (related) setRelated(updated)
+    if (changes.note !== undefined) setNotes(updated.הערות ?? '')
+    onUpdateTransaction?.(updated)
+    if (changes.classification) onClassificationChanged?.()
+    return warning
+  }
 
   return (
     <AnimatePresence>
-      {isOpen && transaction && (
+      {isOpen && active && (
         <>
           {/* Backdrop */}
           <motion.div
@@ -270,50 +294,73 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
               <DetailRow
                 icon={<FileText size={16} />}
                 label="תיאור"
-                value={transaction.תיאור}
+                value={active.תיאור}
               />
 
               {/* Date */}
               <DetailRow
                 icon={<Calendar size={16} />}
                 label="תאריך"
-                value={formatDate(transaction.תאריך)}
+                value={formatDate(active.תאריך)}
               />
 
               {/* Billing date (when the card issuer supplies one) */}
-              {transaction.תאריך_חיוב && (
+              {active.תאריך_חיוב && (
                 <DetailRow
                   icon={<Calendar size={16} />}
                   label="תאריך חיוב"
-                  value={formatDate(transaction.תאריך_חיוב)}
+                  value={formatDate(active.תאריך_חיוב)}
                 />
               )}
 
               {/* Category */}
-              {transaction.קטגוריה && (
+              {active.קטגוריה && (
                 <DetailRow
                   icon={<Tag size={16} />}
                   label="קטגוריה"
-                  value={transaction.קטגוריה}
+                  value={active.קטגוריה}
                 />
               )}
 
               {/* Card type / last 4 digits if available */}
-              {transaction['ארבע ספרות אחרונות'] && (
+              {active['ארבע ספרות אחרונות'] && (
                 <DetailRow
                   icon={<CreditCard size={16} />}
                   label="כרטיס"
-                  value={`**** ${transaction['ארבע ספרות אחרונות']}`}
+                  value={`**** ${active['ארבע ספרות אחרונות']}`}
                 />
               )}
 
-              {isOpen && sessionId && typeof transaction.id === 'number' && (
-                <SimilarTransactions key={JSON.stringify([sessionId, transaction.id, owner])}
-                  sessionId={sessionId} transactionId={transaction.id} owner={owner} />
+              {active.קטגוריה_משנה && (
+                <DetailRow icon={<Tag size={16} />} label="תת־קטגוריה" value={active.קטגוריה_משנה} />
+              )}
+              {related && <Button type="button" size="sm" variant="ghost" onClick={() => {
+                setRelated(null)
+                setEditing(false)
+              }}>חזרה לעסקה המקורית</Button>}
+              {sessionId && typeof active.id === 'number' && (
+                editing ? (
+                  <TransactionClassificationEditor
+                    key={active.id}
+                    transaction={active}
+                    sessionId={sessionId}
+                    userId={user?.id}
+                    onSave={handleSaveClassification}
+                    onClose={() => setEditing(false)}
+                  />
+                ) : (
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(true)} disabled={saving}>
+                    שנה קטגוריה
+                  </Button>
+                )
+              )}
+              {isOpen && sessionId && typeof active.id === 'number' && (
+                <SimilarTransactions key={JSON.stringify([sessionId, active.id, owner])}
+                  sessionId={sessionId} transactionId={active.id} owner={owner}
+                  onEdit={item => { setRelated(item); setEditing(true) }} />
               )}
 
-              {/* Manual notes */}
-              <div
+              {!editing && <div
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -356,7 +403,7 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                   <button
                     type="button"
                     onClick={handleSaveNotes}
-                    disabled={saving || !sessionId || !transaction}
+                    disabled={saving || !sessionId || !active}
                     style={{
                       padding: '8px 14px',
                       borderRadius: '999px',
@@ -372,7 +419,7 @@ export default function TransactionDrawer({ transaction, isOpen, onClose, sessio
                     {saving ? 'שומר...' : 'שמור הערות'}
                   </button>
                 </div>
-              </div>
+              </div>}
             </div>
           </motion.div>
         </>

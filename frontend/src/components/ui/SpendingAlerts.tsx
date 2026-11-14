@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, TrendingUp, Repeat, DollarSign, X, Lightbulb } from 'lucide-react'
-import type { MetricsData, AnomalyItem, RecurringTransaction, ForecastData } from '../../services/types'
+import type { MetricsData, AnomalyItem, RecurringTransaction, ForecastData, Transaction } from '../../services/types'
 import { formatCurrency } from '../../utils/formatting'
+import Button from './Button'
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ interface Alert {
   icon: React.ReactNode
   title: string
   description: string
+  transaction?: Transaction
 }
 
 interface SpendingAlertsProps {
@@ -21,6 +23,7 @@ interface SpendingAlertsProps {
   forecast?: ForecastData | null
   dismissedAlerts?: Set<string>
   onDismiss?: (id: string) => void
+  onEditTransaction?: (tx: Transaction) => void
 }
 
 const COLORS = {
@@ -36,6 +39,7 @@ export default function SpendingAlerts({
   forecast,
   dismissedAlerts = new Set(),
   onDismiss,
+  onEditTransaction,
 }: SpendingAlertsProps) {
   const alerts = useMemo<Alert[]>(() => {
     const result: Alert[] = []
@@ -70,6 +74,7 @@ export default function SpendingAlerts({
         type: 'warning',
         icon: <AlertTriangle size={18} />,
         title: `חריגה: ${a.description}`,
+        transaction: a.transaction,
         description: `${formatCurrency(a.amount)} (ממוצע קטגוריה: ${formatCurrency(a.category_mean)})`,
       })
     })
@@ -151,6 +156,11 @@ export default function SpendingAlerts({
                   {alert.description}
                 </p>
               </div>
+              {onEditTransaction && alert.transaction?.id != null && (
+                <Button type="button" size="sm" variant="ghost" onClick={() => onEditTransaction(alert.transaction!)}>
+                  שנה קטגוריה
+                </Button>
+              )}
               {onDismiss && (
                 <button
                   onClick={() => onDismiss(alert.id)}

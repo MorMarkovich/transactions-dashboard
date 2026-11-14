@@ -94,10 +94,10 @@ def test_merchant_wide_update_skips_locked_rows():
 
 def test_only_this_endpoint_pins_and_normal_edit_unpins():
     sid = _restore([
-        {"id": 1, "תאריך": "2026-07-05", "תיאור": "העברה בביט",
+        {"id": 1, "תאריך": "2026-07-05", "תיאור": "חנות משחקים לדוגמה",
          "קטגוריה": "שונות", "סכום": -100.0},
     ])
-    expected_key = txn_fingerprint("2026-07-05", -100.0, "העברה בביט")
+    expected_key = txn_fingerprint("2026-07-05", -100.0, "חנות משחקים לדוגמה")
 
     resp = client.post("/api/transactions/category", json={
         "session_id": sid, "transaction_id": 1,
@@ -109,7 +109,7 @@ def test_only_this_endpoint_pins_and_normal_edit_unpins():
 
     # A merchant-wide edit now has nothing to touch.
     resp = client.post("/api/merchants/category", json={
-        "session_id": sid, "merchant": "העברה בביט", "category": "העברת כספים",
+        "session_id": sid, "merchant": "חנות משחקים לדוגמה", "category": "העברת כספים",
     }).json()
     assert resp["affected_count"] == 0
     assert _rows(sid)[1]["קטגוריה"] == "אירועים ומתנות"
@@ -176,4 +176,4 @@ def test_bit_withdrawal_to_account_is_dropped_but_payments_and_cash_stay():
     descs = {t["תיאור"] for t in txns}
     assert descs == {"ביט - דני כהן", "משיכת מזומן ללא כרטיס"}
     bit = next(t for t in txns if t["תיאור"] == "ביט - דני כהן")
-    assert bit["קטגוריה"] != "העברת כספים"
+    assert bit["קטגוריה"] == "העברת כספים"

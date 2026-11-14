@@ -1,3 +1,4 @@
+import { isGenericBitTransaction } from '../utils/bitTransactions'
 import { defaultMonth } from '../utils/defaultMonth'
 import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
 import { useCategoryColor } from '../hooks/useCategoryColor'
@@ -269,6 +270,11 @@ export default function Dashboard() {
     await loadDrawerTransactions(categoryName, false, entryMonth)
   }, [sessionId, loadDrawerTransactions])
 
+  const reloadAfterClassification = useCallback(() => {
+    setRefreshKey(value => value + 1)
+    if (drawerOpen && drawerCategory) void loadDrawerTransactions(drawerCategory, true, drawerMonth)
+  }, [drawerOpen, drawerCategory, drawerMonth, loadDrawerTransactions])
+
   // ── Manual category override ──
   // Persists the new category in two places: (1) the in-memory backend
   // session, so the current dashboard view updates immediately; (2) a
@@ -286,13 +292,13 @@ export default function Dashboard() {
           addCustomCategory(newCategory)
           if (user) await supabaseApi.upsertUserCategory(user.id, newCategory)
         }
-        if (user && onlyThis && resp.txn_key) {
+        if (user && resp.locked && resp.txn_key) {
           // "אל תשנה עסקאות דומות": pin ONLY this transaction — no merchant
           // rule, so similar transactions (e.g. other ביט transfers) keep
           // their own categories, now and on every future restore.
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, newCategory, null)
-        } else if (user && !onlyThis) {
+        } else if (user && !resp.locked) {
           if (resp.merchant) {
             await supabaseApi.upsertCategoryRule(user.id, resp.merchant, newCategory)
           }
@@ -326,12 +332,12 @@ export default function Dashboard() {
         if (newSubcategory && resp.category) {
           addCustomSubcategory(resp.category, newSubcategory)
         }
-        if (user && onlyThis && resp.txn_key && resp.category) {
+        if (user && resp.locked && resp.txn_key && resp.category) {
           // Pin this transaction's {category, subcategory} without creating a
           // merchant-wide rule.
           await supabaseApi
             .upsertTransactionOverride(user.id, resp.txn_key, resp.category, newSubcategory || null)
-        } else if (user && !onlyThis && resp.merchant && resp.category) {
+        } else if (user && !resp.locked && resp.merchant && resp.category) {
           await supabaseApi
             .upsertCategorySubrule(user.id, resp.merchant, resp.category, newSubcategory)
         }
@@ -360,7 +366,7 @@ export default function Dashboard() {
         }
         if (newSubcategory) addCustomSubcategory(newCategory, newSubcategory)
         if (user) {
-          if (onlyThis) {
+          if (resp.locked ?? (onlyThis || txs.some(isGenericBitTransaction))) {
             // Pin each selected row.
             await Promise.all(resp.items.map((it) =>
               supabaseApi.upsertTransactionOverride(user.id, it.txn_key, newCategory, newSubcategory),
@@ -2029,11 +2035,12 @@ export default function Dashboard() {
 
       <TransactionDrawer
         transaction={drawerTransaction}
-        isOpen={drawerOpen && drawerTransaction !== null}
+        isOpen={drawerTransaction !== null}
         onClose={closeTransactionDetails}
         sessionId={sessionId}
         owner={selectedOwner}
         onUpdateTransaction={handleUpdateDrawerTransaction}
+        onClassificationChanged={reloadAfterClassification}
       />
 
       <CategoryManagerModal

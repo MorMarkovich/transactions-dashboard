@@ -152,6 +152,9 @@ export default function Transactions() {
   // Drawer state
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [startEditing, setStartEditing] = useState(false)
+  const [classificationRevision, setClassificationRevision] = useState(0)
+  const reloadAfterClassification = useCallback(() => setClassificationRevision(value => value + 1), [])
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -172,7 +175,7 @@ export default function Transactions() {
       })
 
     return () => controller.abort()
-  }, [sessionId])
+  }, [sessionId, classificationRevision])
 
   useEffect(() => {
     if (!sessionId) return
@@ -183,7 +186,7 @@ export default function Transactions() {
       )))
       .catch(() => setSubcategoryMap({}))
     return () => controller.abort()
-  }, [sessionId])
+  }, [sessionId, classificationRevision])
 
   // Skip the first run: on mount the restored view (saved page + filters)
   // must survive; only an actual category CHANGE resets the page.
@@ -235,6 +238,7 @@ export default function Transactions() {
           apiFilters,
           controller.signal,
         )
+        if (controller.signal.aborted) return
         setTransactions(response.transactions)
         setTotal(response.total)
         setServerTotalAmount(response.total_amount ?? 0)
@@ -254,14 +258,14 @@ export default function Transactions() {
         if (typeof err === 'object' && err !== null && 'name' in err && (err as { name: string }).name === 'CanceledError') return
         console.error('Error loading transactions:', err)
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
 
     fetchTransactions()
 
     return () => controller.abort()
-  }, [sessionId, filters, page, pageSize, category, subcategories, owner])
+  }, [sessionId, filters, page, pageSize, category, subcategories, owner, classificationRevision])
 
   // ---- Computed stats -------------------------------------------------------
   const stats = useMemo(() => ({
@@ -581,7 +585,11 @@ export default function Transactions() {
           page={total > 0 ? Math.min(page, totalPages) : page}
           pageSize={pageSize}
           onPageChange={handlePageChange}
-          onRowClick={(tx) => { setSelectedTransaction(tx); setDrawerOpen(true) }}
+          onRowClick={(tx, edit) => {
+            setSelectedTransaction(tx)
+            setStartEditing(!!edit)
+            setDrawerOpen(true)
+          }}
           showBillingDate={transactions.some((tx) => !!tx.תאריך_חיוב)}
         />
       )}
@@ -593,6 +601,8 @@ export default function Transactions() {
         sessionId={sessionId}
         owner={owner}
         onUpdateTransaction={handleUpdateTransaction}
+        onClassificationChanged={reloadAfterClassification}
+        startEditing={startEditing}
       />
     </div>
   )
