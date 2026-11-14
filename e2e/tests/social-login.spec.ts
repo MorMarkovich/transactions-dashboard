@@ -54,6 +54,33 @@ test('Google returns to the requested protected page after a single PKCE exchang
   expect(await page.evaluate(() => sessionStorage.getItem('pinkas-social-login'))).toBeNull()
 })
 
+test('the public theme follows the user from landing through sign-in to the workspace', async ({ page }) => {
+  await mockProvider(page, 'google', 'success')
+  await page.goto('/')
+  const canvas = (selector: string) => page.locator(selector).evaluate(element => getComputedStyle(element).backgroundColor)
+
+  await expect(page.getByRole('heading', { name: /כל הכסף שלכם/ })).toBeVisible()
+  const darkCanvas = await canvas('.pinkas-landing')
+  await page.getByRole('button', { name: 'מעבר למצב בהיר' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  const lightCanvas = await canvas('.pinkas-landing')
+  expect(lightCanvas).not.toBe(darkCanvas)
+
+  const demo = page.getByRole('region', { name: 'הדגמת פנקס' })
+  await demo.getByRole('button', { name: 'עסקאות', exact: true }).click()
+  await expect(demo.getByRole('heading', { name: 'עסקאות אחרונות' })).toBeVisible()
+  await page.getByRole('banner').getByRole('link', { name: 'התחברות', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'כניסה לפנקס' })).toBeVisible()
+  expect(await canvas('.pinkas-auth')).toBe(lightCanvas)
+
+  await page.getByRole('button', { name: 'המשיכו עם Google' }).click()
+  await expect(page.getByRole('heading', { name: 'הסקירה שלכם מתחילה כאן.' })).toBeVisible()
+  expect(await canvas('.pinkas-workspace')).toBe(lightCanvas)
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.getByRole('heading', { name: 'הסקירה שלכם מתחילה כאן.' })).toBeVisible()
+})
+
 test('Apple registration opens the new-user dashboard after provider consent', async ({ page }) => {
   const exchange = await mockProvider(page, 'apple', 'success')
   await page.goto('/login?mode=register')

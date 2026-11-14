@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { ThemeProvider } from '../context/ThemeContext'
 
 const updateUser = vi.fn()
 const getSession = vi.fn()
@@ -24,7 +25,7 @@ import ResetPassword from './ResetPassword'
 function renderPage() {
   return render(
     <MemoryRouter>
-      <ResetPassword />
+      <ThemeProvider><ResetPassword /></ThemeProvider>
     </MemoryRouter>
   )
 }

@@ -10,6 +10,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { ThemeProvider } from '../context/ThemeContext'
 
 const signInWithPassword = vi.fn()
 const signUp = vi.fn()
@@ -32,6 +33,10 @@ import Login from './Login'
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>
 const HEBREW = /[א-ת]/
+
+function renderLogin() {
+  return render(<MemoryRouter><ThemeProvider><AuthProvider><Login /></AuthProvider></ThemeProvider></MemoryRouter>)
+}
 
 describe('F1: authErrorMessage mapping', () => {
   it('maps malformed email to Hebrew', () => {
@@ -79,9 +84,6 @@ describe('F1 via context methods', () => {
 })
 
 describe('F2: focus moves to the new heading on auth page switch', () => {
-  function renderLogin() {
-    return render(<MemoryRouter><AuthProvider><Login /></AuthProvider></MemoryRouter>)
-  }
   it('forgot-password switch focuses its heading', async () => {
     renderLogin()
     fireEvent.click(await screen.findByRole('button', { name: 'שכחתי סיסמה' }))
@@ -106,7 +108,7 @@ describe('F2: focus moves to the new heading on auth page switch', () => {
 describe('F3: register confirmation clears passwords', () => {
   it('password fields are emptied and email kept after needsConfirmation', async () => {
     signUp.mockResolvedValue({ data: { user: { identities: [{}] }, session: null }, error: null })
-    render(<MemoryRouter><AuthProvider><Login /></AuthProvider></MemoryRouter>)
+    renderLogin()
     fireEvent.click(await screen.findByRole('button', { name: 'צור חשבון חדש' }))
     fireEvent.change(await screen.findByLabelText('שם מלא'), { target: { value: 'Test User' } })
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), { target: { value: 't@example.com' } })
