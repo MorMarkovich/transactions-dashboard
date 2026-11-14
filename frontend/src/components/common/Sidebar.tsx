@@ -26,6 +26,7 @@ import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
 import RefreshFromBanks from './RefreshFromBanks'
 import PinkasBrand from './PinkasBrand'
+import SignOutButton from './SignOutButton'
 import { useAuth } from '../../lib/AuthContext'
 import { scoped, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
 import { transactionsApi } from '../../services/api'
@@ -427,7 +428,12 @@ export default function Sidebar({
               </div>
             )}
           </details>
-          <div className="sidebar-account"><NavLink className="sidebar-nav-link" to={buildNavHref('/account')} onClick={onClose}><Settings size={18} /> הגדרות</NavLink></div>
+          <div className="sidebar-account">
+            <NavLink className="sidebar-nav-link" to={buildNavHref('/account')} onClick={onClose}>
+              <Settings size={18} aria-hidden="true" /> הגדרות חשבון
+            </NavLink>
+            <SignOutButton className="sidebar-nav-link sidebar-sign-out" />
+          </div>
         </>
       )}
 

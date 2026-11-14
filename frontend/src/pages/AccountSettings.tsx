@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { User, UserCog, Mail, Lock, Trash2, LogOut } from 'lucide-react'
+import { User, UserCog, Mail, Lock, Trash2 } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
+import SignOutButton from '../components/common/SignOutButton'
 import Card from '../components/ui/Card'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
@@ -15,7 +16,7 @@ import './AccountSettings.css'
 // gradient icon, glass cards, dashboard spacing) — keep it that way.
 // ---------------------------------------------------------------------------
 export default function AccountSettings() {
-  const { user, updateDisplayName, updateEmail, updatePassword, signOut } = useAuth()
+  const { user, updateDisplayName, updateEmail, updatePassword } = useAuth()
 
   const currentName = (user?.user_metadata?.full_name as string | undefined) || ''
   const currentEmail = user?.email || ''
@@ -86,17 +87,7 @@ export default function AccountSettings() {
         title="הגדרות חשבון"
         subtitle="ניהול פרטי ההתחברות והפרופיל שלך"
         icon={UserCog}
-        actions={
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            icon={<LogOut size={16} />}
-            onClick={() => { void signOut() }}
-          >
-            התנתק
-          </Button>
-        }
+        actions={<SignOutButton className="account-settings-sign-out" />}
       />
 
       <div className="account-sections">
