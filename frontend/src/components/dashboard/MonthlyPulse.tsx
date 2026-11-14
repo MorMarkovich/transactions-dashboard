@@ -60,8 +60,8 @@ export default function MonthlyPulse(p: Props) {
         <strong className="pulse-focal">{current ? <bdi dir="ltr">{formatCurrency(current.total_expenses)}</bdi> : p.loading ? 'טוען...' : 'לא זמין'}</strong>
         <div className="pulse-context"><span>{current ? `${current.transaction_count} עסקאות` : 'הנתונים מתעדכנים'}</span><span className="pulse-basis">{change?.percent != null && <bdi className={change.amount > 0 ? 'amount-negative' : 'amount-positive'} dir="ltr">{change.amount > 0 ? '+' : ''}{change.percent.toFixed(1)}%</bdi>}{change?.percent != null && <span aria-hidden="true"> · </span>}{p.dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'} · {p.owner === 'joint' ? 'משותף' : p.owner || 'כולם'}</span></div>
       </div>
-      <div className="pulse-income orbit-kpi"><span className="orbit-kpi-overline">תמונת מצב חודשית</span><span>הכנסות שנקלטו</span><strong><bdi dir="ltr">{current ? formatCurrency(current.total_income) : '-'}</bdi></strong><small>{current?.total_income === 0 ? 'לא נקלטו הכנסות בסינון הזה' : 'לפי הנתונים בדשבורד'}</small></div>
-        <div className="pulse-net orbit-kpi"><span className="orbit-kpi-overline">סיכום החודש</span><span>הכנסות פחות הוצאות</span><strong className={net < 0 ? 'amount-negative' : 'amount-positive'}><bdi dir="ltr">{current ? formatCurrency(net, true) : '-'}</bdi></strong><small>לא יתרת חשבון הבנק</small></div>
+      <div className="pulse-income orbit-kpi"><span>הכנסות שנקלטו</span><strong><bdi dir="ltr">{current ? formatCurrency(current.total_income) : '-'}</bdi></strong><small>{current?.total_income === 0 ? 'לא נקלטו הכנסות בסינון הזה' : ''}</small></div>
+        <div className="pulse-net orbit-kpi"><span>הכנסות פחות הוצאות</span><strong className={net < 0 ? 'amount-negative' : 'amount-positive'}><bdi dir="ltr">{current ? formatCurrency(net, true) : '-'}</bdi></strong><small>לא יתרת חשבון הבנק</small></div>
     </div>
     <div className="pulse-comparison">
       <div className="comparison-title"><span>לעומת {priorMonth ? monthLabel(priorMonth) : 'החודש הקודם'}</span>{change && (change.amount > 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>)}</div>

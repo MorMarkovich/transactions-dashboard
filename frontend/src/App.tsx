@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -6,12 +6,14 @@ import { NotificationProvider } from './context/NotificationContext'
 import { FilterProvider } from './context/FilterContext'
 import { safeReturnTo } from './lib/returnTo'
 import ErrorBoundary from './components/ui/ErrorBoundary'
-import Layout from './components/common/Layout'
 import { Loader2 } from 'lucide-react'
 
 // Lazy-loaded pages for code splitting
+const Layout = lazy(() => import('./components/common/Layout'))
+const Landing = lazy(() => import('./pages/Landing'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const SocialCallback = lazy(() => import('./pages/SocialCallback'))
 const AccountSettings = lazy(() => import('./pages/AccountSettings'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Transactions = lazy(() => import('./pages/Transactions'))
@@ -63,7 +65,7 @@ function ContentLoader() {
   )
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
@@ -91,7 +93,7 @@ function LoginRoute() {
 
 // Wraps every protected page: auth guard + shared Layout + per-route Suspense
 // so the header and sidebar are never unmounted during page transitions.
-function ProtectedPage({ children }: { children: React.ReactNode }) {
+function ProtectedPage({ children }: { children: ReactNode }) {
   return (
     <ProtectedRoute>
       <Layout>
@@ -103,14 +105,23 @@ function ProtectedPage({ children }: { children: React.ReactNode }) {
   )
 }
 
+function HomeRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <PageLoader />
+  return user ? <ProtectedPage><Dashboard /></ProtectedPage> : <Landing />
+}
+
 function AppRoutes() {
+  const { user } = useAuth()
+  usePrefetchPages(Boolean(user))
   return (
     // Outer Suspense handles the lazy Login page (no Layout needed there)
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
+        <Route path="/auth/callback" element={<SocialCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/transactions" element={<ProtectedPage><Transactions /></ProtectedPage>} />
         <Route path="/monthly" element={<ProtectedPage><MonthlyBreakdown /></ProtectedPage>} />
         <Route path="/trends" element={<ProtectedPage><Trends /></ProtectedPage>} />
@@ -148,22 +159,29 @@ const PAGE_LOADERS = [
   () => import('./pages/DataManagement'),
 ]
 
-function usePrefetchPages() {
+function usePrefetchPages(enabled: boolean) {
   useEffect(() => {
-    const idle = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+    if (!enabled) return
+    let idleHandle: number | undefined
     const timers: number[] = []
     const run = () => {
       PAGE_LOADERS.forEach((load, i) => {
         timers.push(window.setTimeout(() => { load().catch(() => {}) }, i * 250))
       })
     }
-    const handle = window.setTimeout(() => (idle ? idle(run) : run()), 2500)
-    return () => { window.clearTimeout(handle); timers.forEach((t) => window.clearTimeout(t)) }
-  }, [])
+    const handle = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') idleHandle = window.requestIdleCallback(run)
+      else run()
+    }, 2500)
+    return () => {
+      window.clearTimeout(handle)
+      if (idleHandle !== undefined) window.cancelIdleCallback(idleHandle)
+      timers.forEach(window.clearTimeout)
+    }
+  }, [enabled])
 }
 
 export default function App() {
-  usePrefetchPages()
   return (
     <ThemeProvider>
       <ErrorBoundary>

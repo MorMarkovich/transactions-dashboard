@@ -101,48 +101,35 @@ const MobileTransactionCard = memo(function MobileTransactionCard({
   const isPositive = amount > 0
 
   return (
-    <button
-      type="button"
-      className="transaction-mobile-card"
-      onClick={() => onClick?.(tx)}
-      aria-disabled={!onClick}
-      tabIndex={onClick ? 0 : -1}
-    >
-      <div className="transaction-mobile-main">
-        <div className="transaction-mobile-title-row">
-          <span className="transaction-mobile-title">{tx.תיאור}</span>
-          <span
-            className="transaction-mobile-amount"
-            style={{ color: isPositive ? 'var(--success)' : 'var(--danger)' }}
-          >
-            {formatCurrency(amount)}
-          </span>
-        </div>
-        <div className="transaction-mobile-meta">
-          <span>{formatDate(tx.תאריך)}</span>
-          {showBillingDate && (
-            <>
+    <div className="transaction-mobile-card">
+      <button type="button" className="transaction-mobile-detail" onClick={() => onClick?.(tx)}
+        aria-disabled={!onClick} tabIndex={onClick ? 0 : -1}>
+        <div className="transaction-mobile-main">
+          <div className="transaction-mobile-title-row">
+            <span className="transaction-mobile-title">{tx.תיאור}</span>
+            <span className="transaction-mobile-amount" style={{ color: isPositive ? 'var(--success)' : 'var(--danger)' }}>
+              {formatCurrency(amount)}
+            </span>
+          </div>
+          <div className="transaction-mobile-meta">
+            <span>{formatDate(tx.תאריך)}</span>
+            {showBillingDate && <>
               <span aria-hidden="true">·</span>
-              <span>
-                {tx.תאריך_חיוב ? formatDate(tx.תאריך_חיוב) : 'תאריך חיוב לא זמין'}
-              </span>
-            </>
-          )}
+              <span>{tx.תאריך_חיוב ? formatDate(tx.תאריך_חיוב) : 'תאריך חיוב לא זמין'}</span>
+            </>}
+          </div>
         </div>
-      </div>
-
-      <div className="transaction-mobile-footer">
-        <span className="transaction-mobile-category">
-          <span aria-hidden="true">{get_icon(tx.קטגוריה)}</span>
-          {tx.קטגוריה}
-        </span>
-        {tx.הערות && (
-          <span className="transaction-mobile-notes" title={tx.הערות}>
-            הערות
-          </span>
-        )}
-      </div>
-    </button>
+        <div className="transaction-mobile-footer">
+          <span className="transaction-mobile-category"><span aria-hidden="true">{get_icon(tx.קטגוריה)}</span>{tx.קטגוריה}</span>
+          {tx.הערות && <span className="transaction-mobile-notes" title={tx.הערות}>הערות</span>}
+        </div>
+      </button>
+      {onClick && tx.id != null && (
+        <button type="button" className="transaction-table-edit transaction-mobile-edit" aria-label={`שנה קטגוריה: ${tx.תיאור}`} onClick={() => onClick(tx, true)}>
+          <Pencil size={15} aria-hidden="true" />
+        </button>
+      )}
+    </div>
   )
 })
 

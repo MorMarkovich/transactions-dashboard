@@ -91,8 +91,6 @@ export default function Transactions() {
   const { category, subcategories, setCategory, setSubcategories, clearFilters, owner } = useDashboardFilters()
 
   // Data state
-  // On phones the search and the transaction list come first; the summary and category analysis sit below, collapsed.
-  const [analysisOpen] = useState(() => !window.matchMedia('(max-width: 640px)').matches)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [total, setTotal] = useState(0)
   const [serverTotalAmount, setServerTotalAmount] = useState(0)
@@ -367,11 +365,11 @@ export default function Transactions() {
     <div className="transactions-page">
       <PageHeader
         title="עסקאות"
-        subtitle="צפייה וניתוח מעמיק של העסקאות שלך"
+        subtitle="חפשו עסקאות ועדכנו את הסיווג שלהן"
         icon={Receipt}
       />
 
-      <details className="tx-analysis" open={analysisOpen}>
+      <details className="tx-analysis">
         <summary>סיכום וניתוח לפי קטגוריה</summary>
       {/* ── Primary Stats Row ─────────────────────────────────────────── */}
       <div className="orbit-transaction-metrics">

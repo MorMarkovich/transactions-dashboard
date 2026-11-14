@@ -17,7 +17,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Info,
-  CreditCard,
+  Settings,
   Search,
   Sun,
   Moon,
@@ -25,6 +25,7 @@ import {
 import { useTheme } from '../../context/ThemeContext'
 import Badge from '../ui/Badge'
 import RefreshFromBanks from './RefreshFromBanks'
+import PinkasBrand from './PinkasBrand'
 import { useAuth } from '../../lib/AuthContext'
 import { scoped, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
 import { transactionsApi } from '../../services/api'
@@ -72,7 +73,7 @@ const NAV_SECTIONS = [
   {
     label: 'ניהול',
     items: [
-      { to: '/data-management', label: 'ניהול מידע', icon: Database },
+      { to: '/data-management', label: 'חשבונות ונתונים', icon: Database },
     ],
   },
 ]
@@ -275,7 +276,7 @@ export default function Sidebar({
 
   return (
     <aside role={isOpen ? "dialog" : undefined} aria-modal={isOpen ? true : undefined} aria-label="תפריט ניהול וניווט" tabIndex={-1} className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
-      <div className="studio-brand"><CreditCard size={26}/>{!collapsed && <div><strong>פנקס</strong><small>התמונה הפיננסית שלך</small></div>}</div>
+      <div className="studio-brand"><PinkasBrand to={buildNavHref('/')} onClick={onClose} /></div>
       <div className="studio-sidebar-tools"><button onClick={onSearch} aria-label="חיפוש"><Search size={18}/>{!collapsed && <span>חיפוש <kbd dir="ltr">⌘K</kbd></span>}</button><button onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
       {/* ─── Close button (mobile only) ─── */}
       <button
@@ -287,7 +288,7 @@ export default function Sidebar({
       </button>
 
       {/* ─── Navigation ─── */}
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-label="ניווט בסביבת העבודה">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label} className="sidebar-section">
             {!collapsed && (
@@ -336,19 +337,22 @@ export default function Sidebar({
       {!collapsed && (
         <>
           <div className="sidebar-divider" />
-          <div className="sidebar-upload-section">
-            <div className="sidebar-upload-title">
+          <div className="sidebar-data-actions">
+            <RefreshFromBanks onSynced={handleBankSynced} sidebarClosed={!isOpen} />
+          </div>
+          <details className="sidebar-upload-section">
+            <summary className="sidebar-upload-title">
               <FolderOpen size={16} />
               <span>העלאת קובץ</span>
-              <button
-                className="sidebar-info-btn"
-                onClick={() => setShowFormats(!showFormats)}
-                aria-label="פורמטים נתמכים"
-                title="פורמטים נתמכים"
-              >
-                <Info size={14} />
-              </button>
-            </div>
+            </summary>
+            <button
+              className="sidebar-info-btn"
+              onClick={() => setShowFormats(!showFormats)}
+              aria-label="פורמטים נתמכים"
+              title="פורמטים נתמכים"
+            >
+              <Info size={14} />
+            </button>
 
             <div className="file-upload-area">
               <input
@@ -394,8 +398,6 @@ export default function Sidebar({
               </label>
             </div>
 
-            <RefreshFromBanks onSynced={handleBankSynced} sidebarClosed={!isOpen} />
-
             {error && <div className="sidebar-error">{error}</div>}
 
             {droppedRows && (() => {
@@ -424,7 +426,8 @@ export default function Sidebar({
                 </div>
               </div>
             )}
-          </div>
+          </details>
+          <div className="sidebar-account"><NavLink className="sidebar-nav-link" to={buildNavHref('/account')} onClick={onClose}><Settings size={18} /> הגדרות</NavLink></div>
         </>
       )}
 

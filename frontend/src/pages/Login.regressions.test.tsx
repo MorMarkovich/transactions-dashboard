@@ -98,7 +98,7 @@ describe('F2: focus moves to the new heading on auth page switch', () => {
     renderLogin()
     fireEvent.click(await screen.findByRole('button', { name: 'שכחתי סיסמה' }))
     fireEvent.click(await screen.findByRole('button', { name: 'חזור' }))
-    const heading = await screen.findByRole('heading', { name: /ברוך הבא/ })
+    const heading = await screen.findByRole('heading', { name: /כניסה לפנקס/ })
     await waitFor(() => expect(document.activeElement).toBe(heading))
   })
 })

@@ -17,7 +17,11 @@ export function safeReturnTo(raw: unknown): string {
   }
   if (decoded.includes('\\') || decoded.includes('//')) return '/'
   if (!decoded.startsWith('/')) return '/'
-  if (decoded === '/login' || decoded.startsWith('/login?')) return '/'
-  if (decoded === '/reset-password' || decoded.startsWith('/reset-password?')) return '/'
-  return raw
+  const base = 'https://pinkas.invalid'
+  let parsed: URL
+  try { parsed = new URL(decoded, base) } catch { return '/' }
+  if (parsed.origin !== base) return '/'
+  const normalizedPath = parsed.pathname.replace(/\/$/, '').toLowerCase()
+  if (['/login', '/reset-password', '/auth/callback'].includes(normalizedPath)) return '/'
+  return raw.split('#', 1)[0]
 }

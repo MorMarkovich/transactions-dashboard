@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { authErrorMessage } from '../lib/AuthContext'
-import { CreditCard, Lock, ArrowRight } from 'lucide-react'
-import Input from '../components/ui/Input'
-import Button from '../components/ui/Button'
+import { ArrowLeft, LoaderCircle } from 'lucide-react'
+import AuthFrame from '../components/common/AuthFrame'
 
 // ---------------------------------------------------------------------------
 // Landing page for the password-recovery email link. Supabase parses the
@@ -54,99 +53,28 @@ export default function ResetPassword() {
     window.setTimeout(() => navigate('/', { replace: true }), 1800)
   }
 
+  const title = status === 'ready' ? 'בחירת סיסמה חדשה'
+    : status === 'invalid' ? 'הקישור לא תקין'
+    : status === 'done' ? 'הסיסמה עודכנה' : 'איפוס סיסמה'
+
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-6"
-      style={{ background: 'var(--bg-primary)', direction: 'rtl' }}
-    >
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 rounded-full opacity-20 blur-[120px]" style={{ background: '#818cf8' }} />
-        <div className="absolute bottom-1/4 left-1/4 w-80 h-80 rounded-full opacity-15 blur-[100px]" style={{ background: '#a78bfa' }} />
-      </div>
-
-      <div
-        className="relative z-10 w-full max-w-[420px] rounded-3xl p-6 sm:p-8"
-        style={{
-          background: 'var(--bg-card)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid var(--border-color)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-        }}
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #818cf8, #6d28d9)' }}
-          >
-            <CreditCard className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>פנקס</span>
-        </div>
-
-        {status === 'checking' && (
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>מאמת את הקישור…</p>
-        )}
-
-        {status === 'invalid' && (
-          <div>
-            <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>הקישור לא תקין 🔑</h2>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-              קישור האיפוס פג תוקף או שכבר נוצל. בקש קישור חדש מעמוד ההתחברות.
-            </p>
-            <Link to="/login" style={{ textDecoration: 'none' }}>
-              <Button type="button" variant="primary" size="lg" fullWidth icon={<ArrowRight size={16} />}>
-                לעמוד ההתחברות
-              </Button>
-            </Link>
-          </div>
-        )}
-
-        {status === 'ready' && (
-          <form onSubmit={handleSubmit} noValidate>
-            <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>בחירת סיסמה חדשה 🔑</h2>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>הזן סיסמה חדשה לחשבון שלך</p>
-            <div className="space-y-3">
-              <Input
-                type="password"
-                placeholder="סיסמה חדשה"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                icon={<Lock size={18} />}
-                aria-label="סיסמה חדשה"
-                aria-invalid={!!error || undefined}
-                autoComplete="new-password"
-              />
-              <Input
-                type="password"
-                placeholder="אימות סיסמה חדשה"
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-                icon={<Lock size={18} />}
-                aria-label="אימות סיסמה חדשה"
-                aria-invalid={!!error || undefined}
-                autoComplete="new-password"
-              />
-            </div>
-            {error && (
-              <div role="alert" style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--accent-danger, #ef4444)', fontSize: '0.8125rem', fontWeight: 500 }}>
-                {error}
-              </div>
-            )}
-            <div style={{ marginTop: '1.25rem' }}>
-              <Button type="submit" variant="primary" size="lg" fullWidth loading={loading}>
-                שמור סיסמה חדשה
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {status === 'done' && (
-          <div>
-            <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>הסיסמה עודכנה ✓</h2>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>מעביר אותך לדשבורד…</p>
-          </div>
-        )}
-      </div>
-    </div>
+    <AuthFrame title={title} description="עדכון הסיסמה לחשבון פנקס.">
+      {status === 'checking' && <p role="status">מאמת את הקישור…</p>}
+      {status === 'invalid' && <>
+        <p className="auth-feedback auth-error" role="alert">קישור האיפוס פג תוקף או שכבר נוצל. אפשר לבקש קישור חדש מעמוד ההתחברות.</p>
+        <Link to="/login" className="auth-submit">לעמוד ההתחברות <ArrowLeft size={18} /></Link>
+      </>}
+      {status === 'ready' && <form className="pinkas-auth-form" onSubmit={handleSubmit}>
+        <label>סיסמה חדשה
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" dir="rtl" required />
+        </label>
+        <label>אימות סיסמה חדשה
+          <input type="password" value={password2} onChange={(event) => setPassword2(event.target.value)} autoComplete="new-password" dir="rtl" required />
+        </label>
+        {error && <p className="auth-feedback auth-error" role="alert">{error}</p>}
+        <button type="submit" className="auth-submit" disabled={loading}>שמור סיסמה חדשה {loading ? <LoaderCircle size={18} className="animate-spin" /> : <ArrowLeft size={18} />}</button>
+      </form>}
+      {status === 'done' && <p className="auth-feedback auth-success" role="status">הדשבורד ייפתח מיד.</p>}
+    </AuthFrame>
   )
 }

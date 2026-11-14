@@ -11,17 +11,35 @@
   border-radius: var(--radius-md);
   background: var(--glass-bg);
   color: var(--text-primary);
-  padding: 12px 14px;
+  display: flex;
+  align-items: center;
   text-align: right;
   font-family: var(--font-family);
 }
 
-.transaction-mobile-card:not([aria-disabled='true']) {
+.transaction-mobile-detail:not([aria-disabled='true']) {
   cursor: pointer;
 }
 
-.transaction-mobile-card[aria-disabled='true'] {
+.transaction-mobile-detail[aria-disabled='true'] {
   cursor: default;
+}
+
+.transaction-mobile-detail {
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  padding: 12px 14px;
+  text-align: start;
+  border-radius: inherit;
+}
+
+.transaction-mobile-card .transaction-mobile-edit {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-inline: 0 5px;
 }
 
 .transaction-mobile-main {
