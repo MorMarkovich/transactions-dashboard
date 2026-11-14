@@ -276,3 +276,27 @@ body { background: var(--workspace-canvas); }
   .pinkas-workspace .transactions-page .date-chips button { padding-inline: 2px; white-space: normal; }
   .pinkas-workspace .tx-analysis { margin-block: 14px 0; }
 }
+
+.auth-social { display: grid; gap: 9px; }
+.auth-social button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 11px;
+  width: 100%; min-height: 46px; padding: 8px 16px; border: 1px solid #767780;
+  border-radius: 999px; background: #fff; color: #1f1f1f; cursor: pointer;
+  font-size: 15px; font-weight: 700;
+}
+.auth-social button:hover:not(:disabled) { border-color: var(--pinkas-blue); box-shadow: 0 0 0 1px var(--pinkas-blue); }
+.auth-social button:disabled { cursor: default; opacity: .7; }
+.auth-social button img { display: block; width: 18px; height: 18px; object-fit: contain; }
+.auth-social-status { color: #4c526c; font-size: 13px; margin-top: 8px; text-align: center; }
+.auth-method-divider { display: flex; align-items: center; gap: 10px; color: #54566c; font-size: 13px; margin-block: 15px; }
+.auth-method-divider::before, .auth-method-divider::after { content: ''; height: 1px; background: #e2e2ec; flex: 1; }
+.pinkas-auth-card > .auth-feedback { margin-bottom: 12px; }
+.auth-callback-status { display: flex; align-items: center; justify-content: center; gap: 9px; }
+.pinkas-auth :is(button, a):focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.auth-text-button:disabled { opacity: .6; cursor: default; }
+
+.pinkas-auth .pinkas-mark, .pinkas-landing .pinkas-mark { --pinkas-mark-bg: #ffffff20; }
+@media (max-width: 460px) {
+  .pinkas-auth-main { padding-block: 24px 42px; }
+  .pinkas-auth-form input { font-size: 16px; }
+}

@@ -1,8 +1,8 @@
-import { defineConfig } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test'
 
 // Layout checks run against the production build served by `vite preview`.
 // The build needs dummy Supabase env vars (the client throws without a URL);
-// no network call is made on the auth pages.
+// OAuth requests are intercepted by the browser tests.
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
@@ -12,10 +12,12 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     locale: 'he-IL',
     colorScheme: 'dark',
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'desktop-1280', use: { viewport: { width: 1280, height: 800 } } },
     { name: 'mobile-390', use: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } },
+    { name: 'safari-mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'webkit' } },
   ],
   webServer: {
     command: 'npm --prefix ../frontend run preview -- --host 127.0.0.1 --port 4173 --strictPort',

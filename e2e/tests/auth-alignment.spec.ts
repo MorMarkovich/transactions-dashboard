@@ -73,3 +73,17 @@ test('login page carries the product name', async ({ page }) => {
   await expect(page).toHaveTitle(/פנקס/)
   await expect(page.getByText('פנקס', { exact: true }).locator('visible=true').first()).toBeVisible()
 })
+
+test('public pages do not load the signed-in workspace bundles', async ({ page }) => {
+  const workspaceScripts: string[] = []
+  page.on('request', request => {
+    if (/\/assets\/(Layout|Dashboard|Transactions|charts|motion)-[\w-]+\.js$/.test(new URL(request.url()).pathname)) {
+      workspaceScripts.push(request.url())
+    }
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: /כל הכסף שלכם/ })).toBeVisible()
+  await page.getByRole('link', { name: 'התחברות', exact: true }).first().click()
+  await expect(page.getByRole('heading', { name: 'כניסה לפנקס' })).toBeVisible()
+  expect(workspaceScripts).toEqual([])
+})

@@ -100,6 +100,7 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo('/%5C%5Cevil.example')).toBe('/')     // encoded backslashes
     expect(safeReturnTo('%2F%2Fevil.example')).toBe('/')      // encoded protocol-relative
     expect(safeReturnTo('/%2f%2fevil.example')).toBe('/')
+    expect(safeReturnTo('/%09/evil.example')).toBe('/')
     expect(safeReturnTo('/%zz')).toBe('/')                    // malformed encoding
     expect(safeReturnTo('')).toBe('/')
   })
@@ -111,6 +112,8 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo('/login')).toBe('/')
     expect(safeReturnTo('/login?x=1')).toBe('/')
     expect(safeReturnTo('/reset-password')).toBe('/')
+    expect(safeReturnTo('/x/../AUTH/callback/?code=example')).toBe('/')
+    expect(safeReturnTo('/transactions?search=cafe#access_token=example')).toBe('/transactions?search=cafe')
     expect(safeReturnTo(undefined)).toBe('/')
     expect(safeReturnTo(42)).toBe('/')
   })
