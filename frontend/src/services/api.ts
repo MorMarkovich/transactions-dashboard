@@ -181,7 +181,47 @@ api.interceptors.response.use(undefined, async (error) => {
   throw error;
 });
 
+export interface BitImportPreview {
+  proposals: {
+    transaction_id: number;
+    txn_key: string;
+    date: string;
+    transaction_date: string;
+    amount: number;
+    reason: string;
+    category: string;
+    subcategory: string;
+  }[];
+  counts: Partial<Record<'total' | 'unmatched' | 'ambiguous' | 'already_classified' | 'unknown_reason' | 'invalid' | 'not_completed' | 'incoming', number>>;
+}
+
+function bitImportForm(file: File, owner: string, selected?: string[]) {
+  const form = new FormData();
+  form.append('file', file);
+  if (owner) form.append('owner', owner);
+  if (selected) form.append('selected', JSON.stringify(selected));
+  return form;
+}
+
 export const transactionsApi = {
+  previewBitImport: async (sessionId: string, file: File, owner: string): Promise<BitImportPreview> => {
+    const response = await api.post<BitImportPreview>('/api/transactions/bit-import', bitImportForm(file, owner), {
+      params: { sessionId },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  applyBitImport: async (sessionId: string, file: File, owner: string, selected: string[]) => {
+    const response = await api.post<{ updated: number; skipped: number }>(
+      '/api/transactions/bit-import', bitImportForm(file, owner, selected), {
+        params: { sessionId },
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
+    return response.data;
+  },
+
   /**
    * List the distinct owners (people) present in the session, for the
    * per-person filter. Returns [] when transactions aren't owner-tagged.
@@ -495,8 +535,10 @@ export const transactionsApi = {
     category: string,
     subcategory: string | null,
     onlyThis: boolean,
-  ): Promise<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }> => {
-    const response = await api.post<{ success: boolean; category: string; subcategory: string; items: { id: number; merchant: string; txn_key: string }[]; affected_count: number }>(
+  ): Promise<{ success: boolean; category: string; subcategory: string; locked: boolean;
+      items: { id: number; merchant: string; txn_key: string; subcategory: string }[]; affected_count: number }> => {
+    const response = await api.post<{ success: boolean; category: string; subcategory: string; locked: boolean;
+      items: { id: number; merchant: string; txn_key: string; subcategory: string }[]; affected_count: number }>(
       '/api/transactions/category-bulk',
       {
         session_id: sessionId,

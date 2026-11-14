@@ -1,3 +1,5 @@
+import TransactionDrawer from '../components/table/TransactionDrawer'
+import Button from '../components/ui/Button'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Wallet, CalendarDays, Hash, TrendingUp, Search, ChevronDown, ChevronUp, Building2, Tag, type LucideIcon } from 'lucide-react'
@@ -10,7 +12,7 @@ import { useCategoryColor } from '../hooks/useCategoryColor'
 import BarChart from '../components/charts/BarChart'
 import { transactionsApi } from '../services/api'
 import { useDashboardFilterSelection } from '../context/FilterContext'
-import type { IncomeAnalysisData, IncomeTransactionDetail } from '../services/types'
+import type { IncomeAnalysisData, IncomeTransactionDetail, Transaction } from '../services/types'
 import { formatCurrency, formatDate, hebOwner } from '../utils/formatting'
 
 export default function Income() {
@@ -21,6 +23,7 @@ export default function Income() {
   const [loadError,setLoadError]=useState(false); const [reloadTick,setReloadTick]=useState(0)
   const [month,setMonth]=useState(''); const [source,setSource]=useState(''); const [category,setCategory]=useState(''); const [search,setSearch]=useState('')
   const [selected,setSelected]=useState<IncomeTransactionDetail|null>(null)
+  const [editTransaction, setEditTransaction] = useState<Transaction | null>(null)
   useEffect(() => {
     if (!sessionId) return
     const controller = new AbortController()
@@ -70,6 +73,21 @@ export default function Income() {
       {loadError&&<div className="income-load-error" role="alert"><span>העדכון האחרון נכשל - מוצגים הנתונים הקודמים.</span><button type="button" onClick={()=>setReloadTick(n=>n+1)}>נסו שוב</button></div>}
       <div className="income-charts"><Card className="glass-card"><h3>הרכב הכנסות לפי מקור</h3><div className="income-source-ranking">{sources.map((item,i)=><button key={item.name} onClick={()=>setSource(item.name)}><span className="rank-number">{String(i+1).padStart(2,'0')}</span><bdi className="income-source-name">{item.name}</bdi><bdi dir="ltr">{formatCurrency(item.value)}</bdi><span className="rank-bar"><i style={{width:`${item.value/(sources[0]?.value||1)*100}%`,background:categoryColor(item.name)}}/></span></button>)}</div></Card><Card className="glass-card"><h3>הכנסות לאורך זמן</h3><BarChart data={months.map(x=>({label:x.name,value:x.value}))} height={310}/></Card></div>
       <Card className="glass-card income-ledger"><div className="income-ledger-title"><h3>כל ההכנסות ({visible.length})</h3>{visible.length>0&&<span>לחצו על שורה לכל הפרטים</span>}</div>{visible.length===0?<EmptyState icon="🔎" title={search?`אין הכנסות שמתאימות ל״${search}״`:'אין הכנסות להצגה'} text={search?'הגרפים למעלה מציגים את כל ההכנסות בסינון הנוכחי, בלי החיפוש. נקו את החיפוש כדי לראות את הרשימה.':'נסו לשנות את הסינון'}/>:<div className="income-table-wrap"><table><thead><tr><th>תאריך</th><th>מקור</th><th>קטגוריה</th><th>חשבון</th><th>סכום</th><th/></tr></thead><tbody>{visible.map(x=><tr key={x.id} onClick={()=>setSelected(selected?.id===x.id?null:x)} className={selected?.id===x.id?'selected':''}><td>{formatDate(x.date)}</td><td><strong><bdi>{x.source}</bdi></strong></td><td>{x.category||'ללא קטגוריה'}</td><td><span style={{whiteSpace:'nowrap'}}>{hebOwner(x.account)}</span></td><td className="income-amount">{formatCurrency(x.amount)}</td><td>{selected?.id===x.id?<ChevronUp size={16}/>:<ChevronDown size={16}/>}</td></tr>)}</tbody></table></div>}
-      {selected&&<div className="income-detail"><div><CalendarDays/><span>תאריך</span><strong>{formatDate(selected.date)}</strong></div><div><Building2/><span>מקור / חשבון</span><strong><span style={{whiteSpace:'nowrap'}}>{hebOwner(selected.source)}</span> · <span style={{whiteSpace:'nowrap'}}>{hebOwner(selected.account)}</span></strong></div><div><Tag/><span>סיווג</span><strong>{[selected.category,selected.subcategory].filter(Boolean).join(' / ')||'לא סווג'}</strong></div><div><Wallet/><span>סכום</span><strong>{formatCurrency(selected.amount)}</strong></div>{selected.notes&&<p><b>הערות:</b> {selected.notes}</p>}</div>}</Card>
-    </>}</div>
+      {selected&&<div className="income-detail"><div><CalendarDays/><span>תאריך</span><strong>{formatDate(selected.date)}</strong></div><div><Building2/><span>מקור / חשבון</span><strong><span style={{whiteSpace:'nowrap'}}>{hebOwner(selected.source)}</span> · <span style={{whiteSpace:'nowrap'}}>{hebOwner(selected.account)}</span></strong></div><div><Tag/><span>סיווג</span><strong>{[selected.category,selected.subcategory].filter(Boolean).join(' / ')||'לא סווג'}</strong></div><div><Wallet/><span>סכום</span><strong>{formatCurrency(selected.amount)}</strong></div>{selected.notes&&<p><b>הערות:</b> {selected.notes}</p>}{selected.transaction?.id != null && (
+        <Button type="button" size="sm" variant="secondary" onClick={() => setEditTransaction(selected.transaction ?? null)}>
+          שנה קטגוריה
+        </Button>
+      )}</div>}</Card>
+    </>}
+    {editTransaction && <TransactionDrawer
+      transaction={editTransaction}
+      isOpen={editTransaction !== null}
+      startEditing
+      onClose={() => setEditTransaction(null)}
+      sessionId={sessionId}
+      owner={owner}
+      onUpdateTransaction={updated => setEditTransaction(current => current?.id === updated.id ? updated : current)}
+      onClassificationChanged={() => setReloadTick(value => value + 1)}
+    />}
+  </div>
 }

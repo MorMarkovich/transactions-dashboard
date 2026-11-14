@@ -1,3 +1,5 @@
+import BitImport from '../components/table/BitImport'
+import { isSampleActive } from '../lib/sampleMode'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -282,6 +284,7 @@ export default function DataManagement() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const sessionId = searchParams.get('session_id')
+  const [showBitImport, setShowBitImport] = useState(false)
 
   // ── Storage & session state ─────────────────────────────────────────
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
@@ -579,6 +582,14 @@ export default function DataManagement() {
         subtitle="צפייה מלאה, ניהול, סינון ומחיקה של כל הנתונים שלך"
         icon={Database}
       />
+
+      {sessionId && !isSampleActive() && (
+        showBitImport ? <BitImport key={sessionId} sessionId={sessionId} /> : (
+          <Button type="button" variant="secondary" onClick={() => setShowBitImport(true)}>
+            ייבוא פירוט מ־Bit
+          </Button>
+        )
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  STORAGE OVERVIEW CARDS                                        */}

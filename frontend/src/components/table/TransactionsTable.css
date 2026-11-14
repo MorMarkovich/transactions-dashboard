@@ -131,3 +131,19 @@
     min-width: 0;
   }
 }
+
+.transaction-table-edit {
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  padding: 5px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.transaction-table-edit:hover,
+.transaction-table-edit:focus-visible {
+  background: var(--glass-bg-hover);
+}

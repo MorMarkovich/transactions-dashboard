@@ -9,9 +9,10 @@ import math
 import logging
 import time
 import zipfile
+import csv
 from typing import Optional, Any, Literal
 from starlette.concurrency import run_in_threadpool
-from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException, Depends
 import json as _json
 import datetime as _dt
 from pydantic import BaseModel, field_validator
@@ -21,6 +22,8 @@ import numpy as np
 from io import BytesIO
 
 from ..services.data_loader import load_transaction_file
+from ..services.bit_import import MAX_BYTES as MAX_BIT_BYTES, is_generic_bit, preview_bit_import
+from ..services.bit_import_store import save_new_bit_overrides
 from ..services.data_processor import keyword_hits
 from ..services.category_rules import apply_manual_rules, manual_rule_mask
 from ..services.data_processor import (
@@ -765,6 +768,68 @@ def restore_session(body: RestoreSessionRequest):
         raise HTTPException(status_code=500, detail="Failed to restore transaction session") from e
 
 
+@router.post("/transactions/bit-import")
+async def import_bit_activity(
+    sessionId: str = Query(...),
+    file: UploadFile = File(...),
+    owner: Optional[str] = Form(None),
+    selected: Optional[str] = Form(None),
+):
+    """Preview Bit classifications; a selection applies only still-valid matches."""
+    if not file.filename or not file.filename.lower().endswith('.csv'):
+        raise HTTPException(400, 'יש לבחור קובץ CSV של תנועות Bit.')
+    content = await file.read(MAX_BIT_BYTES + 1)
+    if len(content) > MAX_BIT_BYTES:
+        raise HTTPException(413, 'קובץ Bit יכול להיות בגודל של עד 2MB.')
+    return await run_in_threadpool(_import_bit_activity, sessionId, content, owner, selected)
+
+
+def _import_bit_activity(session_id: str, content: bytes, owner: str | None, selected: str | None) -> dict:
+    if '::' in session_id:
+        raise HTTPException(400, 'יש לייבא את קובץ Bit מתוך נתוני החשבון המלאים.')
+    df = sessions.get(session_id)
+    if df is None:
+        raise HTTPException(404, 'Session not found')
+    owners = _owner_labels(df)
+    if owner and owner not in owners:
+        raise HTTPException(400, 'בעל החשבון שנבחר אינו נמצא ברשימת העסקאות.')
+    if len(owners) > 1 and not owner:
+        raise HTTPException(400, 'יש לבחור את בעל החשבון לפני קריאת הקובץ.')
+    if not {'id', 'תאריך', 'סכום', 'תיאור', 'קטגוריה'}.issubset(df.columns):
+        raise HTTPException(400, 'יש לטעון עסקאות לפני ייבוא פירוט Bit.')
+    try:
+        preview = preview_bit_import(content, _filter_owner(df, owner))
+    except (ValueError, csv.Error) as error:
+        message = (str(error) if type(error) is ValueError
+                   else 'לא ניתן לקרוא את הקובץ. בחרו CSV מרשימת התנועות של Bit.')
+        raise HTTPException(400, message) from error
+    if selected is None:
+        return preview
+
+    try:
+        selection = _json.loads(selected)
+        if not isinstance(selection, list) or not selection or not all(isinstance(key, str) for key in selection):
+            raise ValueError()
+    except ValueError as error:
+        raise HTTPException(400, 'יש לבחור עסקאות לעדכון.') from error
+    by_key = {row['txn_key']: row for row in preview['proposals']}
+    if not set(selection).issubset(by_key):
+        raise HTTPException(409, 'חלק מהעסקאות השתנו. בחרו שוב את קובץ Bit כדי לרענן את ההתאמות.')
+
+    # Insert only missing overrides. A manual edit from another tab may win
+    # even if this in-memory session had not seen it yet.
+    saved = save_new_bit_overrides([by_key[key] for key in dict.fromkeys(selection)])
+    if 'קטגוריה_משנה' not in df.columns:
+        df['קטגוריה_משנה'] = ''
+    if '_locked' not in df.columns:
+        df['_locked'] = False
+    for key in saved:
+        row = by_key[key]
+        mask = (df['id'] == row['transaction_id']) & ~locked_mask(df) & ~manual_rule_mask(df)
+        df.loc[mask, ['קטגוריה', 'קטגוריה_משנה', '_locked']] = [row['category'], row['subcategory'], True]
+    return {'updated': len(saved), 'skipped': len(set(selection)) - len(saved)}
+
+
 @router.post("/transactions/note")
 @_offload
 def update_transaction_note(body: UpdateTransactionNoteRequest):
@@ -841,7 +906,8 @@ def update_transaction_category(body: UpdateTransactionCategoryRequest):
     merchant = str(row['תיאור']) if 'תיאור' in df.columns else None
     txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
 
-    if body.only_this:
+    only_this = body.only_this or is_generic_bit(merchant or "")
+    if only_this:
         # "אל תשנה עסקאות דומות": this row only, pinned. The old subcategory
         # belonged to the old category (restore clears it the same way).
         df.loc[mask, 'קטגוריה'] = new_category
@@ -871,7 +937,7 @@ def update_transaction_category(body: UpdateTransactionCategoryRequest):
     # save a merchant→category rule without a separate round-trip — and the
     # row's stable fingerprint for persisting a single-transaction override.
     return {"success": True, "merchant": merchant, "category": new_category,
-            "txn_key": txn_key, "locked": bool(body.only_this),
+            "txn_key": txn_key, "locked": only_this,
             "affected_count": affected}
 
 
@@ -925,7 +991,8 @@ def bulk_update_category(body: BulkUpdateCategoryRequest):
         for _, row in df.loc[sel_mask].iterrows()
     ]
 
-    if body.only_this:
+    only_this = body.only_this or any(is_generic_bit(item["merchant"]) for item in items)
+    if only_this:
         df.loc[sel_mask, 'קטגוריה'] = new_category
         df.loc[sel_mask, 'קטגוריה_משנה'] = new_sub
         df.loc[sel_mask, '_locked'] = True
@@ -941,14 +1008,17 @@ def bulk_update_category(body: BulkUpdateCategoryRequest):
         derive_subcategory(df)
         # The explicit bulk subcategory is the user's word — applied AFTER the
         # seeded derivation, like the single-row subcategory editor.
-        if new_sub:
+        if body.subcategory is not None:
             df.loc[apply_mask, 'קטגוריה_משנה'] = new_sub
         df.loc[apply_mask, '_manual_rule'] = True
         affected = int(apply_mask.sum())
 
+    for item, subcategory in zip(items, df.loc[sel_mask, 'קטגוריה_משנה']):
+        item["subcategory"] = _to_json_safe(subcategory) or ""
+
     sessions[body.session_id] = df
     return {"success": True, "category": new_category, "subcategory": new_sub,
-            "items": items, "affected_count": affected}
+            "items": items, "affected_count": affected, "locked": only_this}
 
 
 @router.post("/transactions/subcategory")
@@ -981,7 +1051,8 @@ def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
     category = str(row['קטגוריה']) if 'קטגוריה' in df.columns else None
     txn_key = txn_fingerprint(row.get('תאריך'), row.get('סכום'), row.get('תיאור'))
 
-    if body.only_this:
+    only_this = body.only_this or is_generic_bit(merchant or "")
+    if only_this:
         df.loc[mask, 'קטגוריה_משנה'] = new_subcategory
         df.loc[mask, '_locked'] = True
     else:
@@ -1003,7 +1074,7 @@ def update_transaction_subcategory(body: UpdateTransactionSubcategoryRequest):
         "category": category,
         "subcategory": new_subcategory,
         "txn_key": txn_key,
-        "locked": bool(body.only_this or (locked_mask(df).loc[mask]).any()),
+        "locked": bool(only_this or (locked_mask(df).loc[mask]).any()),
     }
 
 
@@ -1281,12 +1352,17 @@ def get_similar_transactions(
     amounts = df['סכום']
     earlier = (dates.dt.normalize() < reference_date.normalize()) & (np.sign(amounts) == np.sign(amount))
     eligible = earlier & np.isfinite(amounts)
-    candidates = df.loc[eligible, ['תיאור', 'סכום']].assign(_date=dates.loc[eligible])
+    candidates = df.loc[eligible].assign(_date=dates.loc[eligible])
     merchant_keys = candidates['תיאור'].fillna('').map(normalize_merchant)
     matches = candidates.loc[merchant_keys == merchant].sort_values('_date', ascending=False, kind='stable')
     return {"transactions": [
-        {"date": date.strftime('%Y-%m-%d'), "description": description, "amount": round(float(amount), 2)}
-        for description, amount, date in matches.itertuples(index=False, name=None)
+        {
+            "date": row['_date'].strftime('%Y-%m-%d'),
+            "description": row['תיאור'],
+            "amount": round(float(row['סכום']), 2),
+            "transaction": _transaction_details(row),
+        }
+        for _, row in matches.iterrows()
     ]}
 
 
@@ -1447,7 +1523,13 @@ def get_owners(sessionId: str = Query(...)):
     df = sessions[sessionId]
     if '_owner' not in df.columns:
         return []
-    # "joint" and "משותף" are the same owner: expose one label
+    return _owner_labels(df)
+
+
+def _owner_labels(df: pd.DataFrame) -> list[str]:
+    if '_owner' not in df.columns:
+        return []
+    # "joint" and "משותף" are the same owner: expose one label.
     vals = [('משותף' if str(o).strip().lower() == 'joint' else str(o).strip()) for o in df['_owner'].dropna().unique().tolist()]
     return sorted({v for v in vals if v and v.lower() != 'nan'})
 
@@ -2188,6 +2270,12 @@ def _to_json_safe(val):
     return val
 
 
+def _transaction_details(row: pd.Series) -> dict:
+    fields = ('id', 'תאריך', 'תאריך_חיוב', 'תיאור', 'קטגוריה', 'קטגוריה_משנה',
+              'סכום', 'ארבע ספרות אחרונות', 'הערות', '_locked')
+    return {key: _to_json_safe(row[key]) for key in fields if key in row}
+
+
 @router.get("/charts/v2/donut")
 @_offload
 def get_donut_v2(sessionId: str = Query(...)):
@@ -2264,6 +2352,7 @@ def get_income_analysis(
             "source": _safe_str(row.get('תיאור')), "amount": round(_sanitize(float(row['סכום'])), 2),
             "category": _safe_str(row.get('קטגוריה')), "subcategory": _safe_str(row.get('קטגוריה_משנה')),
             "account": account_of(row), "notes": _safe_str(row.get('הערות')), "month": str(row['_month']),
+            "transaction": _transaction_details(row),
         })
     # Chronological (year, month) order - lexical MM/YYYY sort breaks across years
     month_group = income.groupby('_month')['סכום'].agg(['sum', 'count'])
@@ -3450,6 +3539,7 @@ def get_anomalies(sessionId: str = Query(...)):
                     "deviation": _sanitize(round(deviation, 2)),
                     "category_mean": _sanitize(round(mean_amt, 2)),
                     "category_std": _sanitize(round(std_amt, 2)),
+                    "transaction": _transaction_details(row),
                 })
 
     # Sort by deviation descending, limit to 15

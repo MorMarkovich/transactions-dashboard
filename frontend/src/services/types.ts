@@ -21,6 +21,7 @@ export interface Transaction {
 }
 
 export interface SimilarTransaction {
+  transaction?: Transaction;
   date: string;
   description: string;
   amount: number;
@@ -257,6 +258,7 @@ export interface SpendingVelocityData {
 }
 
 export interface AnomalyItem {
+  transaction?: Transaction;
   description: string;
   amount: number;
   category: string;
@@ -418,5 +420,5 @@ export interface CategoryRule {
   updated_at?: string | null
 }
 
-export interface IncomeTransactionDetail { id:number; date:string; source:string; amount:number; category:string; subcategory:string; account:string; notes:string; month:string }
+export interface IncomeTransactionDetail { transaction?:Transaction; id:number; date:string; source:string; amount:number; category:string; subcategory:string; account:string; notes:string; month:string }
 export interface IncomeAnalysisData { transactions:IncomeTransactionDetail[]; total:number; count:number; average:number; months:{name:string;value:number;count:number}[]; sources:{name:string;value:number;count:number}[]; categories:{name:string;value:number;count:number}[] }
