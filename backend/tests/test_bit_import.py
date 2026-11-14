@@ -35,12 +35,12 @@ def test_bit_preview_matches_one_to_one_and_saves_by_fingerprint(monkeypatch):
     sid = restore(rows)
     records = ('06/10/2026;123.45;מתנה ליום הולדת;שליחה;בוצעה\n'
                '12/10/2026;90;תודה רבה;שליחה;בוצעה\n'
-               '12/10/2026;123.45;מתנה ליום הולדת;קבלת כסף;בוצעה\n')
+               '12/10/2026;123.45;החזר עבור ארוחה במסעדה;קבלת כסף;בוצעה\n')
     assert upload(sid, records).status_code == 400
     response = upload(sid, records, owner='משותף', encoding='utf-16')
     assert response.status_code == 200, response.text
     preview = response.json()
-    assert preview['counts'] == {'total': 3, 'unknown_reason': 1, 'incoming': 1}
+    assert preview['counts'] == {'total': 3, 'unknown_reason': 2}
     item, = preview['proposals']
     assert item['transaction_id'] == 17
     assert item['category'] == 'אירועים ומתנות'
@@ -81,3 +81,16 @@ def test_bit_preview_cannot_access_another_users_session(monkeypatch):
 
     monkeypatch.setattr(security, '_authenticate', authenticate)
     assert upload(sid, '07/10/2026;123.45;מתנה;שליחה;בוצעה\n').status_code == 404
+
+
+
+def test_clear_reason_can_classify_incoming_and_ignores_generic_description():
+    sid = restore([ledger_row(1, 8, 60), ledger_row(2, 8, -60)])
+    raw = ('תאריך,סכום,תיאור,סיבת ההעברה,כיוון,סטטוס\n'
+           '08/10/2026,60,שכר דירה,מתנה לחג,קבלת כסף,בוצעה\n').encode('utf-8-sig')
+    response = client.post('/api/transactions/bit-import', params={'sessionId': sid},
+                           files={'file': ('bit.csv', raw, 'text/csv')})
+    assert response.status_code == 200, response.text
+    proposal, = response.json()['proposals']
+    assert proposal['transaction_id'] == 1
+    assert proposal['category'] == 'אירועים ומתנות'

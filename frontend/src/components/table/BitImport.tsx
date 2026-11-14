@@ -12,7 +12,6 @@ const OUTCOMES = {
   already_classified: 'עסקה שכבר סווגה',
   invalid: 'פרטי העברה חסרים או לא תקינים',
   not_completed: 'העברה שלא הושלמה',
-  incoming: 'כסף שהתקבל',
 } as const
 
 function errorMessage(error: unknown) {

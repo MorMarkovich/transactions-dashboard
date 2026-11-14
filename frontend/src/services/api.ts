@@ -192,7 +192,7 @@ export interface BitImportPreview {
     category: string;
     subcategory: string;
   }[];
-  counts: Partial<Record<'total' | 'unmatched' | 'ambiguous' | 'already_classified' | 'unknown_reason' | 'invalid' | 'not_completed' | 'incoming', number>>;
+  counts: Partial<Record<'total' | 'unmatched' | 'ambiguous' | 'already_classified' | 'unknown_reason' | 'invalid' | 'not_completed', number>>;
 }
 
 function bitImportForm(file: File, owner: string, selected?: string[]) {

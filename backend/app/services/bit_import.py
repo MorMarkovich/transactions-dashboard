@@ -161,7 +161,8 @@ def preview_bit_import(raw: bytes, ledger: pd.DataFrame) -> dict:
     candidates = defaultdict(list)
     protected = locked_mask(ledger) | manual_rule_mask(ledger)
     if 'id' in ledger.columns:
-        bit_rows = ledger[ledger['תיאור'].fillna('').str.contains(BIT, na=False)]
+        unique_ids = ~ledger['id'].duplicated(keep=False)
+        bit_rows = ledger.loc[unique_ids & ledger['תיאור'].fillna('').str.contains(BIT, na=False)]
         for index, row in bit_rows.iterrows():
             day = transfer_date(row['תאריך'])
             amount = cents(row['סכום'])
@@ -223,10 +224,6 @@ def preview_bit_import(raw: bytes, ledger: pd.DataFrame) -> dict:
             counts['already_classified'] += 1
         elif classification is None:
             counts['unknown_reason'] += 1
-        elif amount > 0:
-            # Incoming reimbursements need a link to the original purchase
-            # before treating them as anything other than a transfer.
-            counts['incoming'] += 1
         else:
             category, subcategory = classification
             proposals.append({
