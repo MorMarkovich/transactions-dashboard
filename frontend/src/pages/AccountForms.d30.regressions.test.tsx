@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { ThemeProvider } from '../context/ThemeContext'
 
 const signUp = vi.fn()
 vi.mock('../lib/supabase', () => ({
@@ -30,7 +31,7 @@ import { AuthProvider, authErrorMessage } from '../lib/AuthContext'
 import Login from './Login'
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <MemoryRouter><AuthProvider>{children}</AuthProvider></MemoryRouter>
+  <MemoryRouter><ThemeProvider><AuthProvider>{children}</AuthProvider></ThemeProvider></MemoryRouter>
 )
 
 async function openRegister() {
