@@ -28,7 +28,7 @@ const expenses = [
 ]
 const transaction = { id: 1, תאריך: '2025-10-10', תאריך_חיוב: '2025-10-21', תיאור: 'קנייה במכולת', קטגוריה: 'אוכל', סכום: -120 }
 
-async function openOverview(page: Page) {
+async function openOverview(page: Page, withPace = false) {
   const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
   const expiration = Math.floor(Date.now() / 1000) + 3600
   await page.addInitScript(session => {
@@ -57,12 +57,20 @@ async function openOverview(page: Page) {
       case '/api/charts/v2/monthly':
         expect(url.searchParams.get('include_income')).toBe('true')
         return route.fulfill({ json: { months } })
-      case '/api/charts/v2/month-overview':
+      case '/api/charts/v2/month-overview': {
+        const transactionBasis = url.searchParams.get('date_type') === 'transaction'
+        const cumulative = month === '10/2025'
+          ? [...Array(17).fill(transactionBasis ? 7100 : 7000), transactionBasis ? 8400 : 8300]
+          : month === '09/2025' ? [...Array(17).fill(7600), transactionBasis ? 8750 : 8700, ...Array(12).fill(11780)]
+            : month === '07/2025' ? [...Array(30).fill(11100), 11998.2]
+              : month === '06/2025' ? Array(30).fill(10210.5) : null
         return route.fulfill({ json: {
           month, total_expenses: selected?.amount ?? 0, total_income: selected?.income ?? 0,
           transaction_count: selected ? 105 : 0,
           categories: !selected ? [] : month === '10/2025' ? expenses : [{ name: 'אוכל', expenses: selected.amount, income: 0 }],
+          ...(withPace ? { cumulative_expenses: cumulative } : {}),
         } })
+      }
       case '/api/charts/v2/category-snapshot':
         return route.fulfill({ json: { categories: [], total: 0, total_count: 0, month_count: 0, last_month: null, prev_month: null } })
       case '/api/charts/v2/category-transactions':
@@ -204,5 +212,70 @@ test('workspace search, navigation and income details keep the signed-in context
     await expect(page.locator('.workspace-search')).toHaveCount(0)
     await searchInput.press('Escape')
     await expect(page.getByRole('main')).toBeFocused()
+  }
+})
+
+test('spending pace compares equal days and keeps future charges separate', async ({ page, hasTouch }, testInfo) => {
+  await page.clock.setFixedTime(new Date('2025-10-18T10:00:00Z'))
+  await openOverview(page, true)
+
+  const pace = page.getByRole('region', { name: 'קצב ההוצאות' })
+  const slider = pace.getByRole('slider', { name: 'יום להשוואת ההוצאות' })
+  await expect(slider).toHaveValue('18')
+  await expect(pace.getByText(/8,300\.00/)).toBeVisible()
+  await expect(pace.getByText(/8,700\.00/)).toBeVisible()
+  await expect(pace.getByText(/400\.00.*פחות/)).toBeVisible()
+  await expect(page.getByText('כולל חיובים עתידיים')).toBeVisible()
+  await expect(page.getByText(/5,425\.00.*שתאריכן בהמשך/)).toBeVisible()
+  await expect(page.locator('.finance-income-share')).toContainText('72.2%')
+  await expect(pace.locator('.recharts-area-curve')).toBeVisible()
+  await expect(pace.locator('.recharts-line-curve')).toBeVisible()
+  const guide = pace.locator('.recharts-reference-line-line')
+  const startingGuide = await guide.getAttribute('x1')
+
+  await slider.press('ArrowLeft')
+  await expect(slider).toHaveValue('17')
+  await expect(slider).toHaveAttribute('aria-valuetext', /יום 17.*7,000\.00.*7,600\.00/)
+  await expect(pace.getByText(/600\.00.*פחות/)).toBeVisible()
+  await expect(guide).not.toHaveAttribute('x1', startingGuide ?? '')
+  if (hasTouch) {
+    const width = await slider.evaluate(element => element.clientWidth)
+    await slider.tap({ position: { x: width / 4, y: 15 } })
+    expect(Number(await slider.inputValue())).toBeLessThan(17)
+  }
+
+  await page.getByText('סינון תצוגה', { exact: true }).click()
+  await page.getByRole('button', { name: 'תאריך עסקה', exact: true }).click()
+  await expect(slider).toHaveValue('18')
+  await expect(pace.getByText(/8,400\.00/)).toBeVisible()
+  await expect(pace.getByText(/8,750\.00/)).toBeVisible()
+  await expect(pace.getByText(/350\.00.*פחות/)).toBeVisible()
+
+  await page.getByText('מה השתנה בין סיכומי החודשים?', { exact: true }).click()
+  const fullMonth = page.locator('.finance-period-changes')
+  await expect(fullMonth.getByText(/1,945\.00/)).toBeVisible()
+  await fullMonth.getByRole('button', { name: /הוצאות שוטפות/ }).click()
+  await expect(page.getByText('קנייה במכולת').first()).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'חודש קודם עם נתונים' }).click()
+  await expect(slider).toHaveValue('30')
+  await expect(pace.getByText(/11,780\.00/)).toBeVisible()
+  await expect(pace.getByText('אין נתוני השוואה לחודש הקודם.')).toBeVisible()
+
+  await page.getByRole('group', { name: 'בחירת חודש בתרשים' }).getByRole('button', { name: /יולי 2025/ }).click()
+  await expect(slider).toHaveValue('30')
+  await expect(pace.getByText(/10,210\.50/)).toBeVisible()
+  await slider.press('ArrowRight')
+  await expect(slider).toHaveValue('31')
+  await expect(pace.getByText('יוני 2025', { exact: true })).toBeVisible()
+  await expect(pace.getByText('החודש הקודם הסתיים לפני היום הזה.')).toBeVisible()
+
+  await page.setViewportSize({ width: 320, height: 740 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  for (const theme of ['dark', 'light']) {
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+    await testInfo.attach(`spending-pace-${theme}`, { body: await pace.screenshot(), contentType: 'image/png' })
+    if (theme === 'dark') await page.getByRole('banner').getByRole('button', { name: 'מעבר למצב בהיר' }).click()
   }
 })

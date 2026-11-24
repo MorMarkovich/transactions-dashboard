@@ -46,7 +46,7 @@ export default function MonthlyActivity({ months, selectedMonth, onSelect, onCom
           const open = isOpenMonth(item.month)
           return (
             <button type="button" key={item.month} aria-pressed={item.month === selectedMonth} onClick={() => onSelect(item.month)}
-              aria-label={`${label}${open ? ', נתונים עד כה' : ''}, הוצאות ${formatCurrency(item.amount)}, הכנסות ${formatCurrency(income)}`}>
+              aria-label={`${label}${open ? ', חודש פתוח או עתידי' : ''}, הוצאות ${formatCurrency(item.amount)}, הכנסות ${formatCurrency(income)}`}>
               <div className="finance-bar-pair" aria-hidden="true">
                 <i className="finance-expense-marker" style={{ height: `${item.amount / scale * 100}%` }} />
                 <i className="finance-income-marker" style={{ height: `${income / scale * 100}%` }} />
@@ -62,7 +62,7 @@ export default function MonthlyActivity({ months, selectedMonth, onSelect, onCom
         <span>הוצאות <bdi dir="ltr">{formatCurrency(selected.amount)}</bdi></span>
         <span>הכנסות <bdi dir="ltr">{formatCurrency(selected.income ?? 0)}</bdi></span>
       </div>}
-      {visible.some(item => isOpenMonth(item.month)) && <p className="finance-muted finance-chart-note">* נתונים עד כה</p>}
+      {visible.some(item => isOpenMonth(item.month)) && <p className="finance-muted finance-chart-note">* חודש פתוח או עתידי</p>}
       </>}
     </section>
   )

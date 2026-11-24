@@ -47,7 +47,7 @@ import Button from '../components/ui/Button'
 import MultiSelect from '../components/ui/MultiSelect'
 import Select from '../components/ui/Select'
 import { formatCurrency } from '../utils/formatting'
-import { transactionsApi } from '../services/api'
+import { invalidateApiCache, transactionsApi } from '../services/api'
 import { supabaseApi } from '../services/supabaseApi'
 import { useAuth } from '../lib/AuthContext'
 import { scoped, LAST_SESSION_BASE } from '../lib/userStorage'
@@ -66,6 +66,8 @@ import type {
   CategoryCatalog,
   Transaction,
 } from '../services/types'
+
+const israelDay = new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeZone: 'Asia/Jerusalem' })
 
 // ---------------------------------------------------------------------------
 // Component
@@ -147,13 +149,31 @@ export default function Dashboard() {
   const [loadedOverview, setLoadedOverview] = useState<string | null>(null)
   const [monthOverviewError, setMonthOverviewError] = useState(false)
   const [overviewRetry, setOverviewRetry] = useState(0)
+  const [calendarDay, setCalendarDay] = useState(() => israelDay.format(new Date()))
+  useEffect(() => {
+    if (!sessionId) return
+    let lastDay = calendarDay
+    const refreshAtDayBoundary = () => {
+      const today = israelDay.format(new Date())
+      if (today === lastDay) return
+      lastDay = today
+      invalidateApiCache()
+      setCalendarDay(today)
+    }
+    const interval = window.setInterval(refreshAtDayBoundary, 60_000)
+    document.addEventListener('visibilitychange', refreshAtDayBoundary)
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshAtDayBoundary)
+    }
+  }, [calendarDay, sessionId])
   const [snapshotError, setSnapshotError] = useState(false)
   const [snapshotRetry, setSnapshotRetry] = useState(0)
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
   const scopeKey = JSON.stringify([user?.id, sessionId, dateType, selectedOwner, category, subcategories, refreshKey])
-  const overviewKey = JSON.stringify([scopeKey, selectedMonth, overviewRetry])
+  const overviewKey = JSON.stringify([scopeKey, selectedMonth, overviewRetry, calendarDay])
   const [loadedScope, setLoadedScope] = useState<string | null>(null)
   const scopeLoading = loadedScope !== scopeKey
   const monthOverviewLoading = Boolean(selectedMonth && (scopeLoading || loadedOverview !== overviewKey))
@@ -944,7 +964,7 @@ export default function Dashboard() {
 
       <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
         overview={activeOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
-        category={category} subcategories={subcategories} refreshKey={refreshKey}
+        category={category} subcategories={subcategories} refreshKey={refreshKey} calendarDay={calendarDay}
         onApplyView={view => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
         onCategory={handleCategoryCardClick}
         onTransactions={() => {
