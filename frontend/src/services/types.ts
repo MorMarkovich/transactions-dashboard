@@ -328,6 +328,8 @@ export interface MonthOverviewData {
   total_expenses: number
   total_income: number
   transaction_count: number
+  /** One cumulative amount per elapsed calendar day. Null if daily attribution is unavailable. */
+  cumulative_expenses?: number[] | null
 }
 
 // AI category audit (second opinion over all expense merchants)

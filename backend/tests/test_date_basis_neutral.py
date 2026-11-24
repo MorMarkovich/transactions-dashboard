@@ -8,6 +8,8 @@ Approved rules (see CLAUDE.md "Income-month shift" and PR161 constants):
 - תנועות מימון rows stay visible in the ledger but are excluded from
   income/expense aggregation.
 """
+from datetime import date, datetime, timezone
+
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
@@ -28,8 +30,18 @@ def _row(date, amount, desc, cat, billing=None, owner='מור', bank=False, mont
     }
 
 
+def _freeze_month_overview_clock(monkeypatch, instant):
+    class Clock:
+        @staticmethod
+        def now(tz=None):
+            return instant.astimezone(tz) if tz else instant.replace(tzinfo=None)
+
+    monkeypatch.setattr(routes, 'datetime', Clock)
+
+
 @pytest.fixture()
-def client():
+def client(monkeypatch):
+    _freeze_month_overview_clock(monkeypatch, datetime(2026, 11, 25, 9, tzinfo=timezone.utc))
     df = pd.DataFrame([
         # card rows: purchased in Oct, billed in Nov (boundary) / Oct (same month)
         _row('2026-10-31', -500, 'מסעדת הגנה', 'אוכל', billing='2026-11-02'),
@@ -57,6 +69,9 @@ def test_billing_basis_keeps_bank_rows_in_canonical_month(client):
     body = r.json()
     assert body['total_expenses'] == 500.0  # 100 card + 400 ATM
     assert body['total_income'] == 10000.0  # shifted salary stays in 10/2026
+    pace = body['cumulative_expenses']
+    assert len(pace) == 31
+    assert [pace[0], pace[1], pace[28], pace[29], pace[30]] == [0, 100, 100, 500, 500]
 
 
 def test_billing_basis_keeps_card_rows_in_billing_month(client):
@@ -68,6 +83,43 @@ def test_billing_basis_keeps_card_rows_in_billing_month(client):
                      params={'sessionId': 't-datebasis', 'month': '10/2026', 'date_type': 'transaction'}).json()
     assert billing['total_expenses'] == 500.0
     assert txn['total_expenses'] == 1000.0  # 500 + 100 + 400
+    assert billing['cumulative_expenses'][:2] == [0, 500]
+    assert txn['cumulative_expenses'][-2:] == [500, 1000]
+
+
+def test_spending_pace_stops_at_local_today_and_preserves_short_months():
+    expenses = pd.DataFrame({
+        'תאריך': pd.to_datetime(['2024-03-01', '2024-03-18', '2024-03-19']),
+        'סכום_מוחלט': [7.25, 10.50, 200],
+    })
+    today = date(2024, 3, 18)
+    pace = routes._cumulative_expenses(expenses, '03/2024', 'transaction', today)
+    assert pace == [7.25] * 17 + [17.75]
+    assert routes._cumulative_expenses(expenses.iloc[:0], '02/2024', 'transaction', today) == [0] * 29
+    assert routes._cumulative_expenses(expenses.iloc[:0], '04/2024', 'transaction', today) == []
+
+
+def test_month_overview_uses_israel_midnight_for_billing_pace(client, monkeypatch):
+    _freeze_month_overview_clock(monkeypatch, datetime(2026, 4, 30, 21, 1, tzinfo=timezone.utc))
+    monkeypatch.setitem(routes.sessions, 'midnight-pace', pd.DataFrame([
+        _row('2026-04-28', -101, 'קפה', 'אוכל', billing='2026-05-01'),
+        _row('2026-04-29', -77, 'מסעדה', 'אוכל', billing='2026-05-02'),
+    ]))
+    response = client.get('/api/charts/v2/month-overview', params={
+        'sessionId': 'midnight-pace', 'month': '05/2026', 'date_type': 'billing',
+    })
+    assert response.status_code == 200
+    assert response.json()['cumulative_expenses'] == [101]
+    assert response.json()['total_expenses'] == 178
+
+
+@pytest.mark.parametrize('legacy_date', [pd.NaT, pd.Timestamp('2024-02-29')])
+def test_spending_pace_does_not_invent_day_for_legacy_month_attribution(legacy_date):
+    expenses = pd.DataFrame({
+        'תאריך': pd.Series([legacy_date], dtype='datetime64[ns]'),
+        'סכום_מוחלט': [100],
+    })
+    assert routes._cumulative_expenses(expenses, '03/2024', 'billing', date(2024, 4, 1)) is None
 
 
 def test_category_snapshot_billing_no_crash_with_bank_rows(client):

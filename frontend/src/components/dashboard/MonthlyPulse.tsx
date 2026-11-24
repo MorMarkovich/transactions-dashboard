@@ -4,6 +4,7 @@ import type { MonthOverviewData } from '../../services/types'
 import { transactionsApi } from '../../services/api'
 import { previousMonth, spendingChange, categoryChanges, formatMonthLabel, isOpenMonth } from '../../utils/monthComparison'
 import { formatCurrency } from '../../utils/formatting'
+import SpendingPace from './SpendingPace'
 
 interface View {
   name: string
@@ -24,6 +25,7 @@ interface Props {
   category: string
   subcategories: string[]
   refreshKey: number
+  calendarDay?: string
   onApplyView: (view: View) => void
   onCategory: (name: string, month: string) => void
   onTransactions: () => void
@@ -104,7 +106,7 @@ export default function MonthlyPulse(props: Props) {
   const [retry, setRetry] = useState(0)
   const [result, setResult] = useState<ComparisonResult | null>(null)
   const [expandedFor, setExpandedFor] = useState<string | null>(null)
-  const comparisonKey = JSON.stringify([props.userId, sessionId, priorMonth, dateType, owner, category, subcategories, refreshKey, retry])
+  const comparisonKey = JSON.stringify([props.userId, sessionId, priorMonth, dateType, owner, category, subcategories, refreshKey, props.calendarDay, retry])
 
   useEffect(() => {
     if (!priorMonth) return
@@ -130,48 +132,23 @@ export default function MonthlyPulse(props: Props) {
   const change = current && hasPrevious ? spendingChange(current.total_expenses, previous.total_expenses) : null
   const changes = current && hasPrevious ? categoryChanges(current, previous) : []
   const net = current ? spendingChange(current.total_income, current.total_expenses).amount : 0
+  const incomeUsed = current && current.total_income > 0 ? current.total_expenses / current.total_income : null
   const shownChanges = expandedFor === comparisonKey ? changes : changes.slice(0, 3)
   const currentIsOpen = month ? isOpenMonth(month) : false
+  const pace = current?.cumulative_expenses
+  const previousPace = hasPrevious ? previous.cumulative_expenses ?? null : null
+  const hasPace = Boolean(pace?.length && current
+    && (current.transaction_count > 0 || (current.total_income > 0 && previousPace?.some(amount => amount > 0))))
+  const elapsedExpenses = pace ? (pace.at(-1) ?? 0) : null
+  const futureExpenses = currentIsOpen && current && elapsedExpenses !== null
+    ? spendingChange(current.total_expenses, elapsedExpenses).amount : 0
   const displayAmount = (amount: number | undefined, signed = false) => (
     amount !== undefined ? <bdi dir="ltr">{formatCurrency(amount, signed)}</bdi> : loading ? 'טוען...' : '—'
   )
 
-  return (
-    <section className="finance-overview" aria-label="תמונת מצב חודשית">
-      <div className="finance-overview-grid">
-        <div className="finance-balance" aria-busy={loading}>
-          <div className="finance-balance-top">
-            <div>
-              <h2>הוצאות החודש</h2>
-              {currentIsOpen && <span className="finance-period-status">נתונים עד כה</span>}
-            </div>
-            <span className="finance-balance-icon"><Wallet size={21} aria-hidden="true" /></span>
-          </div>
-          <div className="finance-kpis">
-            <div className="finance-spending">
-              <strong className="finance-main-amount">{displayAmount(current?.total_expenses)}</strong>
-              <span>{current ? `${current.transaction_count.toLocaleString('he-IL')} עסקאות הוצאה` : loading ? 'מעדכנים את הסיכום' : 'אין נתונים לתצוגה'}</span>
-            </div>
-            <div className="finance-kpi finance-income">
-              <span><ArrowDownLeft size={16} aria-hidden="true" /> הכנסות שנקלטו</span>
-              <strong>{displayAmount(current?.total_income)}</strong>
-            </div>
-            <div className="finance-kpi finance-net">
-              <span><ArrowUpRight size={16} aria-hidden="true" /> הכנסות פחות הוצאות</span>
-              <strong className={net < 0 ? 'amount-negative' : net > 0 ? 'amount-positive' : undefined}>{displayAmount(current ? net : undefined, true)}</strong>
-            </div>
-          </div>
-          <button type="button" className="finance-action finance-ledger-action" onClick={props.onTransactions} disabled={!month}>
-            עסקאות החודש וייצוא <ArrowLeft size={16} aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="finance-panel finance-comparison" aria-busy={Boolean(priorMonth && (!comparison || loading))}>
-          <div className="finance-section-heading"><div>
-            <h2>מה השתנה?</h2>
-            {priorMonth && <p>לעומת {formatMonthLabel(priorMonth)}</p>}
-          </div></div>
-          {!month || (!current && !loading) ? <p className="finance-muted">נתוני החודש אינם זמינים.</p>
+  const periodComparison = (
+    <div className="finance-period-comparison">
+      {!month || (!current && !loading) ? <p className="finance-muted">נתוני החודש אינם זמינים.</p>
             : loading || (priorMonth && !comparison) ? <p className="finance-muted">טוען השוואה…</p>
               : comparison && !previous ? (
                 <div className="finance-retry"><p>ההשוואה אינה זמינה כרגע</p><button type="button" className="finance-action" onClick={() => setRetry(value => value + 1)}>נסו שוב</button></div>
@@ -185,7 +162,7 @@ export default function MonthlyPulse(props: Props) {
                       <span>{change.amount === 0 ? 'ללא שינוי בהוצאות' : change.amount > 0 ? 'עלייה בהוצאות' : 'ירידה בהוצאות'}</span>
                       {change.percent !== null && change.amount !== 0 && <bdi dir="ltr" className="finance-percent">{Math.abs(change.percent).toLocaleString('he-IL', { maximumFractionDigits: 1 })}%</bdi>}
                     </div>
-                    {currentIsOpen && <p className="finance-muted">חודש חלקי בהשוואה לחודש הקודם כפי שנקלט.</p>}
+                    {currentIsOpen && <p className="finance-muted">כולל את כל העסקאות שנקלטו לכל חודש, לפי התאריכים שלהן.</p>}
                     {shownChanges.length > 0 && <ul className="finance-movers">
                       {shownChanges.map(item => (
                         <li key={item.name}><button type="button" onClick={() => props.onCategory(item.name, item.now > 0 ? month : priorMonth ?? month)}>
@@ -200,6 +177,76 @@ export default function MonthlyPulse(props: Props) {
                     </button>}
                   </>
                 )}
+    </div>
+  )
+
+  return (
+    <section className="finance-overview" aria-label="תמונת מצב חודשית">
+      <div className="finance-overview-grid">
+        <div className="finance-balance" aria-busy={loading}>
+          <div className="finance-balance-top">
+            <div>
+              <h2>הוצאות החודש</h2>
+              {currentIsOpen && <span className="finance-period-status">{futureExpenses > 0 ? 'כולל חיובים עתידיים' : pace?.length === 0 ? 'חודש עתידי' : 'חודש פתוח'}</span>}
+            </div>
+            <span className="finance-balance-icon"><Wallet size={21} aria-hidden="true" /></span>
+          </div>
+          <div className="finance-kpis">
+            <div className="finance-spending">
+              <strong className="finance-main-amount">{displayAmount(current?.total_expenses)}</strong>
+              <span>{current ? `${current.transaction_count.toLocaleString('he-IL')} עסקאות הוצאה` : loading ? 'מעדכנים את הסיכום' : 'אין נתונים לתצוגה'}</span>
+              {futureExpenses > 0 && <span className="finance-spending-future">
+                מתוכן <bdi dir="ltr">{formatCurrency(futureExpenses)}</bdi> שתאריכן בהמשך
+              </span>}
+            </div>
+            <div className="finance-kpi finance-income">
+              <span><ArrowDownLeft size={16} aria-hidden="true" /> הכנסות שנקלטו</span>
+              <strong>{displayAmount(current?.total_income)}</strong>
+            </div>
+            <div className="finance-kpi finance-net">
+              <span><ArrowUpRight size={16} aria-hidden="true" /> הכנסות פחות הוצאות</span>
+              <strong className={net < 0 ? 'amount-negative' : net > 0 ? 'amount-positive' : undefined}>{displayAmount(current ? net : undefined, true)}</strong>
+            </div>
+          </div>
+          {incomeUsed !== null && (
+            <div className="finance-income-share">
+              <div>
+                <span>הוצאות ביחס להכנסות</span>
+                <strong><bdi dir="ltr">{incomeUsed.toLocaleString('he-IL', { style: 'percent', maximumFractionDigits: 1 })}</bdi></strong>
+              </div>
+              <span className="finance-income-track" aria-hidden="true">
+                <i className={incomeUsed > 1 ? 'finance-over-income' : undefined} style={{ width: `${Math.min(incomeUsed, 1) * 100}%` }} />
+              </span>
+            </div>
+          )}
+          <button type="button" className="finance-action finance-ledger-action" onClick={props.onTransactions} disabled={!month}>
+            עסקאות החודש וייצוא <ArrowLeft size={16} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="finance-panel finance-comparison" aria-busy={Boolean(priorMonth && (!comparison || loading))}>
+          {hasPace && pace && month ? (
+            <>
+              <SpendingPace key={JSON.stringify([month, dateType, owner, category, subcategories, sessionId])} month={month}
+                dateType={dateType} current={pace} priorMonth={priorMonth} previous={previousPace} comparisonLoading={!comparison}
+                onRetry={comparison && !previous ? () => setRetry(value => value + 1) : undefined} />
+              <details className="finance-period-changes">
+                <summary>מה השתנה בין סיכומי החודשים? <ChevronDown size={16} aria-hidden="true" /></summary>
+                {priorMonth && <p className="finance-muted">לעומת {formatMonthLabel(priorMonth)}</p>}
+                {periodComparison}
+              </details>
+            </>
+          ) : (
+            <>
+              <div className="finance-section-heading"><div>
+                <h2>מה השתנה?</h2>
+                {priorMonth && <p>לעומת {formatMonthLabel(priorMonth)}</p>}
+              </div></div>
+              {pace === null && <p className="finance-muted">בחודש הזה יש הוצאות ללא תאריך מתאים להצגה יומית.</p>}
+              {pace?.length === 0 && <p className="finance-muted">החודש טרם התחיל.</p>}
+              {periodComparison}
+            </>
+          )}
         </div>
       </div>
       <SavedViews key={props.userId} {...props} />
