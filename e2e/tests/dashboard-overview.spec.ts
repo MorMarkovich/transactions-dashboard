@@ -196,4 +196,13 @@ test('workspace search, navigation and income details keep the signed-in context
   const median = page.locator('.workspace-metric').filter({ hasText: 'חציון הוצאה' })
   await expect(median).toContainText('120.00')
   await expect(page.getByRole('button', { name: 'ייצוא לאקסל' })).toBeEnabled()
+
+  if (desktop) {
+    await search.click()
+    await expect(searchInput).toBeFocused()
+    await page.setViewportSize({ width: 800, height: 800 })
+    await expect(page.locator('.workspace-search')).toHaveCount(0)
+    await searchInput.press('Escape')
+    await expect(page.getByRole('main')).toBeFocused()
+  }
 })

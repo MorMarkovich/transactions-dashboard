@@ -195,6 +195,7 @@ export default function Layout({ children }: LayoutProps) {
   useChartLabels(location.pathname)
   const { category: activeCategory, subcategories: activeSubs, clearFilters, owner: activeOwner, setOwner } = useDashboardFilters()
   const { user } = useAuth()
+  const mainRef = useRef<HTMLElement>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   // Per-user: a second account signing in must get its own restore pass.
   const hasTriedRestore = useRef<string | null>(null)
@@ -542,7 +543,7 @@ export default function Layout({ children }: LayoutProps) {
         />
 
         {/* Main content area */}
-        <main className="main-content" id="workspace-main">
+        <main ref={mainRef} className="main-content" id="workspace-main" tabIndex={-1}>
           <div className="workspace-toolbar" hidden={!desktopNavigation && !snapshotStamp}>
             {desktopNavigation && (
               <button type="button" className="workspace-search" onClick={openSearch}>
@@ -606,6 +607,7 @@ export default function Layout({ children }: LayoutProps) {
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={closeSearch}
+        fallbackFocusRef={mainRef}
       />
       <nav className="mobile-bottom-nav" aria-label="ניווט מהיר">
         {[{to:'/',text:'סקירה',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { type RefObject, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -32,9 +32,10 @@ interface CommandItem {
 interface CommandPaletteProps {
   isOpen: boolean
   onClose: () => void
+  fallbackFocusRef?: RefObject<HTMLElement | null>
 }
 
-export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+export default function CommandPalette({ isOpen, onClose, fallbackFocusRef }: CommandPaletteProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id')
@@ -90,6 +91,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     const id = pushOverlay()
     overlayIdRef.current = id
     const opener = document.activeElement as HTMLElement | null
+    const fallbackTarget = fallbackFocusRef?.current
     const onKey = (e: KeyboardEvent) => {
       if (!isTopOverlay(id)) return
       if (e.key === 'Escape') {
@@ -122,9 +124,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
       document.removeEventListener('keydown', onKey)
       removeOverlay(id)
       overlayIdRef.current = null
-      if (opener && document.contains(opener)) opener.focus()
+      const returnTarget = opener?.isConnected && opener.getClientRects().length > 0 ? opener : fallbackTarget
+      if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true })
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, fallbackFocusRef])
 
   // Keep selected index in bounds
   useEffect(() => {
