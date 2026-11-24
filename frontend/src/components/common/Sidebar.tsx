@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { type MouseEventHandler, useState, useRef, useEffect } from 'react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -43,7 +43,7 @@ interface SidebarProps {
   onClose?: () => void
   onFileUploaded?: (sessionId: string) => void
   onToggleCollapse?: () => void
-  onSearch?: () => void
+  onSearch?: MouseEventHandler<HTMLButtonElement>
 }
 
 // ─── Navigation Sections ─────────────────────────────────────────────
@@ -61,13 +61,13 @@ const NAV_SECTIONS = [
       { to: '/monthly', label: 'השוואת חודשים', icon: CalendarRange },
       { to: '/trends', label: 'מגמות', icon: TrendingUp },
       { to: '/merchants', label: 'בתי עסק', icon: Store },
+      { to: '/income', label: 'הכנסות', icon: Wallet },
     ],
   },
   {
     label: 'תכנון',
     items: [
       { to: '/budget', label: 'תקציב', icon: Target },
-      { to: '/income', label: 'הכנסות', icon: Wallet },
       { to: '/savings', label: 'חיסכון', icon: PiggyBank },
     ],
   },
@@ -278,7 +278,15 @@ export default function Sidebar({
   return (
     <aside role={isOpen ? "dialog" : undefined} aria-modal={isOpen ? true : undefined} aria-label="תפריט ניהול וניווט" tabIndex={-1} className={`sidebar ${isOpen ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
       <div className="studio-brand"><PinkasBrand to={buildNavHref('/')} onClick={onClose} /></div>
-      <div className="studio-sidebar-tools"><button onClick={onSearch} aria-label="חיפוש"><Search size={18}/>{!collapsed && <span>חיפוש <kbd dir="ltr">⌘K</kbd></span>}</button><button onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>{theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button></div>
+      <div className="studio-sidebar-tools">
+        <button type="button" className="sidebar-search" onClick={onSearch} aria-label="חיפוש">
+          <Search size={18} aria-hidden="true" />
+          {!collapsed && <span>חיפוש</span>}
+        </button>
+        <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}>
+          {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+        </button>
+      </div>
       {/* ─── Close button (mobile only) ─── */}
       <button
         className="sidebar-close-btn"

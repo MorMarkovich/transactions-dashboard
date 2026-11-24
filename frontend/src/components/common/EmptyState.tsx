@@ -13,6 +13,7 @@ interface EmptyStateProps {
 export default function EmptyState({ title, text, action }: EmptyStateProps) {
   return (
     <motion.div
+      className="workspace-empty-state"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
@@ -28,6 +29,8 @@ export default function EmptyState({ title, text, action }: EmptyStateProps) {
     >
       {/* Icon with pulse animation */}
       <div
+        className="workspace-empty-icon"
+        aria-hidden="true"
         style={{
           fontSize: '4rem',
           lineHeight: 1,
