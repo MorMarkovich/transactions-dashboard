@@ -38,6 +38,7 @@ import Select from '../components/ui/Select'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import { ToastContainer, useToast } from '../components/ui/Toast'
 import { formatCurrency, formatDate, formatNumber, hebOwner } from '../utils/formatting'
 import { get_icon } from '../utils/constants'
@@ -86,79 +87,6 @@ const RECURRING_LABELS: Record<string, string> = {
   yearly: 'שנתי',
   one_time: 'חד-פעמי',
   once: 'חד-פעמי',
-}
-
-/* ------------------------------------------------------------------ */
-/*  Animation                                                          */
-/* ------------------------------------------------------------------ */
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.35, ease: [0.4, 0, 0.2, 1] as const },
-  }),
-}
-
-/* ------------------------------------------------------------------ */
-/*  Storage info card sub-component                                    */
-/* ------------------------------------------------------------------ */
-
-interface InfoCardProps {
-  icon: React.ReactNode
-  iconBg: string
-  label: string
-  value: string | number
-  index: number
-}
-
-function InfoCard({ icon, iconBg, label, value, index }: InfoCardProps) {
-  return (
-    <motion.div custom={index} initial="hidden" animate="visible" variants={cardVariants}>
-      <Card className="glass-card orbit-info-card" hover>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: iconBg,
-              flexShrink: 0,
-            }}
-          >
-            {icon}
-          </div>
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {label}
-            </p>
-            <p
-              style={{
-                margin: '4px 0 0',
-                fontSize: '1.5rem',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {value}
-            </p>
-          </div>
-        </div>
-      </Card>
-    </motion.div>
-  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -583,44 +511,12 @@ export default function DataManagement() {
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  STORAGE OVERVIEW CARDS                                        */}
       {/* ═══════════════════════════════════════════════════════════════ */}
-      <div className="orbit-storage-overview"
-        style={{
-          display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
-          gap: 'var(--space-md)',
-        }}
-      >
-        <InfoCard
-          index={0}
-          icon={<Database size={22} style={{ color: '#818cf8' }} />}
-          iconBg="rgba(129, 140, 248, 0.12)"
-          label="עסקאות נטענו"
-          value={formatNumber(sessionInfo?.total_rows ?? storageInfo?.transactionSets ?? 0)}
-        />
-        <InfoCard
-          index={1}
-          icon={<Wallet size={22} style={{ color: '#34d399' }} />}
-          iconBg="rgba(16, 185, 129, 0.12)"
-          label="הכנסות שמורות"
-          value={formatNumber(incomes.length)}
-        />
-        <InfoCard
-          index={2}
-          icon={<Upload size={22} style={{ color: '#0ea5e9' }} />}
-          iconBg="rgba(14, 165, 233, 0.12)"
-          label="העלאות"
-          value={formatNumber(sessionFiles.length || uploads.length)}
-        />
-        {sessionId && (
-          <InfoCard
-            index={3}
-            icon={<Receipt size={22} style={{ color: '#f59e0b' }} />}
-            iconBg="rgba(245, 158, 11, 0.12)"
-            label="עסקאות בסשן"
-            value={formatNumber(sessionInfo?.total_rows ?? 0)}
-          />
-        )}
-      </div>
+      <WorkspaceMetrics label="סיכום נתונים" metrics={[
+        { label: 'עותקי נתונים שמורים', value: formatNumber(storageInfo?.transactionSets ?? 0), icon: Database },
+        { label: 'הכנסות שמורות', value: formatNumber(incomes.length), icon: Wallet },
+        { label: 'העלאות', value: formatNumber(sessionFiles.length || uploads.length), icon: Upload },
+        ...(sessionInfo ? [{ label: 'עסקאות בתצוגה', value: formatNumber(sessionInfo.total_rows), icon: Receipt }] : []),
+      ]} />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/*  UPLOADED FILES MANAGER                                        */}

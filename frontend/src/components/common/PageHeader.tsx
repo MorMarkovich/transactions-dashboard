@@ -13,10 +13,10 @@ export default function PageHeader({ title, subtitle, icon: Icon, actions }: Pag
   }, [title])
 
   return (
-    <div className="page-header">
+    <header className="page-header">
       <div className="page-header-info">
         {Icon && (
-          <div className="page-header-icon">
+          <div className="page-header-icon" aria-hidden="true">
             <Icon size={22} />
           </div>
         )}
@@ -26,6 +26,6 @@ export default function PageHeader({ title, subtitle, icon: Icon, actions }: Pag
         </div>
       </div>
       {actions && <div className="page-header-actions">{actions}</div>}
-    </div>
+    </header>
   )
 }

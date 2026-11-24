@@ -212,7 +212,7 @@ export default function AdvancedFilters({
   }
 
   return (
-    <div style={{ direction: 'rtl', marginBottom: 'var(--space-md)' }}>
+    <div className="advanced-filters" style={{ direction: 'rtl' }}>
       {/* Primary row: search + category + toggle + export */}
       <div
         className="advanced-filters-primary"
@@ -258,6 +258,7 @@ export default function AdvancedFilters({
         <Button
           variant={expanded ? 'primary' : 'secondary'}
           size="sm"
+          aria-expanded={expanded}
           icon={<Filter size={14} />}
           onClick={() => setExpanded((v) => !v)}
         >
@@ -275,7 +276,8 @@ export default function AdvancedFilters({
         {onExport && (
           <Button
             type="button"
-            variant="secondary"
+            variant="primary"
+            className="ledger-export"
             size="sm"
             icon={<Download size={14} />}
             onClick={onExport}

@@ -1,16 +1,15 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { TrendingUp, ArrowUpRight, ArrowDownRight, Activity, Hash, Calculator } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { TrendingUp, ArrowUpRight, ArrowDownRight, Activity, Hash, Calculator, type LucideIcon } from 'lucide-react'
 import LineChart from '../components/charts/LineChart'
 import { currentMonthKey } from '../utils/formatting'
 import EmptyState from '../components/common/EmptyState'
 import Button from '../components/ui/Button'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import Card from '../components/ui/Card'
 import Skeleton from '../components/ui/Skeleton'
 import Badge from '../components/ui/Badge'
-import AnimatedNumber from '../components/ui/AnimatedNumber'
 import { transactionsApi } from '../services/api'
 import { useDashboardFilterSelection } from '../context/FilterContext'
 import { formatCurrency } from '../utils/formatting'
@@ -20,60 +19,38 @@ import type { RawTrendData, TrendStats } from '../services/types'
 // Stat card configuration
 // ---------------------------------------------------------------------------
 interface StatCard {
-  key: string
   label: string
-  icon: React.ReactNode
-  gradient: string
+  icon: LucideIcon
   getNumericValue: (s: TrendStats) => number
   formatter: (v: number) => string
 }
 
 const STAT_CARDS: StatCard[] = [
   {
-    key: 'max_expense',
     label: '\u05D4\u05D5\u05E6\u05D0\u05D4 \u05D2\u05D3\u05D5\u05DC\u05D4',
-    icon: <ArrowUpRight size={18} color="#fff" />,
-    gradient: 'var(--gradient-stat-red, linear-gradient(135deg, #f093fb 0%, #f5576c 100%))',
+    icon: ArrowUpRight,
     getNumericValue: (s) => Math.abs(s.max_expense),
     formatter: formatCurrency,
   },
   {
-    key: 'daily_avg',
     label: '\u05DE\u05DE\u05D5\u05E6\u05E2 \u05D9\u05D5\u05DE\u05D9',
-    icon: <Calculator size={18} color="#fff" />,
-    gradient: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe 0%, #00f2fe 100%))',
+    icon: Calculator,
     getNumericValue: (s) => Math.abs(s.daily_avg),
     formatter: formatCurrency,
   },
   {
-    key: 'median',
     label: '\u05D7\u05E6\u05D9\u05D5\u05DF',
-    icon: <Activity size={18} color="#fff" />,
-    gradient: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b 0%, #38f9d7 100%))',
+    icon: Activity,
     getNumericValue: (s) => Math.abs(s.median),
     formatter: formatCurrency,
   },
   {
-    key: 'transaction_count',
     label: '\u05E2\u05E1\u05E7\u05D0\u05D5\u05EA \u05D4\u05D5\u05E6\u05D0\u05D4',
-    icon: <Hash size={18} color="#fff" />,
-    gradient: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea 0%, #764ba2 100%))',
+    icon: Hash,
     getNumericValue: (s) => s.transaction_count,
     formatter: (v) => v.toLocaleString('he-IL'),
   },
 ]
-
-// ---------------------------------------------------------------------------
-// Animation variants
-// ---------------------------------------------------------------------------
-const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.4, ease: [0.4, 0, 0.2, 1] as const },
-  }),
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -201,31 +178,12 @@ export default function Trends() {
         icon={TrendingUp}
       />
 
-      {/* ── Stats Cards (compact horizontal layout) ───────────────────── */}
       {trendStats && (
-        <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-lg)' }}>
-          {STAT_CARDS.map((card, index) => (
-            <motion.div
-              key={card.key}
-              custom={index}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              <div className="stat-card-compact glass-card">
-                <div className="stat-icon" style={{ background: card.gradient }}>
-                  {card.icon}
-                </div>
-                <div className="stat-content">
-                  <div className="stat-value">
-                    <AnimatedNumber value={card.getNumericValue(trendStats)} formatter={card.formatter} />
-                  </div>
-                  <div className="stat-label">{card.label}</div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        <WorkspaceMetrics label="סיכום מגמות" metrics={STAT_CARDS.map(card => ({
+          label: card.label,
+          value: card.formatter(card.getNumericValue(trendStats)),
+          icon: card.icon,
+        }))} />
       )}
 
       {/* ── Trend Line Chart ─────────────────────────────────────────── */}

@@ -55,3 +55,9 @@ frontend/public/icon-maskable-512.png
 # local env files (never commit)
 .env
 **/.env
+
+# Project-local BMAD installation and working artifacts
+/.agents/skills/bmad*/
+/.agents/skills/bmod-*/
+/_bmad/
+/_bmad-output/

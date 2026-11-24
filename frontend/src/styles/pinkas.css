@@ -376,7 +376,6 @@ body { background: var(--workspace-canvas); }
 .pinkas-workspace .transactions-page .dashboard-filter-heading { margin-bottom: 6px; }
 .pinkas-workspace .transactions-page .dashboard-filter-heading span { display: none; }
 @media (max-width: 640px) {
-  .pinkas-workspace .transactions-page > .dashboard-filter-bar { order: -1; }
   .pinkas-workspace .transactions-page .dashboard-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .pinkas-workspace .transactions-page .date-chips { order: 0; width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .pinkas-workspace .transactions-page .date-chips button { padding-inline: 2px; white-space: normal; }

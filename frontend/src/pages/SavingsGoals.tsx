@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import Select from '../components/ui/Select'
 import RadialProgress from '../components/ui/RadialProgress'
 import Card from '../components/ui/Card'
@@ -287,121 +288,12 @@ export default function SavingsGoals() {
         icon={PiggyBank}
       />
 
-      {/* ─── Summary Cards ───────────────────────────────────────── */}
       {goals.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
-            gap: 'var(--space-md)',
-            marginBottom: 'var(--space-xl)',
-          }}
-        >
-          <motion.div initial="hidden" animate="visible" custom={0} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'rgba(52, 211, 153, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Wallet size={20} style={{ color: '#34d399' }} />
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  סה״כ נחסך
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  direction: 'ltr',
-                  display: 'block',
-                  textAlign: 'right',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {formatCurrency(summary.totalSaved)}
-              </span>
-            </Card>
-          </motion.div>
-
-          <motion.div initial="hidden" animate="visible" custom={1} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'rgba(129, 140, 248, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Target size={20} style={{ color: '#818cf8' }} />
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  יעד כולל
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  direction: 'ltr',
-                  display: 'block',
-                  textAlign: 'right',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {formatCurrency(summary.totalTarget)}
-              </span>
-            </Card>
-          </motion.div>
-
-          <motion.div initial="hidden" animate="visible" custom={2} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'rgba(56, 189, 248, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <TrendingUp size={20} style={{ color: '#38bdf8' }} />
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  התקדמות כללית
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {Math.round(summary.overallProgress)}%
-              </span>
-            </Card>
-          </motion.div>
-        </div>
+        <WorkspaceMetrics label="סיכום חיסכון" metrics={[
+          { label: 'סה״כ נחסך', value: formatCurrency(summary.totalSaved), icon: Wallet, tone: 'positive' },
+          { label: 'יעד כולל', value: formatCurrency(summary.totalTarget), icon: Target },
+          { label: 'התקדמות כללית', value: `${Math.round(summary.overallProgress)}%`, icon: TrendingUp },
+        ]} />
       )}
 
       {/* ─── Action Bar ──────────────────────────────────────────── */}

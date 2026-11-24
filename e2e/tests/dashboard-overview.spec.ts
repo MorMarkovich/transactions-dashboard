@@ -68,7 +68,15 @@ async function openOverview(page: Page) {
       case '/api/charts/v2/category-transactions':
         return route.fulfill({ json: { transactions: [transaction], total: 120, count: 1 } })
       case '/api/transactions':
-        return route.fulfill({ json: { transactions: [transaction], total: 1, total_expenses: 120, expense_count: 1 } })
+        return route.fulfill({ json: { transactions: [transaction], total: 1, total_expenses: 120, expense_count: 1, median_transaction: 120 } })
+      case '/api/income-analysis': {
+        const salary = { name: 'משכורת לדוגמה', value: 19000, count: 1 }
+        return route.fulfill({ json: {
+          total: 19000, count: 1, average: 19000,
+          sources: [salary], months: [{ ...salary, name: '10/2025' }], categories: [],
+          transactions: [{ id: 3, date: '2025-10-01', source: salary.name, amount: salary.value, category: 'משכורת', account: 'חשבון דוגמה', notes: 'תלוש לדוגמה' }],
+        } })
+      }
       case '/api/export':
         return route.fulfill({ body: 'synthetic-download', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       default:
@@ -137,4 +145,64 @@ test('the dashboard fits a narrow RTL viewport in both colour schemes', async ({
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   expect(await noHorizontalScroll()).toBe(true)
   await testInfo.attach('overview-320-light', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+})
+
+test('workspace search, navigation and income details keep the signed-in context', async ({ page }, testInfo) => {
+  await openOverview(page)
+  const search = page.getByRole('button', { name: 'חיפוש', exact: true })
+  await expect(search).toHaveCount(1)
+  await search.focus()
+  await search.click()
+  const finder = page.getByRole('dialog', { name: 'חיפוש עמוד או פעולה' })
+  const searchInput = finder.getByRole('textbox')
+  await expect(searchInput).toBeFocused()
+  await searchInput.press('Escape')
+  await expect(finder).toBeHidden()
+  await expect(search).toBeFocused()
+  await search.click()
+  await searchInput.fill('הכנסות')
+  await searchInput.press('Enter')
+  await expect(page).toHaveURL(/\/income\?session_id=overview-demo$/)
+  await expect(page.getByRole('heading', { name: 'כל ההכנסות (1)' })).toBeVisible()
+
+  const detail = page.getByRole('button', { name: /פרטי הכנסה: משכורת לדוגמה/ })
+  await detail.focus()
+  await detail.press('Enter')
+  await expect(detail).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.getByText('תלוש לדוגמה')).toBeVisible()
+  await detail.press('Space')
+  await expect(detail).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByText('תלוש לדוגמה')).toBeHidden()
+
+  const desktop = testInfo.project.name === 'desktop-1280'
+  if (!desktop) {
+    await page.getByRole('navigation', { name: 'ניווט מהיר' }).getByRole('button', { name: 'פתח תפריט' }).click()
+  }
+  const nav = page.getByRole('navigation', { name: 'ניווט בסביבת העבודה' })
+  await expect(nav.getByRole('link', { name: 'הכנסות' })).toHaveAttribute('aria-current', 'page')
+  await nav.getByRole('link', { name: 'עסקאות' }).click()
+  await expect(page).toHaveURL(/\/transactions\?session_id=overview-demo$/)
+  const ledger = page.getByText('קנייה במכולת', { exact: true }).filter({ visible: true })
+  const analysis = page.getByText('סיכום וניתוח לפי קטגוריה', { exact: true })
+  await expect(ledger).toBeVisible()
+  await expect(analysis).toBeVisible()
+  expect(await ledger.evaluate(element => {
+    const summary = document.querySelector('.tx-analysis > summary')
+    return Boolean(summary
+      && (element.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING)
+      && element.getBoundingClientRect().bottom <= summary.getBoundingClientRect().top)
+  })).toBe(true)
+  await analysis.click()
+  const median = page.locator('.workspace-metric').filter({ hasText: 'חציון הוצאה' })
+  await expect(median).toContainText('120.00')
+  await expect(page.getByRole('button', { name: 'ייצוא לאקסל' })).toBeEnabled()
+
+  if (desktop) {
+    await search.click()
+    await expect(searchInput).toBeFocused()
+    await page.setViewportSize({ width: 800, height: 800 })
+    await expect(page.locator('.workspace-search')).toHaveCount(0)
+    await searchInput.press('Escape')
+    await expect(page.getByRole('main')).toBeFocused()
+  }
 })

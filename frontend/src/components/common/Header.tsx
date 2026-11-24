@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type MouseEventHandler, useEffect, useRef } from 'react'
 import { Sun, Moon, Menu, X, Search, PanelsTopLeft, ChevronDown, Settings } from 'lucide-react'
 import { NavLink, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../context/ThemeContext'
@@ -8,7 +8,7 @@ import SignOutButton from './SignOutButton'
 interface HeaderProps {
   onToggleSidebar?: () => void
   sidebarOpen?: boolean
-  onCommandPalette?: () => void
+  onCommandPalette?: MouseEventHandler<HTMLButtonElement>
 }
 export const ORBIT_NAV = [
   {to:'/',label:'סקירה'}, {to:'/transactions',label:'עסקאות'},
@@ -56,7 +56,7 @@ export default function Header({ onToggleSidebar, sidebarOpen, onCommandPalette 
     <div className="orbit-tools">
       <button onClick={onCommandPalette} aria-label="חיפוש" title="חיפוש (Ctrl+K / ⌘K)"><Search size={18}/></button>
       <button onClick={toggleTheme} aria-label={theme==='dark'?'מעבר למצב בהיר':'מעבר למצב כהה'}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button>
-      <button onClick={onToggleSidebar} aria-label={sidebarOpen?'סגור תפריט':'פתח תפריט'} aria-expanded={sidebarOpen}>{sidebarOpen?<X size={18}/>:<Menu size={18}/>}</button>
+      <button className="topbar-menu-toggle" onClick={onToggleSidebar} aria-label={sidebarOpen?'סגור תפריט':'פתח תפריט'} aria-expanded={sidebarOpen}>{sidebarOpen?<X size={18}/>:<Menu size={18}/>}</button>
       <details
         className="orbit-account-menu"
         ref={accountMenu}

@@ -93,6 +93,8 @@ describe('combined filters: date chip + search', () => {
     // CORRECT behavior: date range from the chip must survive the search.
     expect(lastCallFilters().start_date).toBe(chipStart)
     expect(lastCallFilters().end_date).toBe(chipEnd)
+    expect(screen.getByRole('button', { name: 'החודש' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'הכל' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('keeps the date range when applying amount filters from the advanced panel after a chip', async () => {

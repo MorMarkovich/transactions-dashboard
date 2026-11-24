@@ -400,24 +400,15 @@ function TransactionDrawerDetails({
                   </span>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
+                    variant="primary"
                     onClick={handleSaveNotes}
                     disabled={saving || !sessionId || !active}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '999px',
-                      border: 'none',
-                      background: 'var(--accent-primary, #4f46e5)',
-                      color: '#fff',
-                      fontSize: '0.8125rem',
-                      fontWeight: 600,
-                      cursor: saving ? 'default' : 'pointer',
-                      opacity: saving ? 0.7 : 1,
-                    }}
                   >
                     {saving ? 'שומר...' : 'שמור הערות'}
-                  </button>
+                  </Button>
                 </div>
               </div>}
             </div>

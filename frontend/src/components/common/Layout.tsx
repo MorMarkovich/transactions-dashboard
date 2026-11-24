@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
+import { type MouseEvent, type ReactNode, useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { useDashboardFilters } from '../../context/FilterContext'
 import { NavLink, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,7 +8,7 @@ import useMediaQuery from '../../hooks/useMediaQuery'
 import Sidebar from './Sidebar'
 import { getSampleSessionId, clearSampleSession } from '../../lib/sampleMode'
 import CommandPalette from './CommandPalette'
-import { LayoutDashboard, Receipt, CalendarRange, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Receipt, CalendarRange, Menu, X, Search, History } from 'lucide-react'
 import Skeleton from '../ui/Skeleton'
 import { useAuth } from '../../lib/AuthContext'
 import { scoped, LAST_SESSION_BASE, SNAPSHOT_SEEN_BASE } from '../../lib/userStorage'
@@ -16,6 +16,7 @@ import { isValidRuleCategory, migrateRule } from '../../utils/constants'
 import { supabaseApi } from '../../services/supabaseApi'
 import { transactionsApi } from '../../services/api'
 import './Layout.css'
+import '../../styles/workspace.css'
 
 // ─── Constants ────────────────────────────────────────────────────────
 const AUTO_AI_ENABLED = import.meta.env.VITE_AUTO_AI !== 'false'
@@ -194,6 +195,7 @@ export default function Layout({ children }: LayoutProps) {
   useChartLabels(location.pathname)
   const { category: activeCategory, subcategories: activeSubs, clearFilters, owner: activeOwner, setOwner } = useDashboardFilters()
   const { user } = useAuth()
+  const mainRef = useRef<HTMLElement>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   // Per-user: a second account signing in must get its own restore pass.
   const hasTriedRestore = useRef<string | null>(null)
@@ -213,18 +215,24 @@ export default function Layout({ children }: LayoutProps) {
   const lastSessionKey = scoped(LAST_SESSION_BASE, user?.id ?? '')
   const snapshotSeenKey = scoped(SNAPSHOT_SEEN_BASE, user?.id ?? '')
   const [snapshotAt, setSnapshotAt] = useState<string | null>(() => (user ? localStorage.getItem(snapshotSeenKey) : null))
+  const snapshotStamp = !sessionValidating && snapshotAt ? formatStamp(snapshotAt) : null
 
   // The desktop navigation stays visible; smaller screens use a modal drawer.
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const desktopNavigation = useMediaQuery('(min-width: 1024px)')
   const mobileSidebarOpen = sidebarOpen && !desktopNavigation
 
-  const openSearch = () => { setSidebarOpen(false); setCommandPaletteOpen(true) }
+  const openSearch = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.focus({ preventScroll: true })
+    setSidebarOpen(false)
+    setCommandPaletteOpen(true)
+  }
+  const closeSearch = useCallback(() => setCommandPaletteOpen(false), [])
 
   // Global Ctrl+K / Cmd+K keyboard shortcut for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyK' || e.key.toLowerCase() === 'k')) {
         e.preventDefault()
         setSidebarOpen(false)
         setCommandPaletteOpen(prev => !prev)
@@ -535,7 +543,22 @@ export default function Layout({ children }: LayoutProps) {
         />
 
         {/* Main content area */}
-        <main className="main-content" id="workspace-main">
+        <main ref={mainRef} className="main-content" id="workspace-main" tabIndex={-1}>
+          <div className="workspace-toolbar" hidden={!desktopNavigation && !snapshotStamp}>
+            {desktopNavigation && (
+              <button type="button" className="workspace-search" onClick={openSearch}>
+                <Search size={17} aria-hidden="true" />
+                <span>חיפוש</span>
+                <kbd dir="ltr" aria-hidden="true">Ctrl / ⌘ K</kbd>
+              </button>
+            )}
+            {snapshotStamp && (
+              <div className="data-freshness" data-testid="data-freshness">
+                <History size={15} aria-hidden="true" />
+                <span>הנתונים עודכנו: <bdi>{snapshotStamp}</bdi></span>
+              </div>
+            )}
+          </div>
           {newVersion && (
             <div className="update-bar" role="status">
               <span>גרסה חדשה זמינה</span>
@@ -556,9 +579,6 @@ export default function Layout({ children }: LayoutProps) {
               <span>תצוגה לפי <strong>{activeOwner}</strong></span>
               <button type="button" className="ui-btn" onClick={() => setOwner(null)}>נקה סינון לפי אדם</button>
             </div>
-          )}
-          {!sessionValidating && snapshotAt && formatStamp(snapshotAt) && (
-            <div className="data-freshness" data-testid="data-freshness">הנתונים עודכנו: {formatStamp(snapshotAt)}</div>
           )}
           {sessionValidating ? (
             <div className="studio-loading" role="status" aria-label="טוען את הנתונים שלך">
@@ -586,7 +606,8 @@ export default function Layout({ children }: LayoutProps) {
 
       <CommandPalette
         isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
+        onClose={closeSearch}
+        fallbackFocusRef={mainRef}
       />
       <nav className="mobile-bottom-nav" aria-label="ניווט מהיר">
         {[{to:'/',text:'סקירה',Icon:LayoutDashboard},{to:'/transactions',text:'עסקאות',Icon:Receipt},{to:'/monthly',text:'השוואת חודשים',Icon:CalendarRange}].map(({to,text,Icon}) => <NavLink key={to} to={`${to}${searchParams.get('session_id') ? `?session_id=${searchParams.get('session_id')}` : ''}`} end={to === '/'}><Icon size={20}/><span>{text}</span></NavLink>)}

@@ -339,7 +339,7 @@ export default function MonthlyBreakdown() {
   )
 
   return (
-    <div style={{ direction: 'rtl', position: 'relative' }}>
+    <div className="monthly-report" style={{ direction: 'rtl', position: 'relative' }}>
       <PageHeader
         title="השוואת חודשים"
         subtitle="השוואת הרכב ההוצאות בין חודשים שונים, לפי קטגוריה ותת-קטגוריה"
@@ -349,8 +349,7 @@ export default function MonthlyBreakdown() {
       <section className="dashboard-filter-bar sector-filter-bar" aria-label="בחירת ענפים להשוואה">
         <div className="dashboard-filter-heading">
           <div>
-            <strong>בחירת ענף להשוואה לאורך זמן</strong>
-            <span>אפשר להתמקד בענף ובתת-ענף, למשל סופרים קטנים מול סופר גדול.</span>
+            <strong>סינון ההשוואה</strong>
           </div>
           {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>הצג הכל</button>}
         </div>
