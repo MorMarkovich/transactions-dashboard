@@ -8,8 +8,7 @@
  * Passing today (positive regressions):
  *   A - a real filter change resets the page to 1
  */
-import { act, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../lib/AuthContext', async () => {
@@ -100,12 +99,11 @@ beforeEach(() => {
 
 describe('Transactions pagination state (domain24 audit)', () => {
   it('A - a real filter change (date chip) resets the page to 1', async () => {
-    const user = userEvent.setup()
     renderPage()
     await screen.findByText('עמוד 1 מתוך 3')
-    await user.click(screen.getByRole('button', { name: 'עמוד הבא' }))
+    fireEvent.click(screen.getByLabelText('עמוד הבא'))
     await screen.findByText('עמוד 2 מתוך 3')
-    await user.click(screen.getByRole('button', { name: 'החודש' }))
+    fireEvent.click(screen.getByText('החודש', { selector: 'button' }))
     await waitFor(() => expect(lastPage()).toBe(1))
     await screen.findByText('עמוד 1 מתוך 3')
   })
@@ -119,12 +117,11 @@ describe('Transactions pagination state (domain24 audit)', () => {
   })
 
   it('C - shrinking the filtered set via subcategory resets the page (REGRESSION, fails today)', async () => {
-    const user = userEvent.setup()
     renderPage()
     await screen.findByText('עמוד 1 מתוך 3')
     act(() => ctx.setCategory('מזון וצריכה'))
     await screen.findByText('עמוד 1 מתוך 2')
-    await user.click(screen.getByRole('button', { name: 'עמוד הבא' }))
+    fireEvent.click(screen.getByLabelText('עמוד הבא'))
     await screen.findByText('עמוד 2 מתוך 2')
     // 10 rows match this subcategory -> exactly 1 page. Page must reset/clamp.
     act(() => ctx.setSubcategories(['סופר גדול']))
@@ -133,12 +130,11 @@ describe('Transactions pagination state (domain24 audit)', () => {
   })
 
   it('C2 - after a shrink the pager never shows an impossible page and the rows render', async () => {
-    const user = userEvent.setup()
     renderPage()
     await screen.findByText('עמוד 1 מתוך 3')
     act(() => ctx.setCategory('מזון וצריכה'))
     await screen.findByText('עמוד 1 מתוך 2')
-    await user.click(screen.getByRole('button', { name: 'עמוד הבא' }))
+    fireEvent.click(screen.getByLabelText('עמוד הבא'))
     await screen.findByText('עמוד 2 מתוך 2')
     act(() => ctx.setSubcategories(['סופר גדול']))
     await screen.findByText('עמוד 1 מתוך 1')
