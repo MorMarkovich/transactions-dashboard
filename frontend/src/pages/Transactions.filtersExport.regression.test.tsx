@@ -2,7 +2,7 @@
 // These tests assert CORRECT behavior. Failures demonstrate live bugs in main.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Transactions from './Transactions'
 import { FilterProvider } from '../context/FilterContext'
 import { transactionsApi } from '../services/api'
@@ -28,7 +28,8 @@ vi.mock('../services/api', () => ({
     getCategoryCatalog: vi.fn().mockResolvedValue({ subcategories: {} }),
     scopeSession: vi.fn().mockImplementation(async (id: string) => id),
     getTransactions: vi.fn().mockResolvedValue({
-      transactions: [], total: 0, total_amount: 0, avg_transaction: 0,
+      transactions: [{ id: 1, תאריך: '2026-01-12', תיאור: 'סופר', קטגוריה: 'מזון', סכום: -100 }],
+      total: 1, total_amount: 100, avg_transaction: 100,
       expense_count: 0, income_count: 0, total_expenses: 0, total_income: 0,
       median_transaction: 0, max_transaction: null, min_transaction: null,
       category_breakdown: [], date_from: null, date_to: null,
@@ -51,6 +52,12 @@ beforeEach(() => {
   }
   window.URL.createObjectURL = vi.fn(() => 'blob:mock')
   window.URL.revokeObjectURL = vi.fn()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function renderPage() {
@@ -108,6 +115,10 @@ describe('export parity', () => {
     renderPage()
     await waitFor(() => expect(api.getTransactions).toHaveBeenCalled())
 
+    fireEvent.click(screen.getByRole('button', { name: 'החודש' }))
+    await waitFor(() => expect(lastCallFilters().start_date).toBeTruthy())
+    const { start_date, end_date } = lastCallFilters()
+
     fireEvent.change(screen.getByPlaceholderText('חיפוש עסקאות...'), { target: { value: 'סופר' } })
     await waitFor(() => expect(lastCallFilters().search).toBe('סופר'), { timeout: 2000 })
 
@@ -117,13 +128,19 @@ describe('export parity', () => {
     fireEvent.click(screen.getByRole('button', { name: 'החל סינון' }))
     await waitFor(() => expect(lastCallFilters().min_amount).toBe(50))
 
-    fireEvent.click(screen.getByRole('button', { name: /ייצוא/ }))
+    const button = screen.getByRole('button', { name: 'ייצוא לאקסל' })
+    await waitFor(() => expect(button).toBeEnabled())
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    fireEvent.click(button)
     await waitFor(() => expect(api.exportTransactions).toHaveBeenCalled())
 
     const exportFilters = api.exportTransactions.mock.calls[0][1] as Record<string, unknown>
     // CORRECT behavior: export carries the same active filters as the list.
     expect(exportFilters).toMatchObject({ search: 'סופר' })
     expect(exportFilters).toMatchObject({ min_amount: 50, max_amount: 500 })
+    expect(exportFilters).toMatchObject({ start_date, end_date })
+    expect(exportFilters).not.toHaveProperty('page_size')
+    expect(download.mock.contexts[0]).toHaveProperty('download', 'transactions.xlsx')
   })
 })
 

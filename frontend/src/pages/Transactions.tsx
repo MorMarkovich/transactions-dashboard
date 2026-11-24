@@ -156,6 +156,17 @@ export default function Transactions() {
 
   // UI state
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const apiFilters = useMemo(() => ({
+    category: category || filters.category,
+    search: filters.search,
+    start_date: filters.startDate,
+    end_date: filters.endDate,
+    min_amount: filters.minAmount,
+    max_amount: filters.maxAmount,
+  } satisfies TransactionFilters), [category, filters])
 
   // ---- Effect 1: fetch categories once on sessionId change ----------------
   useEffect(() => {
@@ -220,20 +231,9 @@ export default function Transactions() {
 
       try {
         const scopedId = await transactionsApi.scopeSession(sessionId, owner, controller.signal, category, subcategories)
-        const apiFilters: TransactionFilters = {
-          page,
-          page_size: pageSize,
-          search: filters.search,
-          category: category || filters.category,
-          start_date: filters.startDate,
-          end_date: filters.endDate,
-          min_amount: filters.minAmount,
-          max_amount: filters.maxAmount,
-        }
-
         const response = await transactionsApi.getTransactions(
           scopedId,
-          apiFilters,
+          { ...apiFilters, page, page_size: pageSize },
           controller.signal,
         )
         if (controller.signal.aborted) return
@@ -263,7 +263,7 @@ export default function Transactions() {
     fetchTransactions()
 
     return () => controller.abort()
-  }, [sessionId, filters, page, pageSize, category, subcategories, owner, classificationRevision])
+  }, [sessionId, apiFilters, page, pageSize, category, subcategories, owner, classificationRevision])
 
   // ---- Computed stats -------------------------------------------------------
   const stats = useMemo(() => ({
@@ -326,28 +326,27 @@ export default function Transactions() {
   const handleExport = useCallback(async () => {
     if (!sessionId) return
 
+    setExporting(true)
+    setExportError(null)
     try {
       const scopedId = await transactionsApi.scopeSession(sessionId, owner, undefined, category, subcategories)
-      // Export exactly what the list shows: every active filter goes along.
-      const blob = await transactionsApi.exportTransactions(scopedId, {
-        category: category || filters.category,
-        search: filters.search,
-        start_date: filters.startDate,
-        end_date: filters.endDate,
-        min_amount: filters.minAmount,
-        max_amount: filters.maxAmount,
-      })
+      const blob = await transactionsApi.exportTransactions(scopedId, apiFilters)
 
       const url = window.URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
       anchor.download = 'transactions.xlsx'
+      document.body.appendChild(anchor)
       anchor.click()
-      window.URL.revokeObjectURL(url)
+      anchor.remove()
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000)
     } catch (err) {
       console.error('Error exporting:', err)
+      setExportError('הייצוא לאקסל נכשל. נסו שוב.')
+    } finally {
+      setExporting(false)
     }
-  }, [sessionId, filters, category, subcategories, owner])
+  }, [sessionId, apiFilters, category, subcategories, owner])
 
   // ---- No session: empty state --------------------------------------------
   if (!sessionId) {
@@ -549,9 +548,11 @@ export default function Transactions() {
         onFilterChange={handleFilterChange}
         onExport={handleExport}
         categories={categories}
-        loading={loading}
+        loading={loading || total === 0}
+        exporting={exporting}
         showCategory={false}
       />
+      {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
 
       {/* ── Quick Date Filter Chips ───────────────────────────────────── */}
       <div className="filter-chips date-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
