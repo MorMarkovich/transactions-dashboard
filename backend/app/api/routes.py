@@ -9,6 +9,9 @@ import math
 import logging
 import time
 import zipfile
+from calendar import monthrange
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Optional, Any, Literal
 from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException, Depends
@@ -54,6 +57,7 @@ from ..core.security import (
 )
 
 logger = logging.getLogger(__name__)
+ISRAEL_TIME = ZoneInfo('Asia/Jerusalem')
 
 # Every API route requires a valid Supabase access token. Static assets and the
 # health check are registered outside this router and remain public.
@@ -2930,6 +2934,34 @@ def get_heatmap_v2(sessionId: str = Query(...)):
     return {"categories": categories, "months": months, "data": data}
 
 
+def _cumulative_expenses(expenses: pd.DataFrame, month: str, date_type: str, today: _dt.date):
+    """Recorded spending at the end of each elapsed day in the reporting month."""
+    if not re.fullmatch(r"(0[1-9]|1[0-2])/[0-9]{4}", month):
+        return None
+    calendar_month, year = map(int, month.split('/'))
+    if year == 0:
+        return None
+    period = (year, calendar_month)
+    current = (today.year, today.month)
+    if period > current:
+        return []
+    elapsed_days = today.day if period == current else monthrange(*period)[1]
+    if expenses.empty:
+        return [0.0] * elapsed_days
+
+    dates = expenses.get('תאריך', pd.Series(pd.NaT, index=expenses.index))
+    if date_type == 'billing' and 'תאריך_חיוב' in expenses.columns:
+        billed = expenses['תאריך_חיוב']
+        dates = billed.where(billed.notna(), dates)
+    # Keep the monthly total for legacy rows, but do not invent a day when its
+    # effective date is absent or disagrees with the persisted reporting month.
+    if not pd.api.types.is_datetime64_any_dtype(dates) or not dates.dt.strftime('%m/%Y').eq(month).all():
+        return None
+    daily = expenses['סכום_מוחלט'].groupby(dates.dt.day).sum()
+    running = daily.reindex(range(1, elapsed_days + 1), fill_value=0).cumsum()
+    return [round(_sanitize(float(amount)), 2) for amount in running]
+
+
 @router.get("/charts/v2/month-overview")
 @_offload
 def get_month_overview(
@@ -2941,17 +2973,15 @@ def get_month_overview(
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    df = sessions[sessionId].copy()
-    df = drop_neutral_financing(df)
-    if df.empty:
-        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
-
+    df = drop_neutral_financing(sessions[sessionId])
+    today = datetime.now(ISRAEL_TIME).date()
     # Group by the shift-aware month (so salaries land in their attributed month).
-    df['_month'] = _month_series(df, date_type)
-    month_df = df[df['_month'] == month].copy()
-
+    month_df = df if df.empty else df.loc[_month_series(df, date_type).eq(month)]
     if month_df.empty:
-        return {"month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0}
+        return {
+            "month": month, "categories": [], "total_expenses": 0, "total_income": 0, "transaction_count": 0,
+            "cumulative_expenses": _cumulative_expenses(month_df, month, date_type, today),
+        }
 
     expenses = month_df[month_df['סכום'] < 0]
     income = month_df[month_df['סכום'] > 0]
@@ -2982,6 +3012,7 @@ def get_month_overview(
         "total_expenses": total_expenses,
         "total_income": total_income,
         "transaction_count": int(len(expenses)),
+        "cumulative_expenses": _cumulative_expenses(expenses, month, date_type, today),
     }
 
 
