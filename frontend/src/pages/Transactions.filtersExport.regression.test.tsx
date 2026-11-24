@@ -2,7 +2,7 @@
 // These tests assert CORRECT behavior. Failures demonstrate live bugs in main.
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { vi, describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import Transactions from './Transactions'
 import { FilterProvider } from '../context/FilterContext'
 import { transactionsApi } from '../services/api'
@@ -43,6 +43,10 @@ const api = transactionsApi as unknown as {
   exportTransactions: ReturnType<typeof vi.fn>
 }
 
+// Keep the browser API available through React Testing Library's unmount.
+beforeAll(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }))
+afterAll(() => vi.unstubAllGlobals())
+
 beforeEach(() => {
   vi.clearAllMocks()
   sessionStorage.clear()
@@ -52,12 +56,10 @@ beforeEach(() => {
   }
   window.URL.createObjectURL = vi.fn(() => 'blob:mock')
   window.URL.revokeObjectURL = vi.fn()
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
-  vi.unstubAllGlobals()
 })
 
 function renderPage() {

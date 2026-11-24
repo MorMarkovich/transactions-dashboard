@@ -407,6 +407,8 @@ export const transactionsApi = {
 
     if (filters) {
       if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.month) params.append('month', filters.month);
+      if (filters.date_type) params.append('date_type', filters.date_type);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
       if (filters.subcategory) params.append('subcategory', filters.subcategory);
@@ -666,7 +668,7 @@ export const transactionsApi = {
    */
   exportTransactions: async (
     sessionId: string,
-    filters?: { start_date?: string; end_date?: string; category?: string; subcategory?: string; search?: string; min_amount?: number; max_amount?: number },
+    filters?: Omit<TransactionFilters, 'page' | 'page_size' | 'sort_by' | 'sort_order'>,
     signal?: AbortSignal
   ): Promise<Blob> => {
     const params = new URLSearchParams();
@@ -674,6 +676,8 @@ export const transactionsApi = {
 
     if (filters) {
       if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.month) params.append('month', filters.month);
+      if (filters.date_type) params.append('date_type', filters.date_type);
       if (filters.end_date) params.append('end_date', filters.end_date);
       if (filters.category) params.append('category', filters.category);
       if (filters.subcategory) params.append('subcategory', filters.subcategory);
@@ -723,9 +727,9 @@ export const transactionsApi = {
   /**
    * Get monthly chart data (v2 - raw Recharts format)
    */
-  getMonthlyChartV2: async (sessionId: string, dateType?: string, signal?: AbortSignal): Promise<RawMonthlyData> => {
+  getMonthlyChartV2: async (sessionId: string, dateType?: string, signal?: AbortSignal, includeIncome = false): Promise<RawMonthlyData> => {
     const response = await api.get<RawMonthlyData>('/api/charts/v2/monthly', {
-      params: { sessionId, ...(dateType && { date_type: dateType }) },
+      params: { sessionId, date_type: dateType, ...(includeIncome && { include_income: true }) },
       signal,
     });
     return response.data;

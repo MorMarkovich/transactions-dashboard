@@ -1127,7 +1127,9 @@ def get_transactions(
     sort_by: Optional[str] = None,
     sort_order: Optional[str] = "desc",
     page: int = 1,
-    page_size: int = 100
+    page_size: int = 100,
+    month: Optional[str] = None,
+    date_type: Literal["transaction", "billing"] = "transaction",
 ):
     """Get transactions with filters"""
     if sessionId not in sessions:
@@ -1136,6 +1138,8 @@ def get_transactions(
     df = sessions[sessionId].copy()
 
     # Apply filters
+    if month:
+        df = df[_month_series(df, date_type) == month]
     if start_date:
         df = df[df['תאריך'] >= pd.to_datetime(start_date)]
     if end_date:
@@ -2067,7 +2071,9 @@ def export_transactions(
     subcategory: Optional[str] = None,
     search: Optional[str] = None,
     min_amount: Optional[float] = None,
-    max_amount: Optional[float] = None
+    max_amount: Optional[float] = None,
+    month: Optional[str] = None,
+    date_type: Literal["transaction", "billing"] = "transaction",
 ):
     """Export transactions to Excel"""
     if sessionId not in sessions:
@@ -2076,6 +2082,8 @@ def export_transactions(
     df = sessions[sessionId].copy()
     
     # Apply filters
+    if month:
+        df = df[_month_series(df, date_type) == month]
     if start_date:
         df = df[df['תאריך'] >= pd.to_datetime(start_date)]
     if end_date:
@@ -2679,27 +2687,33 @@ def get_merchant_transactions(
 
 @router.get("/charts/v2/monthly")
 @_offload
-def get_monthly_v2(sessionId: str = Query(...), date_type: str = Query("transaction")):
-    """Return raw monthly expense totals."""
+def get_monthly_v2(
+    sessionId: str = Query(...),
+    date_type: str = Query("transaction"),
+    include_income: bool = False,
+):
+    """Return monthly expense totals and, optionally, recorded income."""
     if sessionId not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
 
     df = sessions[sessionId]
     df = drop_neutral_financing(df)
-    expenses = df[df['סכום'] < 0].copy()
-
-    if expenses.empty:
+    if df.empty:
         return {"months": []}
 
-    # Group by the shift-aware month so the month buttons match the other views.
-    expenses['_month'] = _month_series(expenses, date_type)
-    expenses = expenses[expenses['_month'].notna() & (expenses['_month'] != '')]
-    monthly = expenses.groupby('_month')['סכום_מוחלט'].sum()
-
-    months = [
-        {"month": str(m), "amount": round(_sanitize(float(monthly[m])), 2)}
-        for m in sorted(monthly.index, key=_month_key)
-    ]
+    active = df.loc[df['סכום'] != 0].copy()
+    active['_month'] = _month_series(active, date_type)
+    active = active[active['_month'].notna() & (active['_month'] != '')]
+    debits = active[active['סכום'] < 0]
+    expenses = debits.groupby('_month')['סכום_מוחלט'].sum() if not debits.empty else pd.Series(dtype=float)
+    income = active[active['סכום'] > 0].groupby('_month')['סכום'].sum() if include_income else None
+    keys = expenses.index if income is None else expenses.index.union(income.index)
+    months = []
+    for month in sorted(keys, key=_month_key):
+        item = {"month": str(month), "amount": round(_sanitize(float(expenses.get(month, 0))), 2)}
+        if income is not None:
+            item["income"] = round(_sanitize(float(income.get(month, 0))), 2)
+        months.append(item)
     return {"months": months}
 
 

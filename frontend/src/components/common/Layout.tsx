@@ -187,6 +187,8 @@ function useChartLabels(pathname: string) {
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const latestLocation = useRef(location)
+  useLayoutEffect(() => { latestLocation.current = location }, [location])
   const [searchParams] = useSearchParams()
   useScrollMemory(location.pathname)
   useChartLabels(location.pathname)
@@ -251,6 +253,12 @@ export default function Layout({ children }: LayoutProps) {
     // session rather than rebuilding one from the database every time.
     const rememberedSession = urlSession ? null : localStorage.getItem(lastSessionKey)
     const sessionId = urlSession || rememberedSession
+    const navigateWithSession = (id: string) => {
+      const { pathname, search, hash } = latestLocation.current
+      const next = new URLSearchParams(search)
+      next.set('session_id', id)
+      navigate(`${pathname}?${next}${hash}`, { replace: true })
+    }
 
     const doRestore = (attempt = 0): Promise<void> => {
       const snapshotAtPromise = supabaseApi.getLatestSnapshotAt(user.id).catch(() => null)
@@ -299,9 +307,7 @@ export default function Layout({ children }: LayoutProps) {
               // state and stays correct after a switch; the setState does not.
               if (at) { localStorage.setItem(snapshotSeenKey, at); if (!stale()) setSnapshotAt(at) }
             })
-            // Preserve current page path when restoring session
-            const currentPath = window.location.pathname
-            navigate(`${currentPath}?session_id=${response.session_id}`, { replace: true })
+            navigateWithSession(response.session_id)
             // The slow AI fallback (Claude + web search) runs in the
             // background — restore no longer waits for it, so the app paints
             // immediately. Resolved merchants are persisted as rules so each
@@ -348,7 +354,7 @@ export default function Layout({ children }: LayoutProps) {
         }
         setSnapshotAt(localStorage.getItem(snapshotSeenKey))
         if (rememberedSession) {
-          navigate(`${window.location.pathname}?session_id=${rememberedSession}`, { replace: true })
+          navigateWithSession(rememberedSession)
         }
         setSessionValidating(false)
       })

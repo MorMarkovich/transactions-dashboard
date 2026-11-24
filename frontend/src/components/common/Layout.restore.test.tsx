@@ -156,9 +156,9 @@ describe('Layout session restore — dead session in URL', () => {
     getLatestTransactions.mockResolvedValue([{ 'סכום': -10 }] as never)
     restoreSession.mockResolvedValue({ success: true, session_id: 'new-9' } as never)
 
-    renderAt('/?session_id=dead-real')
+    renderAt('/transactions?session_id=dead-real&month=05%2F2026&date_type=billing')
 
-    await waitFor(() => expect(locations.at(-1)).toBe('/?session_id=new-9'))
+    await waitFor(() => expect(locations.at(-1)).toBe('/transactions?session_id=new-9&month=05%2F2026&date_type=billing'))
     expect(restoreSession).toHaveBeenCalledTimes(1)
   })
 

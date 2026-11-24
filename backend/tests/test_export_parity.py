@@ -97,3 +97,24 @@ async def test_export_includes_current_notes_and_all_matches_beyond_the_current_
     assert transactions[1][headers.index('קטגוריה_משנה')] == 'סופרים'
     assert transactions[1][headers.index('הערות')] == note
     assert list(workbook['פירוט לפי קטגוריה'].values)[1:] == [('מזון', 2, 1000, 0)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(('date_type', 'expected'), [
+    ('transaction', ['חיוב שנדחה', 'משכורת מוקדמת']),
+    ('billing', ['משכורת מוקדמת']),
+])
+async def test_dashboard_month_uses_same_attribution_in_ledger_and_workbook(client, date_type, expected):
+    frame = pd.DataFrame([
+        {'תאריך': pd.Timestamp('2026-04-30'), 'תיאור': 'משכורת מוקדמת', 'סכום': 3000, 'קטגוריה': 'הכנסה', 'חודש': '05/2026', 'חודש_חיוב': '05/2026'},
+        {'תאריך': pd.Timestamp('2026-05-25'), 'תיאור': 'חיוב שנדחה', 'סכום': -60, 'קטגוריה': 'אוכל', 'חודש': '05/2026', 'חודש_חיוב': '06/2026'},
+    ])
+    frame['סכום_מוחלט'] = frame['סכום'].abs()
+    sessions['exp'] = frame
+    params = {'sessionId': 'exp', 'month': '05/2026', 'date_type': date_type}
+
+    ledger = await client.get('/api/transactions', params=params)
+    workbook = await client.get('/api/export', params=params)
+    assert ledger.status_code == workbook.status_code == 200
+    assert [row['תיאור'] for row in ledger.json()['transactions']] == expected
+    assert _descriptions(workbook.content) == expected
