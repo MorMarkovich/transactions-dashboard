@@ -6,7 +6,6 @@ import {
   Plus,
   Trash2,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   PiggyBank,
@@ -15,6 +14,7 @@ import Select from '../components/ui/Select'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import RadialProgress from '../components/ui/RadialProgress'
 import EmptyState from '../components/common/EmptyState'
 import Skeleton from '../components/ui/Skeleton'
@@ -327,140 +327,32 @@ export default function Budget() {
         </Card>
       )}
 
-      {/* ─── Overall Budget Health ────────────────────────────────── */}
-      {goals.length > 0 && !loadError && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-          style={{ marginBottom: 'var(--space-xl)' }}
-        >
-          <Card className="glass-card" padding="md">
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-md) 0' }}>
+      {goals.length > 0 && (
+        <div className="budget-overview">
+          <WorkspaceMetrics label="סיכום תקציב" metrics={[
+            { label: 'תקציב כולל', value: formatCurrency(budgetSummary.totalBudget), icon: PiggyBank },
+            {
+              label: 'ניצול תקציב',
+              value: loadError ? '—' : formatPercent(Math.min(budgetSummary.utilization, 999)),
+              icon: TrendingUp,
+            },
+            {
+              label: loadError ? 'לא זמין' : budgetSummary.remaining >= 0 ? 'נותר' : 'חריגה',
+              value: loadError ? '—' : formatCurrency(Math.abs(budgetSummary.remaining)),
+              icon: loadError || budgetSummary.remaining < 0 ? AlertTriangle : CheckCircle,
+              tone: loadError ? undefined : budgetSummary.remaining >= 0 ? 'positive' : 'negative',
+            },
+          ]} />
+          {!loadError && (
+            <div className="budget-health">
               <RadialProgress
                 value={overallBudgetHealth}
-                size={140}
-                label="בריאות תקציב"
-                color={
-                  overallBudgetHealth > 90
-                    ? 'var(--danger)'
-                    : overallBudgetHealth > 70
-                    ? 'var(--warning)'
-                    : 'var(--success)'
-                }
+                size={82}
+                color={overallBudgetHealth > 90 ? 'var(--danger)' : overallBudgetHealth > 70 ? 'var(--warning)' : 'var(--success)'}
               />
+              <span>ממוצע ניצול ליעד</span>
             </div>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* ─── Summary Cards ─────────────────────────────────────────── */}
-      {goals.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))',
-            gap: 'var(--space-md)',
-            marginBottom: 'var(--space-xl)',
-          }}
-        >
-          <motion.div initial="hidden" animate="visible" custom={0} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: 'rgba(59, 130, 246, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <PiggyBank size={20} style={{ color: '#3b82f6' }} />
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>תקציב כולל</span>
-              </div>
-              <AnimatedNumber
-                value={budgetSummary.totalBudget}
-                formatter={formatCurrency}
-                style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}
-              />
-            </Card>
-          </motion.div>
-
-          <motion.div initial="hidden" animate="visible" custom={1} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: loadError ? 'rgba(100, 116, 139, 0.12)' : budgetSummary.utilization > 90 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {loadError ? (
-                    <AlertTriangle size={20} style={{ color: 'var(--text-muted)' }} />
-                  ) : budgetSummary.utilization > 90 ? (
-                    <TrendingUp size={20} style={{ color: '#ef4444' }} />
-                  ) : (
-                    <TrendingDown size={20} style={{ color: '#10b981' }} />
-                  )}
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>ניצול תקציב</span>
-              </div>
-              <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {loadError ? '—' : formatPercent(Math.min(budgetSummary.utilization, 999))}
-              </span>
-            </Card>
-          </motion.div>
-
-          <motion.div initial="hidden" animate="visible" custom={2} variants={cardVariants}>
-            <Card className="glass-card" padding="md">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: loadError ? 'rgba(100, 116, 139, 0.12)' : budgetSummary.remaining >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {loadError ? (
-                    <AlertTriangle size={20} style={{ color: 'var(--text-muted)' }} />
-                  ) : budgetSummary.remaining >= 0 ? (
-                    <CheckCircle size={20} style={{ color: '#10b981' }} />
-                  ) : (
-                    <AlertTriangle size={20} style={{ color: '#ef4444' }} />
-                  )}
-                </div>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                  {loadError ? 'לא זמין' : budgetSummary.remaining >= 0 ? 'נותר' : 'חריגה'}
-                </span>
-              </div>
-              {loadError ? (
-                <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>—</span>
-              ) : (
-              <AnimatedNumber
-                value={Math.abs(budgetSummary.remaining)}
-                formatter={formatCurrency}
-                style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: budgetSummary.remaining >= 0 ? 'var(--success)' : 'var(--accent-danger, #ef4444)',
-                }}
-              />
-              )}
-            </Card>
-          </motion.div>
+          )}
         </div>
       )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Receipt, Hash, DollarSign, Calculator, TrendingDown, TrendingUp, ArrowDownRight, ArrowUpRight, BarChart3 } from 'lucide-react'
+import { Receipt, Hash, DollarSign, Calculator, TrendingDown, TrendingUp, ArrowDownRight, ArrowUpRight, BarChart3, ChevronDown } from 'lucide-react'
 import TransactionsTable from '../components/table/TransactionsTable'
 import TransactionDrawer from '../components/table/TransactionDrawer'
 import AdvancedFilters from '../components/table/AdvancedFilters'
@@ -9,6 +9,7 @@ import MultiSelect from '../components/ui/MultiSelect'
 import { joinActiveFilters } from '../utils/categoryFilters'
 import Select from '../components/ui/Select'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
 import { useCategoryColor } from '../hooks/useCategoryColor'
@@ -141,7 +142,12 @@ export default function Transactions() {
   const [initialFilters] = useState(filters)
 
   // Date chip state
-  const [activeDateChip, setActiveDateChip] = useState(saved?.chip || 'all')
+  const [dateChipSelection, setDateChipSelection] = useState(saved?.chip || 'all')
+  const activeDateChip = DATE_CHIPS.find(chip => {
+    if (chip.key !== dateChipSelection || (month && chip.key === 'all')) return false
+    const range = chip.getRange()
+    return range.startDate === filters.startDate && range.endDate === filters.endDate
+  })?.key ?? (!month && !filters.startDate && !filters.endDate ? 'all' : null)
 
   useEffect(() => {
     try {
@@ -306,7 +312,6 @@ export default function Transactions() {
     (newFilters: { search?: string; category?: string; startDate?: string; endDate?: string; minAmount?: number; maxAmount?: number }) => {
       setFilters(newFilters)
       setPage(1)
-      setActiveDateChip('all')
       if (newFilters.startDate || newFilters.endDate) clearDashboardMonth()
     },
     [clearDashboardMonth],
@@ -314,7 +319,7 @@ export default function Transactions() {
 
   const handleDateChipClick = useCallback(
     (chip: DateChip) => {
-      setActiveDateChip(chip.key)
+      setDateChipSelection(chip.key)
       const range = chip.getRange()
       setFilters((prev) => ({
         ...prev,
@@ -392,208 +397,63 @@ export default function Transactions() {
         </div>
       )}
 
-      <details className="tx-analysis">
-        <summary>סיכום וניתוח לפי קטגוריה</summary>
-      {/* ── Primary Stats Row ─────────────────────────────────────────── */}
-      <div className="orbit-transaction-metrics">
-      <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-sm)' }}>
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
-            <Hash size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.count.toLocaleString('he-IL')}</div>
-            <div className="stat-label">סה"כ עסקאות</div>
-          </div>
-        </div>
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f87171, #ef4444)' }}>
-            <TrendingDown size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value" style={{ color: 'var(--danger)' }}>{formatCurrency(stats.totalExpenses)}</div>
-            <div className="stat-label">{formatNumber(stats.expenseCount)} הוצאות</div>
-          </div>
-        </div>
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b, #38f9d7))' }}>
-            <TrendingUp size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value" style={{ color: 'var(--success)' }}>{formatCurrency(stats.totalIncome)}</div>
-            <div className="stat-label">{formatNumber(stats.incomeCount)} הכנסות</div>
-          </div>
-        </div>
-      {/* ── Secondary stats flow in the SAME grid, so tablet/desktop columns
-          don't restart with staggered empty cells ── */}
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
-            <Calculator size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{formatCurrency(stats.avg)}</div>
-            <div className="stat-label">ממוצע להוצאה</div>
-          </div>
-        </div>
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-            <DollarSign size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{formatCurrency(stats.medianTransaction)}</div>
-            <div className="stat-label">חציון הוצאה</div>
-          </div>
-        </div>
-        <div className="stat-card-compact glass-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>
-            <DollarSign size={18} color="#fff" />
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{formatCurrency(stats.totalAmount)}</div>
-            <div className="stat-label">סכום כולל (מוחלט)</div>
-          </div>
-        </div>
-      </div>
 
-      </div>
-      {/* ── Extremes + Date Range ─────────────────────────────────────── */}
-      {(maxTransaction || minTransaction || dateFrom) && (
-        <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '0.8125rem' }}>
-          {maxTransaction && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowUpRight size={16} style={{ color: 'var(--danger)' }} />
-              <span style={{ color: 'var(--text-secondary)' }}>הוצאה גבוהה:</span>
-              <span style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatCurrency(maxTransaction.amount)}</span>
-              <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
-                ({maxTransaction.description})
-              </span>
+      <div className="ledger-controls">
+        <AdvancedFilters
+          initial={initialFilters}
+          value={filters}
+          onFilterChange={handleFilterChange}
+          onExport={handleExport}
+          categories={categories}
+          loading={loading || total === 0}
+          exporting={exporting}
+          showCategory={false}
+        />
+        {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
+
+        <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
+          <div className="dashboard-filter-heading">
+            <div>
+              <strong>סינון קטגוריות</strong>
             </div>
-          )}
-          {minTransaction && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowDownRight size={16} style={{ color: 'var(--success)' }} />
-              <span style={{ color: 'var(--text-secondary)' }}>הוצאה נמוכה:</span>
-              <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(minTransaction.amount)}</span>
-              <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
-                ({minTransaction.description})
-              </span>
-            </div>
-          )}
-          {dateFrom && dateTo && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: 'auto' }}>
-              <span style={{ color: 'var(--text-muted)' }}>טווח:</span>
-              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
-            </div>
-          )}
+            {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
+          </div>
+          <div className="dashboard-filter-fields">
+            <label>
+              <span>קטגוריה</span>
+              <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...categories.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
+            </label>
+            <label>
+              <span>תת-קטגוריה</span>
+              <MultiSelect options={subcategoryMap[category] ?? []} value={subcategories} onChange={setSubcategories} placeholder="כל תתי-הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
+            </label>
+          </div>
+          {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">מציג: {joinActiveFilters(category, subcategories)}</div>}
+        </section>
+
+        {/* ── Quick Date Filter Chips ───────────────────────────────────── */}
+        <div className="filter-chips date-chips" role="group" aria-label="טווח תאריכים מהיר">
+          {DATE_CHIPS.map((chip) => (
+            <button
+              type="button"
+              key={chip.key}
+              aria-pressed={activeDateChip === chip.key}
+              className={`filter-chip${activeDateChip === chip.key ? ' active' : ''}`}
+              onClick={() => handleDateChipClick(chip)}
+            >
+              {chip.label}
+            </button>
+          ))}
         </div>
+      </div>
+      {!loading && total > 0 && (
+        <WorkspaceMetrics label="סיכום עסקאות בסינון" metrics={[
+          { label: 'סה"כ עסקאות', value: formatNumber(stats.count), icon: Hash },
+          { label: 'הוצאות', value: formatCurrency(stats.totalExpenses), icon: TrendingDown, tone: 'negative', detail: `${formatNumber(stats.expenseCount)} עסקאות` },
+          { label: 'הכנסות', value: formatCurrency(stats.totalIncome), icon: TrendingUp, tone: 'positive', detail: `${formatNumber(stats.incomeCount)} עסקאות` },
+        ]} />
       )}
-
-      {/* ── Category Breakdown ────────────────────────────────────────── */}
-      {categoryBreakdown.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-md)' }}>
-          <div className="section-header-v2" style={{ marginBottom: '8px' }}>
-            <BarChart3 size={18} />
-            <span>פירוט לפי קטגוריה</span>
-          </div>
-          <div className="glass-card" style={{ padding: '16px', overflowX: 'auto' }}>
-            <table className="mobile-stack-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <th style={catThStyle}>קטגוריה</th>
-                  <th style={catThStyle}>עסקאות</th>
-                  <th style={catThStyle}>סה"כ</th>
-                  <th style={catThStyle}>אחוז</th>
-                  <th style={{ ...catThStyle, width: '35%' }}>חלק יחסי</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryBreakdown.map((cat, idx) => (
-                  <tr key={cat.name} style={{ borderBottom: idx < categoryBreakdown.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
-                    <td data-label="קטגוריה" style={catTdStyle}>
-                      <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
-                      {cat.name}
-                    </td>
-                    <td data-label="עסקאות" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
-                      {formatNumber(cat.count)}
-                    </td>
-                    <td data-label={'סה"כ'} style={{ ...catTdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--danger)', direction: 'ltr', textAlign: 'center' }}>
-                      {formatCurrency(cat.total)}
-                    </td>
-                    <td data-label="אחוז" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
-                      {formatPercent(cat.percent)}
-                    </td>
-                    <td data-label="חלק יחסי" style={catTdStyle}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden' }}>
-                          <div style={{
-                            width: `${cat.percent}%`,
-                            height: '100%',
-                            borderRadius: '3px',
-                            background: categoryColor(cat.name),
-                            transition: 'width 0.3s ease',
-                          }} />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      </details>
-
-      <section className="dashboard-filter-bar" aria-label="סינון קטגוריות">
-        <div className="dashboard-filter-heading">
-          <div>
-            <strong>סינון קטגוריות</strong>
-            <span>הבחירה נשמרת גם במעבר בין מסכים</span>
-          </div>
-          {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
-        </div>
-        <div className="dashboard-filter-fields">
-          <label>
-            <span>קטגוריה</span>
-            <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...categories.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
-          </label>
-          <label>
-            <span>תת-קטגוריה</span>
-            <MultiSelect options={subcategoryMap[category] ?? []} value={subcategories} onChange={setSubcategories} placeholder="כל תתי-הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
-          </label>
-        </div>
-        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">מציג: {joinActiveFilters(category, subcategories)}</div>}
-      </section>
-
-      <AdvancedFilters
-        initial={initialFilters}
-        value={filters}
-        onFilterChange={handleFilterChange}
-        onExport={handleExport}
-        categories={categories}
-        loading={loading || total === 0}
-        exporting={exporting}
-        showCategory={false}
-      />
-      {exportError && <p role="alert" style={{ color: 'var(--danger)' }}>{exportError}</p>}
-
-      {/* ── Quick Date Filter Chips ───────────────────────────────────── */}
-      <div className="filter-chips date-chips" style={{ marginTop: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-        {DATE_CHIPS.map((chip) => (
-          <button
-            key={chip.key}
-            className={`filter-chip${activeDateChip === chip.key ? ' active' : ''}`}
-            onClick={() => handleDateChipClick(chip)}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="section-header-v2">
-        <span>רשימת עסקאות</span>
-      </div>
+      <h2 className="section-header-v2">רשימת עסקאות</h2>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'var(--space-md)' }}>
@@ -615,6 +475,112 @@ export default function Transactions() {
           }}
           showBillingDate={transactions.some((tx) => !!tx.תאריך_חיוב)}
         />
+      )}
+
+      {total > 0 && (
+        <details className="tx-analysis">
+          <summary>
+            <BarChart3 size={17} aria-hidden="true" />
+            סיכום וניתוח לפי קטגוריה
+            <ChevronDown size={16} aria-hidden="true" />
+          </summary>
+          {loading ? <Skeleton variant="rectangular" height={100} /> : (
+            <>
+              <WorkspaceMetrics label="ניתוח הוצאות" metrics={[
+                { label: 'ממוצע להוצאה', value: stats.expenseCount > 0 ? formatCurrency(stats.avg) : '—', icon: Calculator },
+                { label: 'חציון הוצאה', value: stats.expenseCount > 0 ? formatCurrency(stats.medianTransaction) : '—', icon: DollarSign },
+                { label: 'סכום כולל (מוחלט)', value: formatCurrency(stats.totalAmount), icon: Hash },
+              ]} />
+
+              {/* ── Extremes + Date Range ─────────────────────────────────────── */}
+              {(maxTransaction || minTransaction || dateFrom) && (
+                <div className="glass-card" style={{ padding: '16px 20px', marginBottom: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '0.8125rem' }}>
+                  {maxTransaction && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ArrowUpRight size={16} style={{ color: 'var(--danger)' }} />
+                      <span style={{ color: 'var(--text-secondary)' }}>הוצאה גבוהה:</span>
+                      <span style={{ fontWeight: 700, color: 'var(--danger)' }}>{formatCurrency(maxTransaction.amount)}</span>
+                      <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        ({maxTransaction.description})
+                      </span>
+                    </div>
+                  )}
+                  {minTransaction && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ArrowDownRight size={16} style={{ color: 'var(--success)' }} />
+                      <span style={{ color: 'var(--text-secondary)' }}>הוצאה נמוכה:</span>
+                      <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatCurrency(minTransaction.amount)}</span>
+                      <span style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                        ({minTransaction.description})
+                      </span>
+                    </div>
+                  )}
+                  {dateFrom && dateTo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: 'auto' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>טווח:</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatDate(dateFrom)} — {formatDate(dateTo)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Category Breakdown ────────────────────────────────────────── */}
+              {categoryBreakdown.length > 0 && (
+                <div style={{ marginBottom: 'var(--space-md)' }}>
+                  <div className="section-header-v2" style={{ marginBottom: '8px' }}>
+                    <BarChart3 size={18} />
+                    <span>פירוט לפי קטגוריה</span>
+                  </div>
+                  <div className="glass-card" style={{ padding: '16px', overflowX: 'auto' }}>
+                    <table className="mobile-stack-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <th style={catThStyle}>קטגוריה</th>
+                          <th style={catThStyle}>עסקאות</th>
+                          <th style={catThStyle}>סה"כ</th>
+                          <th style={catThStyle}>אחוז</th>
+                          <th style={{ ...catThStyle, width: '35%' }}>חלק יחסי</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categoryBreakdown.map((cat, idx) => (
+                          <tr key={cat.name} style={{ borderBottom: idx < categoryBreakdown.length - 1 ? '1px solid var(--border-color)' : 'none' }}>
+                            <td data-label="קטגוריה" style={catTdStyle}>
+                              <span style={{ marginLeft: '6px' }}>{get_icon(cat.name)}</span>
+                              {cat.name}
+                            </td>
+                            <td data-label="עסקאות" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                              {formatNumber(cat.count)}
+                            </td>
+                            <td data-label={'סה"כ'} style={{ ...catTdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--danger)', direction: 'ltr', textAlign: 'center' }}>
+                              {formatCurrency(cat.total)}
+                            </td>
+                            <td data-label="אחוז" style={{ ...catTdStyle, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>
+                              {formatPercent(cat.percent)}
+                            </td>
+                            <td data-label="חלק יחסי" style={catTdStyle}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ flex: 1, height: '6px', borderRadius: '3px', background: 'var(--border-color)', overflow: 'hidden' }}>
+                                  <div style={{
+                                    width: `${cat.percent}%`,
+                                    height: '100%',
+                                    borderRadius: '3px',
+                                    background: categoryColor(cat.name),
+                                    transition: 'width 0.3s ease',
+                                  }} />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </details>
       )}
 
       <TransactionDrawer

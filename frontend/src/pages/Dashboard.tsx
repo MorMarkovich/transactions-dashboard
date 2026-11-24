@@ -24,6 +24,7 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  LayoutDashboard,
   Edit2,
   Check,
 } from 'lucide-react'
@@ -893,7 +894,7 @@ export default function Dashboard() {
       </div>
     )}
     <div className="finance-dashboard" dir="rtl">
-      <PageHeader title="סקירה פיננסית" actions={
+      <PageHeader title="סקירה פיננסית" icon={LayoutDashboard} actions={
         <div className="finance-period" role="group" aria-label="תקופת הדשבורד">
           <button type="button" aria-label="חודש קודם עם נתונים" disabled={!earlierMonth || scopeLoading} onClick={() => earlierMonth && setSelectedMonth(earlierMonth)}><ChevronRight size={19} aria-hidden="true" /></button>
           <Select ariaLabel="חודש לתצוגה" options={availableMonths.map(item => ({ value: item.month, label: formatMonthLabel(item.month) }))}

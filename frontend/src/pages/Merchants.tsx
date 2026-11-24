@@ -12,6 +12,7 @@ import Button from '../components/ui/Button'
 import MerchantChart from '../components/charts/MerchantChart'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import WorkspaceMetrics from '../components/common/WorkspaceMetrics'
 import { formatCurrency, formatNumber } from '../utils/formatting'
 
 /* ------------------------------------------------------------------ */
@@ -187,37 +188,17 @@ export default function Merchants() {
         מוצג: כל התקופה · כל הבעלים
       </p>
 
-      {/* ─── Summary Stats Row ───────────────────────────────────────── */}
       {summaryStats && (
-        <div className="card-grid-responsive" style={{ marginBottom: 'var(--space-lg)' }}>
-          <div className="stat-card-compact glass-card">
-            <div className="stat-icon" style={{ background: 'var(--gradient-stat-blue, linear-gradient(135deg, #4facfe, #00f2fe))' }}>
-              <Users size={18} color="#fff" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-value">{summaryStats.uniqueCount}</div>
-              <div className="stat-label">בתי עסק מובילים</div>
-            </div>
-          </div>
-          <div className="stat-card-compact glass-card">
-            <div className="stat-icon" style={{ background: 'var(--gradient-stat-green, linear-gradient(135deg, #43e97b, #38f9d7))' }}>
-              <DollarSign size={18} color="#fff" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-value">{formatCurrency(summaryStats.totalSpending)}</div>
-              <div className="stat-label">סה"כ הוצאות (בתי העסק המוצגים)</div>
-            </div>
-          </div>
-          <div className="stat-card-compact glass-card">
-            <div className="stat-icon" style={{ background: 'var(--gradient-stat-purple, linear-gradient(135deg, #667eea, #764ba2))' }}>
-              <Crown size={18} color="#fff" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-value"><bdi dir="auto">{summaryStats.mostFrequent.name.replace(/ב(?=[A-Z])/g, 'ב-')}</bdi></div>
-              <div className="stat-label">הכי תדיר ({summaryStats.mostFrequent.count} ביקורים)</div>
-            </div>
-          </div>
-        </div>
+        <WorkspaceMetrics label="סיכום בתי עסק" metrics={[
+          { label: 'בתי עסק מובילים', value: summaryStats.uniqueCount, icon: Users },
+          { label: 'סה"כ הוצאות (בתי העסק המוצגים)', value: formatCurrency(summaryStats.totalSpending), icon: DollarSign },
+          {
+            label: 'הכי תדיר',
+            value: summaryStats.mostFrequent.name.replace(/ב(?=[A-Z])/g, 'ב-'),
+            icon: Crown,
+            detail: `${summaryStats.mostFrequent.count} ביקורים`,
+          },
+        ]} />
       )}
 
       {/* ─── Section title ──────────────────────────────────────────── */}

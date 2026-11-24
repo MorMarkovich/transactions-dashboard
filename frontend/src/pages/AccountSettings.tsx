@@ -12,8 +12,7 @@ import './AccountSettings.css'
 // ---------------------------------------------------------------------------
 // Signed-in account management: display name, email change (confirmed by
 // email), password change, sign-out. Account/data deletion lives in Data
-// Management. Styled to the dashboard's Orbit standard (page header with
-// gradient icon, glass cards, dashboard spacing) — keep it that way.
+// Management.
 // ---------------------------------------------------------------------------
 export default function AccountSettings() {
   const { user, updateDisplayName, updateEmail, updatePassword } = useAuth()
@@ -92,7 +91,7 @@ export default function AccountSettings() {
 
       <div className="account-sections">
         {/* Profile */}
-        <Card padding="lg" className="glass-card">
+        <Card padding="lg" className="glass-card account-profile-card">
           <SectionTitle icon={<User size={16} />} title="פרופיל" />
           <div className="account-identity">
             <div className="account-identity-avatar" aria-hidden="true">{initials}</div>
@@ -175,7 +174,7 @@ export default function AccountSettings() {
         </Card>
 
         {/* Danger zone pointer */}
-        <Card padding="lg" className="glass-card">
+        <Card padding="lg" className="glass-card account-danger-card">
           <SectionTitle icon={<Trash2 size={16} />} title="מחיקת חשבון" />
           <p className="account-hint" style={{ margin: 0 }}>
             מחיקת החשבון והנתונים זמינה בעמוד{' '}
