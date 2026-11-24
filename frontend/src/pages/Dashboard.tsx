@@ -1,22 +1,23 @@
 import { isGenericBitTransaction } from '../utils/bitTransactions'
 import { defaultMonth } from '../utils/defaultMonth'
-import { groupMonthCategories, type MonthLegendItem } from '../utils/monthLegend'
+import { formatMonthLabel } from '../utils/monthComparison'
 import { useCategoryColor } from '../hooks/useCategoryColor'
 import MonthlyPulse from '../components/dashboard/MonthlyPulse'
 import PendingApprovals from '../components/dashboard/PendingApprovals'
+import MonthlyActivity from '../components/dashboard/MonthlyActivity'
+import MonthlyCategories from '../components/dashboard/MonthlyCategories'
+import './DashboardOverview.css'
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { createSearchParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useAppNotifications } from '../context/NotificationContext'
 import { motion } from 'framer-motion'
 import {
-  Calendar,
-  BarChart3,
   RefreshCw,
   TrendingUp,
   Zap,
-  LayoutDashboard,
-  CreditCard,
   ChevronLeft,
+  ChevronRight,
+  ChevronDown,
   ArrowUpDown,
   Grid3X3,
   Tag,
@@ -30,8 +31,6 @@ import { filterAndSortCategories, countActiveFilters } from '../utils/categoryFi
 import { ASSIGNABLE_CATEGORIES, get_icon } from '../utils/constants'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import SparklineChart from '../components/charts/SparklineChart'
-import BarChart from '../components/charts/BarChart'
-import DonutChart from '../components/charts/DonutChart'
 import CategoryManagerModal, { type ManagerCategory } from '../components/category/CategoryManagerModal'
 import { persistCategoryRenameToSupabase } from '../services/categoryRenamePersistence'
 import CategoryTransactionsDrawer from '../components/table/CategoryTransactionsDrawer'
@@ -55,10 +54,8 @@ import { canUseBankSync } from '../lib/bankSyncAccess'
 import { useDashboardFilters } from '../context/FilterContext'
 import type {
   MetricsData,
-  RawDonutData,
   IncomeSourcesData,
   RawMonthlyData,
-  RawWeekdayData,
   WeeklySummaryData,
   ForecastData,
   SpendingVelocityData,
@@ -68,21 +65,6 @@ import type {
   CategoryCatalog,
   Transaction,
 } from '../services/types'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Format MM/YYYY → Hebrew-friendly label, e.g. "01/2024" → "ינואר 2024" */
-const HEBREW_MONTHS: Record<string, string> = {
-  '01': 'ינואר', '02': 'פברואר', '03': 'מרץ', '04': 'אפריל',
-  '05': 'מאי', '06': 'יוני', '07': 'יולי', '08': 'אוגוסט',
-  '09': 'ספטמבר', '10': 'אוקטובר', '11': 'נובמבר', '12': 'דצמבר',
-}
-function formatMonthLabel(mmYYYY: string): string {
-  const [mm, yyyy] = mmYYYY.split('/')
-  return `${HEBREW_MONTHS[mm] ?? mm} ${yyyy}`
-}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -99,10 +81,8 @@ export default function Dashboard() {
 
   // ── Data state ────────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<MetricsData | null>(null)
-  const [, setDonutData] = useState<RawDonutData | null>(null)
   const [incomeSources, setIncomeSources] = useState<IncomeSourcesData | null>(null)
   const [monthlyData, setMonthlyData] = useState<RawMonthlyData | null>(null)
-  const [, setWeekdayData] = useState<RawWeekdayData | null>(null)
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummaryData | null>(null)
   const [forecast, setForecast] = useState<ForecastData | null>(null)
   const [velocity, setVelocity] = useState<SpendingVelocityData | null>(null)
@@ -142,7 +122,6 @@ export default function Dashboard() {
   }, [user])
 
   // ── UI state ──────────────────────────────────────────────────────
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // View state (selected month / date-type / person) survives data refreshes,
   // page switches and session rebuilds — an edit must never bounce the user
@@ -164,7 +143,7 @@ export default function Dashboard() {
   useEffect(() => {
     sessionStorage.setItem('dash-date-type', dateType)
   }, [dateType])
-  const [monthOverviewLoading, setMonthOverviewLoading] = useState(false)
+  const [loadedOverview, setLoadedOverview] = useState<string | null>(null)
   const [monthOverviewError, setMonthOverviewError] = useState(false)
   const [overviewRetry, setOverviewRetry] = useState(0)
   const [snapshotError, setSnapshotError] = useState(false)
@@ -172,6 +151,12 @@ export default function Dashboard() {
   // Bumping this forces every data-fetch effect to re-run; used after a
   // manual category override so all widgets reflect the new classification.
   const [refreshKey, setRefreshKey] = useState(0)
+  const scopeKey = JSON.stringify([user?.id, sessionId, dateType, selectedOwner, category, subcategories, refreshKey])
+  const overviewKey = JSON.stringify([scopeKey, selectedMonth, overviewRetry])
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
+  const scopeLoading = loadedScope !== scopeKey
+  const monthOverviewLoading = Boolean(selectedMonth && (scopeLoading || loadedOverview !== overviewKey))
+  const activeOverview = monthOverviewLoading ? null : monthOverview
 
   // The AI fallback runs in the background after restore (see Layout);
   // when it resolves merchants, refetch so the widgets pick up the new
@@ -429,28 +414,6 @@ export default function Dashboard() {
     setNotifications(items)
   }, [metrics, anomalies, forecast, setNotifications])
 
-  // ── Inject responsive CSS once (prevent duplicate <style> elements) ──
-  useEffect(() => {
-    const STYLE_ID = 'dashboard-responsive-css'
-    if (document.getElementById(STYLE_ID)) return
-    const style = document.createElement('style')
-    style.id = STYLE_ID
-    style.textContent = `
-      @media (max-width: 768px) {
-        .dashboard-premium-row,
-        .dashboard-weekly-row,
-        .dashboard-category-grid,
-        .month-overview-grid { grid-template-columns: minmax(0, 1fr) !important; }
-        .dashboard-monthly-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-      }
-      @media (max-width: 420px) {
-        .dashboard-monthly-comparison { grid-template-columns: minmax(0, 1fr) !important; }
-      }
-    `
-    document.head.appendChild(style)
-    return () => { document.getElementById(STYLE_ID)?.remove() }
-  }, [])
-
   // ── Load the list of people (owners) for the per-person filter ──
   useEffect(() => {
     if (!sessionId) { setOwners([]); return }
@@ -506,54 +469,44 @@ export default function Dashboard() {
     const { signal } = controller
 
     const fetchData = async () => {
-      setLoading(true)
       setError(null)
+      setWeeklySummary(null)
+      setForecast(null)
+      setVelocity(null)
+      setAnomalies([])
+      setIncomeSources(null)
 
       try {
         // Re-scope to the selected person; reads use sid, edits use sessionId.
         const sid = await transactionsApi.scopeSession(sessionId, selectedOwner, signal, category, subcategories)
-        const results = await Promise.all([
+        const [nextMetrics, monthly] = await Promise.all([
           transactionsApi.getMetrics(sid, signal),
-          transactionsApi.getDonutChartV2(sid, signal),
-          transactionsApi.getMonthlyChartV2(sid, dateType, signal),
-          transactionsApi.getWeekdayChartV2(sid, signal),
+          transactionsApi.getMonthlyChartV2(sid, dateType, signal, true),
+        ])
+        if (signal.aborted) return
+
+        setMetrics(nextMetrics)
+        setMonthlyData(monthly)
+        setLoadedScope(scopeKey)
+        const focusedView = Boolean(selectedOwner || category || subcategories.length)
+        setSelectedMonth(previous => focusedView && previous ? previous : defaultMonth(monthly.months.map(item => item.month), previous))
+        recoveryAttempts.current = 0
+
+        // Secondary analytics cannot delay or block the monthly overview.
+        void Promise.all([
           transactionsApi.getWeeklySummary(sid, signal).catch(() => null),
           transactionsApi.getForecast(sid, signal).catch(() => null),
           transactionsApi.getSpendingVelocity(sid, signal).catch(() => null),
           transactionsApi.getAnomalies(sid, signal).catch(() => null),
           transactionsApi.getIncomeSources(sid, signal).catch(() => null),
-        ])
-
-        if (signal.aborted) return
-        setMetrics(results[0] as MetricsData)
-        setDonutData(results[1] as RawDonutData)
-        setMonthlyData(results[2] as RawMonthlyData)
-        setWeekdayData(results[3] as RawWeekdayData)
-        // A failed auxiliary endpoint must CLEAR its card, not keep the
-        // previous filter's values on screen (mirrors incomeSources below).
-        setWeeklySummary((results[4] as WeeklySummaryData | null) ?? null)
-        setForecast((results[5] as ForecastData | null) ?? null)
-        setVelocity((results[6] as SpendingVelocityData | null) ?? null)
-        setAnomalies((results[7] as { anomalies: AnomalyItem[] } | null)?.anomalies ?? [])
-        setIncomeSources((results[8] as IncomeSourcesData) ?? null)
-
-        recoveryAttempts.current = 0 // healthy load — allow future recovery
-
-        // Auto-select the most recent month ONLY when nothing is selected yet
-        // (or the remembered month no longer exists in the data). A refresh
-        // after an edit must keep the user on the month they were viewing.
-        const monthly = results[2] as RawMonthlyData
-        if (monthly?.months?.length) {
-          const months = monthly.months.map((m) => m.month)
-          setSelectedMonth((prev) => {
-            const next = defaultMonth(months, prev) || months[months.length-1]
-            // Keep the snapshot range in step on first load / invalid month;
-            // the selectedMonth sync effect handles user-driven changes.
-            setSnapshotMonthFrom((f) => (f && months.includes(f) ? f : next))
-            setSnapshotMonthTo((t) => (t && months.includes(t) ? t : next))
-            return next
-          })
-        }
+        ]).then(([weekly, nextForecast, nextVelocity, nextAnomalies, sources]) => {
+          if (signal.aborted) return
+          setWeeklySummary(weekly)
+          setForecast(nextForecast)
+          setVelocity(nextVelocity)
+          setAnomalies(nextAnomalies?.anomalies ?? [])
+          setIncomeSources(sources)
+        })
       } catch (err: unknown) {
         if (signal.aborted) return
         if ((err instanceof DOMException && err.name === 'AbortError') || (err as { name?: string })?.name === 'CanceledError') return
@@ -562,24 +515,20 @@ export default function Dashboard() {
         // tier) → rebuild it from Supabase and retry, instead of erroring.
         const status = (err as { response?: { status?: number } })?.response?.status
         if (status === 404 && (await tryRecoverSession())) return
-        const message = err instanceof Error ? err.message : 'שגיאה בטעינת הנתונים'
-        setError(message)
-      } finally {
-        if (!signal.aborted) setLoading(false)
+        if (!signal.aborted) setError('לא ניתן לטעון את הסקירה כרגע.')
       }
     }
 
     fetchData()
     return () => controller.abort()
-  }, [sessionId, dateType, refreshKey, selectedOwner, category, subcategories, tryRecoverSession])
+  }, [sessionId, dateType, refreshKey, selectedOwner, category, subcategories, scopeKey, tryRecoverSession])
 
   // ── Fetch month overview when selectedMonth changes ────────────────
   useEffect(() => {
-    if (!sessionId || !selectedMonth) return
+    if (!sessionId || !selectedMonth || loadedScope !== scopeKey) return
     const controller = new AbortController()
 
     const fetchOverview = async () => {
-      setMonthOverviewLoading(true)
       setMonthOverview(null)
       setMonthOverviewError(false)
       try {
@@ -589,33 +538,37 @@ export default function Dashboard() {
       } catch {
         if (!controller.signal.aborted) setMonthOverviewError(true)
       } finally {
-        if (!controller.signal.aborted) setMonthOverviewLoading(false)
+        if (!controller.signal.aborted) setLoadedOverview(overviewKey)
       }
     }
 
     fetchOverview()
     return () => controller.abort()
-  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories, overviewRetry])
+  }, [sessionId, selectedMonth, dateType, refreshKey, selectedOwner, category, subcategories, overviewKey, loadedScope, scopeKey])
 
   // ── Derived data ───────────────────────────────────────────────────
   // List of months to show in selector (last 12 months)
   const availableMonths = useMemo(() => {
     if (!monthlyData?.months) return []
     const seen = new Set<string>()
-    return [...monthlyData.months].reverse().filter((m) => {
+    const recent = [...monthlyData.months].reverse().filter((m) => {
       const key = formatMonthLabel(m.month)
       if (seen.has(key)) return false
       seen.add(key)
       return true
     }).slice(0, 12)
-  }, [monthlyData])
+    if (selectedMonth && !recent.some(item => item.month === selectedMonth)) {
+      const byDate = (month: string) => `${month.slice(3)}${month.slice(0, 2)}`
+      return [...recent, { month: selectedMonth, amount: 0 }]
+        .sort((first, second) => byDate(second.month).localeCompare(byDate(first.month)))
+    }
+    return recent
+  }, [monthlyData, selectedMonth])
 
-  const spendingTrend = (monthlyData?.months ?? []).slice(-6).map(({ month, amount }) => ({
-    label: formatMonthLabel(month),
-    value: Math.abs(amount),
-  }))
-  const hasBillingDate = metrics?.has_billing_date ?? false
-
+  const selectedMonthIndex = availableMonths.findIndex(item => item.month === selectedMonth)
+  const earlierMonth = selectedMonthIndex >= 0 ? availableMonths[selectedMonthIndex + 1]?.month : undefined
+  const laterMonth = selectedMonthIndex > 0 ? availableMonths[selectedMonthIndex - 1]?.month : undefined
+  const hasActiveFilters = Boolean(selectedOwner || category || subcategories.length || dateType !== 'billing')
   // ── Sync category snapshot month with selectedMonth ──
   useEffect(() => {
     if (selectedMonth) {
@@ -855,17 +808,6 @@ export default function Dashboard() {
     [cancelCategoryRename, categoryRenameValue, drawerCategory, sessionId, persistCategoryRename],
   )
 
-  const monthExpensePie = useMemo<MonthLegendItem[]>(() => {
-    if (!monthOverview) return []
-    return monthOverview.categories
-      .filter((item) => item.expenses > 0)
-      .map((item) => ({ name: item.name, value: item.expenses }))
-      .sort((a, b) => b.value - a.value)
-  }, [monthOverview])
-
-  const [showAllMonthCategories, setShowAllMonthCategories] = useState(false)
-  const monthChartData = groupMonthCategories(monthExpensePie)
-
   // After the local bank-sync tool writes a fresh snapshot to Supabase, load it
   // through the normal restore path (same flow as a manual upload).
   const handleBankSynced = async () => {
@@ -906,9 +848,9 @@ export default function Dashboard() {
   }
 
   // ── Loading ───────────────────────────────────────────────────────
-  if (loading && !metrics) {
+  if (!metrics && !error) {
     return (
-      <div>
+      <div aria-busy="true" aria-label="טוען סקירה פיננסית">
         <div className="card-grid-responsive">
           <Skeleton variant="card" count={4} />
         </div>
@@ -926,8 +868,8 @@ export default function Dashboard() {
   if (error) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-2xl)', textAlign: 'center' }}>
-        <p style={{ color: 'var(--accent-danger)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-md)' }}>{error}</p>
-        <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => window.location.reload()}>נסה שוב</Button>
+        <p role="alert" style={{ color: 'var(--danger)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-md)' }}>{error}</p>
+        <Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => setRefreshKey(value => value + 1)}>נסו שוב</Button>
       </div>
     )
   }
@@ -950,223 +892,79 @@ export default function Dashboard() {
         }}>מעבר להעלאת קובץ משלכם</button>
       </div>
     )}
-    <div className="studio-dashboard" style={{ direction: 'rtl', position: 'relative' }}>
-      {/* Mesh gradient background */}
-      <div className="mesh-gradient-bg" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '300px', pointerEvents: 'none', zIndex: 0, opacity: 0.6 }} />
-
-      <PageHeader
-        title="סקירה פיננסית"
-        subtitle="הוצאות, הכנסות ושינויים ביחס לחודש הקודם"
-        icon={LayoutDashboard}
-        actions={<label className="dashboard-month-control">חודש לתצוגה
-          <Select ariaLabel="חודש לתצוגה" options={availableMonths.map(m => ({ value: m.month, label: formatMonthLabel(m.month) }))} value={selectedMonth || ''} onChange={setSelectedMonth} />
-        </label>}
-      />
-
-      {selectedMonth && (
-        <div className="view-state-line" data-testid="view-state" role="status">
-          <span>
-            מוצג: {formatMonthLabel(selectedMonth)} · {dateType === 'billing' ? 'לפי תאריך חיוב' : 'לפי תאריך עסקה'} · {selectedOwner ? (selectedOwner === 'joint' ? 'משותף' : selectedOwner) : 'כל הבעלים'} · {category ? [category, ...subcategories].join(' / ') : 'כל הקטגוריות'}
-          </span>
-          {(dateType !== 'billing' || selectedOwner || category || subcategories.length > 0) && (
-            <button
-              type="button"
-              className="ui-btn"
-              onClick={() => { setDateType('billing'); setSelectedOwner(null); clearFilters() }}
-            >
-              אפס לברירת מחדל
-            </button>
-          )}
+    <div className="finance-dashboard" dir="rtl">
+      <PageHeader title="סקירה פיננסית" actions={
+        <div className="finance-period" role="group" aria-label="תקופת הדשבורד">
+          <button type="button" aria-label="חודש קודם עם נתונים" disabled={!earlierMonth || scopeLoading} onClick={() => earlierMonth && setSelectedMonth(earlierMonth)}><ChevronRight size={19} aria-hidden="true" /></button>
+          <Select ariaLabel="חודש לתצוגה" options={availableMonths.map(item => ({ value: item.month, label: formatMonthLabel(item.month) }))}
+            value={selectedMonth ?? ''} placeholder="אין חודשים להצגה" onChange={setSelectedMonth} disabled={!availableMonths.length || scopeLoading} />
+          <button type="button" aria-label="חודש הבא עם נתונים" disabled={!laterMonth || scopeLoading} onClick={() => laterMonth && setSelectedMonth(laterMonth)}><ChevronLeft size={19} aria-hidden="true" /></button>
         </div>
-      )}
+      } />
 
-      <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
-        overview={monthOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
-        category={category} subcategories={subcategories} refreshKey={refreshKey}
-        onApplyView={(view) => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
-        onCategory={(name) => handleCategoryCardClick(name, selectedMonth ?? undefined)}
-        onTransactions={() => navigate(`/transactions?session_id=${sessionId}`)} />
-
-      {!loading && spendingTrend.length > 1 && (
-        <section className="workspace-trend" data-chart-label="הוצאות לפי חודש" aria-labelledby="workspace-trend-title">
-          <div className="workspace-trend-heading">
-            <div><h2 id="workspace-trend-title">הוצאות לאורך זמן</h2><p>עד שישה חודשים אחרונים</p></div>
-            <button type="button" onClick={() => navigate(`/monthly?session_id=${sessionId}`)}>השוואת חודשים <ChevronLeft size={17} /></button>
-          </div>
-          <BarChart data={spendingTrend} color="var(--chart-1)" height={isNarrow ? 168 : 206} />
-        </section>
-      )}
-
-      {import.meta.env.VITE_PENDING_APPROVALS === 'true' && user && !isSampleActive() &&
-        <PendingApprovals key={user.id} userId={user.id} refreshKey={refreshKey}/>}
-
-      <details className="dashboard-filter-bar" aria-label="סינון קטגוריות"><summary><SlidersHorizontal size={16}/> סינון ומיקוד <span>{category || 'כל הקטגוריות'}{subcategories.length ? ` · ${subcategories.length} תתי-קטגוריות` : ''}</span></summary>
-        <div className="dashboard-filter-heading">
+      <details className="finance-filter">
+        <summary>
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          <strong>סינון תצוגה</strong>
+          <span className="finance-filter-context">{selectedOwner === 'joint' ? 'משותף' : selectedOwner || 'כל הבעלים'} · {category || 'כל הקטגוריות'}{subcategories.length ? ` · ${subcategories.length} תתי־קטגוריות` : ''} · {dateType === 'billing' ? 'לפי תאריך חיוב' : 'לפי תאריך עסקה'}</span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </summary>
+        <div className="finance-filter-fields">
+          {owners.filter(owner => owner !== 'משותף').length > 1 && <div>
+            <span>בעלים</span>
+            <Select ariaLabel="בעלים" value={selectedOwner || ''} onChange={value => setSelectedOwner(value || null)} options={[
+              { value: '', label: 'כל הבעלים' },
+              ...owners.filter(owner => owner !== 'משותף').map(owner => ({ value: owner, label: owner === 'joint' ? 'משותף' : owner })),
+            ]} />
+          </div>}
           <div>
-            <strong>מיקוד הדשבורד</strong>
-            <span>בחר קטגוריה ותת-קטגוריה. כל המדדים והתצוגות יתעדכנו.</span>
-          </div>
-          {(Boolean(category) || subcategories.length > 0) && <button type="button" className="filter-clear-button" onClick={clearFilters}>נקה הכל</button>}
-        </div>
-        <div className="dashboard-filter-fields">
-          <div className="dashboard-filter-field">
             <span>קטגוריה</span>
-            <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...availableCategoryNames.map((item) => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
+            <Select ariaLabel="קטגוריה" options={[{ value: '', label: 'כל הקטגוריות' }, ...availableCategoryNames.map(item => ({ value: item, label: `${get_icon(item)} ${item}` }))]} value={category} onChange={setCategory} />
           </div>
-          <div className="dashboard-filter-field">
-            <span>תת-קטגוריה</span>
-            <MultiSelect
-              options={subcategoryCatalogMap[category] ?? []}
-              value={subcategories}
-              onChange={setSubcategories}
-              placeholder="כל תתי-הקטגוריות"
-              ariaLabel="בחירת מספר תתי-קטגוריות"
-              disabled={!category}
-            />
+          <div>
+            <span>תת־קטגוריה</span>
+            <MultiSelect options={subcategoryCatalogMap[category] ?? []} value={subcategories} onChange={setSubcategories}
+              placeholder="כל תתי־הקטגוריות" ariaLabel="בחירת מספר תתי-קטגוריות" disabled={!category} />
+          </div>
+          <div>
+            <span>קיבוץ לפי</span>
+            <div className="finance-date-toggle" role="group" aria-label="קיבוץ תאריכים">
+              <button type="button" aria-pressed={dateType === 'billing'} onClick={() => setDateType('billing')}>תאריך חיוב</button>
+              <button type="button" aria-pressed={dateType === 'transaction'} onClick={() => setDateType('transaction')}>תאריך עסקה</button>
+            </div>
           </div>
         </div>
-        {(Boolean(category) || subcategories.length > 0) && <div className="active-filter-summary">הדשבורד מסונן לפי: {[category, subcategories].filter(Boolean).join(' / ')}</div>}
+        {hasActiveFilters && <button type="button" className="finance-text-action finance-filter-reset" onClick={() => {
+          setDateType('billing')
+          setSelectedOwner(null)
+          clearFilters()
+        }}>איפוס מסננים</button>}
       </details>
 
-      {/* ── Per-person filter (הכל = everyone incl. shared; person chips
-              only — "משותף"/shared rows are part of הכל, not a separate view) ── */}
-      {owners.filter((o) => o !== 'משותף').length > 1 && (
-        <div
-          className="filter-chips"
-          style={{ position: 'relative', zIndex: 1, marginBottom: 'var(--space-md)', alignItems: 'center' }}
-        >
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginInlineEnd: '4px' }}>תצוגה לפי:</span>
-          <span
-            className={`filter-chip ${!selectedOwner ? 'active' : ''}`}
-            onClick={() => setSelectedOwner(null)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(null) }}
-          >
-            הכל
-          </span>
-          {owners.filter((o) => o !== 'משותף').map((o) => (
-            <span
-              key={o}
-              className={`filter-chip ${selectedOwner === o ? 'active' : ''}`}
-              onClick={() => setSelectedOwner(o)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedOwner(o) }}
-            >
-              {o === 'joint' ? 'משותף' : o}
-            </span>
-          ))}
-        </div>
-      )}
+      <MonthlyPulse userId={user?.id || 'guest'} sessionId={sessionId} month={selectedMonth}
+        overview={activeOverview} loading={monthOverviewLoading} dateType={dateType} owner={selectedOwner}
+        category={category} subcategories={subcategories} refreshKey={refreshKey}
+        onApplyView={view => { setCategory(view.category); setSubcategories(view.subcategories); setSelectedOwner(view.owner); setDateType(view.dateType) }}
+        onCategory={handleCategoryCardClick}
+        onTransactions={() => {
+          if (selectedMonth) navigate({ pathname: '/transactions', search: createSearchParams({ session_id: sessionId, month: selectedMonth, date_type: dateType }).toString() })
+        }} />
 
+      <div className="finance-analytics">
+        {scopeLoading ? <section className="finance-panel"><Skeleton variant="rectangular" height={285} /></section>
+          : <MonthlyActivity months={monthlyData?.months ?? []} selectedMonth={selectedMonth} onSelect={setSelectedMonth}
+            onCompare={() => navigate(`/monthly?session_id=${sessionId}`)} />}
+        <MonthlyCategories key={selectedMonth ?? ''} month={selectedMonth} overview={activeOverview}
+          loading={monthOverviewLoading} failed={monthOverviewError && !monthOverviewLoading}
+          onRetry={() => setOverviewRetry(value => value + 1)} onCategory={handleCategoryCardClick} />
+      </div>
 
+      {import.meta.env.VITE_PENDING_APPROVALS === 'true' && user && !isSampleActive() &&
+        <PendingApprovals key={user.id} userId={user.id} refreshKey={refreshKey} />}
 
-      {/* ── Date type toggle (billing / transaction) ───────────────── */}
-      {hasBillingDate && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="studio-date-toggle" style={{ marginBottom: 'var(--space-md)', position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}
-        >
-          <CreditCard size={15} style={{ color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>קיבוץ לפי:</span>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-full)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-            {(['transaction', 'billing'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setDateType(type)}
-                style={{
-                  padding: '5px 14px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  fontFamily: 'var(--font-family)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                  background: dateType === type ? 'var(--accent)' : 'transparent',
-                  color: dateType === type ? 'var(--on-accent, #fff)' : 'var(--text-secondary)',
-                }}
-              >
-                {type === 'transaction' ? 'תאריך עסקה' : 'תאריך חיוב'}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* ── Month selector + overview ──────────────────────────────── */}
-      {availableMonths.length > 0 && (
-        <motion.div className="studio-breakdown"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-          style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
-        >
-          {/* Section header */}
-          <div className="section-header-v2">
-            <Calendar size={18} />
-            <span>פילוח חודשי</span>
-            {hasBillingDate && (
-              <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-                {dateType === 'billing' ? 'תאריך חיוב' : 'תאריך עסקה'}
-              </span>
-            )}
-          </div>
-
-          {/* Month overview content */}
-          {monthOverviewLoading ? (
-            <Skeleton variant="rectangular" height={320} />
-          ) : monthOverviewError ? (
-            <div role="status" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-              לא ניתן לטעון את הפילוח כרגע.
-              <button type="button" onClick={() => setOverviewRetry(n => n + 1)} style={{ display: 'block', margin: '10px auto 0', padding: '8px 16px', borderRadius: 'var(--radius-full)', border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-family)' }}>נסו שוב</button>
-            </div>
-          ) : monthOverview && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
-              gap: 'var(--space-md)',
-            }}
-              className="month-overview-grid"
-            >
-              <>
-                {monthExpensePie.length === 0 && (
-                  <div role="status" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', gridColumn: '1/-1' }}>
-                    אין הוצאות בחודש זה.
-                  </div>
-                )}
-                {monthExpensePie.length > 0 && (
-                  <Card variant="glass" padding="md" className="month-breakdown-pie-card">
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                      הרכב ההוצאות - {formatMonthLabel(monthOverview.month)}
-                    </div>
-                    <div className="monthly-pie-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', alignItems: 'center', gap: 'var(--space-md)' }}>
-                      <div data-chart-label={`הרכב ההוצאות - ${formatMonthLabel(monthOverview.month)}`}><DonutChart data={monthChartData} total={monthOverview.total_expenses} /><div className="ring-key">{monthChartData.map(item=><span key={item.name}><i style={{background:categoryColor(item.name)}}/>{item.name}</span>)}</div></div>
-                      <div className="month-pie-legend">
-                        {(showAllMonthCategories ? monthExpensePie : monthChartData).map((item) => {
-                          const pct = monthOverview.total_expenses > 0 ? item.value / monthOverview.total_expenses * 100 : 0
-                          return <button type="button" onClick={() => item.aggregate ? setShowAllMonthCategories(true) : handleCategoryCardClick(item.name, monthOverview.month)} key={`${item.aggregate ? "group" : "category"}:${item.name}`} className="month-pie-legend-row">
-                            <span className="month-pie-color" style={{background:categoryColor(item.name)}} />
-                            <span className="month-pie-name">{item.name}</span>
-                            <span className="month-pie-share"><i style={{width:`${pct}%`}}/></span><span className="month-pie-percent">{pct.toFixed(0)}%</span>
-                            <strong>{formatCurrency(item.value)}</strong>
-                          </button>
-                        })}
-                        {monthExpensePie.length > 7 && <button className="month-legend-expand" onClick={() => setShowAllMonthCategories(v => !v)}>{showAllMonthCategories ? 'הצג פחות' : `כל ${monthExpensePie.length} הקטגוריות`}</button>}
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </>
-
-            </div>
-          )}
-        </motion.div>
-      )}
-
-      {/* ── Full Category Snapshot ──────────────────────────────────── */}
+      {(categorySnapshot || snapshotError) && (
+        <details className="finance-secondary">
+          <summary><strong>ניתוח קטגוריות וניהול סיווגים</strong><ChevronDown size={17} aria-hidden="true" /></summary>
       {snapshotError && !categorySnapshot && (
         <div style={{ marginTop: 'var(--space-lg)' }}>
           <div className="section-header-v2">
@@ -1712,6 +1510,8 @@ export default function Dashboard() {
       )}
 
       {/* ── Income sources (where income came from) ────────────────── */}
+        </details>
+      )}
       {incomeSources && incomeSources.sources.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -1763,32 +1563,9 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Multi-month composition comparison ───────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12, duration: 0.35 }}
-        style={{ marginTop: 'var(--space-lg)', position: 'relative', zIndex: 1 }}
-      >
-        <Card
-          className="glass-card"
-          padding="md"
-          hover
-          onClick={() => navigate(`/monthly?session_id=${sessionId}`)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <BarChart3 size={18} style={{ color: 'var(--accent)' }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>השוואת חודשים</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                השוואת הרכב ההוצאות בין כמה חודשים, לפי קטגוריה ותת-קטגוריה
-              </div>
-            </div>
-            <ChevronLeft size={16} style={{ color: 'var(--text-muted)' }} />
-          </div>
-        </Card>
-      </motion.div>
-
+      {(weeklySummary || forecast || velocity) && (
+        <details className="finance-secondary">
+          <summary><strong>קצב הוצאות ותחזית</strong><ChevronDown size={17} aria-hidden="true" /></summary>
       {/* ── Weekly Summary ─────────────────────────────────────────── */}
       {weeklySummary && (
         <motion.div
@@ -1932,62 +1709,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Month-over-Month ───────────────────────────────────────── */}
-      {monthlyData && monthlyData.months.length >= 2 && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22 }}
-          style={{ marginTop: 'var(--space-lg)' }}
-        >
-          <div className="section-header-v2">
-            <BarChart3 size={18} />
-            <span>השוואת חודשים</span>
-            <span style={{ fontSize: '0.6875rem', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--accent-muted)', color: 'var(--accent)', fontWeight: 600 }}>
-              {Math.min(monthlyData.months.length, 6)} חודשים אחרונים
-            </span>
-          </div>
-          <Card className="glass-card" padding="md">
-            <div
-              style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(monthlyData.months.length, 6)}, 1fr)`, gap: 'var(--space-sm)' }}
-              className="dashboard-monthly-comparison"
-            >
-              {monthlyData.months.slice(-6).map((month, idx, arr) => {
-                const prev = idx > 0 ? arr[idx - 1].amount : null
-                const changePct = prev ? ((month.amount - prev) / Math.abs(prev)) * 100 : null
-                const isSelected = month.month === selectedMonth
-                return (
-                  <button type="button"
-                    key={month.month}
-                    onClick={() => setSelectedMonth(month.month)}
-                    style={{
-                      textAlign: 'center',
-                      padding: 'var(--space-md)',
-                      borderRadius: 'var(--radius-md)',
-                      background: isSelected ? 'var(--accent-muted)' : 'var(--bg-secondary)',
-                      border: isSelected ? '1px solid var(--border-accent)' : '1px solid transparent',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '0.75rem', color: isSelected ? 'var(--accent)' : 'var(--text-muted)', marginBottom: '6px', fontWeight: isSelected ? 600 : 400 }}>
-                      {month.month}
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', direction: 'ltr' }}>
-                      {formatCurrency(month.amount)}
-                    </div>
-                    <div className="month-bar-track"><i style={{height:`${Math.max(2,month.amount/Math.max(...monthlyData.months.map(m=>m.amount))*100)}%`}}/></div>
-                    {changePct !== null && (
-                      <div style={{ fontSize: '0.6875rem', fontWeight: 600, marginTop: '6px', color: changePct > 0 ? 'var(--accent-danger, #ef4444)' : 'var(--success)' }}>
-                        {changePct > 0 ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </Card>
-        </motion.div>
+        </details>
       )}
 
       {/* ── Category Transactions Drawer ────────────────────────────── */}

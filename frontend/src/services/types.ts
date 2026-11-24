@@ -121,6 +121,8 @@ export interface DonutChartData {
 }
 
 export interface TransactionFilters {
+  month?: string;
+  date_type?: 'transaction' | 'billing';
   start_date?: string;
   end_date?: string;
   category?: string;
@@ -152,7 +154,7 @@ export interface IncomeSourcesData {
 }
 
 export interface RawMonthlyData {
-  months: { month: string; amount: number }[];
+  months: { month: string; amount: number; income?: number }[];
 }
 
 export interface RawWeekdayData {

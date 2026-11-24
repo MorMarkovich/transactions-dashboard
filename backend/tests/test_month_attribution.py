@@ -58,6 +58,19 @@ async def test_month_overview_and_buttons_agree():
     assert may['total_income'] == 13000 and may['total_expenses'] == 500
 
 
+@pytest.mark.asyncio
+async def test_monthly_activity_includes_income_only_months_without_changing_spending_views():
+    sid = _setup('t-activity', [*SHIFTED, {
+        'תאריך': '2026-05-31', 'סכום': 2000, 'תיאור': 'הכנסה נוספת', 'קטגוריה': 'שונות',
+        'חודש': '06/2026', 'חודש_חיוב': '06/2026',
+    }])
+    assert (await get_monthly_v2(sid, 'billing'))['months'] == [{'month': '05/2026', 'amount': 500}]
+    assert (await get_monthly_v2(sid, 'billing', include_income=True))['months'] == [
+        {'month': '05/2026', 'amount': 500, 'income': 13000},
+        {'month': '06/2026', 'amount': 0, 'income': 2000},
+    ]
+
+
 def test_month_series_falls_back_when_column_missing():
     df = pd.DataFrame({'תאריך': pd.to_datetime(['2026-04-30'])})
     assert list(_month_series(df, 'transaction')) == ['04/2026']

@@ -13,6 +13,7 @@ import Skeleton from '../components/ui/Skeleton'
 import { transactionsApi } from '../services/api'
 import { useCategoryColor } from '../hooks/useCategoryColor'
 import { formatCurrency, formatNumber, formatPercent, formatDate } from '../utils/formatting'
+import { formatMonthLabel } from '../utils/monthComparison'
 import { get_icon } from '../utils/constants'
 import { useDashboardFilters } from '../context/FilterContext'
 import type { Transaction, TransactionFilters } from '../services/types'
@@ -85,9 +86,12 @@ const DATE_CHIPS: DateChip[] = [
 // Component
 // ---------------------------------------------------------------------------
 export default function Transactions() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const categoryColor = useCategoryColor()
   const sessionId = searchParams.get('session_id')
+  const requestedMonth = searchParams.get('month')
+  const month = requestedMonth && /^(0[1-9]|1[0-2])\/\d{4}$/.test(requestedMonth) ? requestedMonth : null
+  const monthBasis = searchParams.get('date_type') === 'billing' ? 'billing' : 'transaction'
   const { category, subcategories, setCategory, setSubcategories, clearFilters, owner } = useDashboardFilters()
 
   // Data state
@@ -111,7 +115,7 @@ export default function Transactions() {
   // Filter / pagination state
   // The view (page, filters, date chip) survives leaving and re-entering the
   // page: it is kept per session in sessionStorage.
-  const viewKey = `tx-view:v1:${sessionId || ''}`
+  const viewKey = `tx-view:v1:${sessionId || ''}${month ? `:${monthBasis}:${month}` : ''}`
   const [saved] = useState(() => {
     try {
       return JSON.parse(sessionStorage.getItem(viewKey) || 'null') as {
@@ -160,13 +164,14 @@ export default function Transactions() {
   const [exportError, setExportError] = useState<string | null>(null)
 
   const apiFilters = useMemo(() => ({
+    ...(month && { month, date_type: monthBasis }),
     category: category || filters.category,
     search: filters.search,
     start_date: filters.startDate,
     end_date: filters.endDate,
     min_amount: filters.minAmount,
     max_amount: filters.maxAmount,
-  } satisfies TransactionFilters), [category, filters])
+  } satisfies TransactionFilters), [category, filters, month, monthBasis])
 
   // ---- Effect 1: fetch categories once on sessionId change ----------------
   useEffect(() => {
@@ -286,13 +291,25 @@ export default function Transactions() {
 
   // ---- Handlers -----------------------------------------------------------
 
+  const clearDashboardMonth = useCallback(() => {
+    if (!month) return
+    setSearchParams(current => {
+      const next = new URLSearchParams(current)
+      next.delete('month')
+      next.delete('date_type')
+      return next
+    }, { replace: true })
+    setPage(1)
+  }, [month, setSearchParams])
+
   const handleFilterChange = useCallback(
     (newFilters: { search?: string; category?: string; startDate?: string; endDate?: string; minAmount?: number; maxAmount?: number }) => {
       setFilters(newFilters)
       setPage(1)
       setActiveDateChip('all')
+      if (newFilters.startDate || newFilters.endDate) clearDashboardMonth()
     },
-    [],
+    [clearDashboardMonth],
   )
 
   const handleDateChipClick = useCallback(
@@ -305,8 +322,9 @@ export default function Transactions() {
         endDate: range.endDate,
       }))
       setPage(1)
+      clearDashboardMonth()
     },
-    [],
+    [clearDashboardMonth],
   )
 
   const handlePageChange = useCallback((newPage: number) => {
@@ -367,6 +385,12 @@ export default function Transactions() {
         subtitle="חפשו עסקאות ועדכנו את הסיווג שלהן"
         icon={Receipt}
       />
+      {month && (
+        <div className="active-filter-banner">
+          <span><strong>{formatMonthLabel(month)}</strong> · {monthBasis === 'billing' ? 'לפי תאריך חיוב' : 'לפי תאריך עסקה'}</span>
+          <button type="button" className="filter-clear-button" onClick={clearDashboardMonth}>הצגת כל החודשים</button>
+        </div>
+      )}
 
       <details className="tx-analysis">
         <summary>סיכום וניתוח לפי קטגוריה</summary>
