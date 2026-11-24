@@ -7,6 +7,8 @@ import pandas as pd
 from io import BytesIO
 from typing import Optional
 
+from .data_processor import drop_neutral_financing
+
 # Column order in the exported workbook. Optional columns are included only
 # when the session data actually carries them, so slimmer datasets still export.
 _EXPORT_COLUMNS = ['תאריך', 'תאריך_חיוב', 'תיאור', 'קטגוריה', 'קטגוריה_משנה', 'הערות', 'סכום']
@@ -36,6 +38,34 @@ def _is_missing(value) -> bool:
         return False
 
 
+def _write_category_summary(workbook, df, header_format, amount_format):
+    """Use the ledger's income/expense totals for the filtered rows."""
+    stats = drop_neutral_financing(df).reindex(columns=['קטגוריה', _AMOUNT_COLUMN])
+    amounts = pd.to_numeric(stats[_AMOUNT_COLUMN], errors='coerce').replace(
+        [float('inf'), float('-inf')], float('nan'),
+    )
+    summary = (
+        stats.assign(הוצאות=amounts.clip(upper=0).abs(), הכנסות=amounts.clip(lower=0))
+        .groupby('קטגוריה', dropna=False, as_index=False)
+        .agg(עסקאות=(_AMOUNT_COLUMN, 'size'), הוצאות=('הוצאות', 'sum'), הכנסות=('הכנסות', 'sum'))
+        .sort_values('הוצאות', ascending=False)
+    )
+    sheet = workbook.add_worksheet('פירוט לפי קטגוריה')
+    sheet.right_to_left()
+    sheet.freeze_panes(1, 0)
+    sheet.autofilter(0, 0, len(summary), len(summary.columns) - 1)
+    sheet.write_row(0, 0, summary.columns, header_format)
+    sheet.set_column(0, 0, 28)
+    sheet.set_column(1, 1, 12)
+    sheet.set_column(2, 3, 18, amount_format)
+    for index, (category, count, expenses, income) in enumerate(summary.itertuples(index=False, name=None), start=1):
+        if not _is_missing(category):
+            sheet.write_string(index, 0, str(category))
+        sheet.write_number(index, 1, count)
+        sheet.write_number(index, 2, expenses)
+        sheet.write_number(index, 3, income)
+
+
 def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO:
     """ייצוא ל-Excel עם עיצוב מקצועי.
 
@@ -44,6 +74,7 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
     - Dates are real Excel date cells (sortable/filterable), blank when missing.
     - The sheet is right-to-left with a ₪ currency format (red for negatives).
     - Billing date, subcategory and user notes are preserved when present.
+    - The summary uses the same financing exclusions as the ledger totals.
     """
     output = BytesIO()
 
@@ -51,7 +82,7 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
     export_df = df[columns].copy()
     for col in _DATE_COLUMNS:
         if col in export_df.columns:
-            export_df[col] = pd.to_datetime(export_df[col], errors='coerce')
+            export_df[col] = pd.to_datetime(export_df[col], errors='coerce').dt.tz_localize(None)
 
     # Uploaded descriptions are untrusted. Disabling formula/URL conversion
     # prevents spreadsheet-formula injection when a value begins with =, +,
@@ -83,6 +114,9 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
             'valign': 'vcenter',
             'border': 1,
         })
+        notes_format = workbook.add_format({
+            'align': 'right', 'valign': 'top', 'border': 1, 'text_wrap': True,
+        })
         date_format = workbook.add_format({
             'align': 'right',
             'valign': 'vcenter',
@@ -112,10 +146,11 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
                     else:
                         worksheet.write_number(row_idx, col_num, float(value), amount_format)
                 else:
+                    cell_format = notes_format if col == 'הערות' else text_format
                     if _is_missing(value):
-                        worksheet.write_blank(row_idx, col_num, None, text_format)
+                        worksheet.write_blank(row_idx, col_num, None, cell_format)
                     else:
-                        worksheet.write(row_idx, col_num, str(value), text_format)
+                        worksheet.write_string(row_idx, col_num, str(value), cell_format)
 
         # Hebrew RTL layout, readable on screen, and fits one page wide when
         # printed so the amount column never spills onto a second page.
@@ -127,6 +162,8 @@ def export_to_excel(df: pd.DataFrame, filters: Optional[dict] = None) -> BytesIO
         worksheet.fit_to_pages(1, 0)
         for col_num, col in enumerate(columns):
             worksheet.set_column(col_num, col_num, _COLUMN_WIDTHS.get(col, 18))
+
+        _write_category_summary(workbook, export_df, header_format, amount_format)
 
     output.seek(0)
     return output

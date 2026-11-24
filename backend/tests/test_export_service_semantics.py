@@ -128,3 +128,19 @@ def test_financing_rows_stay_in_export():
     cat_col = headers.index('קטגוריה') + 1
     cats = [ws.cell(row=r, column=cat_col).value for r in range(2, 7)]
     assert cats.count('תנועות מימון') == 2
+
+
+def test_summary_uses_ledger_totals_and_notes_are_literal_and_wrapped():
+    df = _frame()
+    df.loc[1, 'הערות'] = '{=1+1}'
+    wb = load_workbook(export_to_excel(df))
+    assert list(wb['פירוט לפי קטגוריה'].values) == [
+        ('קטגוריה', 'עסקאות', 'הוצאות', 'הכנסות'),
+        ('אוכל', 1, 87.9, 0),
+        ('שונות', 1, 10, 0),
+        ('הכנסות', 1, 0, 18000),
+    ]
+    assert wb['פירוט לפי קטגוריה'].sheet_view.rightToLeft
+    assert wb['עסקאות']['F3'].value == '{=1+1}'
+    assert wb['עסקאות']['F3'].data_type == 's'
+    assert wb['עסקאות']['F3'].alignment.wrap_text

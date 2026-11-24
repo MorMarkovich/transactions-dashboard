@@ -68,3 +68,32 @@ async def test_export_combines_search_amount_and_dates(client):
     })
     assert resp.status_code == 200
     assert _descriptions(resp.content) == ['סופר קטן']
+
+
+@pytest.mark.asyncio
+async def test_export_includes_current_notes_and_all_matches_beyond_the_current_page(client):
+    frame = _frame()
+    frame['id'] = [1, 2, 3, 4]
+    frame['קטגוריה_משנה'] = ['סופרים', 'סופרים', '', '']
+    sessions['exp'] = frame
+    note = 'קניות לשבוע\nהחזר חלקי'
+    saved = await client.post('/api/transactions/note', json={
+        'session_id': 'exp', 'transaction_id': 2, 'notes': note,
+    })
+    assert saved.status_code == 200
+
+    params = {'sessionId': 'exp', 'search': 'סופר', 'page_size': 1}
+    ledger = await client.get('/api/transactions', params=params)
+    assert ledger.status_code == 200
+    assert ledger.json()['total'] == 2
+    assert len(ledger.json()['transactions']) == 1
+
+    response = await client.get('/api/export', params=params)
+    assert response.status_code == 200
+    workbook = load_workbook(io.BytesIO(response.content))
+    transactions = list(workbook['עסקאות'].values)
+    headers = transactions[0]
+    assert [row[headers.index('תיאור')] for row in transactions[1:]] == ['סופר קטן', 'סופר גדול']
+    assert transactions[1][headers.index('קטגוריה_משנה')] == 'סופרים'
+    assert transactions[1][headers.index('הערות')] == note
+    assert list(workbook['פירוט לפי קטגוריה'].values)[1:] == [('מזון', 2, 1000, 0)]

@@ -2099,8 +2099,7 @@ def export_transactions(
         if max_amount is not None:
             df = df[df['סכום_מוחלט'] <= max_amount]
 
-    # Export
-    excel_buffer = export_to_excel(df)
+    excel_buffer = export_to_excel(df.sort_values(by='תאריך', ascending=False))
     
     return StreamingResponse(
         BytesIO(excel_buffer.getvalue()),

@@ -19,6 +19,7 @@ interface AdvancedFiltersProps {
   onExport?: () => void
   categories: string[]
   loading?: boolean
+  exporting?: boolean
   showCategory?: boolean
   /** Filters to start from (restored view when coming back to the page). */
   initial?: {
@@ -57,6 +58,7 @@ export default function AdvancedFilters({
   onExport,
   categories,
   loading = false,
+  exporting = false,
   showCategory = true,
   initial,
   value,
@@ -272,13 +274,15 @@ export default function AdvancedFilters({
         {/* Export */}
         {onExport && (
           <Button
+            type="button"
             variant="secondary"
             size="sm"
             icon={<Download size={14} />}
             onClick={onExport}
             disabled={loading}
+            loading={exporting}
           >
-            ייצוא
+            {exporting ? 'מכין קובץ אקסל…' : 'ייצוא לאקסל'}
           </Button>
         )}
       </div>
